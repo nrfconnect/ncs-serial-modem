@@ -5,7 +5,7 @@
  */
 
 #include <stdlib.h>
-#include <modem/modem_slm.h>
+#include <modem_slm.h>
 #include <zephyr/logging/log.h>
 
 LOG_MODULE_REGISTER(app, CONFIG_LOG_DEFAULT_LEVEL);
@@ -26,7 +26,7 @@ void slm_shell_data_indication(const uint8_t *data, size_t datalen)
 	LOG_INF("Data received (len=%d): %.*s", datalen, datalen, (const char *)data);
 }
 
-#if (CONFIG_MODEM_SLM_INDICATE_PIN >= 0)
+#if (CONFIG_SM_HOST_INDICATE_PIN >= 0)
 void slm_shell_indication_handler(void)
 {
 	int err;
@@ -37,7 +37,7 @@ void slm_shell_indication_handler(void)
 		LOG_ERR("Failed to toggle power pin");
 	}
 }
-#endif /* CONFIG_MODEM_SLM_INDICATE_PIN */
+#endif /* CONFIG_SM_HOST_INDICATE_PIN */
 
 int main(void)
 {
@@ -50,12 +50,12 @@ int main(void)
 		LOG_ERR("Failed to initialize SLM: %d", err);
 	}
 
-#if (CONFIG_MODEM_SLM_INDICATE_PIN >= 0)
+#if (CONFIG_SM_HOST_INDICATE_PIN >= 0)
 	err = modem_slm_register_ind(slm_shell_indication_handler, true);
 	if (err) {
 		LOG_ERR("Failed to register indication: %d", err);
 	}
-#endif /* CONFIG_MODEM_SLM_INDICATE_PIN */
+#endif /* CONFIG_SM_HOST_INDICATE_PIN */
 
 	return 0;
 }

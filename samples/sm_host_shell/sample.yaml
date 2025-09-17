@@ -21,7 +21,7 @@ tests:
     sysbuild: true
     build_only: true
     extra_configs:
-      - CONFIG_MODEM_SLM_INDICATE_PIN=-1
+      - CONFIG_SM_HOST_INDICATE_PIN=-1
     platform_allow:
       - nrf52840dk/nrf52840
       - nrf5340dk/nrf5340/cpuapp
