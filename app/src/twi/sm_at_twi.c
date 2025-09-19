@@ -12,7 +12,7 @@
 #include "sm_at_host.h"
 #include "sm_at_twi.h"
 
-LOG_MODULE_REGISTER(slm_twi, CONFIG_SLM_LOG_LEVEL);
+LOG_MODULE_REGISTER(slm_twi, CONFIG_SM_LOG_LEVEL);
 
 #define TWI_ADDR_LEN		2
 #define TWI_DATA_LEN		255

@@ -10,7 +10,7 @@ CMUX AT commands
 This page describes CMUX-related AT commands.
 
 The GSM 0710 multiplexer protocol (CMUX) enables multiplexing multiple data streams through a single serial link, setting up one channel per data stream.
-For example, it can be used to exchange AT data and have a :ref:`Point-to-Point Protocol (PPP) <CONFIG_SLM_PPP>` link up at the same time on a single UART.
+For example, it can be used to exchange AT data and have a :ref:`Point-to-Point Protocol (PPP) <CONFIG_SM_PPP>` link up at the same time on a single UART.
 
 .. note::
 
@@ -60,14 +60,14 @@ Syntax
 
 The ``<AT_channel>`` parameter is an integer used to indicate the address of the AT channel.
 The AT channel denotes the CMUX channel where AT data (commands, responses, notifications) is exchanged.
-If specified, it must be ``1``, unless :ref:`PPP <CONFIG_SLM_PPP>` is enabled.
+If specified, it must be ``1``, unless :ref:`PPP <CONFIG_SM_PPP>` is enabled.
 If PPP is enabled, it can also be ``2`` (to allocate the first CMUX channel to PPP).
 If not specified, the previously used address is used.
 If no address has been previously specified, the default address is ``1``.
 
 .. note::
 
-   If there is more than one CMUX channel (such as when using :ref:`PPP <CONFIG_SLM_PPP>`), the non-AT channels will automatically get assigned to addresses other than the one used for the AT channel.
+   If there is more than one CMUX channel (such as when using :ref:`PPP <CONFIG_SM_PPP>`), the non-AT channels will automatically get assigned to addresses other than the one used for the AT channel.
    For example, if PPP is enabled and CMUX is started with the ``AT#XCMUX=2`` command, the AT channel will be assigned to address ``2`` and the PPP channel to address ``1``.
 
 An ``OK`` response is sent if the command is accepted, after which CMUX is started.
@@ -102,7 +102,7 @@ Response syntax
 * The ``<AT_channel>`` parameter indicates the address of the AT channel.
   It is between ``1`` and ``<channel_count>``.
 * The ``<channel_count>`` parameter is the total number of CMUX channels.
-  It depends on what features are enabled (for example, :ref:`PPP <CONFIG_SLM_PPP>`).
+  It depends on what features are enabled (for example, :ref:`PPP <CONFIG_SM_PPP>`).
 
 Example
 -------

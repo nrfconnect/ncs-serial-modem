@@ -10,7 +10,7 @@
 #include "sm_uart_handler.h"
 #include "sm_util.h"
 #include "sm_ctrl_pin.h"
-#if defined(CONFIG_SLM_PPP)
+#if defined(CONFIG_SM_PPP)
 #include "sm_ppp.h"
 #endif
 #include <assert.h>
@@ -21,7 +21,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/pm/device.h>
 #include <zephyr/sys/ring_buffer.h>
-LOG_MODULE_REGISTER(slm_at_host, CONFIG_SLM_LOG_LEVEL);
+LOG_MODULE_REGISTER(slm_at_host, CONFIG_SM_LOG_LEVEL);
 
 #define SLM_SYNC_STR     "Ready\r\n"
 #define SLM_SYNC_ERR_STR "INIT ERROR\r\n"
@@ -48,7 +48,7 @@ K_MUTEX_DEFINE(mutex_mode); /* Protects the operation mode variables. */
 uint8_t slm_at_buf[SLM_AT_MAX_CMD_LEN + 1];
 uint8_t slm_data_buf[SLM_MAX_MESSAGE_SIZE];
 
-RING_BUF_DECLARE(data_rb, CONFIG_SLM_DATAMODE_BUF_SIZE);
+RING_BUF_DECLARE(data_rb, CONFIG_SM_DATAMODE_BUF_SIZE);
 static uint8_t quit_str_partial_match;
 K_MUTEX_DEFINE(mutex_data); /* Protects the data_rb and quit_str_partial_match. */
 
@@ -137,7 +137,7 @@ static void raw_send(uint8_t flags)
 	/* NOTE ring_buf_get_claim() might not return full size */
 	do {
 		size_all = ring_buf_size_get(&data_rb);
-		size_send = ring_buf_get_claim(&data_rb, &data, CONFIG_SLM_DATAMODE_BUF_SIZE);
+		size_send = ring_buf_get_claim(&data_rb, &data, CONFIG_SM_DATAMODE_BUF_SIZE);
 		if (size_all != size_send) {
 			flags |= SLM_DATAMODE_FLAGS_MORE_DATA;
 		}
@@ -166,7 +166,7 @@ static void raw_send(uint8_t flags)
 			}
 			k_mutex_unlock(&mutex_mode);
 
-#if defined(CONFIG_SLM_DATAMODE_URC)
+#if defined(CONFIG_SM_DATAMODE_URC)
 			rsp_send("\r\n#XDATAMODE: %d\r\n", size_finish);
 #endif
 		} else {
@@ -205,7 +205,7 @@ static void raw_send_scheduled(struct k_work *work)
 
 	/* Interpret partial quit_str as data, if we send due to timeout. */
 	if (quit_str_partial_match > 0) {
-		write_data_buf(CONFIG_SLM_DATAMODE_TERMINATOR, quit_str_partial_match);
+		write_data_buf(CONFIG_SM_DATAMODE_TERMINATOR, quit_str_partial_match);
 		quit_str_partial_match = 0;
 	}
 
@@ -232,7 +232,7 @@ static size_t raw_rx_handler(const uint8_t *buf, const size_t len)
 {
 	k_mutex_lock(&mutex_data, K_FOREVER);
 
-	const char *const quit_str = CONFIG_SLM_DATAMODE_TERMINATOR;
+	const char *const quit_str = CONFIG_SM_DATAMODE_TERMINATOR;
 	size_t processed;
 	bool quit_str_match = false;
 	uint8_t quit_str_match_count = quit_str_partial_match;
@@ -622,14 +622,14 @@ static size_t cmd_rx_handler(const uint8_t *buf, const size_t len)
 		if (!inside_quotes) {
 			switch (buf[processed]) {
 			case '\r':
-				if (IS_ENABLED(CONFIG_SLM_CR_TERMINATION)) {
+				if (IS_ENABLED(CONFIG_SM_CR_TERMINATION)) {
 					send = true;
 				}
 				break;
 			case '\n':
-				if (IS_ENABLED(CONFIG_SLM_LF_TERMINATION)) {
+				if (IS_ENABLED(CONFIG_SM_LF_TERMINATION)) {
 					send = true;
-				} else if (IS_ENABLED(CONFIG_SLM_CR_LF_TERMINATION)) {
+				} else if (IS_ENABLED(CONFIG_SM_CR_LF_TERMINATION)) {
 					if (at_cmd_len > 0 && prev_character == '\r') {
 						at_cmd_len--; /* trim the CR char */
 						send = true;
@@ -676,7 +676,7 @@ static size_t cmd_rx_handler(const uint8_t *buf, const size_t len)
 /* Search for quit_str and exit datamode when one is found. */
 static size_t null_handler(const uint8_t *buf, const size_t len)
 {
-	const char *const quit_str = CONFIG_SLM_DATAMODE_TERMINATOR;
+	const char *const quit_str = CONFIG_SM_DATAMODE_TERMINATOR;
 	static size_t dropped_count;
 	static uint8_t match_count;
 
@@ -749,7 +749,7 @@ static void notification_handler(const char *notification)
 {
 	if (get_slm_mode() == SLM_AT_COMMAND_MODE && at_backend.send != NULL) {
 
-#if defined(CONFIG_SLM_PPP)
+#if defined(CONFIG_SM_PPP)
 		if (!slm_fwd_cgev_notifs
 		 && !strncmp(notification, "+CGEV: ", strlen("+CGEV: "))) {
 			/* CGEV notifications are silenced. Do not forward them. */
@@ -829,7 +829,7 @@ int enter_datamode(slm_datamode_handler_t handler)
 	datamode_handler = handler;
 	if (slm_datamode_time_limit == 0) {
 		if (slm_uart_baudrate > 0) {
-			slm_datamode_time_limit = CONFIG_SLM_UART_RX_BUF_SIZE * (8 + 1 + 1) * 1000 /
+			slm_datamode_time_limit = CONFIG_SM_UART_RX_BUF_SIZE * (8 + 1 + 1) * 1000 /
 					      slm_uart_baudrate;
 			slm_datamode_time_limit += UART_RX_MARGIN_MS;
 		} else {
@@ -878,7 +878,7 @@ bool verify_datamode_control(uint16_t time_limit, uint16_t *min_time_limit)
 		return false;
 	}
 
-	min_time = CONFIG_SLM_UART_RX_BUF_SIZE * (8 + 1 + 1) * 1000 / slm_uart_baudrate;
+	min_time = CONFIG_SM_UART_RX_BUF_SIZE * (8 + 1 + 1) * 1000 / slm_uart_baudrate;
 	min_time += UART_RX_MARGIN_MS;
 
 	if (time_limit > 0 && min_time > time_limit) {
@@ -982,7 +982,7 @@ int slm_at_host_init(void)
 		return -EFAULT;
 	}
 
-	if (!IS_ENABLED(CONFIG_SLM_SKIP_READY_MSG)) {
+	if (!IS_ENABLED(CONFIG_SM_SKIP_READY_MSG)) {
 		/* Send Ready string to indicate that AT host is ready */
 		err = slm_at_send_str(SLM_SYNC_STR);
 		if (err) {

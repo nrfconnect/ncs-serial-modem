@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 
-config SLM_HTTPC
+config SM_HTTPC
 	bool "HTTP client support in SLM"
 	default y
 	select HTTP_CLIENT

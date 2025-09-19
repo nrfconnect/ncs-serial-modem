@@ -15,7 +15,7 @@
 #include "sm_at_host.h"
 #include "sm_at_mqtt.h"
 
-LOG_MODULE_REGISTER(slm_mqtt, CONFIG_SLM_LOG_LEVEL);
+LOG_MODULE_REGISTER(slm_mqtt, CONFIG_SM_LOG_LEVEL);
 
 #define MQTT_MAX_TOPIC_LEN	128
 #define MQTT_MAX_CID_LEN	64
@@ -64,8 +64,8 @@ static struct k_thread mqtt_thread;
 static K_THREAD_STACK_DEFINE(mqtt_thread_stack, THREAD_STACK_SIZE);
 
 /* Buffers for MQTT client. */
-static uint8_t rx_buffer[CONFIG_SLM_MQTTC_MESSAGE_BUFFER_LEN];
-static uint8_t tx_buffer[CONFIG_SLM_MQTTC_MESSAGE_BUFFER_LEN];
+static uint8_t rx_buffer[CONFIG_SM_MQTTC_MESSAGE_BUFFER_LEN];
+static uint8_t tx_buffer[CONFIG_SM_MQTTC_MESSAGE_BUFFER_LEN];
 
 /* The mqtt client struct */
 static struct mqtt_client client;

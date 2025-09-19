@@ -16,7 +16,7 @@
 #include "sm_util.h"
 #include "sm_ctrl_pin.h"
 
-LOG_MODULE_REGISTER(slm_ctrl_pin, CONFIG_SLM_LOG_LEVEL);
+LOG_MODULE_REGISTER(slm_ctrl_pin, CONFIG_SM_LOG_LEVEL);
 
 #define POWER_PIN_DEBOUNCE_MS 50
 
@@ -25,8 +25,8 @@ static const struct device *gpio_dev = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 #if POWER_PIN_IS_ENABLED
 static struct gpio_callback gpio_cb;
 #else
-BUILD_ASSERT(!IS_ENABLED(CONFIG_SLM_START_SLEEP),
-	"CONFIG_SLM_START_SLEEP requires CONFIG_SLM_POWER_PIN to be defined.");
+BUILD_ASSERT(!IS_ENABLED(CONFIG_SM_START_SLEEP),
+	"CONFIG_SM_START_SLEEP requires CONFIG_SM_POWER_PIN to be defined.");
 #endif
 
 #if INDICATE_PIN_IS_ENABLED
@@ -39,7 +39,7 @@ static atomic_t callback_wakeup_running;
 static int ext_xtal_control(bool xtal_on)
 {
 	int err = 0;
-#if defined(CONFIG_SLM_EXTERNAL_XTAL)
+#if defined(CONFIG_SM_EXTERNAL_XTAL)
 	static struct onoff_manager *clk_mgr;
 
 	if (xtal_on) {
@@ -89,7 +89,7 @@ static int configure_gpio(gpio_pin_t pin, gpio_flags_t flags)
 static int configure_power_pin_interrupt(gpio_callback_handler_t handler, gpio_flags_t flags)
 {
 	int err;
-	const gpio_pin_t pin = CONFIG_SLM_POWER_PIN;
+	const gpio_pin_t pin = CONFIG_SM_POWER_PIN;
 
 	/* First disable the previously configured interrupt. Somehow when in idle mode if
 	 * the wake-up interrupt is configured to be on an edge the power consumption
@@ -144,7 +144,7 @@ static void power_pin_callback_poweroff(const struct device *dev,
 
 static void indicate_stop(void)
 {
-	if (gpio_pin_set(gpio_dev, CONFIG_SLM_INDICATE_PIN, 0) != 0) {
+	if (gpio_pin_set(gpio_dev, CONFIG_SM_INDICATE_PIN, 0) != 0) {
 		LOG_WRN("GPIO_0 set error");
 	}
 	LOG_DBG("Stop indicating");
@@ -260,7 +260,7 @@ void slm_ctrl_pin_enter_sleep_no_uninit(void)
 {
 	LOG_INF("Entering sleep.");
 	LOG_PANIC();
-	nrf_gpio_cfg_sense_set(CONFIG_SLM_POWER_PIN, NRF_GPIO_PIN_SENSE_LOW);
+	nrf_gpio_cfg_sense_set(CONFIG_SM_POWER_PIN, NRF_GPIO_PIN_SENSE_LOW);
 
 	k_sleep(K_MSEC(100));
 
@@ -279,11 +279,11 @@ int slm_ctrl_pin_indicate(void)
 		return 0;
 	}
 	LOG_DBG("Start indicating");
-	err = gpio_pin_set(gpio_dev, CONFIG_SLM_INDICATE_PIN, 1);
+	err = gpio_pin_set(gpio_dev, CONFIG_SM_INDICATE_PIN, 1);
 	if (err) {
 		LOG_ERR("GPIO_0 set error: %d", err);
 	} else {
-		k_work_reschedule(&indicate_work, K_MSEC(CONFIG_SLM_INDICATE_TIME));
+		k_work_reschedule(&indicate_work, K_MSEC(CONFIG_SM_INDICATE_TIME));
 	}
 #endif
 	return err;
@@ -295,11 +295,11 @@ void slm_ctrl_pin_enter_shutdown(void)
 
 	/* De-configure GPIOs */
 #if POWER_PIN_IS_ENABLED
-	gpio_pin_interrupt_configure(gpio_dev, CONFIG_SLM_POWER_PIN, GPIO_INT_DISABLE);
-	gpio_pin_configure(gpio_dev, CONFIG_SLM_POWER_PIN, GPIO_DISCONNECTED);
+	gpio_pin_interrupt_configure(gpio_dev, CONFIG_SM_POWER_PIN, GPIO_INT_DISABLE);
+	gpio_pin_configure(gpio_dev, CONFIG_SM_POWER_PIN, GPIO_DISCONNECTED);
 #endif
 #if INDICATE_PIN_IS_ENABLED
-	gpio_pin_configure(gpio_dev, CONFIG_SLM_INDICATE_PIN, GPIO_DISCONNECTED);
+	gpio_pin_configure(gpio_dev, CONFIG_SM_INDICATE_PIN, GPIO_DISCONNECTED);
 #endif
 
 	k_sleep(K_MSEC(100));
@@ -316,11 +316,11 @@ void slm_ctrl_pin_init_gpios(void)
 	}
 
 #if POWER_PIN_IS_ENABLED
-	(void)configure_gpio(CONFIG_SLM_POWER_PIN, GPIO_INPUT | GPIO_PULL_UP | GPIO_ACTIVE_LOW);
+	(void)configure_gpio(CONFIG_SM_POWER_PIN, GPIO_INPUT | GPIO_PULL_UP | GPIO_ACTIVE_LOW);
 #endif
 
 #if INDICATE_PIN_IS_ENABLED
-	(void)configure_gpio(CONFIG_SLM_INDICATE_PIN, GPIO_OUTPUT_INACTIVE | GPIO_ACTIVE_LOW);
+	(void)configure_gpio(CONFIG_SM_INDICATE_PIN, GPIO_OUTPUT_INACTIVE | GPIO_ACTIVE_LOW);
 #endif
 }
 

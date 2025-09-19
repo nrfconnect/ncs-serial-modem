@@ -10,7 +10,7 @@
 #include "sm_at_host.h"
 #include "sm_at_cmng.h"
 
-LOG_MODULE_REGISTER(slm_native_tls, CONFIG_SLM_LOG_LEVEL);
+LOG_MODULE_REGISTER(slm_native_tls, CONFIG_SM_LOG_LEVEL);
 
 /* Stores certificates and other credentials in the Zephyr settings storage.
  * Storage is organized as slm-keys/<sec_tag>/<type>.
@@ -22,12 +22,12 @@ LOG_MODULE_REGISTER(slm_native_tls, CONFIG_SLM_LOG_LEVEL);
 
 /* Loaded for TLS credential management. */
 struct tls_cred_buf {
-	uint8_t buf[CONFIG_SLM_NATIVE_TLS_CREDENTIAL_BUFFER_SIZE]; /* Credentials. */
+	uint8_t buf[CONFIG_SM_NATIVE_TLS_CREDENTIAL_BUFFER_SIZE]; /* Credentials. */
 	sec_tag_t sec_tag; /* sec_tag of the credentials in buf. */
 	uint8_t type_flags; /* Credential types loaded in buf (1 << slm_cmng_type). */
 };
-static struct tls_cred_buf cred_buf[CONFIG_SLM_NATIVE_TLS_CREDENTIAL_BUFFER_COUNT] = {
-	[0 ... CONFIG_SLM_NATIVE_TLS_CREDENTIAL_BUFFER_COUNT - 1] = {
+static struct tls_cred_buf cred_buf[CONFIG_SM_NATIVE_TLS_CREDENTIAL_BUFFER_COUNT] = {
+	[0 ... CONFIG_SM_NATIVE_TLS_CREDENTIAL_BUFFER_COUNT - 1] = {
 		.sec_tag = SEC_TAG_TLS_INVALID
 	}
 };
@@ -227,8 +227,8 @@ int slm_native_tls_store_credential(sec_tag_t sec_tag, uint16_t type, const void
 	/* Verify that the stored credentials could be loaded. */
 	const uint8_t null_termination = type <= SLM_AT_CMNG_TYPE_CLIENT_KEY ? 1 : 0;
 
-	if ((cred_len + len + null_termination) > CONFIG_SLM_NATIVE_TLS_CREDENTIAL_BUFFER_SIZE) {
-		LOG_ERR("Increase CONFIG_SLM_NATIVE_TLS_CREDENTIAL_BUFFER_SIZE.");
+	if ((cred_len + len + null_termination) > CONFIG_SM_NATIVE_TLS_CREDENTIAL_BUFFER_SIZE) {
+		LOG_ERR("Increase CONFIG_SM_NATIVE_TLS_CREDENTIAL_BUFFER_SIZE.");
 		return -E2BIG;
 	}
 

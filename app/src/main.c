@@ -18,7 +18,7 @@
 #include "sm_util.h"
 #include "sm_ctrl_pin.h"
 
-LOG_MODULE_REGISTER(slm, CONFIG_SLM_LOG_LEVEL);
+LOG_MODULE_REGISTER(slm, CONFIG_SM_LOG_LEVEL);
 
 #define SLM_WQ_STACK_SIZE	KB(4)
 #define SLM_WQ_PRIORITY		K_LOWEST_APPLICATION_THREAD_PRIO
@@ -137,7 +137,7 @@ static void check_app_fota_status(void)
 int lte_auto_connect(void)
 {
 	int err = 0;
-#if defined(CONFIG_SLM_AUTO_CONNECT)
+#if defined(CONFIG_SM_AUTO_CONNECT)
 	int ret;
 	int n;
 	int stat;
@@ -191,7 +191,7 @@ int lte_auto_connect(void)
 		LOG_ERR("Failed to turn on radio: %d", err);
 		return err;
 	}
-#endif /* CONFIG_SLM_AUTO_CONNECT */
+#endif /* CONFIG_SM_AUTO_CONNECT */
 
 	return err;
 }
@@ -235,7 +235,7 @@ int main(void)
 		LOG_WRN("Failed to init slm settings");
 	}
 
-#if defined(CONFIG_SLM_FULL_FOTA)
+#if defined(CONFIG_SM_FULL_FOTA)
 	if (slm_modem_full_fota) {
 		slm_finish_modem_full_fota();
 		slm_fota_type = DFU_TARGET_IMAGE_TYPE_FULL_MODEM;
@@ -256,13 +256,13 @@ int main(void)
 
 	check_app_fota_status();
 
-#if defined(CONFIG_SLM_START_SLEEP)
+#if defined(CONFIG_SM_START_SLEEP)
 
 	if (!(rr & NRF_POWER_RESETREAS_OFF_MASK)) { /* DETECT signal from GPIO */
 
 		slm_ctrl_pin_enter_sleep_no_uninit();
 	}
-#endif /* CONFIG_SLM_START_SLEEP */
+#endif /* CONFIG_SM_START_SLEEP */
 
 	ret = start_execute();
 exit:

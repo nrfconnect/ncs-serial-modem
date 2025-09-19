@@ -12,7 +12,7 @@
 #include "sm_at_gpio.h"
 #include "sm_at_host.h"
 
-LOG_MODULE_REGISTER(slm_gpio, CONFIG_SLM_LOG_LEVEL);
+LOG_MODULE_REGISTER(slm_gpio, CONFIG_SM_LOG_LEVEL);
 
 static const struct device *gpio_dev = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 static sys_slist_t slm_gpios = SYS_SLIST_STATIC_INIT(&slm_gpios);

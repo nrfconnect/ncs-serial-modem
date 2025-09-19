@@ -69,7 +69,7 @@ void slm_fota_post_process(void);
  * This is to be called after the application or modem
  * has been rebooted and a full modem firmware update is ongoing.
  */
-#if defined(CONFIG_SLM_FULL_FOTA)
+#if defined(CONFIG_SM_FULL_FOTA)
 void slm_finish_modem_full_fota(void);
 #endif
 

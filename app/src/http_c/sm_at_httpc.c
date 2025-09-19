@@ -14,11 +14,11 @@
 #include "sm_at_host.h"
 #include "sm_at_httpc.h"
 #include "sm_util.h"
-#if defined(CONFIG_SLM_NATIVE_TLS)
+#if defined(CONFIG_SM_NATIVE_TLS)
 #include "sm_native_tls.h"
 #endif
 
-LOG_MODULE_REGISTER(slm_httpc, CONFIG_SLM_LOG_LEVEL);
+LOG_MODULE_REGISTER(slm_httpc, CONFIG_SM_LOG_LEVEL);
 
 #define HTTPC_METHOD_LEN	20
 #define HTTPC_RES_LEN		256
@@ -237,7 +237,7 @@ static int do_http_connect(void)
 
 	/* Set socket options */
 	if (httpc.sec_tag != SEC_TAG_TLS_INVALID) {
-#if defined(CONFIG_SLM_NATIVE_TLS)
+#if defined(CONFIG_SM_NATIVE_TLS)
 		ret = slm_native_tls_load_credentials(httpc.sec_tag);
 		if (ret < 0) {
 			LOG_ERR("Failed to load sec tag: %d (%d)", httpc.sec_tag, ret);
@@ -280,7 +280,7 @@ static int do_http_connect(void)
 			ret = -errno;
 			goto exit_cli;
 		}
-		if (!IS_ENABLED(CONFIG_SLM_NATIVE_TLS)) {
+		if (!IS_ENABLED(CONFIG_SM_NATIVE_TLS)) {
 			int session_cache = TLS_SESSION_CACHE_ENABLED;
 
 			ret = zsock_setsockopt(httpc.fd, SOL_TLS, TLS_SESSION_CACHE, &session_cache,

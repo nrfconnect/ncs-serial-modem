@@ -17,7 +17,7 @@
 #include "sm_util.h"
 #include "sm_at_carrier.h"
 
-LOG_MODULE_REGISTER(slm_carrier, CONFIG_SLM_LOG_LEVEL);
+LOG_MODULE_REGISTER(slm_carrier, CONFIG_SM_LOG_LEVEL);
 
 /* Static variable to report the memory free resource. */
 static int m_mem_free;
@@ -150,7 +150,7 @@ int lwm2m_carrier_event_handler(const lwm2m_carrier_event_t *event)
 	int err = 0;
 
 	switch (event->type) {
-#if defined(CONFIG_SLM_CARRIER_AUTO_CONTROL)
+#if defined(CONFIG_SM_CARRIER_AUTO_CONTROL)
 	case LWM2M_CARRIER_EVENT_LTE_LINK_UP:
 		LOG_DBG("LWM2M_CARRIER_EVENT_LTE_LINK_UP");
 		k_work_reschedule(&reconnect_work, SLM_UART_RESPONSE_DELAY);
@@ -194,7 +194,7 @@ int lwm2m_carrier_event_handler(const lwm2m_carrier_event_t *event)
 		/* Return -1 to defer the reboot until the application decides to do so. */
 		err = -1;
 		break;
-#endif /* CONFIG_SLM_CARRIER_AUTO_CONTROL */
+#endif /* CONFIG_SM_CARRIER_AUTO_CONTROL */
 	case LWM2M_CARRIER_EVENT_BOOTSTRAPPED:
 		LOG_DBG("LWM2M_CARRIER_EVENT_BOOTSTRAPPED");
 		break;
@@ -238,7 +238,7 @@ int lwm2m_carrier_event_handler(const lwm2m_carrier_event_t *event)
 
 	rsp_send("\r\n#XCARRIEREVT: %d,%d\r\n", event->type, err);
 
-#if defined(CONFIG_SLM_CARRIER_AUTO_CONTROL)
+#if defined(CONFIG_SM_CARRIER_AUTO_CONTROL)
 	/* Allow time for the URC be flushed before reboot */
 	if (event->type == LWM2M_CARRIER_EVENT_REBOOT && err == 0) {
 		k_sleep(SLM_UART_RESPONSE_DELAY);
@@ -260,7 +260,7 @@ static int carrier_datamode_callback(uint8_t op, const uint8_t *data, int len, u
 			return -EOVERFLOW;
 		}
 
-		size_t size = CONFIG_SLM_CARRIER_APP_DATA_BUFFER_LEN / 2;
+		size_t size = CONFIG_SM_CARRIER_APP_DATA_BUFFER_LEN / 2;
 
 		ret = slm_util_atoh(data, len, slm_data_buf, size);
 		if (ret < 0) {
@@ -329,11 +329,11 @@ static int do_carrier_appdata_set(enum at_parser_cmd_type, struct at_parser *par
 
 	int ret = 0;
 
-	char data_ascii[CONFIG_SLM_CARRIER_APP_DATA_BUFFER_LEN] = {0};
-	size_t data_ascii_len = CONFIG_SLM_CARRIER_APP_DATA_BUFFER_LEN;
+	char data_ascii[CONFIG_SM_CARRIER_APP_DATA_BUFFER_LEN] = {0};
+	size_t data_ascii_len = CONFIG_SM_CARRIER_APP_DATA_BUFFER_LEN;
 
-	char data_hex[CONFIG_SLM_CARRIER_APP_DATA_BUFFER_LEN / 2];
-	size_t data_hex_len = CONFIG_SLM_CARRIER_APP_DATA_BUFFER_LEN / 2;
+	char data_hex[CONFIG_SM_CARRIER_APP_DATA_BUFFER_LEN / 2];
+	size_t data_hex_len = CONFIG_SM_CARRIER_APP_DATA_BUFFER_LEN / 2;
 
 	if (param_count == 3) {
 		uint16_t path[3] = { LWM2M_CARRIER_OBJECT_APP_DATA_CONTAINER, 0, 0 };
@@ -744,11 +744,11 @@ SLM_AT_CMD_CUSTOM(xcarrier_log_data, "AT#XCARRIER=\"log_data\"",
 static int do_carrier_event_log_log_data(enum at_parser_cmd_type, struct at_parser *parser,
 					 uint32_t)
 {
-	char data_ascii[CONFIG_SLM_CARRIER_APP_DATA_BUFFER_LEN] = {0};
-	size_t data_ascii_len = CONFIG_SLM_CARRIER_APP_DATA_BUFFER_LEN;
+	char data_ascii[CONFIG_SM_CARRIER_APP_DATA_BUFFER_LEN] = {0};
+	size_t data_ascii_len = CONFIG_SM_CARRIER_APP_DATA_BUFFER_LEN;
 
-	char data_hex[CONFIG_SLM_CARRIER_APP_DATA_BUFFER_LEN / 2];
-	size_t data_hex_len = CONFIG_SLM_CARRIER_APP_DATA_BUFFER_LEN / 2;
+	char data_hex[CONFIG_SM_CARRIER_APP_DATA_BUFFER_LEN / 2];
+	size_t data_hex_len = CONFIG_SM_CARRIER_APP_DATA_BUFFER_LEN / 2;
 
 	int ret = util_string_get(parser, 2, data_ascii, &data_ascii_len);
 	if (ret) {

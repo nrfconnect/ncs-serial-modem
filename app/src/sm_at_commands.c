@@ -32,44 +32,44 @@
 #include "sm_at_icmp.h"
 #include "sm_at_sms.h"
 #include "sm_at_fota.h"
-#if defined(CONFIG_SLM_NATIVE_TLS)
+#if defined(CONFIG_SM_NATIVE_TLS)
 #include "sm_at_cmng.h"
 #endif
-#if defined(CONFIG_SLM_NRF_CLOUD)
+#if defined(CONFIG_SM_NRF_CLOUD)
 #include "sm_at_nrfcloud.h"
 #endif
-#if defined(CONFIG_SLM_GNSS)
+#if defined(CONFIG_SM_GNSS)
 #include "sm_at_gnss.h"
 #endif
-#if defined(CONFIG_SLM_FTPC)
+#if defined(CONFIG_SM_FTPC)
 #include "sm_at_ftp.h"
 #endif
-#if defined(CONFIG_SLM_MQTTC)
+#if defined(CONFIG_SM_MQTTC)
 #include "sm_at_mqtt.h"
 #endif
-#if defined(CONFIG_SLM_HTTPC)
+#if defined(CONFIG_SM_HTTPC)
 #include "sm_at_httpc.h"
 #endif
-#if defined(CONFIG_SLM_TWI)
+#if defined(CONFIG_SM_TWI)
 #include "sm_at_twi.h"
 #endif
-#if defined(CONFIG_SLM_GPIO)
+#if defined(CONFIG_SM_GPIO)
 #include "sm_at_gpio.h"
 #endif
-#if defined(CONFIG_SLM_CARRIER)
+#if defined(CONFIG_SM_CARRIER)
 #include "sm_at_carrier.h"
 #endif
 #if defined(CONFIG_LWM2M_CARRIER_SETTINGS)
 #include "sm_at_carrier_cfg.h"
 #endif
-#if defined(CONFIG_SLM_PPP)
+#if defined(CONFIG_SM_PPP)
 #include "sm_ppp.h"
 #endif
-#if defined(CONFIG_SLM_CMUX)
+#if defined(CONFIG_SM_CMUX)
 #include "sm_cmux.h"
 #endif
 
-LOG_MODULE_REGISTER(slm_at, CONFIG_SLM_LOG_LEVEL);
+LOG_MODULE_REGISTER(slm_at, CONFIG_SM_LOG_LEVEL);
 
 /** @brief Shutdown modes. */
 enum sleep_modes {
@@ -113,10 +113,10 @@ static int handle_at_slmver(enum at_parser_cmd_type cmd_type, struct at_parser *
 	if (cmd_type == AT_PARSER_CMD_TYPE_SET) {
 		char *libmodem = nrf_modem_build_version();
 
-		if (strlen(CONFIG_SLM_CUSTOMER_VERSION) > 0) {
+		if (strlen(CONFIG_SM_CUSTOMER_VERSION) > 0) {
 			rsp_send("\r\n#XSLMVER: %s,\"%s\",\"%s\"\r\n",
 				 STRINGIFY(NCS_VERSION_STRING), libmodem,
-				 CONFIG_SLM_CUSTOMER_VERSION);
+				 CONFIG_SM_CUSTOMER_VERSION);
 		} else {
 			rsp_send("\r\n#XSLMVER: %s,\"%s\"\r\n",
 				 STRINGIFY(NCS_VERSION_STRING), libmodem);
@@ -230,7 +230,7 @@ static void slm_modemreset(void)
 	}
 	++step;
 
-#if defined(CONFIG_SLM_FULL_FOTA)
+#if defined(CONFIG_SM_FULL_FOTA)
 	if (slm_modem_full_fota) {
 		slm_finish_modem_full_fota();
 	}
@@ -401,7 +401,7 @@ int slm_at_init(void)
 		LOG_ERR("ICMP could not be initialized: %d", err);
 		return -EFAULT;
 	}
-#if defined(CONFIG_SLM_SMS)
+#if defined(CONFIG_SM_SMS)
 	err = slm_at_sms_init();
 	if (err) {
 		LOG_ERR("SMS could not be initialized: %d", err);
@@ -413,7 +413,7 @@ int slm_at_init(void)
 		LOG_ERR("FOTA could not be initialized: %d", err);
 		return -EFAULT;
 	}
-#if defined(CONFIG_SLM_NRF_CLOUD)
+#if defined(CONFIG_SM_NRF_CLOUD)
 	err = slm_at_nrfcloud_init();
 	if (err) {
 		/* Allow nRF Cloud initialization to fail as sometimes JWT is missing
@@ -423,49 +423,49 @@ int slm_at_init(void)
 		err = 0;
 	}
 #endif
-#if defined(CONFIG_SLM_GNSS)
+#if defined(CONFIG_SM_GNSS)
 	err = slm_at_gnss_init();
 	if (err) {
 		LOG_ERR("GNSS could not be initialized: %d", err);
 		return -EFAULT;
 	}
 #endif
-#if defined(CONFIG_SLM_FTPC)
+#if defined(CONFIG_SM_FTPC)
 	err = slm_at_ftp_init();
 	if (err) {
 		LOG_ERR("FTP could not be initialized: %d", err);
 		return -EFAULT;
 	}
 #endif
-#if defined(CONFIG_SLM_MQTTC)
+#if defined(CONFIG_SM_MQTTC)
 	err = slm_at_mqtt_init();
 	if (err) {
 		LOG_ERR("MQTT could not be initialized: %d", err);
 		return -EFAULT;
 	}
 #endif
-#if defined(CONFIG_SLM_HTTPC)
+#if defined(CONFIG_SM_HTTPC)
 	err = slm_at_httpc_init();
 	if (err) {
 		LOG_ERR("HTTP could not be initialized: %d", err);
 		return -EFAULT;
 	}
 #endif
-#if defined(CONFIG_SLM_GPIO)
+#if defined(CONFIG_SM_GPIO)
 	err = slm_at_gpio_init();
 	if (err) {
 		LOG_ERR("GPIO could not be initialized: %d", err);
 		return -EFAULT;
 	}
 #endif
-#if defined(CONFIG_SLM_TWI)
+#if defined(CONFIG_SM_TWI)
 	err = slm_at_twi_init();
 	if (err) {
 		LOG_ERR("TWI could not be initialized: %d", err);
 		return -EFAULT;
 	}
 #endif
-#if defined(CONFIG_SLM_CARRIER)
+#if defined(CONFIG_SM_CARRIER)
 	err = slm_at_carrier_init();
 	if (err) {
 		LOG_ERR("LwM2M carrier could not be initialized: %d", err);
@@ -479,10 +479,10 @@ int slm_at_init(void)
 		return -EFAULT;
 	}
 #endif
-#if defined(CONFIG_SLM_CMUX)
+#if defined(CONFIG_SM_CMUX)
 	slm_cmux_init();
 #endif
-#if defined(CONFIG_SLM_PPP)
+#if defined(CONFIG_SM_PPP)
 	err = slm_ppp_init();
 	if (err) {
 		LOG_ERR("PPP initialization failed. (%d)", err);
@@ -512,7 +512,7 @@ void slm_at_uninit(void)
 	if (err) {
 		LOG_WRN("ICMP could not be uninitialized: %d", err);
 	}
-#if defined(CONFIG_SLM_SMS)
+#if defined(CONFIG_SM_SMS)
 	err = slm_at_sms_uninit();
 	if (err) {
 		LOG_WRN("SMS could not be uninitialized: %d", err);
@@ -522,49 +522,49 @@ void slm_at_uninit(void)
 	if (err) {
 		LOG_WRN("FOTA could not be uninitialized: %d", err);
 	}
-#if defined(CONFIG_SLM_NRF_CLOUD)
+#if defined(CONFIG_SM_NRF_CLOUD)
 	err = slm_at_nrfcloud_uninit();
 	if (err) {
 		LOG_WRN("nRF Cloud could not be uninitialized: %d", err);
 	}
 #endif
-#if defined(CONFIG_SLM_GNSS)
+#if defined(CONFIG_SM_GNSS)
 	err = slm_at_gnss_uninit();
 	if (err) {
 		LOG_WRN("GNSS could not be uninitialized: %d", err);
 	}
 #endif
-#if defined(CONFIG_SLM_FTPC)
+#if defined(CONFIG_SM_FTPC)
 	err = slm_at_ftp_uninit();
 	if (err) {
 		LOG_WRN("FTP could not be uninitialized: %d", err);
 	}
 #endif
-#if defined(CONFIG_SLM_MQTTC)
+#if defined(CONFIG_SM_MQTTC)
 	err = slm_at_mqtt_uninit();
 	if (err) {
 		LOG_WRN("MQTT could not be uninitialized: %d", err);
 	}
 #endif
-#if defined(CONFIG_SLM_HTTPC)
+#if defined(CONFIG_SM_HTTPC)
 	err = slm_at_httpc_uninit();
 	if (err) {
 		LOG_WRN("HTTP could not be uninitialized: %d", err);
 	}
 #endif
-#if defined(CONFIG_SLM_TWI)
+#if defined(CONFIG_SM_TWI)
 	err = slm_at_twi_uninit();
 	if (err) {
 		LOG_ERR("TWI could not be uninit: %d", err);
 	}
 #endif
-#if defined(CONFIG_SLM_GPIO)
+#if defined(CONFIG_SM_GPIO)
 	err = slm_at_gpio_uninit();
 	if (err) {
 		LOG_ERR("GPIO could not be uninit: %d", err);
 	}
 #endif
-#if defined(CONFIG_SLM_CARRIER)
+#if defined(CONFIG_SM_CARRIER)
 	err = slm_at_carrier_uninit();
 	if (err) {
 		LOG_ERR("LwM2M carrier could not be uninitialized: %d", err);

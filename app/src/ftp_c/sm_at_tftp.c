@@ -12,7 +12,7 @@
 #include "sm_util.h"
 #include "sm_at_host.h"
 
-LOG_MODULE_REGISTER(slm_tftp, CONFIG_SLM_LOG_LEVEL);
+LOG_MODULE_REGISTER(slm_tftp, CONFIG_SM_LOG_LEVEL);
 
 /**@brief Socketopt operations. */
 enum slm_ftp_operation {

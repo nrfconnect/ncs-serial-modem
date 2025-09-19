@@ -16,11 +16,11 @@
 #include "sm_at_host.h"
 #include "sm_at_socket.h"
 #include "sm_sockopt.h"
-#if defined(CONFIG_SLM_NATIVE_TLS)
+#if defined(CONFIG_SM_NATIVE_TLS)
 #include "sm_native_tls.h"
 #endif
 
-LOG_MODULE_REGISTER(slm_sock, CONFIG_SLM_LOG_LEVEL);
+LOG_MODULE_REGISTER(slm_sock, CONFIG_SM_LOG_LEVEL);
 
 #define SLM_FDS_COUNT CONFIG_POSIX_OPEN_MAX
 #define SLM_MAX_SOCKET_COUNT (SLM_FDS_COUNT - 1)
@@ -290,7 +290,7 @@ static int do_secure_socket_open(int peer_verify)
 	}
 	sock->fd = ret;
 
-#if defined(CONFIG_SLM_NATIVE_TLS)
+#if defined(CONFIG_SM_NATIVE_TLS)
 	ret = slm_native_tls_load_credentials(sock->sec_tag);
 	if (ret < 0) {
 		LOG_ERR("Failed to load sec tag: %d (%d)", sock->sec_tag, ret);

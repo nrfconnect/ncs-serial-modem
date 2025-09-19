@@ -14,7 +14,7 @@
 #include <nrf_modem_at.h>
 #include "sm_util.h"
 
-LOG_MODULE_REGISTER(slm_util, CONFIG_SLM_LOG_LEVEL);
+LOG_MODULE_REGISTER(slm_util, CONFIG_SM_LOG_LEVEL);
 
 static bool cmd_name_has_lower(const char *cmd)
 {

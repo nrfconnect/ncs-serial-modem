@@ -19,7 +19,7 @@ The ``#XNRFCLOUD`` command controls the access to the nRF Cloud service.
 
    * You must first preconnect provision the device to nRF Cloud, using the UUID from the modem firmware as device ID.
      See `nRF Cloud Preconnect Provisioning`_ for more information.
-   * The :ref:`CONFIG_SLM_NRF_CLOUD <CONFIG_SLM_NRF_CLOUD>` Kconfig option must be enabled.
+   * The :ref:`CONFIG_SM_NRF_CLOUD <CONFIG_SM_NRF_CLOUD>` Kconfig option must be enabled.
    * The device must have access to nRF Cloud through the LTE network.
 
 Set command
@@ -232,7 +232,7 @@ The ``<wifi_pos>`` parameter can have the following integer values:
 * ``0`` - Do not include Wi-Fi access point information in the location request.
 * ``1`` - Use Wi-Fi access point information.
   The access points must be given as additional parameters to the command.
-  The minimum number of access points to provide is two (:c:macro:`NRF_CLOUD_LOCATION_WIFI_AP_CNT_MIN`), and the maximum is limited by the AT command parameter count limit (:ref:`CONFIG_SLM_AT_MAX_PARAM <CONFIG_SLM_AT_MAX_PARAM>`).
+  The minimum number of access points to provide is two (:c:macro:`NRF_CLOUD_LOCATION_WIFI_AP_CNT_MIN`), and the maximum is limited by the AT command parameter count limit (:ref:`CONFIG_SM_AT_MAX_PARAM <CONFIG_SM_AT_MAX_PARAM>`).
 
 The ``<MAC x>`` parameter is a string.
 It indicates the MAC address of a Wi-Fi access point and must be formatted as ``%02x:%02x:%02x:%02x:%02x:%02x`` (:c:macro:`WIFI_MAC_ADDR_TEMPLATE`).

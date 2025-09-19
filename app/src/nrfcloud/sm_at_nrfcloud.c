@@ -3,7 +3,7 @@
  *
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
-#if defined(CONFIG_SLM_NRF_CLOUD)
+#if defined(CONFIG_SM_NRF_CLOUD)
 
 #include <zephyr/kernel.h>
 #include <stdio.h>
@@ -18,7 +18,7 @@
 #include "sm_at_host.h"
 #include "sm_at_nrfcloud.h"
 
-LOG_MODULE_REGISTER(slm_nrfcloud, CONFIG_SLM_LOG_LEVEL);
+LOG_MODULE_REGISTER(slm_nrfcloud, CONFIG_SM_LOG_LEVEL);
 
 #define MODEM_AT_RSP \
 	"{\"appId\":\"MODEM\", \"messageType\":\"RSP\", \"data\":\"%s\"}"
@@ -54,15 +54,15 @@ static struct k_work nrfcloud_loc_req;
  * [,<n_earfcn>2, <n_phys_cell_id>2, <n_rsrp>2, <n_rsrq>2,<time_diff>2] ...
  * [,<n_earfcn>17, <n_phys_cell_id>17, <n_rsrp>17, <n_rsrq>17,<time_diff>17
  *
- * Max 17 ncell, but align with CONFIG_SLM_AT_MAX_PARAM
+ * Max 17 ncell, but align with CONFIG_SM_AT_MAX_PARAM
  * 11 number of parameters for current cell (including "%NCELLMEAS")
  * 5  number of parameters for one neighboring cell
  */
 #define MAX_PARAM_CELL   11
 #define MAX_PARAM_NCELL  5
 /* Must support at least all params for current cell plus one ncell */
-#define NCELL_CNT ((CONFIG_SLM_AT_MAX_PARAM - MAX_PARAM_CELL) / MAX_PARAM_NCELL)
-BUILD_ASSERT(NCELL_CNT > 0, "CONFIG_SLM_AT_MAX_PARAM too small");
+#define NCELL_CNT ((CONFIG_SM_AT_MAX_PARAM - MAX_PARAM_CELL) / MAX_PARAM_NCELL)
+BUILD_ASSERT(NCELL_CNT > 0, "CONFIG_SM_AT_MAX_PARAM too small");
 
 /* Neighboring cell measurements. */
 static struct lte_lc_ncell nrfcloud_ncells[NCELL_CNT];
@@ -76,7 +76,7 @@ static bool nrfcloud_ncellmeas_done;
 
 #define WIFI_APS_BEGIN_IDX 3
 BUILD_ASSERT(WIFI_APS_BEGIN_IDX + NRF_CLOUD_LOCATION_WIFI_AP_CNT_MIN
-	< CONFIG_SLM_AT_MAX_PARAM, "CONFIG_SLM_AT_MAX_PARAM too small");
+	< CONFIG_SM_AT_MAX_PARAM, "CONFIG_SM_AT_MAX_PARAM too small");
 
 /* nRF Cloud location request Wi-Fi data. */
 static struct wifi_scan_info nrfcloud_wifi_data;
@@ -785,4 +785,4 @@ int slm_at_nrfcloud_uninit(void)
 
 	return 0;
 }
-#endif /* CONFIG_SLM_NRF_CLOUD */
+#endif /* CONFIG_SM_NRF_CLOUD */

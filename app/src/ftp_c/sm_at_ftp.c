@@ -15,7 +15,7 @@
 #include "sm_at_host.h"
 #include "sm_at_ftp.h"
 
-LOG_MODULE_REGISTER(slm_ftp, CONFIG_SLM_LOG_LEVEL);
+LOG_MODULE_REGISTER(slm_ftp, CONFIG_SM_LOG_LEVEL);
 
 #define FTP_MAX_OPTION		32
 

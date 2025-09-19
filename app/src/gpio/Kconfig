@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 
-config SLM_GPIO
+config SM_GPIO
 	bool "GPIO support in SLM"
 	default y
 	depends on GPIO
