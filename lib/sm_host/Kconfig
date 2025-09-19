@@ -5,7 +5,7 @@
 #
 
 menuconfig SM_HOST
-	bool "Modem SLM Library for host MCU"
+	bool "Serial Modem Host Library"
 	depends on SERIAL
 	depends on UART_ASYNC_API
 	depends on RING_BUFFER
@@ -40,16 +40,16 @@ config SM_HOST_UART_TX_BUF_SIZE
 	  If the buffers are full, all messages will be sent synchronously.
 
 config SM_HOST_AT_CMD_RESP_MAX_SIZE
-	int "Maximum size of AT command response from SLM"
+	int "Maximum size of AT command response from Serial Modem"
 	default 2100
 	help
 	  The maximum size of the AT command response.
 
 config SM_HOST_SHELL
-	bool "SLM Shell"
+	bool "Serial Modem Host Shell"
 	depends on SHELL
 	help
-	  Adds AT command capability to shell. The shell command is "slm".
+	  Adds AT command capability to shell. The shell command is "sm".
 
 choice
 	prompt "AT command terminator"
@@ -82,16 +82,18 @@ config SM_HOST_POWER_PIN_TIME
 	int "Power pin active time"
 	default 100
 	help
-	  GPIO active time in milliseconds. This setting specifies the period length for the pin to be active.
+	  GPIO active time in milliseconds. This setting specifies
+	  the period length for the pin to be active.
 
 config SM_HOST_INDICATE_PIN
 	int "Indicate pin"
 	default -1
 	help
-	  Interface GPIO pin used by SLM to indicate that data is available or an unexpected reset has occurred.
+	  Interface GPIO pin used by Serial Modem to indicate that data is available or
+	  an unexpected reset has occurred.
 
 module = SM_HOST
-module-str = Modem SLM
+module-str = SM Host
 source "$(ZEPHYR_BASE)/subsys/logging/Kconfig.template.log_config"
 
 endif # SM_HOST

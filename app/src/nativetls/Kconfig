@@ -3,16 +3,16 @@
 #
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 
-config SLM_NATIVE_TLS
+config SM_NATIVE_TLS
 	bool "Use Zephyr's Mbed TLS for TLS connections"
 
-config SLM_NATIVE_TLS_CREDENTIAL_BUFFER_SIZE
+config SM_NATIVE_TLS_CREDENTIAL_BUFFER_SIZE
 	int "Buffer space reserved for loading credentials"
 	default 4096
 	help
 	  Buffer space available for a single sec_tag when loading credentials for Mbed TLS.
 
-config SLM_NATIVE_TLS_CREDENTIAL_BUFFER_COUNT
+config SM_NATIVE_TLS_CREDENTIAL_BUFFER_COUNT
 	int "Amount of buffers for loading credentials"
 	default 1
 	range 1 2

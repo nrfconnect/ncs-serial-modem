@@ -3,12 +3,12 @@
 #
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 
-config SLM_FTPC
-	bool "FTP client support in SLM"
+config SM_FTPC
+	bool "FTP client support"
 	default y
 	select FTP_CLIENT
 
-config SLM_TFTPC
-	bool "TFTP client support in SLM"
+config SM_TFTPC
+	bool "TFTP client support"
 	default y
 	select TFTP_LIB
