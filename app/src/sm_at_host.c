@@ -21,10 +21,10 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/pm/device.h>
 #include <zephyr/sys/ring_buffer.h>
-LOG_MODULE_REGISTER(slm_at_host, CONFIG_SM_LOG_LEVEL);
+LOG_MODULE_REGISTER(sm_at_host, CONFIG_SM_LOG_LEVEL);
 
-#define SLM_SYNC_STR     "Ready\r\n"
-#define SLM_SYNC_ERR_STR "INIT ERROR\r\n"
+#define SM_SYNC_STR     "Ready\r\n"
+#define SM_SYNC_ERR_STR "INIT ERROR\r\n"
 #define OK_STR		 "\r\nOK\r\n"
 #define ERROR_STR	 "\r\nERROR\r\n"
 #define CRLF_STR	 "\r\n"
@@ -33,20 +33,20 @@ LOG_MODULE_REGISTER(slm_at_host, CONFIG_SM_LOG_LEVEL);
 #define HEXDUMP_LIMIT    16
 
 /* Operation mode variables */
-enum slm_operation_mode {
-	SLM_AT_COMMAND_MODE,		/* AT command host or bridge */
-	SLM_DATA_MODE,			/* Raw data sending */
-	SLM_NULL_MODE			/* Discard incoming until next command */
+enum sm_operation_mode {
+	SM_AT_COMMAND_MODE,		/* AT command host or bridge */
+	SM_DATA_MODE,			/* Raw data sending */
+	SM_NULL_MODE			/* Discard incoming until next command */
 };
-static struct slm_at_backend at_backend;
-static enum slm_operation_mode at_mode;
-static slm_datamode_handler_t datamode_handler;
+static struct sm_at_backend at_backend;
+static enum sm_operation_mode at_mode;
+static sm_datamode_handler_t datamode_handler;
 static int datamode_handler_result;
-uint16_t slm_datamode_time_limit; /* Send trigger by time in data mode */
+uint16_t sm_datamode_time_limit; /* Send trigger by time in data mode */
 K_MUTEX_DEFINE(mutex_mode); /* Protects the operation mode variables. */
 
-uint8_t slm_at_buf[SLM_AT_MAX_CMD_LEN + 1];
-uint8_t slm_data_buf[SLM_MAX_MESSAGE_SIZE];
+uint8_t sm_at_buf[SM_AT_MAX_CMD_LEN + 1];
+uint8_t sm_data_buf[SM_MAX_MESSAGE_SIZE];
 
 RING_BUF_DECLARE(data_rb, CONFIG_SM_DATAMODE_BUF_SIZE);
 static uint8_t quit_str_partial_match;
@@ -55,12 +55,12 @@ K_MUTEX_DEFINE(mutex_data); /* Protects the data_rb and quit_str_partial_match. 
 static struct k_work raw_send_scheduled_work;
 
 /* global functions defined in different files */
-int slm_at_init(void);
-void slm_at_uninit(void);
+int sm_at_init(void);
+void sm_at_uninit(void);
 
-static enum slm_operation_mode get_slm_mode(void)
+static enum sm_operation_mode get_sm_mode(void)
 {
-	enum slm_operation_mode mode;
+	enum sm_operation_mode mode;
 
 	k_mutex_lock(&mutex_mode, K_FOREVER);
 	mode = at_mode;
@@ -70,29 +70,29 @@ static enum slm_operation_mode get_slm_mode(void)
 }
 
 /* Lock mutex_mode, before calling. */
-static bool set_slm_mode(enum slm_operation_mode mode)
+static bool set_sm_mode(enum sm_operation_mode mode)
 {
 	bool ret = false;
 
-	if (at_mode == SLM_AT_COMMAND_MODE) {
-		if (mode == SLM_DATA_MODE) {
+	if (at_mode == SM_AT_COMMAND_MODE) {
+		if (mode == SM_DATA_MODE) {
 			ret = true;
 		}
-	} else if (at_mode == SLM_DATA_MODE) {
-		if (mode == SLM_NULL_MODE || mode == SLM_AT_COMMAND_MODE) {
+	} else if (at_mode == SM_DATA_MODE) {
+		if (mode == SM_NULL_MODE || mode == SM_AT_COMMAND_MODE) {
 			ret = true;
 		}
-	} else if (at_mode == SLM_NULL_MODE) {
-		if (mode == SLM_AT_COMMAND_MODE || mode == SLM_NULL_MODE) {
+	} else if (at_mode == SM_NULL_MODE) {
+		if (mode == SM_AT_COMMAND_MODE || mode == SM_NULL_MODE) {
 			ret = true;
 		}
 	}
 
 	if (ret) {
-		LOG_DBG("SLM mode changed: %d -> %d", at_mode, mode);
+		LOG_DBG("SM mode changed: %d -> %d", at_mode, mode);
 		at_mode = mode;
 	} else {
-		LOG_ERR("Failed to change SLM mode: %d -> %d", at_mode, mode);
+		LOG_ERR("Failed to change SM mode: %d -> %d", at_mode, mode);
 	}
 
 	return ret;
@@ -104,9 +104,9 @@ static bool exit_datamode(void)
 
 	k_mutex_lock(&mutex_mode, K_FOREVER);
 
-	if (set_slm_mode(SLM_AT_COMMAND_MODE)) {
+	if (set_sm_mode(SM_AT_COMMAND_MODE)) {
 		if (datamode_handler) {
-			(void)datamode_handler(DATAMODE_EXIT, NULL, 0, SLM_DATAMODE_FLAGS_NONE);
+			(void)datamode_handler(DATAMODE_EXIT, NULL, 0, SM_DATAMODE_FLAGS_NONE);
 		}
 		datamode_handler = NULL;
 
@@ -117,7 +117,7 @@ static bool exit_datamode(void)
 		rsp_send("\r\n#XDATAMODE: %d\r\n", datamode_handler_result);
 		datamode_handler_result = 0;
 
-		slm_at_socket_notify_datamode_exit();
+		sm_at_socket_notify_datamode_exit();
 
 		LOG_INF("Exit datamode");
 		ret = true;
@@ -139,7 +139,7 @@ static void raw_send(uint8_t flags)
 		size_all = ring_buf_size_get(&data_rb);
 		size_send = ring_buf_get_claim(&data_rb, &data, CONFIG_SM_DATAMODE_BUF_SIZE);
 		if (size_all != size_send) {
-			flags |= SLM_DATAMODE_FLAGS_MORE_DATA;
+			flags |= SM_DATAMODE_FLAGS_MORE_DATA;
 		}
 		LOG_INF("Raw send: size_send: %d, data %p", size_send, (void *)data);
 		if (data != NULL && size_send > 0) {
@@ -192,7 +192,7 @@ static void write_data_buf(const uint8_t *buf, size_t len)
 			index += ret;
 		} else {
 			/* Buffer is full. Send data.*/
-			raw_send(SLM_DATAMODE_FLAGS_MORE_DATA);
+			raw_send(SM_DATAMODE_FLAGS_MORE_DATA);
 		}
 	}
 }
@@ -209,7 +209,7 @@ static void raw_send_scheduled(struct k_work *work)
 		quit_str_partial_match = 0;
 	}
 
-	raw_send(SLM_DATAMODE_FLAGS_NONE);
+	raw_send(SM_DATAMODE_FLAGS_NONE);
 
 	k_mutex_unlock(&mutex_data);
 }
@@ -279,7 +279,7 @@ static size_t raw_rx_handler(const uint8_t *buf, const size_t len)
 	write_data_buf(buf, processed - (quit_str_match_count - prev_quit_str_match_count));
 
 	if (quit_str_match) {
-		raw_send(SLM_DATAMODE_FLAGS_NONE);
+		raw_send(SM_DATAMODE_FLAGS_NONE);
 		(void)exit_datamode();
 		quit_str_partial_match = 0;
 	} else {
@@ -451,7 +451,7 @@ static void restore_at_backend(void)
 
 	if (err) {
 		LOG_ERR("Failed to restore AT backend. (%d) Resetting.", err);
-		slm_reset();
+		sm_reset();
 	}
 }
 
@@ -466,9 +466,9 @@ static int stop_at_backend(void)
 	return err;
 }
 
-int slm_at_set_backend(const struct slm_at_backend new_backend)
+int sm_at_set_backend(const struct sm_at_backend new_backend)
 {
-	const struct slm_at_backend old_backend = at_backend;
+	const struct sm_at_backend old_backend = at_backend;
 	int ret;
 
 	if (old_backend.start) {
@@ -492,7 +492,7 @@ int slm_at_set_backend(const struct slm_at_backend new_backend)
 	return ret;
 }
 
-static int slm_at_send_indicate(const uint8_t *data, size_t len,
+static int sm_at_send_indicate(const uint8_t *data, size_t len,
 				bool print_full_debug, bool indicate)
 {
 	int ret;
@@ -508,9 +508,9 @@ static int slm_at_send_indicate(const uint8_t *data, size_t len,
 	if (indicate) {
 		enum pm_device_state state = PM_DEVICE_STATE_OFF;
 
-		pm_device_state_get(slm_uart_dev, &state);
+		pm_device_state_get(sm_uart_dev, &state);
 		if (state != PM_DEVICE_STATE_ACTIVE) {
-			slm_ctrl_pin_indicate();
+			sm_ctrl_pin_indicate();
 		}
 	}
 
@@ -521,14 +521,14 @@ static int slm_at_send_indicate(const uint8_t *data, size_t len,
 	return ret;
 }
 
-int slm_at_send(const uint8_t *data, size_t len)
+int sm_at_send(const uint8_t *data, size_t len)
 {
-	return slm_at_send_indicate(data, len, true, false);
+	return sm_at_send_indicate(data, len, true, false);
 }
 
-int slm_at_send_str(const char *str)
+int sm_at_send_str(const char *str)
 {
-	return slm_at_send(str, strlen(str));
+	return sm_at_send(str, strlen(str));
 }
 
 static void cmd_send(uint8_t *buf, size_t cmd_length, size_t buf_size)
@@ -579,7 +579,7 @@ static void cmd_send(uint8_t *buf, size_t cmd_length, size_t buf_size)
 	buf[1] = LF;
 	if (strlen(buf) > strlen(CRLF_STR)) {
 		format_final_result(buf, strlen(buf), buf_size);
-		err = slm_at_send_str(buf);
+		err = sm_at_send_str(buf);
 		if (err) {
 			LOG_ERR("AT command response failed: %d", err);
 		}
@@ -611,7 +611,7 @@ static size_t cmd_rx_handler(const uint8_t *buf, const size_t len)
 				inside_quotes = !inside_quotes;
 			}
 			if (at_cmd_len > 0) {
-				prev_character = slm_at_buf[at_cmd_len - 1];
+				prev_character = sm_at_buf[at_cmd_len - 1];
 			} else {
 				prev_character = '\0';
 			}
@@ -641,8 +641,8 @@ static size_t cmd_rx_handler(const uint8_t *buf, const size_t len)
 
 		if (send == false) {
 			/* Write character to AT buffer, leave space for null */
-			if (at_cmd_len < sizeof(slm_at_buf) - 1) {
-				slm_at_buf[at_cmd_len] = buf[processed];
+			if (at_cmd_len < sizeof(sm_at_buf) - 1) {
+				sm_at_buf[at_cmd_len] = buf[processed];
 			}
 			at_cmd_len++;
 
@@ -656,12 +656,12 @@ static size_t cmd_rx_handler(const uint8_t *buf, const size_t len)
 	}
 
 	if (send) {
-		if (at_cmd_len > sizeof(slm_at_buf) - 1) {
+		if (at_cmd_len > sizeof(sm_at_buf) - 1) {
 			LOG_ERR("AT command buffer overflow, %d dropped", at_cmd_len);
 			rsp_send_error();
 		} else if (at_cmd_len > 0) {
-			slm_at_buf[at_cmd_len] = '\0';
-			cmd_send(slm_at_buf, at_cmd_len, sizeof(slm_at_buf));
+			sm_at_buf[at_cmd_len] = '\0';
+			cmd_send(sm_at_buf, at_cmd_len, sizeof(sm_at_buf));
 		} else {
 			/* Ignore 0 size command. */
 		}
@@ -712,7 +712,7 @@ static size_t null_handler(const uint8_t *buf, const size_t len)
 	return processed;
 }
 
-void slm_at_receive(const uint8_t *buf, size_t len)
+void sm_at_receive(const uint8_t *buf, size_t len)
 {
 	size_t ret = 0;
 
@@ -720,14 +720,14 @@ void slm_at_receive(const uint8_t *buf, size_t len)
 
 	while (len > 0) {
 
-		switch (get_slm_mode()) {
-		case SLM_AT_COMMAND_MODE:
+		switch (get_sm_mode()) {
+		case SM_AT_COMMAND_MODE:
 			ret = cmd_rx_handler(buf, len);
 			break;
-		case SLM_DATA_MODE:
+		case SM_DATA_MODE:
 			ret = raw_rx_handler(buf, len);
 			break;
-		case SLM_NULL_MODE:
+		case SM_NULL_MODE:
 			ret = null_handler(buf, len);
 			break;
 		}
@@ -738,8 +738,8 @@ void slm_at_receive(const uint8_t *buf, size_t len)
 	}
 
 	/* start inactivity timer in datamode */
-	if (get_slm_mode() == SLM_DATA_MODE) {
-		k_timer_start(&inactivity_timer, K_MSEC(slm_datamode_time_limit), K_NO_WAIT);
+	if (get_sm_mode() == SM_DATA_MODE) {
+		k_timer_start(&inactivity_timer, K_MSEC(sm_datamode_time_limit), K_NO_WAIT);
 	}
 }
 
@@ -747,17 +747,17 @@ AT_MONITOR(at_notify, ANY, notification_handler);
 
 static void notification_handler(const char *notification)
 {
-	if (get_slm_mode() == SLM_AT_COMMAND_MODE && at_backend.send != NULL) {
+	if (get_sm_mode() == SM_AT_COMMAND_MODE && at_backend.send != NULL) {
 
 #if defined(CONFIG_SM_PPP)
-		if (!slm_fwd_cgev_notifs
+		if (!sm_fwd_cgev_notifs
 		 && !strncmp(notification, "+CGEV: ", strlen("+CGEV: "))) {
 			/* CGEV notifications are silenced. Do not forward them. */
 			return;
 		}
 #endif
-		slm_at_send_indicate(CRLF_STR, strlen(CRLF_STR), true, true);
-		slm_at_send_str(notification);
+		sm_at_send_indicate(CRLF_STR, strlen(CRLF_STR), true, true);
+		sm_at_send_str(notification);
 	} else {
 		LOG_DBG("Drop notification: %s", notification);
 	}
@@ -765,18 +765,18 @@ static void notification_handler(const char *notification)
 
 void rsp_send_ok(void)
 {
-	slm_at_send_str(OK_STR);
+	sm_at_send_str(OK_STR);
 }
 
 void rsp_send_error(void)
 {
-	slm_at_send_str(ERROR_STR);
+	sm_at_send_str(ERROR_STR);
 }
 
 static void rsp_send_internal(bool indicate, const char *fmt, va_list arg_ptr)
 {
 	static K_MUTEX_DEFINE(mutex_rsp_buf);
-	static char rsp_buf[SLM_AT_MAX_RSP_LEN];
+	static char rsp_buf[SM_AT_MAX_RSP_LEN];
 	int rsp_len;
 
 	k_mutex_lock(&mutex_rsp_buf, K_FOREVER);
@@ -784,7 +784,7 @@ static void rsp_send_internal(bool indicate, const char *fmt, va_list arg_ptr)
 	rsp_len = vsnprintf(rsp_buf, sizeof(rsp_buf), fmt, arg_ptr);
 	rsp_len = MIN(rsp_len, sizeof(rsp_buf) - 1);
 
-	slm_at_send_indicate(rsp_buf, rsp_len, true, indicate);
+	sm_at_send_indicate(rsp_buf, rsp_len, true, indicate);
 
 	k_mutex_unlock(&mutex_rsp_buf);
 }
@@ -809,14 +809,14 @@ void rsp_send_indicate(const char *fmt, ...)
 
 void data_send(const uint8_t *data, size_t len)
 {
-	slm_at_send_indicate(data, len, false, true);
+	sm_at_send_indicate(data, len, false, true);
 }
 
-int enter_datamode(slm_datamode_handler_t handler)
+int enter_datamode(sm_datamode_handler_t handler)
 {
 	k_mutex_lock(&mutex_mode, K_FOREVER);
 
-	if (handler == NULL || datamode_handler != NULL || set_slm_mode(SLM_DATA_MODE) == false) {
+	if (handler == NULL || datamode_handler != NULL || set_sm_mode(SM_DATA_MODE) == false) {
 		LOG_INF("Invalid, not enter datamode");
 		k_mutex_unlock(&mutex_mode);
 		return -EINVAL;
@@ -827,14 +827,14 @@ int enter_datamode(slm_datamode_handler_t handler)
 	k_mutex_unlock(&mutex_data);
 
 	datamode_handler = handler;
-	if (slm_datamode_time_limit == 0) {
-		if (slm_uart_baudrate > 0) {
-			slm_datamode_time_limit = CONFIG_SM_UART_RX_BUF_SIZE * (8 + 1 + 1) * 1000 /
-					      slm_uart_baudrate;
-			slm_datamode_time_limit += UART_RX_MARGIN_MS;
+	if (sm_datamode_time_limit == 0) {
+		if (sm_uart_baudrate > 0) {
+			sm_datamode_time_limit = CONFIG_SM_UART_RX_BUF_SIZE * (8 + 1 + 1) * 1000 /
+					      sm_uart_baudrate;
+			sm_datamode_time_limit += UART_RX_MARGIN_MS;
 		} else {
 			LOG_WRN("Baudrate not set");
-			slm_datamode_time_limit = 1000;
+			sm_datamode_time_limit = 1000;
 		}
 	}
 	LOG_INF("Enter datamode");
@@ -846,7 +846,7 @@ int enter_datamode(slm_datamode_handler_t handler)
 
 bool in_datamode(void)
 {
-	return (get_slm_mode() == SLM_DATA_MODE);
+	return (get_sm_mode() == SM_DATA_MODE);
 }
 
 bool exit_datamode_handler(int result)
@@ -855,9 +855,9 @@ bool exit_datamode_handler(int result)
 
 	k_mutex_lock(&mutex_mode, K_FOREVER);
 
-	if (set_slm_mode(SLM_NULL_MODE)) {
+	if (set_sm_mode(SM_NULL_MODE)) {
 		if (datamode_handler) {
-			datamode_handler(DATAMODE_EXIT, NULL, 0, SLM_DATAMODE_FLAGS_EXIT_HANDLER);
+			datamode_handler(DATAMODE_EXIT, NULL, 0, SM_DATAMODE_FLAGS_EXIT_HANDLER);
 		}
 		datamode_handler = NULL;
 		datamode_handler_result = result;
@@ -873,12 +873,12 @@ bool verify_datamode_control(uint16_t time_limit, uint16_t *min_time_limit)
 {
 	int min_time;
 
-	if (slm_uart_baudrate == 0) {
+	if (sm_uart_baudrate == 0) {
 		LOG_ERR("Baudrate not set");
 		return false;
 	}
 
-	min_time = CONFIG_SM_UART_RX_BUF_SIZE * (8 + 1 + 1) * 1000 / slm_uart_baudrate;
+	min_time = CONFIG_SM_UART_RX_BUF_SIZE * (8 + 1 + 1) * 1000 / sm_uart_baudrate;
 	min_time += UART_RX_MARGIN_MS;
 
 	if (time_limit > 0 && min_time > time_limit) {
@@ -893,7 +893,7 @@ bool verify_datamode_control(uint16_t time_limit, uint16_t *min_time_limit)
 	return true;
 }
 
-int slm_at_cb_wrapper(char *buf, size_t len, char *at_cmd, slm_at_callback *cb)
+int sm_at_cb_wrapper(char *buf, size_t len, char *at_cmd, sm_at_callback *cb)
 {
 	int err;
 	struct at_parser parser;
@@ -927,7 +927,7 @@ int slm_at_cb_wrapper(char *buf, size_t len, char *at_cmd, slm_at_callback *cb)
 		int at_cmd_err = err;
 
 		/* Reconstruct 'ERROR', 'CME ERROR' and 'CMS ERROR' response from
-		 * nrf_modem_at_cmd() return value, which is returned by some SLM specific
+		 * nrf_modem_at_cmd() return value, which is returned by some Serial Modem specific
 		 * AT commands, such as AT#XSMS
 		 */
 		switch (nrf_modem_at_err_type(err)) {
@@ -955,27 +955,27 @@ int slm_at_cb_wrapper(char *buf, size_t len, char *at_cmd, slm_at_callback *cb)
 	return err;
 }
 
-int slm_at_host_init(void)
+int sm_at_host_init(void)
 {
 	int err;
 
 	k_mutex_lock(&mutex_mode, K_FOREVER);
-	slm_datamode_time_limit = 0;
+	sm_datamode_time_limit = 0;
 	datamode_handler = NULL;
-	at_mode = SLM_AT_COMMAND_MODE;
+	at_mode = SM_AT_COMMAND_MODE;
 	k_mutex_unlock(&mutex_mode);
 
 	k_work_init(&raw_send_scheduled_work, raw_send_scheduled);
 
-	err = slm_uart_handler_enable();
+	err = sm_uart_handler_enable();
 	if (err) {
 		return err;
 	}
 
-	err = slm_at_init();
+	err = sm_at_init();
 	if (err) {
 		/* Send "INIT ERROR" string to indicate that AT host init failed */
-		err = slm_at_send_str(SLM_SYNC_ERR_STR);
+		err = sm_at_send_str(SM_SYNC_ERR_STR);
 		if (err) {
 			return err;
 		}
@@ -984,7 +984,7 @@ int slm_at_host_init(void)
 
 	if (!IS_ENABLED(CONFIG_SM_SKIP_READY_MSG)) {
 		/* Send Ready string to indicate that AT host is ready */
-		err = slm_at_send_str(SLM_SYNC_STR);
+		err = sm_at_send_str(SM_SYNC_STR);
 		if (err) {
 			return err;
 		}
@@ -993,7 +993,7 @@ int slm_at_host_init(void)
 	/* This is here and not earlier because in case of firmware
 	 * update it will send an AT response so the UART must be up.
 	 */
-	slm_fota_post_process();
+	sm_fota_post_process();
 
 	LOG_INF("at_host init done");
 	return 0;
@@ -1006,7 +1006,7 @@ static int at_host_power_off(bool shutting_down)
 	if (!err || shutting_down) {
 
 		/* Power off UART module */
-		err = pm_device_action_run(slm_uart_dev, PM_DEVICE_ACTION_SUSPEND);
+		err = pm_device_action_run(sm_uart_dev, PM_DEVICE_ACTION_SUSPEND);
 		if (err == -EALREADY) {
 			err = 0;
 		}
@@ -1021,19 +1021,19 @@ static int at_host_power_off(bool shutting_down)
 	return err;
 }
 
-int slm_at_host_power_off(void)
+int sm_at_host_power_off(void)
 {
 	const int err = at_host_power_off(false);
 
 	/* Write sync str to buffer so it is sent first when resuming. */
-	slm_at_send_str(SLM_SYNC_STR);
+	sm_at_send_str(SM_SYNC_STR);
 
 	return err;
 }
 
-int slm_at_host_power_on(void)
+int sm_at_host_power_on(void)
 {
-	const int err = pm_device_action_run(slm_uart_dev, PM_DEVICE_ACTION_RESUME);
+	const int err = pm_device_action_run(sm_uart_dev, PM_DEVICE_ACTION_RESUME);
 
 	if (err && err != -EALREADY) {
 		LOG_ERR("Failed to resume UART. (%d)", err);
@@ -1047,16 +1047,16 @@ int slm_at_host_power_on(void)
 	return 0;
 }
 
-void slm_at_host_uninit(void)
+void sm_at_host_uninit(void)
 {
 	k_mutex_lock(&mutex_mode, K_FOREVER);
-	if (at_mode == SLM_DATA_MODE) {
+	if (at_mode == SM_DATA_MODE) {
 		k_timer_stop(&inactivity_timer);
 	}
 	datamode_handler = NULL;
 	k_mutex_unlock(&mutex_mode);
 
-	slm_at_uninit();
+	sm_at_uninit();
 
 	at_host_power_off(true);
 

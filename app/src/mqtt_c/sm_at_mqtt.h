@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
-#ifndef SLM_AT_MQTT_
-#define SLM_AT_MQTT_
+#ifndef SM_AT_MQTT_
+#define SM_AT_MQTT_
 
-/**@file slm_at_mqtt.h
+/**@file sm_at_mqtt.h
  *
  * @brief Vendor-specific AT command for MQTT service.
  * @{
@@ -19,7 +19,7 @@
  * @retval 0 If the operation was successful.
  *           Otherwise, a (negative) error code is returned.
  */
-int slm_at_mqtt_init(void);
+int sm_at_mqtt_init(void);
 
 /**
  * @brief Uninitialize MQTT AT command parser.
@@ -27,8 +27,8 @@ int slm_at_mqtt_init(void);
  * @retval 0 If the operation was successful.
  *           Otherwise, a (negative) error code is returned.
  */
-int slm_at_mqtt_uninit(void);
+int sm_at_mqtt_uninit(void);
 
 /** @} */
 
-#endif /* SLM_AT_GPS_ */
+#endif /* SM_AT_GPS_ */

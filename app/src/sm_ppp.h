@@ -3,17 +3,17 @@
  *
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
-#ifndef SLM_PPP_
-#define SLM_PPP_
+#ifndef SM_PPP_
+#define SM_PPP_
 
 #include <stdbool.h>
 
-/* Whether to forward CGEV notifications to the SLM UART. */
-extern bool slm_fwd_cgev_notifs;
+/* Whether to forward CGEV notifications to the Serial Modem UART. */
+extern bool sm_fwd_cgev_notifs;
 
 /** @retval 0 on success. */
-int slm_ppp_init(void);
+int sm_ppp_init(void);
 
-bool slm_ppp_is_stopped(void);
+bool sm_ppp_is_stopped(void);
 
 #endif

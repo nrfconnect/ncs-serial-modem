@@ -12,12 +12,12 @@
 #include "sm_at_host.h"
 #include "sm_at_twi.h"
 
-LOG_MODULE_REGISTER(slm_twi, CONFIG_SM_LOG_LEVEL);
+LOG_MODULE_REGISTER(sm_twi, CONFIG_SM_LOG_LEVEL);
 
 #define TWI_ADDR_LEN		2
 #define TWI_DATA_LEN		255
 
-static const struct device *slm_twi_dev[] = {
+static const struct device *sm_twi_dev[] = {
 	DEVICE_DT_GET_OR_NULL(DT_NODELABEL(i2c0)),
 	DEVICE_DT_GET_OR_NULL(DT_NODELABEL(i2c1)),
 	DEVICE_DT_GET_OR_NULL(DT_NODELABEL(i2c2)),
@@ -31,8 +31,8 @@ static void do_twi_list(void)
 	memset(rsp_buf, 0, sizeof(rsp_buf));
 	sprintf(rsp_buf, "\r\n#XTWILS: ");
 
-	for (size_t i = 0U; i < ARRAY_SIZE(slm_twi_dev); i++) {
-		if (slm_twi_dev[i] != NULL) {
+	for (size_t i = 0U; i < ARRAY_SIZE(sm_twi_dev); i++) {
+		if (sm_twi_dev[i] != NULL) {
 			sprintf(rsp_buf + strlen(rsp_buf), "%d,", i);
 		}
 	}
@@ -47,20 +47,20 @@ static int do_twi_write(uint16_t index, uint16_t dev_addr, const uint8_t *twi_da
 {
 	int ret;
 
-	if (index >= ARRAY_SIZE(slm_twi_dev) || slm_twi_dev[index] == NULL) {
+	if (index >= ARRAY_SIZE(sm_twi_dev) || sm_twi_dev[index] == NULL) {
 		LOG_ERR("TWI device not available");
 		return -EINVAL;
 	}
 
 	/* Decode hex string to hex array */
 	memset(rsp_buf, 0, sizeof(rsp_buf));
-	ret = slm_util_atoh(twi_data_ascii, ascii_len, rsp_buf, ascii_len / 2);
+	ret = sm_util_atoh(twi_data_ascii, ascii_len, rsp_buf, ascii_len / 2);
 	if (ret < 0) {
 		LOG_ERR("Fail to decode hex string to hex array");
 		return ret;
 	}
 
-	ret = i2c_write(slm_twi_dev[index], rsp_buf, ret, dev_addr);
+	ret = i2c_write(sm_twi_dev[index], rsp_buf, ret, dev_addr);
 	if (ret < 0) {
 		LOG_ERR("Fail to write twi data at address: %hx", dev_addr);
 	}
@@ -72,7 +72,7 @@ static int do_twi_read(uint16_t index, uint16_t dev_addr, uint8_t num_read)
 {
 	int ret;
 
-	if (index >= ARRAY_SIZE(slm_twi_dev) || slm_twi_dev[index] == NULL) {
+	if (index >= ARRAY_SIZE(sm_twi_dev) || sm_twi_dev[index] == NULL) {
 		LOG_ERR("TWI device not available");
 		return -EINVAL;
 	}
@@ -83,13 +83,13 @@ static int do_twi_read(uint16_t index, uint16_t dev_addr, uint8_t num_read)
 	}
 
 	memset(twi_data, 0, sizeof(twi_data));
-	ret = i2c_read(slm_twi_dev[index], twi_data, (uint32_t)num_read, dev_addr);
+	ret = i2c_read(sm_twi_dev[index], twi_data, (uint32_t)num_read, dev_addr);
 	if (ret < 0) {
 		LOG_ERR("Fail to read twi data");
 		return ret;
 	}
 	memset(rsp_buf, 0, sizeof(rsp_buf));
-	ret = slm_util_htoa(twi_data, num_read, rsp_buf, num_read * 2);
+	ret = sm_util_htoa(twi_data, num_read, rsp_buf, num_read * 2);
 	if (ret > 0) {
 		rsp_send("\r\n#XTWIR: ");
 		data_send(rsp_buf, ret);
@@ -108,27 +108,27 @@ static int do_twi_write_read(uint16_t index, uint16_t dev_addr, const uint8_t *t
 {
 	int ret;
 
-	if (index >= ARRAY_SIZE(slm_twi_dev) || slm_twi_dev[index] == NULL) {
+	if (index >= ARRAY_SIZE(sm_twi_dev) || sm_twi_dev[index] == NULL) {
 		LOG_ERR("TWI device not available");
 		return -EINVAL;
 	}
 
 	/* Decode hex string to hex array */
 	memset(rsp_buf, 0, sizeof(rsp_buf));
-	ret = slm_util_atoh(twi_data_ascii, ascii_len, rsp_buf, ascii_len / 2);
+	ret = sm_util_atoh(twi_data_ascii, ascii_len, rsp_buf, ascii_len / 2);
 	if (ret < 0) {
 		LOG_ERR("Fail to decode hex string to hex array");
 		return ret;
 	}
 	memset(twi_data, 0, sizeof(twi_data));
-	ret = i2c_write_read(slm_twi_dev[index], dev_addr, rsp_buf, ret, twi_data, num_read);
+	ret = i2c_write_read(sm_twi_dev[index], dev_addr, rsp_buf, ret, twi_data, num_read);
 	if (ret < 0) {
 		LOG_ERR("Fail to write and read data at address: %hx", dev_addr);
 		return ret;
 	}
 	/* Encode hex arry to hex string */
 	memset(rsp_buf, 0, sizeof(rsp_buf));
-	ret = slm_util_htoa(twi_data, num_read, rsp_buf, num_read * 2);
+	ret = sm_util_htoa(twi_data, num_read, rsp_buf, num_read * 2);
 	if (ret > 0) {
 		rsp_send("\r\n#XTWIWR: ");
 		data_send(rsp_buf, ret);
@@ -142,7 +142,7 @@ static int do_twi_write_read(uint16_t index, uint16_t dev_addr, const uint8_t *t
 	return ret;
 }
 
-SLM_AT_CMD_CUSTOM(xtwils, "AT#XTWILS", handle_at_twi_list);
+SM_AT_CMD_CUSTOM(xtwils, "AT#XTWILS", handle_at_twi_list);
 static int handle_at_twi_list(enum at_parser_cmd_type cmd_type, struct at_parser *, uint32_t)
 {
 	int err = -EINVAL;
@@ -160,7 +160,7 @@ static int handle_at_twi_list(enum at_parser_cmd_type cmd_type, struct at_parser
 	return err;
 }
 
-SLM_AT_CMD_CUSTOM(xtwiw, "AT#XTWIW", handle_at_twi_write);
+SM_AT_CMD_CUSTOM(xtwiw, "AT#XTWIW", handle_at_twi_write);
 static int handle_at_twi_write(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			       uint32_t param_count)
 {
@@ -207,7 +207,7 @@ static int handle_at_twi_write(enum at_parser_cmd_type cmd_type, struct at_parse
 	return err;
 }
 
-SLM_AT_CMD_CUSTOM(xtwir, "AT#XTWIR", handle_at_twi_read);
+SM_AT_CMD_CUSTOM(xtwir, "AT#XTWIR", handle_at_twi_read);
 static int handle_at_twi_read(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			      uint32_t)
 {
@@ -256,7 +256,7 @@ static int handle_at_twi_read(enum at_parser_cmd_type cmd_type, struct at_parser
 	return err;
 }
 
-SLM_AT_CMD_CUSTOM(xtwiwr, "AT#XTWIWR", handle_at_twi_write_read);
+SM_AT_CMD_CUSTOM(xtwiwr, "AT#XTWIWR", handle_at_twi_write_read);
 static int handle_at_twi_write_read(enum at_parser_cmd_type cmd_type,
 				    struct at_parser *parser, uint32_t)
 {
@@ -311,10 +311,10 @@ static int handle_at_twi_write_read(enum at_parser_cmd_type cmd_type,
 	return err;
 }
 
-int slm_at_twi_init(void)
+int sm_at_twi_init(void)
 {
-	for (size_t i = 0U; i < ARRAY_SIZE(slm_twi_dev); i++) {
-		if (slm_twi_dev[i] != NULL && !device_is_ready(slm_twi_dev[i])) {
+	for (size_t i = 0U; i < ARRAY_SIZE(sm_twi_dev); i++) {
+		if (sm_twi_dev[i] != NULL && !device_is_ready(sm_twi_dev[i])) {
 			return -ENODEV;
 		}
 	}
@@ -322,7 +322,7 @@ int slm_at_twi_init(void)
 	return 0;
 }
 
-int slm_at_twi_uninit(void)
+int sm_at_twi_uninit(void)
 {
 	return 0;
 }

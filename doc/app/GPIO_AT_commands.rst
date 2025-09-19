@@ -1,4 +1,4 @@
-.. _SLM_AT_GPIO:
+.. _SM_AT_GPIO:
 
 GPIO AT commands
 ****************

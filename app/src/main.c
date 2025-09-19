@@ -18,13 +18,13 @@
 #include "sm_util.h"
 #include "sm_ctrl_pin.h"
 
-LOG_MODULE_REGISTER(slm, CONFIG_SM_LOG_LEVEL);
+LOG_MODULE_REGISTER(sm, CONFIG_SM_LOG_LEVEL);
 
-#define SLM_WQ_STACK_SIZE	KB(4)
-#define SLM_WQ_PRIORITY		K_LOWEST_APPLICATION_THREAD_PRIO
-static K_THREAD_STACK_DEFINE(slm_wq_stack_area, SLM_WQ_STACK_SIZE);
+#define SM_WQ_STACK_SIZE	KB(4)
+#define SM_WQ_PRIORITY		K_LOWEST_APPLICATION_THREAD_PRIO
+static K_THREAD_STACK_DEFINE(sm_wq_stack_area, SM_WQ_STACK_SIZE);
 
-struct k_work_q slm_work_q;
+struct k_work_q sm_work_q;
 
 NRF_MODEM_LIB_ON_INIT(lwm2m_init_hook, on_modem_lib_init, NULL);
 NRF_MODEM_LIB_ON_DFU_RES(main_dfu_hook, on_modem_dfu_res, NULL);
@@ -67,16 +67,16 @@ void nrf_modem_fault_handler(struct nrf_modem_fault_info *fault_info)
 
 static void on_modem_dfu_res(int dfu_res, void *ctx)
 {
-	slm_fota_type = DFU_TARGET_IMAGE_TYPE_MODEM_DELTA;
-	slm_fota_stage = FOTA_STAGE_COMPLETE;
-	slm_fota_status = FOTA_STATUS_ERROR;
-	slm_fota_info = dfu_res;
+	sm_fota_type = DFU_TARGET_IMAGE_TYPE_MODEM_DELTA;
+	sm_fota_stage = FOTA_STAGE_COMPLETE;
+	sm_fota_status = FOTA_STATUS_ERROR;
+	sm_fota_info = dfu_res;
 
 	switch (dfu_res) {
 	case NRF_MODEM_DFU_RESULT_OK:
 		LOG_INF("Modem update OK. Running new firmware.");
-		slm_fota_status = FOTA_STATUS_OK;
-		slm_fota_info = 0;
+		sm_fota_status = FOTA_STATUS_OK;
+		sm_fota_info = 0;
 		break;
 	case NRF_MODEM_DFU_RESULT_UUID_ERROR:
 	case NRF_MODEM_DFU_RESULT_AUTH_ERROR:
@@ -89,7 +89,7 @@ static void on_modem_dfu_res(int dfu_res, void *ctx)
 	case NRF_MODEM_DFU_RESULT_VOLTAGE_LOW:
 		LOG_ERR("Modem update postponed due to low voltage. "
 			"Reset the modem once you have sufficient power.");
-		slm_fota_stage = FOTA_STAGE_ACTIVATE;
+		sm_fota_stage = FOTA_STAGE_ACTIVATE;
 		break;
 	default:
 		LOG_ERR("Unhandled nrf_modem DFU result code 0x%x.", dfu_res);
@@ -118,20 +118,20 @@ static void check_app_fota_status(void)
 	case BOOT_SWAP_TYPE_PERM:
 	/** Swap failed because image to be run is not valid. */
 	case BOOT_SWAP_TYPE_FAIL:
-		slm_fota_status = FOTA_STATUS_ERROR;
-		slm_fota_info = type;
+		sm_fota_status = FOTA_STATUS_ERROR;
+		sm_fota_info = type;
 		break;
 	/** Swap back to alternate slot. A confirm changes this state to NONE. */
 	case BOOT_SWAP_TYPE_REVERT:
 		/* Happens on a successful application FOTA. */
 		const int ret = boot_write_img_confirmed();
 
-		slm_fota_info = ret;
-		slm_fota_status = ret ? FOTA_STATUS_ERROR : FOTA_STATUS_OK;
+		sm_fota_info = ret;
+		sm_fota_status = ret ? FOTA_STATUS_ERROR : FOTA_STATUS_OK;
 		break;
 	}
-	slm_fota_type = DFU_TARGET_IMAGE_TYPE_MCUBOOT;
-	slm_fota_stage = FOTA_STAGE_COMPLETE;
+	sm_fota_type = DFU_TARGET_IMAGE_TYPE_MCUBOOT;
+	sm_fota_stage = FOTA_STAGE_COMPLETE;
 }
 
 int lte_auto_connect(void)
@@ -159,34 +159,34 @@ int lte_auto_connect(void)
 #include "sm_auto_connect.h"
 	};
 
-	ret = slm_util_at_scanf("AT+CEREG?", "+CEREG: %d,%d", &n, &stat);
+	ret = sm_util_at_scanf("AT+CEREG?", "+CEREG: %d,%d", &n, &stat);
 	if (ret != 2 || (stat == 1 || stat == 5)) {
 		return 0;
 	}
 
-	LOG_INF("lte auto connect");
-	err = slm_util_at_printf("AT%%XSYSTEMMODE=%d,%d,%d,%d", cfg.lte_m_support,
+	LOG_INF("LTE auto connect");
+	err = sm_util_at_printf("AT%%XSYSTEMMODE=%d,%d,%d,%d", cfg.lte_m_support,
 				  cfg.nb_iot_support, cfg.gnss_support, cfg.lte_preference);
 	if (err) {
 		LOG_ERR("Failed to configure system mode: %d", err);
 		return err;
 	}
 	if (cfg.pdp_config) {
-		err = slm_util_at_printf("AT+CGDCONT=0,%s,%s", cfg.pdn_fam, cfg.pdn_apn);
+		err = sm_util_at_printf("AT+CGDCONT=0,%s,%s", cfg.pdn_fam, cfg.pdn_apn);
 		if (err) {
 			LOG_ERR("Failed to configure PDN: %d", err);
 			return err;
 		}
 	}
 	if (cfg.pdp_config && cfg.pdn_auth != 0) {
-		err = slm_util_at_printf("AT+CGAUTH=0,%d,%s,%s", cfg.pdn_auth,
+		err = sm_util_at_printf("AT+CGAUTH=0,%d,%s,%s", cfg.pdn_auth,
 					  cfg.pdn_username, cfg.pdn_password);
 		if (err) {
 			LOG_ERR("Failed to configure AUTH: %d", err);
 			return err;
 		}
 	}
-	err = slm_util_at_printf("AT+CFUN=1");
+	err = sm_util_at_printf("AT+CFUN=1");
 	if (err) {
 		LOG_ERR("Failed to turn on radio: %d", err);
 		return err;
@@ -200,22 +200,22 @@ int start_execute(void)
 {
 	int err;
 
-	LOG_INF("Serial LTE Modem");
+	LOG_INF("Serial Modem");
 
-	slm_ctrl_pin_init();
+	sm_ctrl_pin_init();
 
 	/* This will send "READY" or "INIT ERROR" to UART so after this nothing
 	 * should be done that can fail
 	 */
-	err = slm_at_host_init();
+	err = sm_at_host_init();
 	if (err) {
 		LOG_ERR("Failed to init at_host: %d", err);
 		return err;
 	}
 
-	k_work_queue_start(&slm_work_q, slm_wq_stack_area,
-			   K_THREAD_STACK_SIZEOF(slm_wq_stack_area),
-			   SLM_WQ_PRIORITY, NULL);
+	k_work_queue_start(&sm_work_q, sm_wq_stack_area,
+			   K_THREAD_STACK_SIZEOF(sm_wq_stack_area),
+			   SM_WQ_PRIORITY, NULL);
 	(void)lte_auto_connect();
 
 	return 0;
@@ -228,17 +228,17 @@ int main(void)
 	nrf_power_resetreas_clear(NRF_POWER_NS, 0x70017);
 	LOG_DBG("RR: 0x%08x", rr);
 
-	slm_ctrl_pin_init_gpios();
+	sm_ctrl_pin_init_gpios();
 
 	/* Init and load settings */
-	if (slm_settings_init() != 0) {
-		LOG_WRN("Failed to init slm settings");
+	if (sm_settings_init() != 0) {
+		LOG_WRN("Failed to init sm settings");
 	}
 
 #if defined(CONFIG_SM_FULL_FOTA)
-	if (slm_modem_full_fota) {
-		slm_finish_modem_full_fota();
-		slm_fota_type = DFU_TARGET_IMAGE_TYPE_FULL_MODEM;
+	if (sm_modem_full_fota) {
+		sm_finish_modem_full_fota();
+		sm_fota_type = DFU_TARGET_IMAGE_TYPE_FULL_MODEM;
 	}
 #endif
 
@@ -260,14 +260,14 @@ int main(void)
 
 	if (!(rr & NRF_POWER_RESETREAS_OFF_MASK)) { /* DETECT signal from GPIO */
 
-		slm_ctrl_pin_enter_sleep_no_uninit();
+		sm_ctrl_pin_enter_sleep_no_uninit();
 	}
 #endif /* CONFIG_SM_START_SLEEP */
 
 	ret = start_execute();
 exit:
 	if (ret) {
-		LOG_ERR("Failed to start SLM (%d). It's not operational!!!", ret);
+		LOG_ERR("Failed to start SM (%d). It's not operational!!!", ret);
 	}
 	return ret;
 }

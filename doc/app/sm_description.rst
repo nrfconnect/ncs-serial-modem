@@ -1,4 +1,4 @@
-.. _slm_description:
+.. _sm_description:
 
 Application description
 #######################
@@ -7,20 +7,20 @@ Application description
    :local:
    :depth: 3
 
-The Serial LTE Modem (SLM) application demonstrates how to use an nRF91 Series device as a stand-alone LTE modem that can be controlled by AT commands.
+The Serial Modem (SM) application demonstrates how to use an nRF91 Series device as a stand-alone modem that can be controlled by AT commands.
 
 Overview
 ********
 
-The nRF91 Series SiP integrates both a full LTE modem and an application MCU, enabling you to run your LTE application directly on the device.
+The nRF91 Series SiP integrates both a full LTE modem and an application MCU, enabling you to run your application directly on the device.
 
-However, if you want to run your application on a different chip and use the nRF91 Series device only as a modem, the serial LTE modem application provides you with an interface for controlling the LTE modem through AT commands.
+However, if you want to run your application on a different chip and use the nRF91 Series device only as a modem, the Serial Modem application provides you with an interface for controlling the modem through AT commands.
 
-The application accepts both the modem-specific AT commands and proprietary AT commands.
+The application accepts both the modem specific AT commands and proprietary AT commands.
 The AT commands are documented in the following guides:
 
-* Modem-specific AT commands - `nRF91x1 AT Commands Reference Guide`_  and `nRF9160 AT Commands Reference Guide`_
-* Proprietary AT commands - :ref:`SLM_AT_commands`
+* Modem specific AT commands - `nRF91x1 AT Commands Reference Guide`_  and `nRF9160 AT Commands Reference Guide`_
+* Proprietary AT commands - :ref:`SM_AT_commands`
 
 Requirements
 ************
@@ -36,7 +36,7 @@ Configuration
 
 |config|
 
-.. _slm_config_options:
+.. _sm_config_options:
 
 Configuration options
 =====================
@@ -57,7 +57,7 @@ CONFIG_SM_AT_MAX_PARAM - AT command parameter count limit
 CONFIG_SM_CMUX - Enable CMUX functionality
    This option is enabled by the CMUX overlay.
    It adds support for CMUX.
-   See :ref:`SLM_AT_CMUX` for more information.
+   See :ref:`SM_AT_CMUX` for more information.
 
 .. _CONFIG_SM_PPP:
 
@@ -66,13 +66,13 @@ CONFIG_SM_PPP - Enable PPP functionality
    It adds support for PPP.
    PPP can be used in conjunction with :ref:`CMUX <CONFIG_SM_CMUX>` in order to use a single UART for both AT data and PPP.
    When CMUX is also enabled, PPP is usable only through a CMUX channel.
-   See :ref:`SLM_AT_PPP` for more information.
+   See :ref:`SM_AT_PPP` for more information.
 
 .. _CONFIG_SM_NATIVE_TLS:
 
 CONFIG_SM_NATIVE_TLS - Use Zephyr's Mbed TLS for TLS connections
    This option is enabled by the native TLS overlay.
-   See :ref:`slm_native_tls` for more information.
+   See :ref:`sm_native_tls` for more information.
 
 .. _CONFIG_SM_NATIVE_TLS_CREDENTIAL_BUFFER_SIZE:
 
@@ -107,7 +107,7 @@ CONFIG_SM_START_SLEEP - Enter sleep on startup
 .. _CONFIG_SM_POWER_PIN:
 
 CONFIG_SM_POWER_PIN - Interface GPIO pin to power off the SiP and exit from sleep or idle
-   This option specifies which pin to use to power on or off the SiP and make SLM exit idle mode.
+   This option specifies which pin to use to power on or off the SiP and make Serial Modem exit idle mode.
    It is set by default as follows:
 
    * On an nRF91x1 DK:
@@ -155,14 +155,14 @@ CONFIG_SM_INDICATE_TIME - Indicate GPIO active time
 
 .. _CONFIG_SM_AUTO_CONNECT:
 
-CONFIG_SM_AUTO_CONNECT - Connect to LTE network at start-up or reset
-   This option enables connecting to the LTE network at start-up or reset using a defined PDN configuration.
+CONFIG_SM_AUTO_CONNECT - Connect to the network at start-up or reset
+   This option enables connecting to the network at start-up or reset using a defined PDN configuration.
    This option is enabled by the LwM2M Carrier overlay, but is otherwise disabled by default.
 
    .. note::
-      This option requires network-specific configuration in the ``slm_auto_connect.h`` file.
+      This option requires network-specific configuration in the ``sm_auto_connect.h`` file.
 
-   Here is a sample configuration for NIDD connection in the :file:`slm_auto_connect.h` file::
+   Here is a sample configuration for NIDD connection in the :file:`sm_auto_connect.h` file::
 
       /* Network-specific default system mode configured by %XSYSTEMMODE (refer to AT command manual) */
       0,        /* LTE support */
@@ -202,32 +202,32 @@ CONFIG_SM_TCP_POLL_TIME - Poll timeout in seconds for TCP connection
 
 .. _CONFIG_SM_SMS:
 
-CONFIG_SM_SMS - SMS support in SLM
+CONFIG_SM_SMS - SMS support in Serial Modem
    This option enables additional AT commands for using the SMS service.
 
 .. _CONFIG_SM_GNSS:
 
-CONFIG_SM_GNSS - GNSS support in SLM
+CONFIG_SM_GNSS - GNSS support in Serial Modem
    This option enables additional AT commands for using the GNSS service.
 
 .. _CONFIG_SM_NRF_CLOUD:
 
-CONFIG_SM_NRF_CLOUD - nRF Cloud support in SLM
+CONFIG_SM_NRF_CLOUD - nRF Cloud support in Serial Modem
    This option enables additional AT commands for using the nRF Cloud service.
 
 .. _CONFIG_SM_FTPC:
 
-CONFIG_SM_FTPC - FTP client support in SLM
+CONFIG_SM_FTPC - FTP client support in Serial Modem
    This option enables additional AT commands for using the FTP client service.
 
 .. _CONFIG_SM_TFTPC:
 
-CONFIG_SM_TFTPC - TFTP client support in SLM
+CONFIG_SM_TFTPC - TFTP client support in Serial Modem
    This option enables additional AT commands for using the TFTP client service.
 
 .. _CONFIG_SM_MQTTC:
 
-CONFIG_SM_MQTTC - MQTT client support in SLM
+CONFIG_SM_MQTTC - MQTT client support in Serial Modem
    This option enables additional AT commands for using the MQTT client service.
 
 .. _CONFIG_SM_MQTTC_MESSAGE_BUFFER_LEN:
@@ -238,12 +238,12 @@ CONFIG_SM_MQTTC_MESSAGE_BUFFER_LEN - Size of the buffer for the MQTT library
 
 .. _CONFIG_SM_HTTPC:
 
-CONFIG_SM_HTTPC - HTTP client support in SLM
+CONFIG_SM_HTTPC - HTTP client support in Serial Modem
    This option enables additional AT commands for using the HTTP client service.
 
 .. _CONFIG_SM_TWI:
 
-CONFIG_SM_TWI - TWI support in SLM
+CONFIG_SM_TWI - TWI support in Serial Modem
    This option enables additional AT commands for using the TWI service.
 
 .. _CONFIG_SM_UART_RX_BUF_COUNT:
@@ -273,7 +273,7 @@ CONFIG_SM_PPP_FALLBACK_MTU - Control the MTU used by PPP.
    The MTU will be used for sending and receiving data on both the PPP and cellular links.
    The default value is 1280.
 
-.. _slm_additional_config:
+.. _sm_additional_config:
 
 Additional configuration
 ========================
@@ -291,12 +291,12 @@ To switch to UART output, change the following options in the :file:`prj.conf` f
    CONFIG_LOG_BACKEND_RTT=n
    CONFIG_LOG_BACKEND_UART=y
 
-.. _slm_config_files:
+.. _sm_config_files:
 
 Configuration files
 ===================
 
-You can find the configuration files in the :file:`applications/serial_lte_modem` directory.
+You can find the configuration files in the :file:`app` directory.
 
 In general, they have an ``overlay-`` prefix, and a :file:`.conf` or :file:`.overlay` extension for Kconfig or devicetree overlays, respectively.
 Board-specific configuration files are named :file:`<BOARD>` with a :file:`.conf` or :file:`.overlay` extension and are located in the :file:`boards` directory.
@@ -311,14 +311,14 @@ See :ref:`app_build_system`: for more information on the |NCS| configuration sys
 
 The following configuration files are provided:
 
-* :file:`prj.conf` - This configuration file contains the standard configuration for the serial LTE modem application and is included by default by the build system.
+* :file:`prj.conf` - This configuration file contains the standard configuration for the Serial Modem application and is included by default by the build system.
 
-* :file:`overlay-native_tls.conf` - This configuration file contains additional configuration options that are required to use :ref:`slm_native_tls`.
+* :file:`overlay-native_tls.conf` - This configuration file contains additional configuration options that are required to use :ref:`sm_native_tls`.
   Not supported with the ``thingy91/nrf9160/ns`` board target due to flash memory constraints.
   If you need to use native TLS with Thingy:91, you must disable features to free up flash memory.
 
 * :file:`overlay-carrier.conf` - Configuration file that adds |NCS| :ref:`liblwm2m_carrier_readme` support.
-  See :ref:`slm_carrier_library_support` for more information on how to connect to an operator's device management platform.
+  See :ref:`sm_carrier_library_support` for more information on how to connect to an operator's device management platform.
   With the ``thingy91/nrf9160/ns`` board target, you must additionally pass the sysbuild option ``-DSB_CONFIG_THINGY91_STATIC_PARTITIONS_LWM2M_CARRIER=y`` to fit the application in the flash memory.
   This means that you will need an external debug probe to program the application.
   See the :ref:`programming_thingy` for more information.
@@ -331,26 +331,26 @@ The following configuration files are provided:
   For more information, see the :ref:`lwm2m_carrier_dependent` section of the :ref:`liblwm2m_carrier_readme` documentation.
 
 * :file:`overlay-full_fota.conf` - Configuration file that adds full modem FOTA support.
-  See :ref:`SLM_AT_FOTA` for more information on how to use full modem FOTA functionality.
+  See :ref:`SM_AT_FOTA` for more information on how to use full modem FOTA functionality.
 
 * :file:`overlay-cmux.conf` - Configuration file that adds support for the CMUX protocol.
-  See :ref:`SLM_AT_CMUX` for more information.
+  See :ref:`SM_AT_CMUX` for more information.
 
 * :file:`overlay-ppp.conf` - Configuration file that adds support for the Point-to-Point Protocol (PPP).
   This disables most of the IP-based protocols available through AT commands (such as FTP and MQTT) as it is expected that the controlling chip's own IP stack is used instead.
-  See :ref:`CONFIG_SM_PPP <CONFIG_SM_PPP>` and :ref:`SLM_AT_PPP` for more information.
+  See :ref:`CONFIG_SM_PPP <CONFIG_SM_PPP>` and :ref:`SM_AT_PPP` for more information.
 
 * :file:`overlay-ppp-without-cmux.overlay` - Devicetree overlay that configures the UART to be used by PPP.
-  This configuration file should be included when building SLM with PPP and without CMUX, in addition to :file:`overlay-ppp.conf`.
+  This configuration file should be included when building Serial Modem with PPP and without CMUX, in addition to :file:`overlay-ppp.conf`.
   It can be customized to fit your configuration, such as UART settings, baud rate, and flow control.
   By default, it sets the baud rate of the PPP UART to 1 000 000.
 
 * :file:`overlay-memfault.conf` - Configuration file that enables `Memfault`_.
   For more information about Memfault features in |NCS|, see :ref:`mod_memfault`.
 
-* :file:`overlay-zephyr-modem.conf`, :file:`overlay-zephyr-modem-nrf9160dk-nrf52840.conf`, :file:`overlay-external-mcu.overlay`,  and :file:`overlay-zephyr-modem-nrf9160dk-nrf52840.overlay` - These configuration files are used when compiling SLM to turn an nRF91 Series SiP into a Zephyr-compatible standalone modem.
+* :file:`overlay-zephyr-modem.conf`, :file:`overlay-zephyr-modem-nrf9160dk-nrf52840.conf`, :file:`overlay-external-mcu.overlay`,  and :file:`overlay-zephyr-modem-nrf9160dk-nrf52840.overlay` - These configuration files are used when compiling Serial Modem to turn an nRF91 Series SiP into a Zephyr-compatible standalone modem.
   Also set :kconfig:option:`CONFIG_SM_POWER_PIN` Kconfig option.
-  See :ref:`slm_as_zephyr_modem` for more information.
+  See :ref:`sm_as_zephyr_modem` for more information.
 
 * :file:`boards/nrf9160dk_nrf9160_ns.conf` - Configuration file specific for the nRF9160 DK.
   This file is automatically merged with the :file:`prj.conf` file when you build for the ``nrf9160dk/nrf9160/ns`` board target.
@@ -367,7 +367,7 @@ The following configuration files are provided:
 * :file:`boards/thingy91x_nrf9151_ns.conf` - Configuration file specific for Thingy:91 X.
   This file is automatically merged with the :file:`prj.conf` file when you build for the ``thingy91x/nrf9151/ns`` board target.
 
-.. _slm_native_tls:
+.. _sm_native_tls:
 
 Native TLS
 ----------
@@ -375,7 +375,7 @@ Native TLS
 By default, the secure socket (TLS/DTLS) is offloaded to the modem.
 If you need customized TLS/DTLS features that are not supported by the modem firmware, you can use native TLS instead.
 Native TLS uses the Mbed TLS library in Zephyr to establish secure connectivity.
-Currently, the SLM application can be built to use native TLS for the following services:
+Currently, the Serial Modem application can be built to use native TLS for the following services:
 
 * Secure socket
 * TLS Proxy client
@@ -398,31 +398,31 @@ The configuration options that are required to enable native TLS are defined in 
    :start-after: modem_lib_sending_traces_UART_start
    :end-before: modem_lib_sending_traces_UART_end
 
-.. _slm_building:
+.. _sm_building:
 
 Building and running
 ********************
 
-.. |sample path| replace:: :file:`applications/serial_lte_modem`
+.. |sample path| replace:: :file:`app`
 
 .. include:: /includes/build_and_run_ns.txt
 
-.. _slm_connecting_91dk:
+.. _sm_connecting_91dk:
 
 Communicating with the modem on an nRF91 Series DK
 ==================================================
 
-In this scenario, an nRF91 Series DK running the Serial LTE Modem application serves as the host.
+In this scenario, an nRF91 Series DK running the Serial Modem application serves as the host.
 You can use either a PC or an external MCU as a client.
 
-.. _slm_connecting_91dk_pc:
+.. _sm_connecting_91dk_pc:
 
 Connecting with a PC
 --------------------
 
 To connect to an nRF91 Series DK with a PC:
 
-.. slm_connecting_91dk_pc_instr_start
+.. sm_connecting_91dk_pc_instr_start
 
 1. Verify that ``UART_0`` is selected in the application.
    It is defined in the default configuration.
@@ -440,12 +440,12 @@ To connect to an nRF91 Series DK with a PC:
       The default AT command terminator is a carriage return followed by a line feed (``\r\n``).
       The Serial Terminal app supports this format.
       If you want to use another terminal emulator, make sure that the configured AT command terminator corresponds to the line terminator of your terminal.
-      When using PuTTY, you must set the :ref:`CONFIG_SM_CR_TERMINATION <CONFIG_SM_CR_TERMINATION>` SLM configuration option.
-      See :ref:`slm_config_options` for more details.
+      When using PuTTY, you must set the :ref:`CONFIG_SM_CR_TERMINATION <CONFIG_SM_CR_TERMINATION>` Serial Modem configuration option.
+      See :ref:`sm_config_options` for more details.
 
-.. slm_connecting_91dk_pc_instr_end
+.. sm_connecting_91dk_pc_instr_end
 
-.. _slm_connecting_91dk_mcu:
+.. _sm_connecting_91dk_mcu:
 
 Connecting with an external MCU
 -------------------------------
@@ -455,7 +455,7 @@ Connecting with an external MCU
    This section does not apply to Thingy:91 or Thingy:91 X.
 
 If you run your user application on an external MCU (for example, an nRF52 Series development kit), you can control the modem on an nRF91 Series device directly from the application.
-See the :ref:`slm_shell_sample` for a sample implementation of such an application.
+See the :ref:`sm_shell_sample` for a sample implementation of such an application.
 
 To connect with an external MCU using UART_2, change the configuration files for the default board as follows:
 
@@ -477,7 +477,7 @@ To connect with an external MCU using UART_2, change the configuration files for
 
           / {
               chosen {
-                       ncs,slm-uart = &uart2;
+                       ncs,sm-uart = &uart2;
                      }
             };
 
@@ -512,7 +512,7 @@ To connect with an external MCU using UART_2, change the configuration files for
 
           / {
               chosen {
-                       ncs,slm-uart = &uart2;
+                       ncs,sm-uart = &uart2;
                      }
             };
 
@@ -549,7 +549,7 @@ To connect with an external MCU using UART_2, change the configuration files for
 
           / {
               chosen {
-                       ncs,slm-uart = &uart2;
+                       ncs,sm-uart = &uart2;
                      }
             };
 
@@ -635,15 +635,15 @@ Use the following UART configuration, which is different from the :ref:`default 
    * For nRF9160 DK, you can set the VDD voltage with the **VDD IO** switch (**SW9**).
      See the `VDD supply rail section in the nRF9160 DK User Guide`_ for more information related to nRF9160 DK.
 
-.. _slm_connecting_thingy91:
+.. _sm_connecting_thingy91:
 
 Communicating with the modem on Thingy:91
 =========================================
 
-In this scenario, Thingy:91 running the Serial LTE Modem application serves as the host.
+In this scenario, Thingy:91 running the Serial Modem application serves as the host.
 You can use a PC as a client.
 
-.. _slm_connecting_thingy91_pc:
+.. _sm_connecting_thingy91_pc:
 
 Connecting with a PC
 --------------------
@@ -651,18 +651,18 @@ Connecting with a PC
 The nRF52840 SoC of Thingy:91 is pre-programmed with the :ref:`connectivity_bridge` application.
 To update the :ref:`connectivity_bridge` application, see the :ref:`programming_thingy` documentation.
 The :ref:`connectivity_bridge` application routes ``UART_0`` to ``USB_CDC0`` on Thingy:91.
-By enabling the :kconfig:option:`CONFIG_BRIDGE_BLE_ENABLE` Kconfig option in the :ref:`connectivity_bridge`, you can also use SLM over :ref:`nus_service_readme`.
+By enabling the :kconfig:option:`CONFIG_BRIDGE_BLE_ENABLE` Kconfig option in the :ref:`connectivity_bridge`, you can also use Serial Modem over :ref:`nus_service_readme`.
 
 To connect to a Thingy:91 with a PC:
 
-.. include:: slm_description.rst
-   :start-after: .. slm_connecting_91dk_pc_instr_start
-   :end-before: .. slm_connecting_91dk_pc_instr_end
+.. include:: sm_description.rst
+   :start-after: .. sm_connecting_91dk_pc_instr_start
+   :end-before: .. sm_connecting_91dk_pc_instr_end
 
-You can also test the i2c sensor on Thingy:91 using :ref:`SLM_AT_TWI`.
-See :ref:`slm_testing_twi` for more details.
+You can also test the i2c sensor on Thingy:91 using :ref:`SM_AT_TWI`.
+See :ref:`sm_testing_twi` for more details.
 
-.. _slm_testing_section:
+.. _sm_testing_section:
 
 Testing
 =======
@@ -675,29 +675,29 @@ If you have an nRF52 Series DK running a client application, you can also use th
 1. |connect_kit|
 #. :ref:`Connect to the kit with the Serial Terminal app <serial_terminal_connect>`.
    You can also use the :guilabel:`Open Serial Terminal` option of the `Cellular Monitor app`_ to open the Serial Terminal app.
-   If you want to use a different terminal emulator, see :ref:`slm_connecting_91dk_pc`.
+   If you want to use a different terminal emulator, see :ref:`sm_connecting_91dk_pc`.
 #. Reset the kit.
 #. Observe that the development kit sends a ``Ready\r\n`` message on UART.
 #. Send AT commands and observe the responses from the development kit.
 
-See :ref:`slm_testing` for typical test cases.
+See :ref:`sm_testing` for typical test cases.
 
 .. note::
 
-   If the initialization of SLM fails, the application sends an ``INIT ERROR\r\n`` message on UART if it has managed to enable UART.
+   If the initialization of Serial Modem fails, the application sends an ``INIT ERROR\r\n`` message on UART if it has managed to enable UART.
    See the logs for more information about the error.
    The logs are written to RTT by default.
 
-.. _slm_carrier_library_support:
+.. _sm_carrier_library_support:
 
 Using the LwM2M carrier library
 ===============================
 
-.. |application_sample_name| replace:: Serial LTE Modem application
+.. |application_sample_name| replace:: Serial Modem application
 
 .. include:: /includes/lwm2m_carrier_library.txt
 
-The certificate provisioning can also be done directly in the Serial LTE Modem application by using the same AT commands as described for the :ref:`at_client_sample` sample.
+The certificate provisioning can also be done directly in the Serial Modem application by using the same AT commands as described for the :ref:`at_client_sample` sample.
 
 When the :ref:`liblwm2m_carrier_readme` library is in use, by default the application will auto-connect to the network on startup.
 This behavior can be changed by disabling the :kconfig:option:`CONFIG_SM_AUTO_CONNECT` option.

@@ -15,27 +15,27 @@
 #include "sm_at_host.h"
 #include "sm_at_mqtt.h"
 
-LOG_MODULE_REGISTER(slm_mqtt, CONFIG_SM_LOG_LEVEL);
+LOG_MODULE_REGISTER(sm_mqtt, CONFIG_SM_LOG_LEVEL);
 
 #define MQTT_MAX_TOPIC_LEN	128
 #define MQTT_MAX_CID_LEN	64
 
-#define SLM_DEFAULT_CID		"slm_default_client_id"
+#define SM_DEFAULT_CID		"sm_default_client_id"
 
 /**@brief MQTT client operations. */
-enum slm_mqttcon_operation {
+enum sm_mqttcon_operation {
 	MQTTC_DISCONNECT,
 	MQTTC_CONNECT,
 	MQTTC_CONNECT6,
 };
 
 /**@brief MQTT subscribe operations. */
-enum slm_mqttsub_operation {
+enum sm_mqttsub_operation {
 	AT_MQTTSUB_UNSUB,
 	AT_MQTTSUB_SUB
 };
 
-static struct slm_mqtt_ctx {
+static struct sm_mqtt_ctx {
 	int family; /* Socket address family */
 	bool connected;
 	struct mqtt_utf8 client_id;
@@ -48,11 +48,11 @@ static struct slm_mqtt_ctx {
 	};
 } ctx;
 
-static char mqtt_broker_url[SLM_MAX_URL + 1];
+static char mqtt_broker_url[SM_MAX_URL + 1];
 static uint16_t mqtt_broker_port;
 static char mqtt_clientid[MQTT_MAX_CID_LEN + 1];
-static char mqtt_username[SLM_MAX_USERNAME + 1];
-static char mqtt_password[SLM_MAX_PASSWORD + 1];
+static char mqtt_username[SM_MAX_USERNAME + 1];
+static char mqtt_password[SM_MAX_PASSWORD + 1];
 
 static struct mqtt_publish_param pub_param;
 static uint8_t pub_topic[MQTT_MAX_TOPIC_LEN];
@@ -92,7 +92,7 @@ static int handle_mqtt_publish_evt(struct mqtt_client *const c, const struct mqt
 		mqtt_publish_qos2_receive(&client, &ack);
 	}
 
-	/* SLM MQTT client does not track the packet identifiers, so MQTT_QOS_2_EXACTLY_ONCE
+	/* MQTT client does not track the packet identifiers, so MQTT_QOS_2_EXACTLY_ONCE
 	 * promise is not kept. This deviates from MQTT v3.1.1.
 	 */
 	rsp_send("\r\n#XMQTTMSG: %d,%d\r\n",
@@ -102,9 +102,9 @@ static int handle_mqtt_publish_evt(struct mqtt_client *const c, const struct mqt
 		evt->param.publish.message.topic.topic.size);
 	data_send("\r\n", 2);
 	do {
-		ret = mqtt_read_publish_payload_blocking(c, slm_data_buf, sizeof(slm_data_buf));
+		ret = mqtt_read_publish_payload_blocking(c, sm_data_buf, sizeof(sm_data_buf));
 		if (ret > 0) {
-			data_send(slm_data_buf, ret);
+			data_send(sm_data_buf, ret);
 			size_read += ret;
 		}
 	} while (ret >= 0 && size_read < evt->param.publish.message.payload.len);
@@ -439,7 +439,7 @@ static int do_mqtt_disconnect(void)
 
 static int do_mqtt_publish(uint8_t *msg, size_t msg_len)
 {
-	/* SLM MQTT client does not store packets, so we will not retransmit packets
+	/* MQTT client does not store packets, so we will not retransmit packets
 	 * that are lacking response. This deviates from MQTT v3.1.1.
 	 */
 	pub_param.message.payload.data = msg;
@@ -485,7 +485,7 @@ static int do_mqtt_subscribe(uint16_t op,
 	return err;
 }
 
-SLM_AT_CMD_CUSTOM(xmqttcfg, "AT#XMQTTCFG", handle_at_mqtt_config);
+SM_AT_CMD_CUSTOM(xmqttcfg, "AT#XMQTTCFG", handle_at_mqtt_config);
 static int handle_at_mqtt_config(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 				 uint32_t param_count)
 {
@@ -534,7 +534,7 @@ static int handle_at_mqtt_config(enum at_parser_cmd_type cmd_type, struct at_par
 	return err;
 }
 
-SLM_AT_CMD_CUSTOM(xmqttcon, "AT#XMQTTCON", handle_at_mqtt_connect);
+SM_AT_CMD_CUSTOM(xmqttcon, "AT#XMQTTCON", handle_at_mqtt_connect);
 static int handle_at_mqtt_connect(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 				  uint32_t param_count)
 {
@@ -626,7 +626,7 @@ static int mqtt_datamode_callback(uint8_t op, const uint8_t *data, int len, uint
 	int ret = 0;
 
 	if (op == DATAMODE_SEND) {
-		if ((flags & SLM_DATAMODE_FLAGS_MORE_DATA) != 0) {
+		if ((flags & SM_DATAMODE_FLAGS_MORE_DATA) != 0) {
 			LOG_ERR("Datamode buffer overflow");
 			exit_datamode_handler(-EOVERFLOW);
 			return -EOVERFLOW;
@@ -640,7 +640,7 @@ static int mqtt_datamode_callback(uint8_t op, const uint8_t *data, int len, uint
 	return ret;
 }
 
-SLM_AT_CMD_CUSTOM(xmqttpub, "AT#XMQTTPUB", handle_at_mqtt_publish);
+SM_AT_CMD_CUSTOM(xmqttpub, "AT#XMQTTPUB", handle_at_mqtt_publish);
 static int handle_at_mqtt_publish(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 				  uint32_t param_count)
 {
@@ -649,7 +649,7 @@ static int handle_at_mqtt_publish(enum at_parser_cmd_type cmd_type, struct at_pa
 	uint16_t qos = MQTT_QOS_0_AT_MOST_ONCE;
 	uint16_t retain = 0;
 	size_t topic_sz = MQTT_MAX_TOPIC_LEN;
-	uint8_t pub_msg[SLM_MAX_PAYLOAD_SIZE];
+	uint8_t pub_msg[SM_MAX_PAYLOAD_SIZE];
 	size_t msg_sz = sizeof(pub_msg);
 
 	if (!ctx.connected) {
@@ -720,7 +720,7 @@ static int handle_at_mqtt_publish(enum at_parser_cmd_type cmd_type, struct at_pa
 	return err;
 }
 
-SLM_AT_CMD_CUSTOM(xmqttsub, "AT#XMQTTSUB", handle_at_mqtt_subscribe);
+SM_AT_CMD_CUSTOM(xmqttsub, "AT#XMQTTSUB", handle_at_mqtt_subscribe);
 static int handle_at_mqtt_subscribe(enum at_parser_cmd_type cmd_type,
 				    struct at_parser *parser, uint32_t param_count)
 {
@@ -762,7 +762,7 @@ static int handle_at_mqtt_subscribe(enum at_parser_cmd_type cmd_type,
 	return err;
 }
 
-SLM_AT_CMD_CUSTOM(xmqttunsub, "AT#XMQTTUNSUB", handle_at_mqtt_unsubscribe);
+SM_AT_CMD_CUSTOM(xmqttunsub, "AT#XMQTTUNSUB", handle_at_mqtt_unsubscribe);
 static int handle_at_mqtt_unsubscribe(enum at_parser_cmd_type cmd_type,
 				      struct at_parser *parser, uint32_t param_count)
 {
@@ -800,19 +800,19 @@ static int handle_at_mqtt_unsubscribe(enum at_parser_cmd_type cmd_type,
 	return err;
 }
 
-int slm_at_mqtt_init(void)
+int sm_at_mqtt_init(void)
 {
 	pub_param.message_id = 0;
 	memset(&ctx, 0, sizeof(ctx));
 	ctx.sec_tag = SEC_TAG_TLS_INVALID;
 
-	strcpy(mqtt_clientid, SLM_DEFAULT_CID);
+	strcpy(mqtt_clientid, SM_DEFAULT_CID);
 	do_mqtt_config(CONFIG_MQTT_KEEPALIVE, CONFIG_MQTT_CLEAN_SESSION);
 
 	return 0;
 }
 
-int slm_at_mqtt_uninit(void)
+int sm_at_mqtt_uninit(void)
 {
 	client.broker = NULL;
 

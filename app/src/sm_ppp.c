@@ -24,20 +24,20 @@
 #include <zephyr/pm/device.h>
 #include <assert.h>
 
-LOG_MODULE_REGISTER(slm_ppp, CONFIG_SM_LOG_LEVEL);
+LOG_MODULE_REGISTER(sm_ppp, CONFIG_SM_LOG_LEVEL);
 
 /* This keeps track of whether the user is registered to the CGEV notifications.
  * We need them to know when to start/stop the PPP link, but that should not
  * influence what the user receives, so we do the filtering based on this.
  */
-bool slm_fwd_cgev_notifs;
+bool sm_fwd_cgev_notifs;
 
 #if defined(CONFIG_SM_CMUX)
-BUILD_ASSERT(!DT_NODE_EXISTS(DT_CHOSEN(ncs_slm_ppp_uart)),
+BUILD_ASSERT(!DT_NODE_EXISTS(DT_CHOSEN(ncs_sm_ppp_uart)),
 	"When CMUX is enabled PPP is usable only through it so it cannot have its own UART.");
-static const struct device *ppp_uart_dev = DEVICE_DT_GET(DT_CHOSEN(ncs_slm_uart));
+static const struct device *ppp_uart_dev = DEVICE_DT_GET(DT_CHOSEN(ncs_sm_uart));
 #else
-static const struct device *ppp_uart_dev = DEVICE_DT_GET(DT_CHOSEN(ncs_slm_ppp_uart));
+static const struct device *ppp_uart_dev = DEVICE_DT_GET(DT_CHOSEN(ncs_sm_ppp_uart));
 #endif
 static struct net_if *ppp_iface;
 
@@ -233,7 +233,7 @@ static void delegate_ppp_event(enum ppp_action action, enum ppp_reason reason)
 		LOG_ERR("Failed to queue PPP event.");
 	}
 
-	k_work_submit_to_queue(&slm_work_q, &ppp_work.work);
+	k_work_submit_to_queue(&sm_work_q, &ppp_work.work);
 }
 
 static bool ppp_is_running(void)
@@ -337,7 +337,7 @@ static int ppp_start(void)
 	}
 
 #if defined(CONFIG_SM_CMUX)
-	ppp_pipe = slm_cmux_reserve(CMUX_PPP_CHANNEL);
+	ppp_pipe = sm_cmux_reserve(CMUX_PPP_CHANNEL);
 	/* The pipe opening is managed by CMUX. */
 #endif
 
@@ -371,7 +371,7 @@ error:
 	return ret;
 }
 
-bool slm_ppp_is_stopped(void)
+bool sm_ppp_is_stopped(void)
 {
 	return (ppp_state == PPP_STATE_STOPPED);
 }
@@ -400,7 +400,7 @@ static int ppp_stop(enum ppp_reason reason)
 	modem_ppp_release(&ppp_module);
 
 #if defined(CONFIG_SM_CMUX)
-	slm_cmux_release(CMUX_PPP_CHANNEL, reason == PPP_REASON_PEER_DISCONNECTED);
+	sm_cmux_release(CMUX_PPP_CHANNEL, reason == PPP_REASON_PEER_DISCONNECTED);
 #endif
 
 	net_if_carrier_off(ppp_iface);
@@ -438,19 +438,19 @@ static int at_cgerep_callback(char *buf, size_t len, char *at_cmd)
 	}
 	if (!set_cmd || subscribe) {
 		/* Forward the command to the modem only if not unsubscribing. */
-		ret = slm_util_at_cmd_no_intercept(buf, len, at_cmd);
+		ret = sm_util_at_cmd_no_intercept(buf, len, at_cmd);
 		if (ret) {
 			return ret;
 		}
 		/* Modify the output of the read command to reflect the user's
-		 * subscription status, not that of the SLM.
+		 * subscription status, not that of the Serial Modem.
 		 */
 		if (at_cmd[strlen("AT+CGEREP")] == '?') {
 			const size_t mode_idx = strlen("+CGEREP: ");
 
 			if (mode_idx < len) {
 				/* +CGEREP: <mode>,<bfr> */
-				buf[mode_idx] = '0' + slm_fwd_cgev_notifs;
+				buf[mode_idx] = '0' + sm_fwd_cgev_notifs;
 			}
 		}
 	} else { /* AT+CGEREP=0 */
@@ -458,7 +458,7 @@ static int at_cgerep_callback(char *buf, size_t len, char *at_cmd)
 	}
 
 	if (set_cmd) {
-		slm_fwd_cgev_notifs = subscribe;
+		sm_fwd_cgev_notifs = subscribe;
 	}
 	return 0;
 }
@@ -468,14 +468,14 @@ static void subscribe_cgev_notifications(void)
 	char buf[sizeof("\r\nOK")];
 
 	/* Bypass the CGEREP interception above as it is meant for commands received externally. */
-	const int ret = slm_util_at_cmd_no_intercept(buf, sizeof(buf), "AT+CGEREP=1");
+	const int ret = sm_util_at_cmd_no_intercept(buf, sizeof(buf), "AT+CGEREP=1");
 
 	if (ret) {
 		LOG_ERR("Failed to subscribe to +CGEV notifications (%d).", ret);
 	}
 }
 
-AT_MONITOR(slm_ppp_on_cgev, "CGEV", at_notif_on_cgev);
+AT_MONITOR(sm_ppp_on_cgev, "CGEV", at_notif_on_cgev);
 
 static void at_notif_on_cgev(const char *notify)
 {
@@ -516,7 +516,7 @@ AT_CMD_CUSTOM(at_cfun_set_interceptor, "AT+CFUN=", at_cfun_set_callback);
 static int at_cfun_set_callback(char *buf, size_t len, char *at_cmd)
 {
 	unsigned int mode;
-	const int ret = slm_util_at_cmd_no_intercept(buf, len, at_cmd);
+	const int ret = sm_util_at_cmd_no_intercept(buf, len, at_cmd);
 
 	/* sscanf() doesn't match if this is a test command (it also gets intercepted). */
 	if (ret || sscanf(at_cmd, "AT+CFUN=%u", &mode) != 1) {
@@ -528,7 +528,7 @@ static int at_cfun_set_callback(char *buf, size_t len, char *at_cmd)
 		subscribe_cgev_notifications();
 	} else if (mode == LTE_LC_FUNC_MODE_POWER_OFF) {
 		/* Unsubscribe the user as would normally happen. */
-		slm_fwd_cgev_notifs = false;
+		sm_fwd_cgev_notifs = false;
 	}
 	return 0;
 }
@@ -608,7 +608,7 @@ static void ppp_net_mgmt_event_handler(struct net_mgmt_event_callback *cb,
 	}
 }
 
-int slm_ppp_init(void)
+int sm_ppp_init(void)
 {
 #if !defined(CONFIG_SM_CMUX)
 	if (!device_is_ready(ppp_uart_dev)) {
@@ -655,7 +655,7 @@ int slm_ppp_init(void)
 	return 0;
 }
 
-SLM_AT_CMD_CUSTOM(xppp, "AT#XPPP", handle_at_ppp);
+SM_AT_CMD_CUSTOM(xppp, "AT#XPPP", handle_at_ppp);
 static int handle_at_ppp(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			 uint32_t param_count)
 {
@@ -748,7 +748,7 @@ static void ppp_data_passing_thread(void*, void*, void*)
 				pm_device_state_get(ppp_uart_dev, &state);
 				if (state != PM_DEVICE_STATE_ACTIVE) {
 					LOG_DBG("PPP data received but UART not active");
-					slm_ctrl_pin_indicate();
+					sm_ctrl_pin_indicate();
 				}
 			}
 			const ssize_t len =

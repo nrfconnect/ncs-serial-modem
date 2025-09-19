@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
-#ifndef SLM_NATIVE_TLS_
-#define SLM_NATIVE_TLS_
+#ifndef SM_NATIVE_TLS_
+#define SM_NATIVE_TLS_
 
-/**@file slm_native_tls.h
+/**@file sm_native_tls.h
  *
- * @brief Utility functions for serial LTE modem native TLS socket
+ * @brief Utility functions for Serial Modem native TLS socket
  * @{
  */
 
@@ -25,10 +25,10 @@
  * @param[in] len Length of the credential data.
  *
  * @retval 0 If succeeded.
- * @retval -E2BIG if credentials under sec_tag would exceed SLM_NATIVE_TLS_CREDENTIAL_BUFFER_SIZE.
+ * @retval -E2BIG if credentials under sec_tag would exceed SM_NATIVE_TLS_CREDENTIAL_BUFFER_SIZE.
  * @retval -errno Negative errno for other failures.
  */
-int slm_native_tls_store_credential(sec_tag_t sec_tag, uint16_t type, const void *data, size_t len);
+int sm_native_tls_store_credential(sec_tag_t sec_tag, uint16_t type, const void *data, size_t len);
 
 /**
  * @brief List credential sec_tags and types from Zephyr settings storage.
@@ -36,7 +36,7 @@ int slm_native_tls_store_credential(sec_tag_t sec_tag, uint16_t type, const void
  * @retval 0 If succeeded.
  * @retval -errno Negative errno for failures.
  */
-int slm_native_tls_list_credentials(void);
+int sm_native_tls_list_credentials(void);
 
 /**
  * @brief Load credentials from Zephyr settings storage to TLS credentials storage for Mbed TLS.
@@ -46,7 +46,7 @@ int slm_native_tls_list_credentials(void);
  * @retval 0 If succeeded.
  * @retval -errno Negative errno for failures.
  */
-int slm_native_tls_load_credentials(sec_tag_t sec_tag);
+int sm_native_tls_load_credentials(sec_tag_t sec_tag);
 
 /**
  * @brief Delete credential from Zephyr settings storage.
@@ -57,8 +57,8 @@ int slm_native_tls_load_credentials(sec_tag_t sec_tag);
  * @retval 0 If succeeded.
  * @retval -errno Negative errno for failures.
  */
-int slm_native_tls_delete_credential(sec_tag_t sec_tag, uint16_t type);
+int sm_native_tls_delete_credential(sec_tag_t sec_tag, uint16_t type);
 
 /** @} */
 
-#endif /* SLM_NATIVE_TLS_ */
+#endif /* SM_NATIVE_TLS_ */

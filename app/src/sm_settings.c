@@ -12,14 +12,14 @@
 #include "sm_at_fota.h"
 #include "sm_settings.h"
 
-LOG_MODULE_REGISTER(slm_settings, CONFIG_SM_LOG_LEVEL);
+LOG_MODULE_REGISTER(sm_settings, CONFIG_SM_LOG_LEVEL);
 
 static int settings_set(const char *name, size_t len, settings_read_cb read_cb, void *cb_arg)
 {
 	if (!strcmp(name, "modem_full_fota")) {
-		if (len != sizeof(slm_modem_full_fota))
+		if (len != sizeof(sm_modem_full_fota))
 			return -EINVAL;
-		if (read_cb(cb_arg, &slm_modem_full_fota, len) > 0)
+		if (read_cb(cb_arg, &sm_modem_full_fota, len) > 0)
 			return 0;
 	}
 	/* Simply ignore obsolete settings that are not in use anymore.
@@ -28,12 +28,12 @@ static int settings_set(const char *name, size_t len, settings_read_cb read_cb, 
 	return 0;
 }
 
-static struct settings_handler slm_settings_conf = {
-	.name = "slm",
+static struct settings_handler sm_settings_conf = {
+	.name = "sm",
 	.h_set = settings_set
 };
 
-int slm_settings_init(void)
+int sm_settings_init(void)
 {
 	int ret;
 
@@ -42,12 +42,12 @@ int slm_settings_init(void)
 		LOG_ERR("Init setting failed: %d", ret);
 		return ret;
 	}
-	ret = settings_register(&slm_settings_conf);
+	ret = settings_register(&sm_settings_conf);
 	if (ret) {
 		LOG_ERR("Register setting failed: %d", ret);
 		return ret;
 	}
-	ret = settings_load_subtree("slm");
+	ret = settings_load_subtree("sm");
 	if (ret) {
 		LOG_ERR("Load setting failed: %d", ret);
 	}
@@ -55,8 +55,8 @@ int slm_settings_init(void)
 	return ret;
 }
 
-int slm_settings_fota_save(void)
+int sm_settings_fota_save(void)
 {
-	return settings_save_one("slm/modem_full_fota",
-		&slm_modem_full_fota, sizeof(slm_modem_full_fota));
+	return settings_save_one("sm/modem_full_fota",
+		&sm_modem_full_fota, sizeof(sm_modem_full_fota));
 }

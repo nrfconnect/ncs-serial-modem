@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 
 config SM_TWI
-	bool "Access TWI interface with SLM AT command"
+	bool "Access TWI interface with Serial Modem AT command"
 	select I2C
 	default y if "$(dt_nodelabel_enabled,i2c0)" || \
 		     "$(dt_nodelabel_enabled,i2c1)" || \

@@ -6,7 +6,7 @@
 
 #
 # Script to start PPP link inside CMUX channel
-# using Serial LTE Modem
+# using Serial Modem
 #
 
 MODEM=/dev/ttyACM0

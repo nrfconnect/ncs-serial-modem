@@ -13,7 +13,7 @@
 #include "sm_at_host.h"
 #include "sm_at_icmp.h"
 
-LOG_MODULE_REGISTER(slm_icmp, CONFIG_SM_LOG_LEVEL);
+LOG_MODULE_REGISTER(sm_icmp, CONFIG_SM_LOG_LEVEL);
 
 #define ICMP_DEFAULT_LINK_MTU    1500
 #define ICMP_HDR_LEN             8
@@ -513,17 +513,17 @@ static int ping_test_handler(const char *target)
 		LOG_WRN("Address family not supported: %d", res->ai_family);
 	}
 
-	k_work_submit_to_queue(&slm_work_q, &ping_work);
+	k_work_submit_to_queue(&sm_work_q, &ping_work);
 	return 0;
 }
 
-SLM_AT_CMD_CUSTOM(xping, "AT#XPING", handle_at_icmp_ping);
+SM_AT_CMD_CUSTOM(xping, "AT#XPING", handle_at_icmp_ping);
 static int handle_at_icmp_ping(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			       uint32_t param_count)
 {
 	int err = -EINVAL;
-	char target[SLM_MAX_URL];
-	int size = SLM_MAX_URL;
+	char target[SM_MAX_URL];
+	int size = SM_MAX_URL;
 
 	switch (cmd_type) {
 	case AT_PARSER_CMD_TYPE_SET:
@@ -573,7 +573,7 @@ static int handle_at_icmp_ping(enum at_parser_cmd_type cmd_type, struct at_parse
 
 /**@brief API to initialize ICMP AT commands handler
  */
-int slm_at_icmp_init(void)
+int sm_at_icmp_init(void)
 {
 	k_work_init(&ping_work, ping_task);
 	return 0;
@@ -581,7 +581,7 @@ int slm_at_icmp_init(void)
 
 /**@brief API to uninitialize ICMP AT commands handler
  */
-int slm_at_icmp_uninit(void)
+int sm_at_icmp_uninit(void)
 {
 	return 0;
 }

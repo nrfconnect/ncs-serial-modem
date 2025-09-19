@@ -69,7 +69,7 @@
 #include "sm_cmux.h"
 #endif
 
-LOG_MODULE_REGISTER(slm_at, CONFIG_SM_LOG_LEVEL);
+LOG_MODULE_REGISTER(sm_at, CONFIG_SM_LOG_LEVEL);
 
 /** @brief Shutdown modes. */
 enum sleep_modes {
@@ -87,25 +87,25 @@ static struct {
 
 bool verify_datamode_control(uint16_t time_limit, uint16_t *time_limit_min);
 
-bool slm_is_modem_functional_mode(enum lte_lc_func_mode mode)
+bool sm_is_modem_functional_mode(enum lte_lc_func_mode mode)
 {
 	int cfun;
-	int rc = slm_util_at_scanf("AT+CFUN?", "+CFUN: %d", &cfun);
+	int rc = sm_util_at_scanf("AT+CFUN?", "+CFUN: %d", &cfun);
 
 	return (rc == 1 && cfun == mode);
 }
 
-int slm_power_off_modem(void)
+int sm_power_off_modem(void)
 {
 	/* "[...] there may be a delay until modem is disconnected from the network."
 	 * https://infocenter.nordicsemi.com/topic/ps_nrf9160/chapters/pmu/doc/operationmodes/system_off_mode.html
 	 * This will return once the modem responds, which means it has actually stopped.
 	 * This has been observed to take between 1 and 2 seconds when it is not already stopped.
 	 */
-	return slm_util_at_printf("AT+CFUN=0");
+	return sm_util_at_printf("AT+CFUN=0");
 }
 
-SLM_AT_CMD_CUSTOM(xslmver, "AT#XSLMVER", handle_at_slmver);
+SM_AT_CMD_CUSTOM(xslmver, "AT#XSLMVER", handle_at_slmver);
 static int handle_at_slmver(enum at_parser_cmd_type cmd_type, struct at_parser *, uint32_t)
 {
 	int ret = -EINVAL;
@@ -132,17 +132,17 @@ static int handle_at_slmver(enum at_parser_cmd_type cmd_type, struct at_parser *
 static void go_sleep_wk(struct k_work *)
 {
 	if (sleep_control.mode == SLEEP_MODE_IDLE) {
-		if (slm_at_host_power_off() == 0) {
-			slm_ctrl_pin_enter_idle();
+		if (sm_at_host_power_off() == 0) {
+			sm_ctrl_pin_enter_idle();
 		} else {
 			LOG_ERR("failed to power off UART");
 		}
 	} else if (sleep_control.mode == SLEEP_MODE_DEEP) {
-		slm_ctrl_pin_enter_sleep();
+		sm_ctrl_pin_enter_sleep();
 	}
 }
 
-SLM_AT_CMD_CUSTOM(xsleep, "AT#XSLEEP", handle_at_sleep);
+SM_AT_CMD_CUSTOM(xsleep, "AT#XSLEEP", handle_at_sleep);
 static int handle_at_sleep(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			   uint32_t)
 {
@@ -155,7 +155,7 @@ static int handle_at_sleep(enum at_parser_cmd_type cmd_type, struct at_parser *p
 		}
 		if (sleep_control.mode == SLEEP_MODE_DEEP ||
 		    sleep_control.mode == SLEEP_MODE_IDLE) {
-			k_work_reschedule(&sleep_control.work, SLM_UART_RESPONSE_DELAY);
+			k_work_reschedule(&sleep_control.work, SM_UART_RESPONSE_DELAY);
 		} else {
 			ret = -EINVAL;
 		}
@@ -175,51 +175,51 @@ static void final_call(void (*func)(void))
 	static struct k_work_delayable worker;
 
 	k_work_init_delayable(&worker, (k_work_handler_t)func);
-	k_work_schedule(&worker, SLM_UART_RESPONSE_DELAY);
+	k_work_schedule(&worker, SM_UART_RESPONSE_DELAY);
 }
 
-static void slm_shutdown(void)
+static void sm_shutdown(void)
 {
-	slm_at_host_uninit();
-	slm_power_off_modem();
+	sm_at_host_uninit();
+	sm_power_off_modem();
 	LOG_PANIC();
-	slm_ctrl_pin_enter_shutdown();
+	sm_ctrl_pin_enter_shutdown();
 }
 
-SLM_AT_CMD_CUSTOM(xshutdown, "AT#XSHUTDOWN", handle_at_shutdown);
+SM_AT_CMD_CUSTOM(xshutdown, "AT#XSHUTDOWN", handle_at_shutdown);
 static int handle_at_shutdown(enum at_parser_cmd_type cmd_type, struct at_parser *, uint32_t)
 {
 	if (cmd_type != AT_PARSER_CMD_TYPE_SET) {
 		return -EINVAL;
 	}
 
-	final_call(slm_shutdown);
+	final_call(sm_shutdown);
 	return 0;
 }
 
-FUNC_NORETURN void slm_reset(void)
+FUNC_NORETURN void sm_reset(void)
 {
-	slm_at_host_uninit();
-	slm_power_off_modem();
+	sm_at_host_uninit();
+	sm_power_off_modem();
 	LOG_PANIC();
 	sys_reboot(SYS_REBOOT_COLD);
 }
 
-SLM_AT_CMD_CUSTOM(xreset, "AT#XRESET", handle_at_reset);
+SM_AT_CMD_CUSTOM(xreset, "AT#XRESET", handle_at_reset);
 static int handle_at_reset(enum at_parser_cmd_type cmd_type, struct at_parser *, uint32_t)
 {
 	if (cmd_type != AT_PARSER_CMD_TYPE_SET) {
 		return -EINVAL;
 	}
 
-	final_call(slm_reset);
+	final_call(sm_reset);
 	return 0;
 }
 
-static void slm_modemreset(void)
+static void sm_modemreset(void)
 {
 	/* The modem must be put in minimal function mode before being shut down. */
-	slm_power_off_modem();
+	sm_power_off_modem();
 
 	unsigned int step = 1;
 	int ret;
@@ -231,15 +231,15 @@ static void slm_modemreset(void)
 	++step;
 
 #if defined(CONFIG_SM_FULL_FOTA)
-	if (slm_modem_full_fota) {
-		slm_finish_modem_full_fota();
+	if (sm_modem_full_fota) {
+		sm_finish_modem_full_fota();
 	}
 #endif
 
 	ret = nrf_modem_lib_init();
 
-	if (slm_fota_type & DFU_TARGET_IMAGE_TYPE_ANY_MODEM) {
-		slm_fota_post_process();
+	if (sm_fota_type & DFU_TARGET_IMAGE_TYPE_ANY_MODEM) {
+		sm_fota_post_process();
 	}
 
 out:
@@ -252,7 +252,7 @@ out:
 	rsp_send_ok();
 }
 
-SLM_AT_CMD_CUSTOM(xmodemreset, "AT#XMODEMRESET", handle_at_modemreset);
+SM_AT_CMD_CUSTOM(xmodemreset, "AT#XMODEMRESET", handle_at_modemreset);
 static int handle_at_modemreset(enum at_parser_cmd_type cmd_type, struct at_parser *, uint32_t)
 {
 	if (cmd_type != AT_PARSER_CMD_TYPE_SET) {
@@ -262,12 +262,12 @@ static int handle_at_modemreset(enum at_parser_cmd_type cmd_type, struct at_pars
 	/* Return immediately to allow the custom command handling in libmodem to finish processing,
 	 * before restarting libmodem.
 	 */
-	final_call(slm_modemreset);
+	final_call(sm_modemreset);
 
 	return -SILENT_AT_COMMAND_RET;
 }
 
-SLM_AT_CMD_CUSTOM(xuuid, "AT#XUUID", handle_at_uuid);
+SM_AT_CMD_CUSTOM(xuuid, "AT#XUUID", handle_at_uuid);
 static int handle_at_uuid(enum at_parser_cmd_type cmd_type, struct at_parser *, uint32_t)
 {
 	int ret;
@@ -288,7 +288,7 @@ static int handle_at_uuid(enum at_parser_cmd_type cmd_type, struct at_parser *, 
 	return ret;
 }
 
-SLM_AT_CMD_CUSTOM(xdatactrl, "AT#XDATACTRL", handle_at_datactrl);
+SM_AT_CMD_CUSTOM(xdatactrl, "AT#XDATACTRL", handle_at_datactrl);
 static int handle_at_datactrl(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			      uint32_t)
 {
@@ -302,15 +302,15 @@ static int handle_at_datactrl(enum at_parser_cmd_type cmd_type, struct at_parser
 			return ret;
 		}
 		if (time_limit > 0 && verify_datamode_control(time_limit, NULL)) {
-			slm_datamode_time_limit = time_limit;
+			sm_datamode_time_limit = time_limit;
 		} else {
 			return -EINVAL;
 		}
 		break;
 
 	case AT_PARSER_CMD_TYPE_READ:
-		(void)verify_datamode_control(slm_datamode_time_limit, &time_limit_min);
-		rsp_send("\r\n#XDATACTRL: %d,%d\r\n", slm_datamode_time_limit, time_limit_min);
+		(void)verify_datamode_control(sm_datamode_time_limit, &time_limit_min);
+		rsp_send("\r\n#XDATACTRL: %d,%d\r\n", sm_datamode_time_limit, time_limit_min);
 		break;
 
 	case AT_PARSER_CMD_TYPE_TEST:
@@ -324,14 +324,14 @@ static int handle_at_datactrl(enum at_parser_cmd_type cmd_type, struct at_parser
 	return ret;
 }
 
-SLM_AT_CMD_CUSTOM(xclac, "AT#XCLAC", handle_at_clac);
+SM_AT_CMD_CUSTOM(xclac, "AT#XCLAC", handle_at_clac);
 static int handle_at_clac(enum at_parser_cmd_type cmd_type, struct at_parser *, uint32_t)
 {
 	if (cmd_type != AT_PARSER_CMD_TYPE_SET) {
 		return -EINVAL;
 	}
 
-	/* Use AT_CMD_CUSTOM listing for extracting SLM AT commands. */
+	/* Use AT_CMD_CUSTOM listing for extracting Serial Modem AT commands. */
 	extern struct nrf_modem_at_cmd_custom _nrf_modem_at_cmd_custom_list_start[];
 	extern struct nrf_modem_at_cmd_custom _nrf_modem_at_cmd_custom_list_end[];
 	size_t cmd_custom_count = _nrf_modem_at_cmd_custom_list_end -
@@ -341,7 +341,7 @@ static int handle_at_clac(enum at_parser_cmd_type cmd_type, struct at_parser *, 
 	memset(base_cmd_len, 0, cmd_custom_count * sizeof(size_t));
 	rsp_send("\r\n");
 	for (size_t i = 0; i < cmd_custom_count; i++) {
-		/* SLM at commands start with AT#X. */
+		/* Serial Modem at commands start with AT#X. */
 		if (strncasecmp(_nrf_modem_at_cmd_custom_list_start[i].cmd, "AT#X",
 				strlen("AT#X"))) {
 			continue;
@@ -373,7 +373,7 @@ static int handle_at_clac(enum at_parser_cmd_type cmd_type, struct at_parser *, 
 	return 0;
 }
 
-int slm_at_init(void)
+int sm_at_init(void)
 {
 	int err;
 
@@ -381,40 +381,40 @@ int slm_at_init(void)
 	k_work_init_delayable(&sleep_control.work, go_sleep_wk);
 #endif
 
-	err = slm_at_tcp_proxy_init();
+	err = sm_at_tcp_proxy_init();
 	if (err) {
 		LOG_ERR("TCP Server could not be initialized: %d", err);
 		return -EFAULT;
 	}
-	err = slm_at_udp_proxy_init();
+	err = sm_at_udp_proxy_init();
 	if (err) {
 		LOG_ERR("UDP Server could not be initialized: %d", err);
 		return -EFAULT;
 	}
-	err = slm_at_socket_init();
+	err = sm_at_socket_init();
 	if (err) {
 		LOG_ERR("TCPIP could not be initialized: %d", err);
 		return -EFAULT;
 	}
-	err = slm_at_icmp_init();
+	err = sm_at_icmp_init();
 	if (err) {
 		LOG_ERR("ICMP could not be initialized: %d", err);
 		return -EFAULT;
 	}
 #if defined(CONFIG_SM_SMS)
-	err = slm_at_sms_init();
+	err = sm_at_sms_init();
 	if (err) {
 		LOG_ERR("SMS could not be initialized: %d", err);
 		return -EFAULT;
 	}
 #endif
-	err = slm_at_fota_init();
+	err = sm_at_fota_init();
 	if (err) {
 		LOG_ERR("FOTA could not be initialized: %d", err);
 		return -EFAULT;
 	}
 #if defined(CONFIG_SM_NRF_CLOUD)
-	err = slm_at_nrfcloud_init();
+	err = sm_at_nrfcloud_init();
 	if (err) {
 		/* Allow nRF Cloud initialization to fail as sometimes JWT is missing
 		 * especially during development.
@@ -424,66 +424,66 @@ int slm_at_init(void)
 	}
 #endif
 #if defined(CONFIG_SM_GNSS)
-	err = slm_at_gnss_init();
+	err = sm_at_gnss_init();
 	if (err) {
 		LOG_ERR("GNSS could not be initialized: %d", err);
 		return -EFAULT;
 	}
 #endif
 #if defined(CONFIG_SM_FTPC)
-	err = slm_at_ftp_init();
+	err = sm_at_ftp_init();
 	if (err) {
 		LOG_ERR("FTP could not be initialized: %d", err);
 		return -EFAULT;
 	}
 #endif
 #if defined(CONFIG_SM_MQTTC)
-	err = slm_at_mqtt_init();
+	err = sm_at_mqtt_init();
 	if (err) {
 		LOG_ERR("MQTT could not be initialized: %d", err);
 		return -EFAULT;
 	}
 #endif
 #if defined(CONFIG_SM_HTTPC)
-	err = slm_at_httpc_init();
+	err = sm_at_httpc_init();
 	if (err) {
 		LOG_ERR("HTTP could not be initialized: %d", err);
 		return -EFAULT;
 	}
 #endif
 #if defined(CONFIG_SM_GPIO)
-	err = slm_at_gpio_init();
+	err = sm_at_gpio_init();
 	if (err) {
 		LOG_ERR("GPIO could not be initialized: %d", err);
 		return -EFAULT;
 	}
 #endif
 #if defined(CONFIG_SM_TWI)
-	err = slm_at_twi_init();
+	err = sm_at_twi_init();
 	if (err) {
 		LOG_ERR("TWI could not be initialized: %d", err);
 		return -EFAULT;
 	}
 #endif
 #if defined(CONFIG_SM_CARRIER)
-	err = slm_at_carrier_init();
+	err = sm_at_carrier_init();
 	if (err) {
 		LOG_ERR("LwM2M carrier could not be initialized: %d", err);
 		return -EFAULT;
 	}
 #endif
 #if defined(CONFIG_LWM2M_CARRIER_SETTINGS)
-	err = slm_at_carrier_cfg_init();
+	err = sm_at_carrier_cfg_init();
 	if (err) {
 		LOG_ERR("LwM2M carrier could not be initialized: %d", err);
 		return -EFAULT;
 	}
 #endif
 #if defined(CONFIG_SM_CMUX)
-	slm_cmux_init();
+	sm_cmux_init();
 #endif
 #if defined(CONFIG_SM_PPP)
-	err = slm_ppp_init();
+	err = sm_ppp_init();
 	if (err) {
 		LOG_ERR("PPP initialization failed. (%d)", err);
 		return err;
@@ -492,80 +492,80 @@ int slm_at_init(void)
 	return err;
 }
 
-void slm_at_uninit(void)
+void sm_at_uninit(void)
 {
 	int err;
 
-	err = slm_at_tcp_proxy_uninit();
+	err = sm_at_tcp_proxy_uninit();
 	if (err) {
 		LOG_WRN("TCP Server could not be uninitialized: %d", err);
 	}
-	err = slm_at_udp_proxy_uninit();
+	err = sm_at_udp_proxy_uninit();
 	if (err) {
 		LOG_WRN("UDP Server could not be uninitialized: %d", err);
 	}
-	err = slm_at_socket_uninit();
+	err = sm_at_socket_uninit();
 	if (err) {
 		LOG_WRN("TCPIP could not be uninitialized: %d", err);
 	}
-	err = slm_at_icmp_uninit();
+	err = sm_at_icmp_uninit();
 	if (err) {
 		LOG_WRN("ICMP could not be uninitialized: %d", err);
 	}
 #if defined(CONFIG_SM_SMS)
-	err = slm_at_sms_uninit();
+	err = sm_at_sms_uninit();
 	if (err) {
 		LOG_WRN("SMS could not be uninitialized: %d", err);
 	}
 #endif
-	err = slm_at_fota_uninit();
+	err = sm_at_fota_uninit();
 	if (err) {
 		LOG_WRN("FOTA could not be uninitialized: %d", err);
 	}
 #if defined(CONFIG_SM_NRF_CLOUD)
-	err = slm_at_nrfcloud_uninit();
+	err = sm_at_nrfcloud_uninit();
 	if (err) {
 		LOG_WRN("nRF Cloud could not be uninitialized: %d", err);
 	}
 #endif
 #if defined(CONFIG_SM_GNSS)
-	err = slm_at_gnss_uninit();
+	err = sm_at_gnss_uninit();
 	if (err) {
 		LOG_WRN("GNSS could not be uninitialized: %d", err);
 	}
 #endif
 #if defined(CONFIG_SM_FTPC)
-	err = slm_at_ftp_uninit();
+	err = sm_at_ftp_uninit();
 	if (err) {
 		LOG_WRN("FTP could not be uninitialized: %d", err);
 	}
 #endif
 #if defined(CONFIG_SM_MQTTC)
-	err = slm_at_mqtt_uninit();
+	err = sm_at_mqtt_uninit();
 	if (err) {
 		LOG_WRN("MQTT could not be uninitialized: %d", err);
 	}
 #endif
 #if defined(CONFIG_SM_HTTPC)
-	err = slm_at_httpc_uninit();
+	err = sm_at_httpc_uninit();
 	if (err) {
 		LOG_WRN("HTTP could not be uninitialized: %d", err);
 	}
 #endif
 #if defined(CONFIG_SM_TWI)
-	err = slm_at_twi_uninit();
+	err = sm_at_twi_uninit();
 	if (err) {
 		LOG_ERR("TWI could not be uninit: %d", err);
 	}
 #endif
 #if defined(CONFIG_SM_GPIO)
-	err = slm_at_gpio_uninit();
+	err = sm_at_gpio_uninit();
 	if (err) {
 		LOG_ERR("GPIO could not be uninit: %d", err);
 	}
 #endif
 #if defined(CONFIG_SM_CARRIER)
-	err = slm_at_carrier_uninit();
+	err = sm_at_carrier_uninit();
 	if (err) {
 		LOG_ERR("LwM2M carrier could not be uninitialized: %d", err);
 	}

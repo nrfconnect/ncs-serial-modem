@@ -8,7 +8,7 @@
 
 / {
 	chosen {
-		ncs,slm-uart = &uart1;
+		ncs,sm-uart = &uart1;
 	};
 };
 

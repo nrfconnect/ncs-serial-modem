@@ -1,4 +1,4 @@
-.. _slm_testing:
+.. _sm_testing:
 
 Testing scenarios
 #################
@@ -12,15 +12,15 @@ They list the required AT commands and the expected responses.
 
 Some scenarios are generic and should work out of the box, while others require you to set up a server that you can test against.
 
-See :ref:`slm_building` for instructions on how to build and run the Serial LTE modem application.
-:ref:`slm_testing_section` describes how to turn on the modem and conduct the tests.
+See :ref:`sm_building` for instructions on how to build and run the Serial LTE modem application.
+:ref:`sm_testing_section` describes how to turn on the modem and conduct the tests.
 
 Generic AT commands
 *******************
 
-Complete the following steps to test the functionality provided by the :ref:`SLM_AT_gen`:
+Complete the following steps to test the functionality provided by the :ref:`SM_AT_gen`:
 
-1. Retrieve the version of the serial LTE modem application.
+1. Retrieve the version of the Serial Modem application.
 
    .. parsed-literal::
       :class: highlight
@@ -56,7 +56,7 @@ Complete the following steps to test the functionality provided by the :ref:`SLM
 TCP/UDP AT commands
 *******************
 
-The following sections show how to test the functionalities provided by the :ref:`SLM_AT_SOCKET` and the :ref:`SLM_AT_TCP_UDP`.
+The following sections show how to test the functionalities provided by the :ref:`SM_AT_SOCKET` and the :ref:`SM_AT_TCP_UDP`.
 
 Network connection is required for these tests, so insert a SIM card and connect to the network:
 
@@ -376,7 +376,7 @@ A TLS client connection requires a valid certificate for the TLS server.
 Update your TLS (root) certificate in PEM format with your selected security tag (in this example, 1000), and start the modem:
 
    .. note::
-      Sending multi-line text to SLM requires the terminal to be configured to use `<CR><LF>` as the line ending.
+      Sending multi-line text to Serial Modem requires the terminal to be configured to use `<CR><LF>` as the line ending.
 
    .. parsed-literal::
       :class: highlight
@@ -1116,7 +1116,7 @@ After opening a client-role socket, you can configure various options.
 ICMP AT commands
 ****************
 
-Complete the following steps to test the functionality provided by the :ref:`SLM_AT_ICMP`:
+Complete the following steps to test the functionality provided by the :ref:`SM_AT_ICMP`:
 
 1. Ping a remote host, for example, *www.google.com*.
 
@@ -1163,7 +1163,7 @@ Before you test the FTP AT commands, check the setting of the :kconfig:option:`C
 By default, the :ref:`lib_ftp_client` library keeps the connection to the FTP server alive for 60 seconds, but you can change the duration or turn KEEPALIVE off by setting :kconfig:option:`CONFIG_FTP_CLIENT_KEEPALIVE_TIME` to 0.
 
 The FTP client behavior depends on the FTP server that is used for testing.
-Complete the following steps to test the functionality provided by the :ref:`SLM_AT_FTP` with two example servers:
+Complete the following steps to test the functionality provided by the :ref:`SM_AT_FTP` with two example servers:
 
 1. Test an FTP connection to *speedtest.tele2.net*.
 
@@ -1558,7 +1558,7 @@ Complete the following steps to test the functionality provided by the :ref:`SLM
          221 Logout.
          OK
 
-.. _slm_testing_twi:
+.. _sm_testing_twi:
 
 TWI AT commands
 ***************
