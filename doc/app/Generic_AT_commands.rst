@@ -38,7 +38,7 @@ The ``<ncs_version>`` value is a string containing the version of the |NCS|.
 
 The ``<libmodem_version>`` value is a string containing the version of the modem library.
 
-The ``<customer_version>`` value is the :ref:`CONFIG_SLM_CUSTOMER_VERSION <CONFIG_SLM_CUSTOMER_VERSION>` string, if defined.
+The ``<customer_version>`` value is the :ref:`CONFIG_SM_CUSTOMER_VERSION <CONFIG_SM_CUSTOMER_VERSION>` string, if defined.
 
 Example
 ~~~~~~~
@@ -146,14 +146,14 @@ The ``<sleep_mode>`` parameter accepts only the following integer values:
 * ``1`` - Enter Sleep.
   In this mode, both the SLM service and the LTE connection are terminated.
 
-  The nRF91 Series SiP can be woken up using the pin specified with the :ref:`CONFIG_SLM_POWER_PIN <CONFIG_SLM_POWER_PIN>` Kconfig option.
+  The nRF91 Series SiP can be woken up using the pin specified with the :ref:`CONFIG_SM_POWER_PIN <CONFIG_SM_POWER_PIN>` Kconfig option.
 
 * ``2`` - Enter Idle.
   In this mode, both the SLM service and the LTE connection are maintained.
 
-  The nRF91 Series SiP can be made to exit idle using the pin specified with the :ref:`CONFIG_SLM_POWER_PIN <CONFIG_SLM_POWER_PIN>` Kconfig option.
-  If the :ref:`CONFIG_SLM_INDICATE_PIN <CONFIG_SLM_INDICATE_PIN>` Kconfig option is defined, SLM toggles the specified pin when there is data for the MCU to read.
-  The MCU can in turn make SLM exit idle by toggling the pin specified with the :ref:`CONFIG_SLM_POWER_PIN <CONFIG_SLM_POWER_PIN>` Kconfig option.
+  The nRF91 Series SiP can be made to exit idle using the pin specified with the :ref:`CONFIG_SM_POWER_PIN <CONFIG_SM_POWER_PIN>` Kconfig option.
+  If the :ref:`CONFIG_SM_INDICATE_PIN <CONFIG_SM_INDICATE_PIN>` Kconfig option is defined, SLM toggles the specified pin when there is data for the MCU to read.
+  The MCU can in turn make SLM exit idle by toggling the pin specified with the :ref:`CONFIG_SM_POWER_PIN <CONFIG_SM_POWER_PIN>` Kconfig option.
   The data is buffered when SLM is idle and sent to the MCU after having exited idle.
 
 .. note::
@@ -240,7 +240,7 @@ Syntax
 
 .. note::
 
-   In this case the nRF91 Series SiP cannot be woken up using the pin specified with the :ref:`CONFIG_SLM_POWER_PIN <CONFIG_SLM_POWER_PIN>` Kconfig option.
+   In this case the nRF91 Series SiP cannot be woken up using the pin specified with the :ref:`CONFIG_SM_POWER_PIN <CONFIG_SM_POWER_PIN>` Kconfig option.
 
 Example
 ~~~~~~~~
@@ -405,7 +405,7 @@ The test command is not supported.
 Native TLS CMNG #XCMNG
 ======================
 
-The ``#XCMNG`` command manages the credentials to support :ref:`CONFIG_SLM_NATIVE_TLS <CONFIG_SLM_NATIVE_TLS>`, which is activated with the :file:`overlay-native_tls.conf` configuration file.
+The ``#XCMNG`` command manages the credentials to support :ref:`CONFIG_SM_NATIVE_TLS <CONFIG_SM_NATIVE_TLS>`, which is activated with the :file:`overlay-native_tls.conf` configuration file.
 This command is similar to the modem ``%CMNG`` command, but it utilizes Zephyr setting storage instead of modem credential storage.
 
 .. note::

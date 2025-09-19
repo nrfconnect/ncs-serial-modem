@@ -23,7 +23,7 @@
 #include "sm_at_host.h"
 #include "sm_at_fota.h"
 
-LOG_MODULE_REGISTER(slm_fota, CONFIG_SLM_LOG_LEVEL);
+LOG_MODULE_REGISTER(slm_fota, CONFIG_SM_LOG_LEVEL);
 
 /* file_uri: scheme://hostname[:port]path[?parameters] */
 #define FILE_URI_MAX	CONFIG_DOWNLOADER_MAX_FILENAME_SIZE
@@ -56,7 +56,7 @@ int32_t slm_fota_info;
 static char path[FILE_URI_MAX];
 static char hostname[URI_HOST_MAX];
 
-#if defined(CONFIG_SLM_FULL_FOTA)
+#if defined(CONFIG_SM_FULL_FOTA)
 /* Buffer used as temporary storage when downloading the modem firmware.
  */
 #define FMFU_BUF_SIZE	32
@@ -313,7 +313,7 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 			break;
 		case SLM_FOTA_START_APP:
 		case SLM_FOTA_START_MFW:
-#if defined(CONFIG_SLM_FULL_FOTA)
+#if defined(CONFIG_SM_FULL_FOTA)
 		case SLM_FOTA_START_FULL_FOTA:
 #endif
 			char uri[FILE_URI_MAX];
@@ -332,7 +332,7 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 			if (op == SLM_FOTA_START_APP) {
 				type = DFU_TARGET_IMAGE_TYPE_MCUBOOT;
 			}
-#if defined(CONFIG_SLM_FULL_FOTA)
+#if defined(CONFIG_SM_FULL_FOTA)
 			else if (op == SLM_FOTA_START_FULL_FOTA)  {
 				fdev.dev = flash_dev;
 				fdev.size = DT_PROP(FLASH_NODE, size) / 8;
@@ -389,7 +389,7 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 		break;
 
 	case AT_PARSER_CMD_TYPE_TEST:
-#if defined(CONFIG_SLM_FULL_FOTA)
+#if defined(CONFIG_SM_FULL_FOTA)
 		rsp_send("\r\n#XFOTA: (%d,%d,%d,%d,%d,%d)[,<file_url>[,<sec_tag>[,<pdn_id>]]]\r\n",
 			SLM_FOTA_STOP, SLM_FOTA_START_APP, SLM_FOTA_START_MFW,
 			SLM_FOTA_MFW_READ, SLM_FOTA_ERASE_MFW, SLM_FOTA_START_FULL_FOTA);
@@ -471,7 +471,7 @@ void slm_fota_post_process(void)
 	slm_settings_fota_save();
 }
 
-#if defined(CONFIG_SLM_FULL_FOTA)
+#if defined(CONFIG_SM_FULL_FOTA)
 
 FUNC_NORETURN static void handle_full_fota_activation_fail(int ret)
 {
@@ -538,4 +538,4 @@ void slm_finish_modem_full_fota(void)
 	LOG_INF("Full modem firmware update complete.");
 }
 
-#endif /* CONFIG_SLM_FULL_FOTA */
+#endif /* CONFIG_SM_FULL_FOTA */

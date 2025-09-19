@@ -14,11 +14,11 @@
 #include "sm_at_host.h"
 #include "sm_at_socket.h"
 #include "sm_at_udp_proxy.h"
-#if defined(CONFIG_SLM_NATIVE_TLS)
+#if defined(CONFIG_SM_NATIVE_TLS)
 #include "sm_native_tls.h"
 #endif
 
-LOG_MODULE_REGISTER(slm_udp, CONFIG_SLM_LOG_LEVEL);
+LOG_MODULE_REGISTER(slm_udp, CONFIG_SM_LOG_LEVEL);
 
 #define THREAD_STACK_SIZE	KB(4)
 #define THREAD_PRIORITY		K_LOWEST_APPLICATION_THREAD_PRIO
@@ -82,7 +82,7 @@ static int do_udp_server_start(uint16_t port)
 	proxy.sock = ret;
 
 	if (proxy.sec_tag != SEC_TAG_TLS_INVALID) {
-#ifndef CONFIG_SLM_NATIVE_TLS
+#ifndef CONFIG_SM_NATIVE_TLS
 		LOG_ERR("Not supported");
 		ret = -ENOTSUP;
 		goto exit_svr;
@@ -169,7 +169,7 @@ static int do_udp_proxy_close(void)
 	if (ret < 0) {
 		return -errno;
 	}
-	ret = k_thread_join(&udp_thread, K_SECONDS(CONFIG_SLM_UDP_POLL_TIME));
+	ret = k_thread_join(&udp_thread, K_SECONDS(CONFIG_SM_UDP_POLL_TIME));
 	if (ret) {
 		LOG_WRN("Thread terminate failed: %d", ret);
 
@@ -201,7 +201,7 @@ static int do_udp_client_connect(const char *url, uint16_t port, uint16_t cid)
 	proxy.sock = ret;
 
 	if (using_dtls) {
-#if defined(CONFIG_SLM_NATIVE_TLS)
+#if defined(CONFIG_SM_NATIVE_TLS)
 		ret = slm_native_tls_load_credentials(proxy.sec_tag);
 		if (ret < 0) {
 			LOG_ERR("Failed to load sec tag: %d (%d)", proxy.sec_tag, ret);
@@ -412,7 +412,7 @@ static void udp_thread_func(void *p1, void *p2, void *p3)
 	fds[EVENT_FD].events = ZSOCK_POLLIN;
 
 	do {
-		ret = zsock_poll(fds, ARRAY_SIZE(fds), MSEC_PER_SEC * CONFIG_SLM_UDP_POLL_TIME);
+		ret = zsock_poll(fds, ARRAY_SIZE(fds), MSEC_PER_SEC * CONFIG_SM_UDP_POLL_TIME);
 		if (ret < 0) {  /* IO error */
 			LOG_WRN("zsock_poll() error: %d", ret);
 			continue;
@@ -525,7 +525,7 @@ static int udp_datamode_callback(uint8_t op, const uint8_t *data, int len, uint8
 		LOG_DBG("datamode exit");
 		if ((flags & SLM_DATAMODE_FLAGS_EXIT_HANDLER) != 0) {
 			/* Datamode exited unexpectedly. */
-			rsp_send(CONFIG_SLM_DATAMODE_TERMINATOR);
+			rsp_send(CONFIG_SM_DATAMODE_TERMINATOR);
 		}
 	}
 

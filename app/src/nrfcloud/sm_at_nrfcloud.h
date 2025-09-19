@@ -12,7 +12,7 @@
  * @brief Vendor-specific AT command for nRF Cloud service.
  * @{
  */
-#if defined(CONFIG_SLM_NRF_CLOUD)
+#if defined(CONFIG_SM_NRF_CLOUD)
 
 #include <stdbool.h>
 
@@ -38,6 +38,6 @@ int slm_at_nrfcloud_init(void);
  */
 int slm_at_nrfcloud_uninit(void);
 
-#endif /* CONFIG_SLM_NRF_CLOUD */
+#endif /* CONFIG_SM_NRF_CLOUD */
 /** @} */
 #endif /* SLM_AT_NRFCLOUD_ */

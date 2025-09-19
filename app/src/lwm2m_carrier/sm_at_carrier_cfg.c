@@ -12,7 +12,7 @@
 #include "sm_settings.h"
 #include "sm_util.h"
 
-LOG_MODULE_REGISTER(slm_carrier_cfg, CONFIG_SLM_LOG_LEVEL);
+LOG_MODULE_REGISTER(slm_carrier_cfg, CONFIG_SM_LOG_LEVEL);
 
 /* AT#XCARRIERCFG="apn"[,<apn>] */
 SLM_AT_CMD_CUSTOM(xcarriercfg_apn, "AT#XCARRIERCFG=\"apn\"", do_cfg_apn);
@@ -42,7 +42,7 @@ SLM_AT_CMD_CUSTOM(xcarriercfg_auto_startup, "AT#XCARRIERCFG=\"auto_startup\"", d
 static int do_cfg_auto_startup(enum at_parser_cmd_type, struct at_parser *parser,
 			       uint32_t param_count)
 {
-#if !defined(CONFIG_SLM_CARRIER_AUTO_STARTUP)
+#if !defined(CONFIG_SM_CARRIER_AUTO_STARTUP)
 	if (param_count == 2) {
 		rsp_send("\r\n#XCARRIERCFG: %u\r\n", lwm2m_settings_auto_startup_get());
 		return 0;
@@ -66,7 +66,7 @@ static int do_cfg_auto_startup(enum at_parser_cmd_type, struct at_parser *parser
 	return lwm2m_settings_auto_startup_set(auto_startup);
 #else
 	LOG_ERR("AT#XCARRIERCFG=\"auto_startup\" not available when"
-		" CONFIG_SLM_CARRIER_AUTO_STARTUP is enabled");
+		" CONFIG_SM_CARRIER_AUTO_STARTUP is enabled");
 
 	return -1;
 #endif
@@ -713,7 +713,7 @@ static int do_cfg_uri(enum at_parser_cmd_type, struct at_parser *parser, uint32_
 
 int slm_at_carrier_cfg_init(void)
 {
-	if (IS_ENABLED(CONFIG_SLM_CARRIER_AUTO_STARTUP)) {
+	if (IS_ENABLED(CONFIG_SM_CARRIER_AUTO_STARTUP)) {
 		return lwm2m_settings_auto_startup_set(true);
 	}
 

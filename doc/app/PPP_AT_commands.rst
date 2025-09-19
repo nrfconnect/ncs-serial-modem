@@ -18,7 +18,7 @@ See the :ref:`slm_config_files` section for more information.
 
 .. note::
 
-   If :ref:`CMUX <CONFIG_SLM_CMUX>` is enabled, PPP is usable only through a CMUX channel.
+   If :ref:`CMUX <CONFIG_SM_CMUX>` is enabled, PPP is usable only through a CMUX channel.
    In that case, the CMUX link should be set up before PPP is started.
 
 Control PPP #XPPP

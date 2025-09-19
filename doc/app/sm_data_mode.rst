@@ -60,17 +60,17 @@ Sending data in data mode
 
 Any arbitrary data received from the MCU is sent to LTE network *as-is*.
 
-If the current sending function succeeds and :ref:`CONFIG_SLM_DATAMODE_URC <CONFIG_SLM_DATAMODE_URC>` is defined, the SLM application reports back the total size as ``#XDATAMODE: <size>``.
+If the current sending function succeeds and :ref:`CONFIG_SM_DATAMODE_URC <CONFIG_SM_DATAMODE_URC>` is defined, the SLM application reports back the total size as ``#XDATAMODE: <size>``.
 The ``<size>`` value is a positive integer.
 This Unsolicited Result Code (URC) can also be used to impose flow control on uplink sending.
 
 .. note::
-  If the sending operation fails due to a network problem while in data mode, the SLM application moves to a state where the data received from UART is dropped until the MCU sends the termination command :ref:`CONFIG_SLM_DATAMODE_TERMINATOR <CONFIG_SLM_DATAMODE_TERMINATOR>`.
+  If the sending operation fails due to a network problem while in data mode, the SLM application moves to a state where the data received from UART is dropped until the MCU sends the termination command :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>`.
 
 Exiting data mode
 =================
 
-To exit the data mode, the MCU sends the termination command set by the :ref:`CONFIG_SLM_DATAMODE_TERMINATOR <CONFIG_SLM_DATAMODE_TERMINATOR>` configuration option over UART.
+To exit the data mode, the MCU sends the termination command set by the :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` configuration option over UART.
 
 The pattern string could be sent alone or as an affix to the data.
 The pattern string must be sent in full.
@@ -80,14 +80,14 @@ When exiting the data mode, the SLM application sends the ``#XDATAMODE`` unsolic
 After exiting the data mode, the SLM application returns to the AT command mode.
 
 .. note::
-  The SLM application sends the termination string :ref:`CONFIG_SLM_DATAMODE_TERMINATOR <CONFIG_SLM_DATAMODE_TERMINATOR>` and moves to a state where the data received on the UART is dropped in the following scenarios:
+  The SLM application sends the termination string :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` and moves to a state where the data received on the UART is dropped in the following scenarios:
 
   * The TCP server is stopped due to an error.
   * The remote server disconnects the TCP client.
   * The TCP client disconnects from the remote server due to an error.
   * The UDP client disconnects from the remote server due to an error.
 
-  For SLM to stop dropping the data received from UART and move to AT-command mode, the MCU needs to send the termination command :ref:`CONFIG_SLM_DATAMODE_TERMINATOR <CONFIG_SLM_DATAMODE_TERMINATOR>` back to the SLM application.
+  For SLM to stop dropping the data received from UART and move to AT-command mode, the MCU needs to send the termination command :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` back to the SLM application.
 
 Triggering the transmission
 ===========================
@@ -114,7 +114,7 @@ If the data mode buffer fills, the data are transmitted to the LTE network.
    There is no unsolicited notification defined for this event.
    UART hardware flow control is responsible for imposing and revoking flow control.
 
-The data mode buffer size is controlled by :ref:`CONFIG_SLM_DATAMODE_BUF_SIZE <CONFIG_SLM_DATAMODE_BUF_SIZE>`.
+The data mode buffer size is controlled by :ref:`CONFIG_SM_DATAMODE_BUF_SIZE <CONFIG_SM_DATAMODE_BUF_SIZE>`.
 
 .. note::
    The whole buffer is sent in a single operation.
@@ -125,22 +125,22 @@ Configuration options
 
 Check and configure the following configuration options for data mode:
 
-.. _CONFIG_SLM_DATAMODE_TERMINATOR:
+.. _CONFIG_SM_DATAMODE_TERMINATOR:
 
-CONFIG_SLM_DATAMODE_TERMINATOR - Pattern string to terminate data mode
+CONFIG_SM_DATAMODE_TERMINATOR - Pattern string to terminate data mode
    This option specifies a pattern string to terminate data mode.
    The default pattern string is ``+++``.
 
-.. _CONFIG_SLM_DATAMODE_URC:
+.. _CONFIG_SM_DATAMODE_URC:
 
-CONFIG_SLM_DATAMODE_URC - Send URC in data mode
+CONFIG_SM_DATAMODE_URC - Send URC in data mode
    This option reports the result of the previous data-sending operation while the SLM application remains in data mode.
    The MCU could use this URC for application-level uplink flow control.
    It is not selected by default.
 
-.. _CONFIG_SLM_DATAMODE_BUF_SIZE:
+.. _CONFIG_SM_DATAMODE_BUF_SIZE:
 
-CONFIG_SLM_DATAMODE_BUF_SIZE - Buffer size for data mode
+CONFIG_SM_DATAMODE_BUF_SIZE - Buffer size for data mode
    This option defines the buffer size for the data mode.
    The default value is 4096.
 
@@ -171,7 +171,7 @@ Syntax
 
 * The ``<time_limit>`` parameter sets the timeout value in milliseconds.
   The default value is the minimum required value, based on the configured UART baud rate.
-  This value must be long enough to allow for a DMA transmission of an UART receive (RX) buffer (:ref:`CONFIG_SLM_UART_RX_BUF_SIZE <CONFIG_SLM_UART_RX_BUF_SIZE>`).
+  This value must be long enough to allow for a DMA transmission of an UART receive (RX) buffer (:ref:`CONFIG_SM_UART_RX_BUF_SIZE <CONFIG_SM_UART_RX_BUF_SIZE>`).
 
 Read command
 ------------
@@ -214,7 +214,7 @@ Response syntax
 Exit data mode #XDATAMODE
 =========================
 
-When the application receives the termination command :ref:`CONFIG_SLM_DATAMODE_TERMINATOR <CONFIG_SLM_DATAMODE_TERMINATOR>` in data mode, it sends the ``#XDATAMODE`` unsolicited notification.
+When the application receives the termination command :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` in data mode, it sends the ``#XDATAMODE`` unsolicited notification.
 
 Unsolicited notification
 ------------------------

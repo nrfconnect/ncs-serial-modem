@@ -11,7 +11,7 @@
 #include "sm_util.h"
 #include "sm_at_host.h"
 
-LOG_MODULE_REGISTER(slm_sms, CONFIG_SLM_LOG_LEVEL);
+LOG_MODULE_REGISTER(slm_sms, CONFIG_SM_LOG_LEVEL);
 
 #define MAX_CONCATENATED_MESSAGE  3
 

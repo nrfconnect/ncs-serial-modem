@@ -5,7 +5,7 @@
  */
 
 /*
- * This file defines the network configuration when CONFIG_SLM_AUTO_CONNECT is enabled.
+ * This file defines the network configuration when CONFIG_SM_AUTO_CONNECT is enabled.
  */
 
 /* Network-specific default system mode configured by %XSYSTEMMODE (refer to AT command manual) */

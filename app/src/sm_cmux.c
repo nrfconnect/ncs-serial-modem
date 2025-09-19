@@ -5,7 +5,7 @@
  */
 #include "sm_cmux.h"
 #include "sm_at_host.h"
-#if defined(CONFIG_SLM_PPP)
+#if defined(CONFIG_SM_PPP)
 #include "sm_ppp.h"
 #endif
 #include "sm_util.h"
@@ -16,7 +16,7 @@
 #include <assert.h>
 
 /* This makes use of part of the Zephyr modem subsystem which has a CMUX module. */
-LOG_MODULE_REGISTER(slm_cmux, CONFIG_SLM_LOG_LEVEL);
+LOG_MODULE_REGISTER(slm_cmux, CONFIG_SM_LOG_LEVEL);
 
 #define CHANNEL_COUNT (1 + CMUX_EXT_CHANNEL_COUNT)
 
@@ -36,9 +36,9 @@ static struct {
 	struct modem_pipe *uart_pipe;
 	bool uart_pipe_open;
 	struct modem_backend_uart_slm uart_backend;
-	uint8_t uart_backend_receive_buf[CONFIG_SLM_CMUX_UART_BUFFER_SIZE]
+	uint8_t uart_backend_receive_buf[CONFIG_SM_CMUX_UART_BUFFER_SIZE]
 		__aligned(sizeof(void *));
-	uint8_t uart_backend_transmit_buf[CONFIG_SLM_CMUX_UART_BUFFER_SIZE];
+	uint8_t uart_backend_transmit_buf[CONFIG_SM_CMUX_UART_BUFFER_SIZE];
 
 	/* CMUX */
 	struct modem_cmux instance;
@@ -62,7 +62,7 @@ static struct {
 
 	/* Outgoing data for AT DLCI. */
 	struct ring_buf tx_rb;
-	uint8_t tx_buffer[CONFIG_SLM_CMUX_TX_BUFFER_SIZE];
+	uint8_t tx_buffer[CONFIG_SM_CMUX_TX_BUFFER_SIZE];
 	struct k_mutex tx_rb_mutex;
 	struct k_work tx_work;
 
@@ -346,13 +346,13 @@ void slm_cmux_init(void)
 
 static struct cmux_dlci *cmux_get_dlci(enum cmux_channel channel)
 {
-#if defined(CONFIG_SLM_PPP)
+#if defined(CONFIG_SM_PPP)
 	if (channel == CMUX_PPP_CHANNEL) {
 		/* The first DLCI that is not the AT channel's is PPP's. */
 		return &cmux.dlcis[!cmux.at_channel];
 	}
 #endif
-#if defined(CONFIG_SLM_GNSS_OUTPUT_NMEA_ON_CMUX_CHANNEL)
+#if defined(CONFIG_SM_GNSS_OUTPUT_NMEA_ON_CMUX_CHANNEL)
 	if (channel == CMUX_GNSS_CHANNEL) {
 		/* The last DLCI. */
 		return &cmux.dlcis[CHANNEL_COUNT - 1];
@@ -374,7 +374,7 @@ void slm_cmux_release(enum cmux_channel channel, bool fallback)
 {
 	struct cmux_dlci *dlci = cmux_get_dlci(channel);
 
-#if defined(CONFIG_SLM_CMUX_AUTOMATIC_FALLBACK_ON_PPP_STOPPAGE)
+#if defined(CONFIG_SM_CMUX_AUTOMATIC_FALLBACK_ON_PPP_STOPPAGE)
 	if (channel == CMUX_PPP_CHANNEL && fallback) {
 		cmux.at_channel = 0;
 	}
@@ -387,7 +387,7 @@ static int cmux_start(void)
 	int ret;
 
 	if (cmux_is_started()) {
-		ret = modem_pipe_open(cmux.uart_pipe, K_SECONDS(CONFIG_SLM_MODEM_PIPE_TIMEOUT));
+		ret = modem_pipe_open(cmux.uart_pipe, K_SECONDS(CONFIG_SM_MODEM_PIPE_TIMEOUT));
 		if (!ret) {
 			cmux.uart_pipe_open = true;
 			LOG_INF("CMUX resumed.");
@@ -416,7 +416,7 @@ static int cmux_start(void)
 		return ret;
 	}
 
-	ret = modem_pipe_open(cmux.uart_pipe, K_SECONDS(CONFIG_SLM_MODEM_PIPE_TIMEOUT));
+	ret = modem_pipe_open(cmux.uart_pipe, K_SECONDS(CONFIG_SM_MODEM_PIPE_TIMEOUT));
 	if (!ret) {
 		cmux.uart_pipe_open = true;
 	}
@@ -460,12 +460,12 @@ static int handle_at_cmux(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 
 	if (param_count == 2) {
 		ret = at_parser_num_get(parser, 1, &at_dlci);
-		if (ret || (at_dlci != 1 && (!IS_ENABLED(CONFIG_SLM_PPP) || at_dlci != 2))) {
+		if (ret || (at_dlci != 1 && (!IS_ENABLED(CONFIG_SM_PPP) || at_dlci != 2))) {
 			return -EINVAL;
 		}
 		const unsigned int at_channel = DLCI_TO_INDEX(at_dlci);
 
-#if defined(CONFIG_SLM_PPP)
+#if defined(CONFIG_SM_PPP)
 		if (!slm_ppp_is_stopped() && at_channel != cmux.at_channel) {
 			/* The AT channel cannot be changed when PPP has a channel reserved. */
 			return -ENOTSUP;
