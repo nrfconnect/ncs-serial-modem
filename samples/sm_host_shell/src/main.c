@@ -10,7 +10,7 @@
 
 LOG_MODULE_REGISTER(app, CONFIG_LOG_DEFAULT_LEVEL);
 
-SLM_MONITOR(network, "\r\n+CEREG:", cereg_mon);
+SM_MONITOR(network, "\r\n+CEREG:", cereg_mon);
 
 static void cereg_mon(const char *notif)
 {
@@ -21,18 +21,18 @@ static void cereg_mon(const char *notif)
 	}
 }
 
-void slm_shell_data_indication(const uint8_t *data, size_t datalen)
+void sm_host_shell_data_indication(const uint8_t *data, size_t datalen)
 {
 	LOG_INF("Data received (len=%d): %.*s", datalen, datalen, (const char *)data);
 }
 
 #if (CONFIG_SM_HOST_INDICATE_PIN >= 0)
-void slm_shell_indication_handler(void)
+void sm_host_shell_indication_handler(void)
 {
 	int err;
 
-	LOG_INF("SLM indicate pin triggered");
-	err = modem_slm_power_pin_toggle();
+	LOG_INF("Serial Modem indicate pin triggered");
+	err = sm_host_power_pin_toggle();
 	if (err) {
 		LOG_ERR("Failed to toggle power pin");
 	}
@@ -43,15 +43,15 @@ int main(void)
 {
 	int err;
 
-	LOG_INF("SLM Shell starts on %s", CONFIG_BOARD);
+	LOG_INF("Serial Modem Host Shell starts on %s", CONFIG_BOARD);
 
-	err = modem_slm_init(slm_shell_data_indication);
+	err = sm_host_init(sm_host_shell_data_indication);
 	if (err) {
-		LOG_ERR("Failed to initialize SLM: %d", err);
+		LOG_ERR("Failed to initialize Serial Modem: %d", err);
 	}
 
 #if (CONFIG_SM_HOST_INDICATE_PIN >= 0)
-	err = modem_slm_register_ind(slm_shell_indication_handler, true);
+	err = sm_host_register_ind(sm_host_shell_indication_handler, true);
 	if (err) {
 		LOG_ERR("Failed to register indication: %d", err);
 	}

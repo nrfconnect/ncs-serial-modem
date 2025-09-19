@@ -14,7 +14,7 @@
 #include <zephyr/shell/shell_rtt.h>
 #include <zephyr/logging/log.h>
 
-LOG_MODULE_REGISTER(mdm_slm, CONFIG_SM_HOST_LOG_LEVEL);
+LOG_MODULE_REGISTER(sm_host, CONFIG_SM_HOST_LOG_LEVEL);
 
 BUILD_ASSERT(CONFIG_SM_HOST_POWER_PIN >= 0, "Power pin not configured");
 
@@ -23,13 +23,13 @@ BUILD_ASSERT(CONFIG_SM_HOST_POWER_PIN >= 0, "Power pin not configured");
 #define UART_ERROR_DELAY_MS     500
 #define UART_TX_TIMEOUT_US      100000
 
-/* SLM has formatted AT response based on TS 27.007 */
+/* Serial Modem has formatted AT response based on TS 27.007 */
 #define AT_CMD_OK_STR    "\r\nOK\r\n"
 #define AT_CMD_ERROR_STR "\r\nERROR\r\n"
 #define AT_CMD_CMS_STR   "\r\n+CMS ERROR:"
 #define AT_CMD_CME_STR   "\r\n+CME ERROR:"
 
-static const struct device *uart_dev = DEVICE_DT_GET(DT_CHOSEN(ncs_slm_uart));
+static const struct device *uart_dev = DEVICE_DT_GET(DT_CHOSEN(ncs_sm_uart));
 
 static struct k_work_delayable rx_process_work;
 struct rx_buf_t {
@@ -40,7 +40,7 @@ BUILD_ASSERT(CONFIG_SM_HOST_AT_CMD_RESP_MAX_SIZE > CONFIG_SM_HOST_UART_RX_BUF_SI
 
 /* Slabs for RX buffer. */
 #define UART_SLAB_BLOCK_SIZE sizeof(struct rx_buf_t)
-#define UART_SLAB_BLOCK_COUNT CONFIG_SLM_UART_RX_BUF_COUNT
+#define UART_SLAB_BLOCK_COUNT CONFIG_SM_UART_RX_BUF_COUNT
 #define UART_SLAB_ALIGNMENT sizeof(uint32_t)
 BUILD_ASSERT(UART_SLAB_BLOCK_SIZE % UART_SLAB_ALIGNMENT == 0);
 K_MEM_SLAB_DEFINE_STATIC(rx_slab, UART_SLAB_BLOCK_SIZE, CONFIG_SM_HOST_UART_RX_BUF_COUNT,
@@ -66,24 +66,24 @@ enum uart_recovery_state {
 static atomic_t recovery_state;
 static K_SEM_DEFINE(at_rsp, 0, 1);
 
-static slm_data_handler_t data_handler;
-static enum at_cmd_state slm_at_state;
+static sm_data_handler_t data_handler;
+static enum at_cmd_state sm_at_state;
 
-#if DT_HAS_CHOSEN(ncs_slm_gpio)
-static const struct device *gpio_dev = DEVICE_DT_GET(DT_CHOSEN(ncs_slm_gpio));
+#if DT_HAS_CHOSEN(ncs_sm_gpio)
+static const struct device *gpio_dev = DEVICE_DT_GET(DT_CHOSEN(ncs_sm_gpio));
 #else
 static const struct device *gpio_dev = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 #endif
 static struct k_work_delayable gpio_power_pin_disable_work;
-static slm_ind_handler_t ind_handler;
-static slm_ind_handler_t ind_handler_backup;
+static sm_ind_handler_t ind_handler;
+static sm_ind_handler_t ind_handler_backup;
 
 #if defined(CONFIG_SM_HOST_SHELL)
 static const struct shell *global_shell;
-static const char at_usage_str[] = "Usage: slm <at_command>";
+static const char at_usage_str[] = "Usage: sm <at_command>";
 #endif
 
-extern void slm_monitor_dispatch(const char *notif, size_t len);
+extern void sm_monitor_dispatch(const char *notif, size_t len);
 extern char *strnstr(const char *haystack, const char *needle, size_t haystack_sz);
 
 #if (CONFIG_SM_HOST_INDICATE_PIN >= 0)
@@ -144,7 +144,7 @@ static void gpio_power_pin_disable_work_fn(struct k_work *work)
 	if (gpio_pin_set(gpio_dev, CONFIG_SM_HOST_POWER_PIN, 0) != 0) {
 		LOG_WRN("GPIO set error");
 	}
-	/* When SLM is woken up, indicate pin must be enabled */
+	/* When Serial Modem is woken up, indicate pin must be enabled */
 	(void)indicate_pin_enable();
 
 	LOG_INF("Disable power pin");
@@ -251,7 +251,7 @@ static void rx_recovery(void)
 /* Attempts to find AT responses in the UART buffer. */
 static size_t parse_at_response(const char *data, size_t datalen)
 {
-	/* SLM AT responses are formatted based on TS 27.007. */
+	/* Serial Modem AT responses are formatted based on TS 27.007. */
 	static const char * const at_responses[] = {
 		[AT_CMD_OK] = "\r\nOK\r\n",
 		[AT_CMD_ERROR] = "\r\nERROR\r\n",
@@ -266,7 +266,7 @@ static size_t parse_at_response(const char *data, size_t datalen)
 		if (match) {
 			if (at_state == AT_CMD_OK || at_state == AT_CMD_ERROR) {
 				/* Found a match. */
-				slm_at_state = at_state;
+				sm_at_state = at_state;
 				return match - data + strlen(at_responses[at_state]);
 			}
 			/* Search for the "\r\n" at the end of the response. */
@@ -274,7 +274,7 @@ static size_t parse_at_response(const char *data, size_t datalen)
 			match = strnstr(match, "\r\n", datalen - (match - data));
 			if (match) {
 				/* Found a match. */
-				slm_at_state = at_state;
+				sm_at_state = at_state;
 				return match - data + 2;
 			}
 		}
@@ -295,7 +295,7 @@ static void response_handler(const uint8_t *data, const size_t len)
 	memcpy(at_cmd_resp + resp_len, data, copy_len);
 	resp_len += copy_len;
 
-	if (slm_at_state == AT_CMD_PENDING) {
+	if (sm_at_state == AT_CMD_PENDING) {
 		size_t processed = parse_at_response(at_cmd_resp, resp_len);
 
 		if (processed == 0 && resp_len == sizeof(at_cmd_resp)) {
@@ -328,8 +328,8 @@ static void response_handler(const uint8_t *data, const size_t len)
 		}
 	}
 
-	if (slm_at_state != AT_CMD_PENDING && resp_len > 0) {
-		slm_monitor_dispatch((const char *)at_cmd_resp, resp_len);
+	if (sm_at_state != AT_CMD_PENDING && resp_len > 0) {
+		sm_monitor_dispatch((const char *)at_cmd_resp, resp_len);
 
 #if defined(CONFIG_SM_HOST_SHELL)
 		shell_print(global_shell, "%.*s", resp_len, (char *)at_cmd_resp);
@@ -553,7 +553,7 @@ static void gpio_cb_func(const struct device *dev, struct gpio_callback *gpio_cb
 	if (ind_handler) {
 		ind_handler();
 	} else {
-		LOG_WRN("Indicate PIN configured but slm_ind_handler_t not defined");
+		LOG_WRN("Indicate PIN configured but sm_ind_handler_t not defined");
 	}
 }
 #endif  /* CONFIG_SM_HOST_INDICATE_PIN */
@@ -579,7 +579,7 @@ static int gpio_init(void)
 	return err;
 }
 
-int modem_slm_init(slm_data_handler_t handler)
+int sm_host_init(sm_data_handler_t handler)
 {
 	int err;
 
@@ -591,7 +591,7 @@ int modem_slm_init(slm_data_handler_t handler)
 	data_handler = handler;
 	ind_handler = NULL;
 	ind_handler_backup = NULL;
-	slm_at_state = AT_CMD_OK;
+	sm_at_state = AT_CMD_OK;
 
 	err = gpio_init();
 	if (err != 0) {
@@ -617,7 +617,7 @@ int modem_slm_init(slm_data_handler_t handler)
 	return 0;
 }
 
-int modem_slm_uninit(void)
+int sm_host_uninit(void)
 {
 	rx_disable();
 
@@ -628,12 +628,12 @@ int modem_slm_uninit(void)
 	data_handler = NULL;
 	ind_handler = NULL;
 	ind_handler_backup = NULL;
-	slm_at_state = AT_CMD_OK;
+	sm_at_state = AT_CMD_OK;
 
 	return 0;
 }
 
-int modem_slm_register_ind(slm_ind_handler_t handler, bool wakeup)
+int sm_host_register_ind(sm_ind_handler_t handler, bool wakeup)
 {
 #if (CONFIG_SM_HOST_INDICATE_PIN >= 0)
 	if (ind_handler != NULL) {
@@ -655,7 +655,7 @@ int modem_slm_register_ind(slm_ind_handler_t handler, bool wakeup)
 #endif
 }
 
-int modem_slm_power_pin_toggle(void)
+int sm_host_power_pin_toggle(void)
 {
 	int err;
 
@@ -677,7 +677,7 @@ int modem_slm_power_pin_toggle(void)
 	return 0;
 }
 
-int modem_slm_send_cmd(const char *const command, uint32_t timeout)
+int sm_host_send_cmd(const char *const command, uint32_t timeout)
 {
 	int ret;
 
@@ -686,7 +686,7 @@ int modem_slm_send_cmd(const char *const command, uint32_t timeout)
 	 */
 	(void)indicate_pin_enable();
 
-	slm_at_state = AT_CMD_PENDING;
+	sm_at_state = AT_CMD_PENDING;
 	ret = tx_write(command, strlen(command), false);
 	if (ret < 0) {
 		return ret;
@@ -712,74 +712,74 @@ int modem_slm_send_cmd(const char *const command, uint32_t timeout)
 		return ret;
 	}
 
-	return slm_at_state;
+	return sm_at_state;
 }
 
-int modem_slm_send_data(const uint8_t *const data, size_t datalen)
+int sm_host_send_data(const uint8_t *const data, size_t datalen)
 {
 	return tx_write(data, datalen, true);
 }
 
 #if defined(CONFIG_SM_HOST_SHELL)
 
-int modem_slm_shell(const struct shell *shell, size_t argc, char **argv)
+int sm_host_shell(const struct shell *shell, size_t argc, char **argv)
 {
 	if (argc < 2) {
 		shell_print(shell, "%s", at_usage_str);
 		return 0;
 	}
 
-	return modem_slm_send_cmd(argv[1], 10);
+	return sm_host_send_cmd(argv[1], 10);
 }
 
-int modem_slm_shell_slmsh_powerpin(const struct shell *shell, size_t argc, char **argv)
+int sm_host_shell_smsh_powerpin(const struct shell *shell, size_t argc, char **argv)
 {
 	int err;
 
-	err = modem_slm_power_pin_toggle();
+	err = sm_host_power_pin_toggle();
 	if (err) {
 		LOG_ERR("Failed to toggle power pin");
 	}
 	return 0;
 }
 
-int modem_slm_shell_slmsh_indicate_enable(const struct shell *shell, size_t argc, char **argv)
+int sm_host_shell_smsh_indicate_enable(const struct shell *shell, size_t argc, char **argv)
 {
 	LOG_INF("Enable indicate pin callback");
-	(void)modem_slm_register_ind(ind_handler_backup, true);
+	(void)sm_host_register_ind(ind_handler_backup, true);
 	(void)indicate_pin_enable();
 	return 0;
 }
 
-int modem_slm_shell_slmsh_indicate_disable(const struct shell *shell, size_t argc, char **argv)
+int sm_host_shell_smsh_indicate_disable(const struct shell *shell, size_t argc, char **argv)
 {
 	LOG_INF("Disable indicate pin callback");
 	/* indicate_pin_disable() is not called so we get one indication where we just log
 	 * a warning that indications are not coming and then disable the indication pin.
 	 */
-	return modem_slm_register_ind(NULL, true);
+	return sm_host_register_ind(NULL, true);
 }
 
-SHELL_CMD_REGISTER(slm, NULL, "Send AT commands to SLM device", modem_slm_shell);
+SHELL_CMD_REGISTER(sm, NULL, "Send AT commands to Serial Modem device", sm_host_shell);
 
 SHELL_STATIC_SUBCMD_SET_CREATE(
 	sub_indicate,
 	SHELL_CMD(enable, NULL, "Enable/disable indicate pin callback",
-		  modem_slm_shell_slmsh_indicate_enable),
+		  sm_host_shell_smsh_indicate_enable),
 	SHELL_CMD(disable, NULL, "Disable indicate pin callback",
-		  modem_slm_shell_slmsh_indicate_disable),
+		  sm_host_shell_smsh_indicate_disable),
 	SHELL_SUBCMD_SET_END
 );
 
 SHELL_STATIC_SUBCMD_SET_CREATE(
-	sub_slmsh,
+	sub_smsh,
 	SHELL_CMD(powerpin, NULL, "Toggle power pin configured with CONFIG_SM_HOST_POWER_PIN",
-		  modem_slm_shell_slmsh_powerpin),
+		  sm_host_shell_smsh_powerpin),
 	SHELL_CMD(indicate, &sub_indicate, "Enable/disable indicate pin callback",
 		  NULL),
 	SHELL_SUBCMD_SET_END
 );
 
-SHELL_CMD_REGISTER(slmsh, &sub_slmsh, "Commands handled in SLM shell device", NULL);
+SHELL_CMD_REGISTER(smsh, &sub_smsh, "Commands handled in Serial Modem Host shell device", NULL);
 
 #endif /* CONFIG_SM_HOST_SHELL */

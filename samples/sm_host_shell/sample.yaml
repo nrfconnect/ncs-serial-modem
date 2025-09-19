@@ -1,8 +1,8 @@
 sample:
-  description: SLM shell sample
-  name: slm shell
+  description: Serial Modem Shell sample
+  name: SM shell
 tests:
-  sample.cellular.slm_shell:
+  sample.cellular.sm_host_shell:
     sysbuild: true
     build_only: true
     platform_allow:
@@ -17,7 +17,7 @@ tests:
       - ci_build
       - sysbuild
       - ci_samples_cellular
-  sample.cellular.slm_shell.no_indicate_pin:
+  sample.cellular.sm_host_shell.no_indicate_pin:
     sysbuild: true
     build_only: true
     extra_configs:
