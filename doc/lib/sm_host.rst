@@ -1,19 +1,19 @@
 .. _lib_sm_host:
 
-Modem Serial Modem
-#########
+Serial Modem Host
+#################
 
 .. contents::
    :local:
    :depth: 2
 
-The Modem Serial Modem library exposes the AT command interface of the :ref:`Serial LTE Modem <sm_description>` application for external devices over a serial interface.
+The Serial Modem Host library exposes the AT command interface of the :ref:`Serial Modem <sm_description>` application for external devices over a serial interface.
 This library is for applications running on external MCU that is built with |NCS| and is connected to an nRF91 Series SiP through UART.
 
 Overview
 ********
 
-The Modem Serial Modem library allows you to perform the following functions:
+The Serial Modem Host library allows you to perform the following functions:
 
 * Manage the serial interface so that the application only decides which UART device to use and configures its DTS.
 * Manage the GPIO pins, with support for bidirectional indication and power pin.
@@ -114,10 +114,10 @@ Request toggling of the power pin from the Modem Serial Modem library to put the
      [00:00:34.538,513] <inf> app: Data received (len=7): Ready
      uart:~$
 
-Serial Modem Monitor usage
-*****************
+Serial Modem Host Monitor usage
+*******************************
 
-The Serial Modem Monitor has similar functions to the :ref:`at_monitor_readme` library, except "Direct dispatching".
+The Serial Modem Host Monitor has similar functions to the :ref:`at_monitor_readme` library, except "Direct dispatching".
 
   .. code-block:: console
 
@@ -126,7 +126,7 @@ The Serial Modem Monitor has similar functions to the :ref:`at_monitor_readme` l
 API documentation
 *****************
 
-| Header file: :file:`include/modem/sm_host.h`
+| Header file: :file:`include/sm_host.h`
 | Source file: :file:`lib/sm_host/sm_host.c`
 | Source file: :file:`lib/sm_host/sm_host_monitor.c`
 

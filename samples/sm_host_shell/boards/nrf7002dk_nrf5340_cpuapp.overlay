@@ -6,8 +6,8 @@
 
 / {
 	chosen {
-		ncs,slm-uart = &uart2;
-		ncs,slm-gpio = &gpio0;
+		ncs,sm-uart = &uart2;
+		ncs,sm-gpio = &gpio0;
 	};
 };
 
@@ -17,7 +17,7 @@
 	status = "okay";
 };
 
-/* SLM Shell <-> SLM UART */
+/* Serial Modem Host Shell <-> Serial Modem UART */
 &uart2 {
 	compatible = "nordic,nrf-uarte";
 	current-speed = <115200>;

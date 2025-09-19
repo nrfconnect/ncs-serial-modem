@@ -7,7 +7,7 @@ Cellular: Serial Modem Host Shell
    :local:
    :depth: 2
 
-The Serial Modem Host Shell sample demonstrates how to send AT commands to modem through the :ref:`Serial LTE Modem <sm_description>` application running on nRF91 Series SiP.
+The Serial Modem Host Shell sample demonstrates how to send AT commands to modem through the :ref:`Serial Modem <sm_description>` application running on nRF91 Series SiP.
 This sample enables an external MCU to send modem or Serial Modem proprietary AT commands for LTE connection and IP services.
 See more information on the functionality of this sample from the :ref:`lib_sm_host` library, which provides the core functionality for this sample.
 
