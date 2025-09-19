@@ -5,7 +5,7 @@
  */
 
 #include <stdlib.h>
-#include <modem_slm.h>
+#include <sm_host.h>
 #include <zephyr/logging/log.h>
 
 LOG_MODULE_REGISTER(app, CONFIG_LOG_DEFAULT_LEVEL);

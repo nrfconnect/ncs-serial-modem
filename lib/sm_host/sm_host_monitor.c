@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
-#include <modem_slm.h>
+#include <sm_host.h>
 #include <zephyr/logging/log.h>
 #include <string.h>
 
