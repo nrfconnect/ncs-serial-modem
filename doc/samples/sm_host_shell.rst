@@ -1,20 +1,20 @@
-.. _slm_shell_sample:
+.. _sm_shell_sample:
 
-Cellular: SLM Shell
-###################
+Cellular: Serial Modem Host Shell
+#################################
 
 .. contents::
    :local:
    :depth: 2
 
-The SLM Shell sample demonstrates how to send AT commands to modem through the :ref:`Serial LTE Modem <slm_description>` application running on nRF91 Series SiP.
-This sample enables an external MCU to send modem or SLM proprietary AT commands for LTE connection and IP services.
-See more information on the functionality of this sample from the :ref:`lib_modem_slm` library, which provides the core functionality for this sample.
+The Serial Modem Host Shell sample demonstrates how to send AT commands to modem through the :ref:`Serial LTE Modem <sm_description>` application running on nRF91 Series SiP.
+This sample enables an external MCU to send modem or Serial Modem proprietary AT commands for LTE connection and IP services.
+See more information on the functionality of this sample from the :ref:`lib_sm_host` library, which provides the core functionality for this sample.
 
 Requirements
 ************
 
-The SLM application should be configured to use UART2 on the nRF91 Series DK side with hardware flow control.
+The Serial Modem application should be configured to use UART2 on the nRF91 Series DK side with hardware flow control.
 
 The sample supports the following development kits:
 
@@ -118,11 +118,11 @@ References
 
 * `nRF91x1 AT Commands Reference Guide`_
 * `nRF9160 AT Commands Reference Guide`_
-* :ref:`SLM_AT_commands`
+* :ref:`SM_AT_commands`
 
 Dependencies
 ************
 
 This sample uses the following |NCS| libraries:
 
-* :ref:`lib_modem_slm`
+* :ref:`lib_sm_host`

@@ -1,4 +1,4 @@
-.. _slm_data_mode:
+.. _sm_data_mode:
 
 Running in data mode
 ####################
@@ -7,7 +7,7 @@ Running in data mode
    :local:
    :depth: 2
 
-The Serial LTE Modem (SLM) application can run in the two operation modes defined by the AT command set: AT-command mode and data mode.
+The Serial Modem (SM) application can run in the two operation modes defined by the AT command set: AT-command mode and data mode.
 
 When running in data mode, the application does the following:
 
@@ -18,7 +18,7 @@ Overview
 ********
 
 You can manually switch between AT-command mode and data mode.
-However, the SLM data mode is applied automatically while using the following modules:
+However, the Serial Modem data mode is applied automatically while using the following modules:
 
 * Socket ``send()`` and ``sendto()``
 * TCP/TLS proxy send
@@ -32,11 +32,11 @@ However, the SLM data mode is applied automatically while using the following mo
 Entering data mode
 ==================
 
-The SLM application enters data mode when an AT command to send data out does not carry the payload.
+The Serial Modem application enters data mode when an AT command to send data out does not carry the payload.
 See the following examples:
 
-* ``AT#XSEND`` makes SLM enter data mode to receive arbitrary data to transmit.
-* ``AT#XSEND="data"`` makes SLM transmit data in normal AT Command mode.
+* ``AT#XSEND`` makes Serial Modem enter data mode to receive arbitrary data to transmit.
+* ``AT#XSEND="data"`` makes Serial Modem transmit data in normal AT Command mode.
 
 .. note::
    If the data contains either  ``,`` or ``"`` as characters, it can only be sent in data mode.
@@ -53,19 +53,19 @@ Other examples:
 * ``AT#XNRFCLOUD=2``
 * ``AT#XCARRIER="app_data_set"``
 
-The SLM application sends an *OK* response when it successfully enters data mode.
+The Serial Modem application sends an *OK* response when it successfully enters data mode.
 
 Sending data in data mode
 =========================
 
 Any arbitrary data received from the MCU is sent to LTE network *as-is*.
 
-If the current sending function succeeds and :ref:`CONFIG_SM_DATAMODE_URC <CONFIG_SM_DATAMODE_URC>` is defined, the SLM application reports back the total size as ``#XDATAMODE: <size>``.
+If the current sending function succeeds and :ref:`CONFIG_SM_DATAMODE_URC <CONFIG_SM_DATAMODE_URC>` is defined, the Serial Modem application reports back the total size as ``#XDATAMODE: <size>``.
 The ``<size>`` value is a positive integer.
 This Unsolicited Result Code (URC) can also be used to impose flow control on uplink sending.
 
 .. note::
-  If the sending operation fails due to a network problem while in data mode, the SLM application moves to a state where the data received from UART is dropped until the MCU sends the termination command :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>`.
+  If the sending operation fails due to a network problem while in data mode, the Serial Modem application moves to a state where the data received from UART is dropped until the MCU sends the termination command :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>`.
 
 Exiting data mode
 =================
@@ -75,24 +75,24 @@ To exit the data mode, the MCU sends the termination command set by the :ref:`CO
 The pattern string could be sent alone or as an affix to the data.
 The pattern string must be sent in full.
 
-When exiting the data mode, the SLM application sends the ``#XDATAMODE`` unsolicited notification.
+When exiting the data mode, the Serial Modem application sends the ``#XDATAMODE`` unsolicited notification.
 
-After exiting the data mode, the SLM application returns to the AT command mode.
+After exiting the data mode, the Serial Modem application returns to the AT command mode.
 
 .. note::
-  The SLM application sends the termination string :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` and moves to a state where the data received on the UART is dropped in the following scenarios:
+  The Serial Modem application sends the termination string :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` and moves to a state where the data received on the UART is dropped in the following scenarios:
 
   * The TCP server is stopped due to an error.
   * The remote server disconnects the TCP client.
   * The TCP client disconnects from the remote server due to an error.
   * The UDP client disconnects from the remote server due to an error.
 
-  For SLM to stop dropping the data received from UART and move to AT-command mode, the MCU needs to send the termination command :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` back to the SLM application.
+  For Serial Modem to stop dropping the data received from UART and move to AT-command mode, the MCU needs to send the termination command :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` back to the Serial Modem application.
 
 Triggering the transmission
 ===========================
 
-The SLM application buffers all the arbitrary data received from the UART bus before initiating the transmission.
+The Serial Modem application buffers all the arbitrary data received from the UART bus before initiating the transmission.
 
 The transmission of the buffered data to the LTE network is triggered in the following scenarios:
 
@@ -106,8 +106,8 @@ For more information, see the `Data mode control #XDATACTRL`_  command.
 Flow control in data mode
 =========================
 
-When SLM fills its UART receive buffers, it disables UART reception. If ``hw-flow-control`` is enabled for the UART, hardware flow control is imposed. Without hardware flow control, the SLM application will drop incoming data while the UART reception is disabled.
-SLM reenables UART reception when the data has been moved to the data mode buffer.
+When Serial Modem fills its UART receive buffers, it disables UART reception. If ``hw-flow-control`` is enabled for the UART, hardware flow control is imposed. Without hardware flow control, the Serial Modem application will drop incoming data while the UART reception is disabled.
+Serial Modem reenables UART reception when the data has been moved to the data mode buffer.
 If the data mode buffer fills, the data are transmitted to the LTE network.
 
 .. note::
@@ -134,7 +134,7 @@ CONFIG_SM_DATAMODE_TERMINATOR - Pattern string to terminate data mode
 .. _CONFIG_SM_DATAMODE_URC:
 
 CONFIG_SM_DATAMODE_URC - Send URC in data mode
-   This option reports the result of the previous data-sending operation while the SLM application remains in data mode.
+   This option reports the result of the previous data-sending operation while the Serial Modem application remains in data mode.
    The MCU could use this URC for application-level uplink flow control.
    It is not selected by default.
 

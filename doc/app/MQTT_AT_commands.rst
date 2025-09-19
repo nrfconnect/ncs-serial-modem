@@ -1,4 +1,4 @@
-.. _SLM_AT_MQTT:
+.. _SM_AT_MQTT:
 
 MQTT client AT commands
 ***********************
@@ -34,7 +34,7 @@ Syntax
 
 * The ``<client_id>`` parameter is a string.
   It indicates the MQTT Client ID.
-  If this command is not issued, SLM uses the default value of ``slm_default_client_id``.
+  If this command is not issued, Serial Modem uses the default value of ``sm_default_client_id``.
 * The ``<keep_alive>`` parameter is an integer.
   It indicates the maximum Keep Alive time in seconds for MQTT.
   The default Kepp Alive time is 60 seconds.
@@ -372,38 +372,38 @@ Examples
 
 ::
 
-   AT#XMQTTSUB="nrf91/slm/mqtt/topic0",0
+   AT#XMQTTSUB="nrf91/sm/mqtt/topic0",0
    OK
    #XMQTTEVT: 7,0
 
    Message with QoS0 is received:
    #XMQTTMSG: 21,7
-   nrf91/slm/mqtt/topic0
+   nrf91/sm/mqtt/topic0
    message
    #XMQTTEVT: 2,0
 
 ::
 
-   AT#XMQTTSUB="nrf91/slm/mqtt/topic1",1
+   AT#XMQTTSUB="nrf91/sm/mqtt/topic1",1
    OK
    #XMQTTEVT: 7,0
 
    Message with QoS1 is received:
    #XMQTTMSG: 21,7
-   nrf91/slm/mqtt/topic1
+   nrf91/sm/mqtt/topic1
    message
 
    #XMQTTEVT: 2,0
 
 ::
 
-   AT#XMQTTSUB="nrf91/slm/mqtt/topic2",2
+   AT#XMQTTSUB="nrf91/sm/mqtt/topic2",2
    OK
    #XMQTTEVT: 7,0
 
    Message with QoS2 is received:
    #XMQTTMSG: 21,7
-   nrf91/slm/mqtt/topic2
+   nrf91/sm/mqtt/topic2
    message
 
    #XMQTTEVT: 2,0
@@ -461,7 +461,7 @@ Examples
 
 ::
 
-   AT#XMQTTUNSUB="nrf91/slm/mqtt/topic0"
+   AT#XMQTTUNSUB="nrf91/sm/mqtt/topic0"
    OK
    #XMQTTEVT: 8,0
 
@@ -499,7 +499,7 @@ Syntax
   It contains the payload on the topic being published.
 
   The maximum size of the payload is 1024 bytes when not empty.
-  If the payload is empty (for example, ``""``), SLM enters ``slm_data_mode``.
+  If the payload is empty (for example, ``""``), Serial Modem enters ``sm_data_mode``.
 * The ``<qos>`` parameter is an integer.
   It indicates the MQTT Quality of Service type to use.
   It can accept the following values:
@@ -539,25 +539,25 @@ Examples
 
 ::
 
-   AT#XMQTTPUB="nrf91/slm/mqtt/topic0","Test message with QoS 0",0,0
+   AT#XMQTTPUB="nrf91/sm/mqtt/topic0","Test message with QoS 0",0,0
    OK
 
 ::
 
-   AT#XMQTTPUB="nrf91/slm/mqtt/topic0"
+   AT#XMQTTPUB="nrf91/sm/mqtt/topic0"
    OK
    {"msg":"Test Json publish"}+++
    #XDATAMODE: 0
 
 ::
 
-   AT#XMQTTPUB="nrf91/slm/mqtt/topic1","Test message with QoS 1",1,0
+   AT#XMQTTPUB="nrf91/sm/mqtt/topic1","Test message with QoS 1",1,0
    OK
    #XMQTTEVT: 3,0
 
 ::
 
-   AT#XMQTTPUB="nrf91/slm/mqtt/topic2","",2,0
+   AT#XMQTTPUB="nrf91/sm/mqtt/topic2","",2,0
    OK
    Test message with QoS 2+++
    #XDATAMODE: 0

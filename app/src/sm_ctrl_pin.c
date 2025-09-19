@@ -16,7 +16,7 @@
 #include "sm_util.h"
 #include "sm_ctrl_pin.h"
 
-LOG_MODULE_REGISTER(slm_ctrl_pin, CONFIG_SM_LOG_LEVEL);
+LOG_MODULE_REGISTER(sm_ctrl_pin, CONFIG_SM_LOG_LEVEL);
 
 #define POWER_PIN_DEBOUNCE_MS 50
 
@@ -123,15 +123,15 @@ static int configure_power_pin_interrupt(gpio_callback_handler_t handler, gpio_f
 	return 0;
 }
 
-static void slm_ctrl_pin_enter_sleep_work_fn(struct k_work *)
+static void sm_ctrl_pin_enter_sleep_work_fn(struct k_work *)
 {
-	slm_ctrl_pin_enter_sleep();
+	sm_ctrl_pin_enter_sleep();
 }
 
 static void power_pin_callback_poweroff(const struct device *dev,
 					struct gpio_callback *gpio_callback, uint32_t)
 {
-	static K_WORK_DEFINE(work, slm_ctrl_pin_enter_sleep_work_fn);
+	static K_WORK_DEFINE(work, sm_ctrl_pin_enter_sleep_work_fn);
 
 	LOG_INF("Power off triggered.");
 	gpio_remove_callback(dev, gpio_callback);
@@ -195,11 +195,11 @@ static void power_pin_callback_wakeup_work_fn(struct k_work *)
 	if (err < 0) {
 		LOG_WRN("Failed to enable ext XTAL: %d", err);
 	}
-	err = slm_at_host_power_on();
+	err = sm_at_host_power_on();
 	if (err) {
-		LOG_ERR("Failed to power on uart: %d. Resetting SLM.", err);
+		LOG_ERR("Failed to power on uart: %d. Resetting Serial Modem.", err);
 		gpio_remove_callback(gpio_dev, &gpio_cb);
-		slm_reset();
+		sm_reset();
 		return;
 	}
 
@@ -225,7 +225,7 @@ static void power_pin_callback_wakeup(const struct device *dev,
 	k_work_submit(&work);
 }
 
-void slm_ctrl_pin_enter_idle(void)
+void sm_ctrl_pin_enter_idle(void)
 {
 	LOG_INF("Entering idle.");
 	int err;
@@ -243,20 +243,20 @@ void slm_ctrl_pin_enter_idle(void)
 	}
 }
 
-void slm_ctrl_pin_enter_sleep(void)
+void sm_ctrl_pin_enter_sleep(void)
 {
-	slm_at_host_uninit();
+	sm_at_host_uninit();
 
 	/* Only power off the modem if it has not been put
 	 * in flight mode to allow reducing NVM wear.
 	 */
-	if (!slm_is_modem_functional_mode(LTE_LC_FUNC_MODE_OFFLINE)) {
-		slm_power_off_modem();
+	if (!sm_is_modem_functional_mode(LTE_LC_FUNC_MODE_OFFLINE)) {
+		sm_power_off_modem();
 	}
-	slm_ctrl_pin_enter_sleep_no_uninit();
+	sm_ctrl_pin_enter_sleep_no_uninit();
 }
 
-void slm_ctrl_pin_enter_sleep_no_uninit(void)
+void sm_ctrl_pin_enter_sleep_no_uninit(void)
 {
 	LOG_INF("Entering sleep.");
 	LOG_PANIC();
@@ -270,7 +270,7 @@ void slm_ctrl_pin_enter_sleep_no_uninit(void)
 
 #endif /* POWER_PIN_IS_ENABLED */
 
-int slm_ctrl_pin_indicate(void)
+int sm_ctrl_pin_indicate(void)
 {
 	int err = 0;
 
@@ -289,7 +289,7 @@ int slm_ctrl_pin_indicate(void)
 	return err;
 }
 
-void slm_ctrl_pin_enter_shutdown(void)
+void sm_ctrl_pin_enter_shutdown(void)
 {
 	LOG_INF("Entering shutdown.");
 
@@ -308,7 +308,7 @@ void slm_ctrl_pin_enter_shutdown(void)
 	assert(false);
 }
 
-void slm_ctrl_pin_init_gpios(void)
+void sm_ctrl_pin_init_gpios(void)
 {
 	if (!device_is_ready(gpio_dev)) {
 		LOG_ERR("GPIO controller not ready");
@@ -324,7 +324,7 @@ void slm_ctrl_pin_init_gpios(void)
 #endif
 }
 
-int slm_ctrl_pin_init(void)
+int sm_ctrl_pin_init(void)
 {
 	int err;
 
@@ -340,7 +340,8 @@ int slm_ctrl_pin_init(void)
 #if POWER_PIN_IS_ENABLED
 	/* Do not directly enable the poweroff interrupt so that only a full toggle triggers
 	 * power off. This is because power on is triggered on low level, so if the pin is held
-	 * down until SLM is fully initialized releasing it would directly trigger the power off.
+	 * down until Serial Modem is fully initialized releasing it would directly trigger
+	 * the power off.
 	 */
 	err = configure_power_pin_interrupt(power_pin_callback_enable_poweroff,
 					    GPIO_INT_EDGE_FALLING);

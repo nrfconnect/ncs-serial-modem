@@ -1,4 +1,4 @@
-.. _SLM_AT_SMS:
+.. _SM_AT_SMS:
 
 SMS AT commands
 ****************
@@ -65,7 +65,7 @@ Example
   at#xsms=1
 
   OK
-  at#xsms=2,"+8190xxxxxxxx","SLM test"
+  at#xsms=2,"+8190xxxxxxxx","SM test"
 
   OK
 

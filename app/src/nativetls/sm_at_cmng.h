@@ -4,24 +4,24 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
-#ifndef SLM_AT_CMNG_
-#define SLM_AT_CMNG_
+#ifndef SM_AT_CMNG_
+#define SM_AT_CMNG_
 
-/**@file slm_at_cmng.h
+/**@file sm_at_cmng.h
  *
- * @brief SLM-specific AT command for credential storing.
+ * @brief Serial Modem specific AT command for credential storing.
  * @{
  */
 
-enum slm_cmng_type {
-	SLM_AT_CMNG_TYPE_CA_CERT,
-	SLM_AT_CMNG_TYPE_CLIENT_CERT,
-	SLM_AT_CMNG_TYPE_CLIENT_KEY,
-	SLM_AT_CMNG_TYPE_PSK,
-	SLM_AT_CMNG_TYPE_PSK_ID,
-	SLM_AT_CMNG_TYPE_COUNT
+enum sm_cmng_type {
+	SM_AT_CMNG_TYPE_CA_CERT,
+	SM_AT_CMNG_TYPE_CLIENT_CERT,
+	SM_AT_CMNG_TYPE_CLIENT_KEY,
+	SM_AT_CMNG_TYPE_PSK,
+	SM_AT_CMNG_TYPE_PSK_ID,
+	SM_AT_CMNG_TYPE_COUNT
 };
 
 /** @} */
 
-#endif /* SLM_AT_CMNG_ */
+#endif /* SM_AT_CMNG_ */

@@ -18,13 +18,13 @@
 #include "sm_native_tls.h"
 #endif
 
-LOG_MODULE_REGISTER(slm_httpc, CONFIG_SM_LOG_LEVEL);
+LOG_MODULE_REGISTER(sm_httpc, CONFIG_SM_LOG_LEVEL);
 
 #define HTTPC_METHOD_LEN	20
 #define HTTPC_RES_LEN		256
 #define HTTPC_HEADERS_LEN	512
 #define HTTPC_REQ_LEN		(HTTPC_METHOD_LEN + HTTPC_RES_LEN + HTTPC_HEADER_LEN + 3)
-#define HTTPC_BUF_LEN		SLM_MAX_MESSAGE_SIZE
+#define HTTPC_BUF_LEN		SM_MAX_MESSAGE_SIZE
 #if HTTPC_REQ_LEN > HTTPC_BUF_LEN
 # error "Please specify larger HTTPC_BUF_LEN"
 #endif
@@ -32,7 +32,7 @@ LOG_MODULE_REGISTER(slm_httpc, CONFIG_SM_LOG_LEVEL);
 #define HTTPC_CONTEN_TYPE_LEN	64
 
 /**@brief HTTP connect operations. */
-enum slm_httpccon_operation {
+enum sm_httpccon_operation {
 	HTTPC_DISCONNECT,
 	HTTPC_CONNECT,
 	HTTPC_CONNECT6
@@ -47,13 +47,13 @@ enum httpc_state {
 	HTTPC_COMPLETE
 };
 
-static struct slm_httpc_ctx {
+static struct sm_httpc_ctx {
 	int fd;				/* HTTPC socket */
 	int family;			/* Socket address family */
 	uint32_t sec_tag;		/* security tag to be used */
 	int peer_verify;		/* Peer verification level for TLS connection. */
 	bool hostname_verify;		/* Verify hostname against the certificate. */
-	char host[SLM_MAX_URL];		/* HTTP server address */
+	char host[SM_MAX_URL];		/* HTTP server address */
 	uint16_t port;			/* HTTP server port */
 	char *method_str;		/* request method */
 	char *resource;			/* resource */
@@ -238,7 +238,7 @@ static int do_http_connect(void)
 	/* Set socket options */
 	if (httpc.sec_tag != SEC_TAG_TLS_INVALID) {
 #if defined(CONFIG_SM_NATIVE_TLS)
-		ret = slm_native_tls_load_credentials(httpc.sec_tag);
+		ret = sm_native_tls_load_credentials(httpc.sec_tag);
 		if (ret < 0) {
 			LOG_ERR("Failed to load sec tag: %d (%d)", httpc.sec_tag, ret);
 			goto exit_cli;
@@ -396,7 +396,7 @@ static int do_http_request(void)
 	req.host = httpc.host;
 	req.protocol = "HTTP/1.1";
 	req.response = response_cb;
-	req.recv_buf = slm_data_buf;
+	req.recv_buf = sm_data_buf;
 	req.recv_buf_len = HTTPC_BUF_LEN;
 	req.content_type_value = httpc.content_type;
 	if (httpc.chunked_transfer) {
@@ -421,13 +421,13 @@ static int do_http_request(void)
 	return err;
 }
 
-SLM_AT_CMD_CUSTOM(xhttpccon, "AT#XHTTPCCON", handle_at_httpc_connect);
+SM_AT_CMD_CUSTOM(xhttpccon, "AT#XHTTPCCON", handle_at_httpc_connect);
 static int handle_at_httpc_connect(enum at_parser_cmd_type cmd_type,
 				   struct at_parser *parser, uint32_t param_count)
 {
 	int err = -EINVAL;
 	uint16_t op;
-	size_t host_sz = SLM_MAX_URL;
+	size_t host_sz = SM_MAX_URL;
 
 	switch (cmd_type) {
 	case AT_PARSER_CMD_TYPE_SET:
@@ -571,7 +571,7 @@ static int http_headers_preprocess(size_t size)
 	return 0;
 }
 
-SLM_AT_CMD_CUSTOM(xhttpcreq, "AT#XHTTPCREQ", handle_at_httpc_request);
+SM_AT_CMD_CUSTOM(xhttpcreq, "AT#XHTTPCREQ", handle_at_httpc_request);
 static int handle_at_httpc_request(enum at_parser_cmd_type cmd_type,
 				   struct at_parser *parser, uint32_t param_count)
 {
@@ -591,32 +591,32 @@ static int handle_at_httpc_request(enum at_parser_cmd_type cmd_type,
 			return -EEXIST;
 		}
 
-		memset(slm_data_buf, 0, sizeof(slm_data_buf));
+		memset(sm_data_buf, 0, sizeof(sm_data_buf));
 		/* Get method string */
 		size = HTTPC_METHOD_LEN;
-		err = util_string_get(parser, 1, slm_data_buf, &size);
+		err = util_string_get(parser, 1, sm_data_buf, &size);
 		if (err < 0) {
 			LOG_ERR("Fail to get method string: %d", err);
 			return err;
 		}
-		httpc.method_str = (char *)slm_data_buf;
+		httpc.method_str = (char *)sm_data_buf;
 		offset = size + 1;
 		/* Get resource path string */
 		size = HTTPC_RES_LEN;
-		err = util_string_get(parser, 2, slm_data_buf + offset, &size);
+		err = util_string_get(parser, 2, sm_data_buf + offset, &size);
 		if (err < 0) {
 			LOG_ERR("Fail to get resource string: %d", err);
 			return err;
 		}
-		httpc.resource = (char *)(slm_data_buf + offset);
+		httpc.resource = (char *)(sm_data_buf + offset);
 		httpc.headers = NULL;
 		if (param_count >= 4) {
 			/* Get headers string */
 			offset += size + 1;
 			size = HTTPC_HEADERS_LEN;
-			err = util_string_get(parser, 3, slm_data_buf + offset, &size);
+			err = util_string_get(parser, 3, sm_data_buf + offset, &size);
 			if (err == 0 && size > 0) {
-				httpc.headers = (char *)(slm_data_buf + offset);
+				httpc.headers = (char *)(sm_data_buf + offset);
 				err = http_headers_preprocess(size);
 				if (err) {
 					return err;
@@ -630,9 +630,9 @@ static int handle_at_httpc_request(enum at_parser_cmd_type cmd_type,
 			/* Get content type string */
 			offset += size + 1;
 			size = HTTPC_CONTEN_TYPE_LEN;
-			err = util_string_get(parser, 4, slm_data_buf + offset, &size);
+			err = util_string_get(parser, 4, sm_data_buf + offset, &size);
 			if (err == 0 && size > 0) {
-				httpc.content_type = (char *)(slm_data_buf + offset);
+				httpc.content_type = (char *)(sm_data_buf + offset);
 			}
 			/* Get content length */
 			err = at_parser_num_get(parser, 5, &httpc.content_length);
@@ -671,7 +671,7 @@ static int handle_at_httpc_request(enum at_parser_cmd_type cmd_type,
 	return err;
 }
 
-int slm_at_httpc_init(void)
+int sm_at_httpc_init(void)
 {
 	httpc.fd = INVALID_SOCKET;
 	httpc.state = HTTPC_INIT;
@@ -683,7 +683,7 @@ int slm_at_httpc_init(void)
 	return 0;
 }
 
-int slm_at_httpc_uninit(void)
+int sm_at_httpc_uninit(void)
 {
 	int err = 0;
 

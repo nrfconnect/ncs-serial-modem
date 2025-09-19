@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
-#ifndef SLM_SOCKOPT_
-#define SLM_SOCKOPT_
+#ifndef SM_SOCKOPT_
+#define SM_SOCKOPT_
 
-/** @file slm_sockopt.h
+/** @file sm_sockopt.h
  *
- * @brief SLM socket options for AT-commands.
+ * @brief Serial Modem socket options for AT-commands.
  * @{
  */
 

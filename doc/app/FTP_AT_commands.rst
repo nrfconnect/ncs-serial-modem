@@ -1,4 +1,4 @@
-.. _SLM_AT_FTP:
+.. _SM_AT_FTP:
 
 FTP AT commands
 ***************
@@ -47,11 +47,11 @@ The ``<cmd>`` command is a string, and can be used as follows:
 * ``AT#XFTP="mput",<file>[,<data>]``
 
 The values of the parameters depend on the command string used.
-When using the ``put``, ``uput`` and ``mput`` commands, if the ``<data>`` attribute is not specified, SLM enters ``slm_data_mode``.
+When using the ``put``, ``uput`` and ``mput`` commands, if the ``<data>`` attribute is not specified, Serial Modem enters ``sm_data_mode``.
 
 .. note::
    The maximum size of the data that can be received when using the commands ``ls`` and ``get`` is limited by the size of the internal FTP buffer, which is 2048 bytes.
-   The size can be adjusted by modifying the declaration of ``ftp_data_buf`` in :file:`src/ftp_c/slm_at_ftp.c`.
+   The size can be adjusted by modifying the declaration of ``ftp_data_buf`` in :file:`src/ftp_c/sm_at_ftp.c`.
 
    If more data than can be handled is received after issuing an ``ls`` or ``get`` command, the data will be truncated to the maximum supported size.
 

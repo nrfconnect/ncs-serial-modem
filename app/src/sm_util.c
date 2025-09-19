@@ -14,7 +14,7 @@
 #include <nrf_modem_at.h>
 #include "sm_util.h"
 
-LOG_MODULE_REGISTER(slm_util, CONFIG_SM_LOG_LEVEL);
+LOG_MODULE_REGISTER(sm_util, CONFIG_SM_LOG_LEVEL);
 
 static bool cmd_name_has_lower(const char *cmd)
 {
@@ -32,7 +32,7 @@ static bool cmd_name_has_lower(const char *cmd)
 	return false;
 }
 
-int slm_util_at_printf(const char *fmt, ...)
+int sm_util_at_printf(const char *fmt, ...)
 {
 	int ret;
 	char buf[128];
@@ -66,7 +66,7 @@ int slm_util_at_printf(const char *fmt, ...)
 	return ret;
 }
 
-int slm_util_at_scanf(const char *cmd, const char *fmt, ...)
+int sm_util_at_scanf(const char *cmd, const char *fmt, ...)
 {
 	char buf[128];
 	va_list args;
@@ -110,7 +110,7 @@ static int terminate_at_response(char *buf, size_t len,
 	return success_ret;
 }
 
-int slm_util_at_cmd_no_intercept(char *buf, size_t len, const char *at_cmd)
+int sm_util_at_cmd_no_intercept(char *buf, size_t len, const char *at_cmd)
 {
 	int ret;
 	char second_line[strlen("+CMx ERROR: xxxx")];
@@ -165,7 +165,7 @@ int slm_util_at_cmd_no_intercept(char *buf, size_t len, const char *at_cmd)
 	return ret;
 }
 
-bool slm_util_casecmp(const char *str1, const char *str2)
+bool sm_util_casecmp(const char *str1, const char *str2)
 {
 	int str2_len = strlen(str2);
 
@@ -182,7 +182,7 @@ bool slm_util_casecmp(const char *str1, const char *str2)
 	return true;
 }
 
-bool slm_util_hexstr_check(const uint8_t *data, uint16_t data_len)
+bool sm_util_hexstr_check(const uint8_t *data, uint16_t data_len)
 {
 	for (int i = 0; i < data_len; i++) {
 		char ch = *(data + i);
@@ -197,7 +197,7 @@ bool slm_util_hexstr_check(const uint8_t *data, uint16_t data_len)
 	return true;
 }
 
-int slm_util_htoa(const uint8_t *hex, uint16_t hex_len, char *ascii, uint16_t ascii_len)
+int sm_util_htoa(const uint8_t *hex, uint16_t hex_len, char *ascii, uint16_t ascii_len)
 {
 	if (hex == NULL || ascii == NULL) {
 		return -EINVAL;
@@ -213,7 +213,7 @@ int slm_util_htoa(const uint8_t *hex, uint16_t hex_len, char *ascii, uint16_t as
 	return (hex_len * 2);
 }
 
-int slm_util_atoh(const char *ascii, uint16_t ascii_len, uint8_t *hex, uint16_t hex_len)
+int sm_util_atoh(const char *ascii, uint16_t ascii_len, uint8_t *hex, uint16_t hex_len)
 {
 	char hex_str[3];
 
@@ -226,7 +226,7 @@ int slm_util_atoh(const char *ascii, uint16_t ascii_len, uint8_t *hex, uint16_t 
 	if (ascii_len > (hex_len * 2)) {
 		return -EINVAL;
 	}
-	if (!slm_util_hexstr_check(ascii, ascii_len)) {
+	if (!sm_util_hexstr_check(ascii, ascii_len)) {
 		return -EINVAL;
 	}
 
@@ -309,7 +309,7 @@ void util_get_ip_addr(int cid, char addr4[INET_ADDRSTRLEN], char addr6[INET6_ADD
 	 * PDN type "IPV6": PDP_addr_1 is <IPv6>, max 46(INET6_ADDRSTRLEN),':', digits, 'A'~'F'
 	 * PDN type "IPV4V6": <IPv4>,<IPv6> or <IPV4> or <IPv6>
 	 */
-	ret = slm_util_at_scanf(cmd, "+CGPADDR: %*d,\"%46[.:0-9A-F]\",\"%46[:0-9A-F]\"",
+	ret = sm_util_at_scanf(cmd, "+CGPADDR: %*d,\"%46[.:0-9A-F]\",\"%46[:0-9A-F]\"",
 				 addr1, addr2);
 	if (ret <= 0) {
 		return;

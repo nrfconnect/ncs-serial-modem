@@ -1,4 +1,4 @@
-.. _SLM_AT_TWI:
+.. _SM_AT_TWI:
 
 TWI AT commands
 ***************

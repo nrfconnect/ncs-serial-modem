@@ -12,10 +12,10 @@
 #include "sm_util.h"
 #include "sm_at_host.h"
 
-LOG_MODULE_REGISTER(slm_tftp, CONFIG_SM_LOG_LEVEL);
+LOG_MODULE_REGISTER(sm_tftp, CONFIG_SM_LOG_LEVEL);
 
 /**@brief Socketopt operations. */
-enum slm_ftp_operation {
+enum sm_ftp_operation {
 	TFTP_DUMMY,
 	TFTP_GET,	/** IPv4 TFTP Read */
 	TFTP_PUT,	/** IPv4 TFTP Write */
@@ -29,8 +29,8 @@ void tftp_callback(const struct tftp_evt *evt)
 	switch (evt->type) {
 	case TFTP_EVT_DATA:
 		if (evt->param.data.len > 0) {
-			memcpy(slm_data_buf, evt->param.data.data_ptr, evt->param.data.len);
-			data_send(slm_data_buf, evt->param.data.len);
+			memcpy(sm_data_buf, evt->param.data.data_ptr, evt->param.data.len);
+			data_send(sm_data_buf, evt->param.data.len);
 		}
 		break;
 
@@ -128,15 +128,15 @@ static int do_tftp_put(int family, const char *server, uint16_t port, const char
 	return ret;
 }
 
-SLM_AT_CMD_CUSTOM(xtftp, "AT#XTFTP", handle_at_tftp);
+SM_AT_CMD_CUSTOM(xtftp, "AT#XTFTP", handle_at_tftp);
 static int handle_at_tftp(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			  uint32_t param_count)
 {
 	int err = -EINVAL;
 	uint16_t op;
 	uint16_t port;
-	char url[SLM_MAX_URL];
-	char filepath[SLM_MAX_FILEPATH];
+	char url[SM_MAX_URL];
+	char filepath[SM_MAX_FILEPATH];
 	char mode[16];   /** "netascii", "octet", "mail" */
 	int size;
 
@@ -167,9 +167,9 @@ static int handle_at_tftp(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 			if (err) {
 				return err;
 			}
-			if (!slm_util_casecmp(mode, "netascii") &&
-			    !slm_util_casecmp(mode, "octet") &&
-			    !slm_util_casecmp(mode, "mail")) {
+			if (!sm_util_casecmp(mode, "netascii") &&
+			    !sm_util_casecmp(mode, "octet") &&
+			    !sm_util_casecmp(mode, "mail")) {
 				return -EINVAL;
 			}
 		} else {
@@ -181,7 +181,7 @@ static int handle_at_tftp(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 		} else if (op == TFTP_GET6) {
 			err = do_tftp_get(AF_INET6, url, port, filepath, mode);
 		} else if (op == TFTP_PUT || op == TFTP_PUT6) {
-			uint8_t data[SLM_MAX_PAYLOAD_SIZE + 1] = {0};
+			uint8_t data[SM_MAX_PAYLOAD_SIZE + 1] = {0};
 
 			size = sizeof(data);
 			err = util_string_get(parser, 6, data, &size);

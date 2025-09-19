@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
-#ifndef SLM_AT_HTTPC_
-#define SLM_AT_HTTPC_
+#ifndef SM_AT_HTTPC_
+#define SM_AT_HTTPC_
 
-/**@file slm_at_httpc.h
+/**@file sm_at_httpc.h
  *
  * @brief Vendor-specific AT command for HTTP service.
  * @{
@@ -31,7 +31,7 @@ int handle_at_httpc_send(const char *data, size_t length);
  * @retval 0 If the operation was successful.
  *           Otherwise, a (negative) error code is returned.
  */
-int slm_at_httpc_init(void);
+int sm_at_httpc_init(void);
 
 /**
  * @brief Uninitialize HTTPC AT command parser.
@@ -39,8 +39,8 @@ int slm_at_httpc_init(void);
  * @retval 0 If the operation was successful.
  *           Otherwise, a (negative) error code is returned.
  */
-int slm_at_httpc_uninit(void);
+int sm_at_httpc_uninit(void);
 
 /** @} */
 
-#endif /* SLM_AT_HTTPC_ */
+#endif /* SM_AT_HTTPC_ */

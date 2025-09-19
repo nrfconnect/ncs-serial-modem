@@ -3,14 +3,14 @@
  *
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
-#ifndef SLM_CMUX_
-#define SLM_CMUX_
+#ifndef SM_CMUX_
+#define SM_CMUX_
 
 #include <stdbool.h>
 
 struct modem_pipe;
 
-void slm_cmux_init(void);
+void sm_cmux_init(void);
 
 /* CMUX channels that are used by other modules. */
 enum cmux_channel {
@@ -22,7 +22,7 @@ enum cmux_channel {
 #endif
 	CMUX_EXT_CHANNEL_COUNT
 };
-struct modem_pipe *slm_cmux_reserve(enum cmux_channel);
-void slm_cmux_release(enum cmux_channel, bool fallback);
+struct modem_pipe *sm_cmux_reserve(enum cmux_channel);
+void sm_cmux_release(enum cmux_channel, bool fallback);
 
 #endif

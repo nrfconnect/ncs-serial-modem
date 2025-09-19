@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
-#ifndef SLM_AT_GPIO_
-#define SLM_AT_GPIO_
+#ifndef SM_AT_GPIO_
+#define SM_AT_GPIO_
 
-/**@file slm_at_gpio.h
+/**@file sm_at_gpio.h
  *
  * @brief Vendor-specific AT command for GPIO service.
  * @{
@@ -19,7 +19,7 @@
  * @retval 0 If the operation was successful.
  *           Otherwise, a (negative) error code is returned.
  */
-int slm_at_gpio_init(void);
+int sm_at_gpio_init(void);
 
 /**
  * @brief Uninitialize GPIO AT command parser.
@@ -27,8 +27,8 @@ int slm_at_gpio_init(void);
  * @retval 0 If the operation was successful.
  *           Otherwise, a (negative) error code is returned.
  */
-int slm_at_gpio_uninit(void);
+int sm_at_gpio_uninit(void);
 
 /** @} */
 
-#endif /* SLM_AT_GPIO_ */
+#endif /* SM_AT_GPIO_ */

@@ -10,21 +10,21 @@
 #include "sm_at_host.h"
 #include "sm_at_cmng.h"
 
-LOG_MODULE_REGISTER(slm_native_tls, CONFIG_SM_LOG_LEVEL);
+LOG_MODULE_REGISTER(sm_native_tls, CONFIG_SM_LOG_LEVEL);
 
 /* Stores certificates and other credentials in the Zephyr settings storage.
- * Storage is organized as slm-keys/<sec_tag>/<type>.
+ * Storage is organized as sm-keys/<sec_tag>/<type>.
  * When native TLS connection is created, credentials under <sec_tag> are loaded to
  * TLS credential management for Mbed TLS.
  */
 
-#define SLM_KEYS_MAX_SIZE sizeof("slm-keys/2147483647/0")
+#define SM_KEYS_MAX_SIZE sizeof("sm-keys/2147483647/0")
 
 /* Loaded for TLS credential management. */
 struct tls_cred_buf {
 	uint8_t buf[CONFIG_SM_NATIVE_TLS_CREDENTIAL_BUFFER_SIZE]; /* Credentials. */
 	sec_tag_t sec_tag; /* sec_tag of the credentials in buf. */
-	uint8_t type_flags; /* Credential types loaded in buf (1 << slm_cmng_type). */
+	uint8_t type_flags; /* Credential types loaded in buf (1 << sm_cmng_type). */
 };
 static struct tls_cred_buf cred_buf[CONFIG_SM_NATIVE_TLS_CREDENTIAL_BUFFER_COUNT] = {
 	[0 ... CONFIG_SM_NATIVE_TLS_CREDENTIAL_BUFFER_COUNT - 1] = {
@@ -41,20 +41,20 @@ struct load_credential_params {
 	size_t buf_len;
 };
 
-enum tls_credential_type slm_cmng_to_tls_cred(enum slm_cmng_type type)
+enum tls_credential_type sm_cmng_to_tls_cred(enum sm_cmng_type type)
 {
 	switch (type) {
-	case SLM_AT_CMNG_TYPE_CA_CERT: return TLS_CREDENTIAL_CA_CERTIFICATE;
-	case SLM_AT_CMNG_TYPE_CLIENT_CERT: return TLS_CREDENTIAL_SERVER_CERTIFICATE;
-	case SLM_AT_CMNG_TYPE_CLIENT_KEY: return TLS_CREDENTIAL_PRIVATE_KEY;
-	case SLM_AT_CMNG_TYPE_PSK: return TLS_CREDENTIAL_PSK;
-	case SLM_AT_CMNG_TYPE_PSK_ID: return TLS_CREDENTIAL_PSK_ID;
+	case SM_AT_CMNG_TYPE_CA_CERT: return TLS_CREDENTIAL_CA_CERTIFICATE;
+	case SM_AT_CMNG_TYPE_CLIENT_CERT: return TLS_CREDENTIAL_SERVER_CERTIFICATE;
+	case SM_AT_CMNG_TYPE_CLIENT_KEY: return TLS_CREDENTIAL_PRIVATE_KEY;
+	case SM_AT_CMNG_TYPE_PSK: return TLS_CREDENTIAL_PSK;
+	case SM_AT_CMNG_TYPE_PSK_ID: return TLS_CREDENTIAL_PSK_ID;
 	default: return TLS_CREDENTIAL_NONE;
 	}
 }
 
 /* Load credentials to TLS credential management.
- * Called for every (slm-keys/<sec_tag>/)<type>.
+ * Called for every (sm-keys/<sec_tag>/)<type>.
  */
 static int load_credential_cb(const char *key, size_t len, settings_read_cb read_cb, void *cb_arg,
 				void *param)
@@ -65,7 +65,7 @@ static int load_credential_cb(const char *key, size_t len, settings_read_cb read
 	struct load_credential_params *lcp = (struct load_credential_params *)param;
 
 	type = strtoul(key, NULL, 10);
-	if (type >= SLM_AT_CMNG_TYPE_COUNT) {
+	if (type >= SM_AT_CMNG_TYPE_COUNT) {
 		return -EFAULT;
 	}
 	if (len > lcp->buf_len) {
@@ -78,13 +78,13 @@ static int load_credential_cb(const char *key, size_t len, settings_read_cb read
 	}
 
 	/* PEM formatted certificate and keys need to be null-terminated for Mbed TLS. */
-	if (type <= SLM_AT_CMNG_TYPE_CLIENT_KEY && lcp->buf[setting_length - 1] != '\0' &&
+	if (type <= SM_AT_CMNG_TYPE_CLIENT_KEY && lcp->buf[setting_length - 1] != '\0' &&
 	    lcp->buf_len > setting_length) {
 		lcp->buf[setting_length] = '\0';
 		setting_length++;
 	}
 
-	err = tls_credential_add(lcp->sec_tag, slm_cmng_to_tls_cred(type), lcp->buf,
+	err = tls_credential_add(lcp->sec_tag, sm_cmng_to_tls_cred(type), lcp->buf,
 				 setting_length);
 	if (err) {
 		LOG_ERR("Failed tls_credential_add: %d,%lu", lcp->sec_tag, type);
@@ -103,8 +103,8 @@ static int load_credential_cb(const char *key, size_t len, settings_read_cb read
 	return 0;
 }
 
-/* List SLM credentials stored in Zephyr settings storage.
- * Called for every (slm-keys/)<sec_tag>.
+/* List Serial Modem credentials stored in Zephyr settings storage.
+ * Called for every (sm-keys/)<sec_tag>.
  */
 static int list_credentials_cb(const char *key, size_t len, settings_read_cb read_cb, void *cb_arg,
 				void *param)
@@ -134,15 +134,15 @@ static int list_credentials_cb(const char *key, size_t len, settings_read_cb rea
 		ptr++;
 	}
 
-	err = slm_at_send_str(buf);
+	err = sm_at_send_str(buf);
 	if (err) {
-		LOG_ERR("Failed slm_at_send: %d", err);
+		LOG_ERR("Failed sm_at_send: %d", err);
 	}
 
 	return err;
 }
 
-/* Called for every (slm-keys/<sec_tag>/)<type>. */
+/* Called for every (sm-keys/<sec_tag>/)<type>. */
 static int get_setting_len_cb(const char *key, size_t len, settings_read_cb read_cb, void *cb_arg,
 				void *param)
 {
@@ -158,8 +158,8 @@ static int get_setting_len_cb(const char *key, size_t len, settings_read_cb read
 
 static int get_credentials_len(sec_tag_t sec_tag, size_t *len)
 {
-	char key[SLM_KEYS_MAX_SIZE];
-	const int err = snprintf(key, sizeof(key), "slm-keys/%d", sec_tag);
+	char key[SM_KEYS_MAX_SIZE];
+	const int err = snprintf(key, sizeof(key), "sm-keys/%d", sec_tag);
 
 	if (err < 0) {
 		return err;
@@ -189,10 +189,10 @@ static int unload_tls_cred_buf(sec_tag_t sec_tag)
 	}
 
 	/* Delete previously loaded credentials from the credential store. */
-	for (enum slm_cmng_type i = SLM_AT_CMNG_TYPE_CA_CERT; i != SLM_AT_CMNG_TYPE_COUNT; ++i) {
+	for (enum sm_cmng_type i = SM_AT_CMNG_TYPE_CA_CERT; i != SM_AT_CMNG_TYPE_COUNT; ++i) {
 		if (cred->type_flags & (1 << i)) {
 			const int err =
-				tls_credential_delete(cred->sec_tag, slm_cmng_to_tls_cred(i));
+				tls_credential_delete(cred->sec_tag, sm_cmng_to_tls_cred(i));
 
 			if (err) {
 				LOG_ERR("Failed tls_credential_delete: %d, credential: %d,%d",
@@ -208,13 +208,13 @@ static int unload_tls_cred_buf(sec_tag_t sec_tag)
 	return 0;
 }
 
-int slm_native_tls_store_credential(sec_tag_t sec_tag, uint16_t type, const void *data, size_t len)
+int sm_native_tls_store_credential(sec_tag_t sec_tag, uint16_t type, const void *data, size_t len)
 {
-	char key[SLM_KEYS_MAX_SIZE];
+	char key[SM_KEYS_MAX_SIZE];
 	int err;
 	size_t cred_len = 0;
 
-	err = snprintf(key, sizeof(key), "slm-keys/%d/%d", sec_tag, type);
+	err = snprintf(key, sizeof(key), "sm-keys/%d/%d", sec_tag, type);
 	if (err < 0) {
 		return err;
 	}
@@ -225,7 +225,7 @@ int slm_native_tls_store_credential(sec_tag_t sec_tag, uint16_t type, const void
 	}
 
 	/* Verify that the stored credentials could be loaded. */
-	const uint8_t null_termination = type <= SLM_AT_CMNG_TYPE_CLIENT_KEY ? 1 : 0;
+	const uint8_t null_termination = type <= SM_AT_CMNG_TYPE_CLIENT_KEY ? 1 : 0;
 
 	if ((cred_len + len + null_termination) > CONFIG_SM_NATIVE_TLS_CREDENTIAL_BUFFER_SIZE) {
 		LOG_ERR("Increase CONFIG_SM_NATIVE_TLS_CREDENTIAL_BUFFER_SIZE.");
@@ -241,12 +241,12 @@ int slm_native_tls_store_credential(sec_tag_t sec_tag, uint16_t type, const void
 	return unload_tls_cred_buf(sec_tag);
 }
 
-int slm_native_tls_list_credentials(void)
+int sm_native_tls_list_credentials(void)
 {
-	return settings_load_subtree_direct("slm-keys", list_credentials_cb, NULL);
+	return settings_load_subtree_direct("sm-keys", list_credentials_cb, NULL);
 }
 
-int slm_native_tls_load_credentials(sec_tag_t sec_tag)
+int sm_native_tls_load_credentials(sec_tag_t sec_tag)
 {
 	int err;
 	struct tls_cred_buf *cred = get_tls_cred_buf(sec_tag);
@@ -265,9 +265,9 @@ int slm_native_tls_load_credentials(sec_tag_t sec_tag)
 	}
 	cred->sec_tag = sec_tag;
 
-	char key[SLM_KEYS_MAX_SIZE];
+	char key[SM_KEYS_MAX_SIZE];
 
-	err = snprintf(key, sizeof(key), "slm-keys/%d", cred->sec_tag);
+	err = snprintf(key, sizeof(key), "sm-keys/%d", cred->sec_tag);
 	if (err < 0) {
 		return err;
 	}
@@ -282,12 +282,12 @@ int slm_native_tls_load_credentials(sec_tag_t sec_tag)
 	return settings_load_subtree_direct(key, load_credential_cb, (void *)&params);
 }
 
-int slm_native_tls_delete_credential(sec_tag_t sec_tag, uint16_t type)
+int sm_native_tls_delete_credential(sec_tag_t sec_tag, uint16_t type)
 {
 	int err;
-	char key[SLM_KEYS_MAX_SIZE];
+	char key[SM_KEYS_MAX_SIZE];
 
-	err = snprintf(key, sizeof(key), "slm-keys/%d/%d", sec_tag, type);
+	err = snprintf(key, sizeof(key), "sm-keys/%d/%d", sec_tag, type);
 	if (err < 0) {
 		return err;
 	}

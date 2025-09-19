@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
-#ifndef SLM_AT_SOCKET_
-#define SLM_AT_SOCKET_
+#ifndef SM_AT_SOCKET_
+#define SM_AT_SOCKET_
 
-/**@file slm_at_socket.h
+/**@file sm_at_socket.h
  *
  * @brief Vendor-specific AT command for Socket service.
  * @{
@@ -23,12 +23,12 @@
  * @retval 0 If the operation was successful.
  *         Otherwise, a (negative) error code is returned.
  */
-int slm_bind_to_local_addr(int socket, int family, uint16_t port);
+int sm_bind_to_local_addr(int socket, int family, uint16_t port);
 
 /**
  * @brief Notify socket AT command parser that the data mode has been exited.
  */
-void slm_at_socket_notify_datamode_exit(void);
+void sm_at_socket_notify_datamode_exit(void);
 
 /**
  * @brief Initialize socket AT command parser.
@@ -36,7 +36,7 @@ void slm_at_socket_notify_datamode_exit(void);
  * @retval 0 If the operation was successful.
  *           Otherwise, a (negative) error code is returned.
  */
-int slm_at_socket_init(void);
+int sm_at_socket_init(void);
 
 /**
  * @brief Uninitialize socket AT command parser.
@@ -44,7 +44,7 @@ int slm_at_socket_init(void);
  * @retval 0 If the operation was successful.
  *           Otherwise, a (negative) error code is returned.
  */
-int slm_at_socket_uninit(void);
+int sm_at_socket_uninit(void);
 /** @} */
 
-#endif /* SLM_AT_SOCKET_ */
+#endif /* SM_AT_SOCKET_ */

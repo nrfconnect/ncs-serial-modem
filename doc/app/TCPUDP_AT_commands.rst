@@ -1,4 +1,4 @@
-.. _SLM_AT_TCP_UDP:
+.. _SM_AT_TCP_UDP:
 
 TCP and UDP AT commands
 ***********************
@@ -69,7 +69,7 @@ This is emitted when a new connection has been created to the server.
 
 * The ``<peer_ip>`` value is the IPv4 or IPv6 address of the peer.
 
-.. slm_tcpsvr_disconnect_notif_start
+.. sm_tcpsvr_disconnect_notif_start
 
 ::
 
@@ -80,7 +80,7 @@ This is emitted when the client has been disconnected.
 * The ``<error>`` value is an integer.
   It is either ``0`` when the client is disconnected normally, or an *-errno* code.
 
-.. slm_tcpsvr_disconnect_notif_end
+.. sm_tcpsvr_disconnect_notif_end
 
 
 Example
@@ -311,7 +311,7 @@ Syntax
 
 * The ``<data>`` parameter is a string that contains the data to be sent.
   The maximum size of the data is 1024 bytes.
-  When the parameter is not specified, SLM enters ``slm_data_mode``.
+  When the parameter is not specified, Serial Modem enters ``sm_data_mode``.
 * The ``<flags>`` parameter sets the sending behavior.
   It can be set to the following value:
 
@@ -373,8 +373,8 @@ Response syntax
 ~~~~~~~~~~~~~~~
 
 .. include:: TCPUDP_AT_commands.rst
-   :start-after: slm_tcpsvr_disconnect_notif_start
-   :end-before: slm_tcpsvr_disconnect_notif_end
+   :start-after: sm_tcpsvr_disconnect_notif_start
+   :end-before: sm_tcpsvr_disconnect_notif_end
 
 Examples
 ~~~~~~~~
@@ -431,7 +431,7 @@ TCP receive data
    <data>
 
 * The ``<size>`` parameter is an integer that indicates the size of the received data.
-  This notification comes only when SLM is not operating in :ref:`data mode <slm_data_mode>`.
+  This notification comes only when Serial Modem is not operating in :ref:`data mode <sm_data_mode>`.
 * The ``<data>`` value is raw data that is being received.
 
 UDP server #XUDPSVR
@@ -582,7 +582,7 @@ Syntax
 * The ``<use_dtls_cid>`` parameter is an integer.
   It indicates whether to use DTLS's connection identifier.
   This parameter is only supported with modem firmware 1.3.5 and newer.
-  See :ref:`SLM_AT_SSOCKETOPT` for more details regarding the allowed values.
+  See :ref:`SM_AT_SSOCKETOPT` for more details regarding the allowed values.
 * The ``<peer_verify>`` parameter accepts the following values:
 
   * ``0`` - None.
@@ -694,7 +694,7 @@ Syntax
 
 * The ``<data>`` parameter is a string that contains the data to be sent.
   The maximum size of the data is 1024 bytes.
-  When the parameter is not specified, SLM enters ``slm_data_mode``.
+  When the parameter is not specified, Serial Modem enters ``sm_data_mode``.
 * The ``<flags>`` parameter sets the sending behavior.
   It can be set to the following value:
 
@@ -739,7 +739,7 @@ UDP receive data
    #XUDPDATA: <size>,<ip_addr>,<port>
    <data>
 
-* ``#XUDPDATA`` notification comes only when SLM is not operating in :ref:`data mode <slm_data_mode>`.
+* ``#XUDPDATA`` notification comes only when Serial Modem is not operating in :ref:`data mode <sm_data_mode>`.
 * The ``<size>`` value is an integer that represents the actual number of bytes received.
 * The ``<ip_addr>`` value is a string that represents the IPv4 or IPv6 address of the remote peer.
 * The ``<port>`` value is an integer that represents the UDP port of the remote peer.

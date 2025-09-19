@@ -20,10 +20,10 @@
 #include "sm_native_tls.h"
 #endif
 
-LOG_MODULE_REGISTER(slm_sock, CONFIG_SM_LOG_LEVEL);
+LOG_MODULE_REGISTER(sm_sock, CONFIG_SM_LOG_LEVEL);
 
-#define SLM_FDS_COUNT CONFIG_POSIX_OPEN_MAX
-#define SLM_MAX_SOCKET_COUNT (SLM_FDS_COUNT - 1)
+#define SM_FDS_COUNT CONFIG_POSIX_OPEN_MAX
+#define SM_MAX_SOCKET_COUNT (SM_FDS_COUNT - 1)
 
 /*
  * Known limitation in this version
@@ -32,34 +32,34 @@ LOG_MODULE_REGISTER(slm_sock, CONFIG_SM_LOG_LEVEL);
  */
 
 /**@brief Socket operations. */
-enum slm_socket_operation {
+enum sm_socket_operation {
 	AT_SOCKET_CLOSE,
 	AT_SOCKET_OPEN,
 	AT_SOCKET_OPEN6
 };
 
 /**@brief Socketopt operations. */
-enum slm_socketopt_operation {
+enum sm_socketopt_operation {
 	AT_SOCKETOPT_GET,
 	AT_SOCKETOPT_SET
 };
 
 /**@brief Socket roles. */
-enum slm_socket_role {
+enum sm_socket_role {
 	AT_SOCKET_ROLE_CLIENT,
 	AT_SOCKET_ROLE_SERVER
 };
 
-static char udp_url[SLM_MAX_URL];
+static char udp_url[SM_MAX_URL];
 static uint16_t udp_port;
 
-struct slm_async_poll {
+struct sm_async_poll {
 	atomic_t update_events; /* Update events to poll for this socket. */
 	bool specific: 1;	/* Specific socket to poll. */
 	bool disable: 1;	/* Poll needs to stay disabled for this socket. */
 };
 
-static struct slm_socket {
+static struct sm_socket {
 	int type;          /* SOCK_STREAM or SOCK_DGRAM */
 	uint16_t role;     /* Client or Server */
 	sec_tag_t sec_tag; /* Security tag of the credential */
@@ -69,11 +69,11 @@ static struct slm_socket {
 	int ranking;       /* Ranking of socket */
 	uint16_t cid;      /* PDP Context ID, 0: primary; 1~10: secondary */
 	int send_flags;    /* Send flags */
-	struct slm_async_poll async_poll; /* Async poll info */
-} socks[SLM_MAX_SOCKET_COUNT];
+	struct sm_async_poll async_poll; /* Async poll info */
+} socks[SM_MAX_SOCKET_COUNT];
 
-static struct zsock_pollfd fds[SLM_MAX_SOCKET_COUNT];
-static struct slm_socket *sock = &socks[0]; /* Current socket in use */
+static struct zsock_pollfd fds[SM_MAX_SOCKET_COUNT];
+static struct sm_socket *sock = &socks[0]; /* Current socket in use */
 
 enum EFD_COMMAND {
 	EFD_POLL = 0x1,
@@ -102,7 +102,7 @@ static int handle_at_sendto(enum at_parser_cmd_type cmd_type, struct at_parser *
 
 static int socket_ranking;
 
-static void init_socket(struct slm_socket *socket)
+static void init_socket(struct sm_socket *socket)
 {
 	if (socket == NULL) {
 		return;
@@ -115,13 +115,13 @@ static void init_socket(struct slm_socket *socket)
 	socket->fd_peer = INVALID_SOCKET;
 	socket->ranking = 0;
 	socket->cid = 0;
-	socket->async_poll = (struct slm_async_poll){0};
+	socket->async_poll = (struct sm_async_poll){0};
 }
 
 static bool is_opened_socket(int fd)
 {
 	if (fd != INVALID_SOCKET) {
-		for (int i = 0; i < SLM_MAX_SOCKET_COUNT; i++) {
+		for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
 			if (socks[i].fd == fd) {
 				return true;
 			}
@@ -131,9 +131,9 @@ static bool is_opened_socket(int fd)
 	return false;
 }
 
-static struct slm_socket *find_avail_socket(void)
+static struct sm_socket *find_avail_socket(void)
 {
-	for (int i = 0; i < SLM_MAX_SOCKET_COUNT; i++) {
+	for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
 		if (socks[i].fd == INVALID_SOCKET) {
 			return &socks[i];
 		}
@@ -142,12 +142,12 @@ static struct slm_socket *find_avail_socket(void)
 	return NULL;
 }
 
-static struct slm_socket *get_active_socket(void)
+static struct sm_socket *get_active_socket(void)
 {
 	int ranking = 0;
-	struct slm_socket *latest_sock = NULL;
+	struct sm_socket *latest_sock = NULL;
 
-	for (int i = 0; i < SLM_MAX_SOCKET_COUNT; i++) {
+	for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
 		if (socks[i].fd == INVALID_SOCKET) {
 			continue;
 		}
@@ -193,7 +193,7 @@ static void update_work_fn(struct k_work *work)
 	}
 }
 
-static void delegate_poll_event(struct slm_socket *s, int events)
+static void delegate_poll_event(struct sm_socket *s, int events)
 {
 	if (poll_ctx.poll_running && (poll_ctx.poll_all || s->async_poll.specific)) {
 		LOG_DBG("Delegate poll events %d for socket %d", events, s->fd);
@@ -204,10 +204,10 @@ static void delegate_poll_event(struct slm_socket *s, int events)
 
 }
 
-void slm_at_socket_notify_datamode_exit(void)
+void sm_at_socket_notify_datamode_exit(void)
 {
 	if (poll_ctx.poll_running) {
-		for (int i = 0; i < SLM_MAX_SOCKET_COUNT; i++) {
+		for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
 			if (socks[i].fd == INVALID_SOCKET) {
 				continue;
 			}
@@ -291,7 +291,7 @@ static int do_secure_socket_open(int peer_verify)
 	sock->fd = ret;
 
 #if defined(CONFIG_SM_NATIVE_TLS)
-	ret = slm_native_tls_load_credentials(sock->sec_tag);
+	ret = sm_native_tls_load_credentials(sock->sec_tag);
 	if (ret < 0) {
 		LOG_ERR("Failed to load sec tag: %d (%d)", sock->sec_tag, ret);
 		goto error;
@@ -550,7 +550,7 @@ static int sec_sockopt_set(enum at_sec_sockopt at_option, void *value, socklen_t
 
 	/* Options with special handling. */
 	if (level == SOL_TLS && option == TLS_HOSTNAME) {
-		if (slm_util_casecmp(value, "NULL")) {
+		if (sm_util_casecmp(value, "NULL")) {
 			value = NULL;
 			len = 0;
 		}
@@ -584,7 +584,7 @@ static int sec_sockopt_get(enum at_sec_sockopt at_option)
 			rsp_send("\r\n#XSSOCKETOPT: 0x%x\r\n", value);
 		}
 	} else if (level == SOL_TLS && option == TLS_HOSTNAME) {
-		char hostname[SLM_MAX_URL] = {0};
+		char hostname[SM_MAX_URL] = {0};
 
 		len = sizeof(hostname);
 		ret = zsock_getsockopt(sock->fd, level, option, &hostname, &len);
@@ -606,7 +606,7 @@ static int sec_sockopt_get(enum at_sec_sockopt at_option)
 	return ret;
 }
 
-int slm_bind_to_local_addr(int socket, int family, uint16_t port)
+int sm_bind_to_local_addr(int socket, int family, uint16_t port)
 {
 	int ret;
 
@@ -807,7 +807,7 @@ static int do_recv(int timeout, int flags)
 		LOG_ERR("zsock_setsockopt(%d) error: %d", SO_RCVTIMEO, -errno);
 		return -errno;
 	}
-	ret = zsock_recv(sockfd, (void *)slm_data_buf, sizeof(slm_data_buf), flags);
+	ret = zsock_recv(sockfd, (void *)sm_data_buf, sizeof(sm_data_buf), flags);
 	if (ret < 0) {
 		LOG_WRN("zsock_recv() error: %d", -errno);
 		return -errno;
@@ -823,7 +823,7 @@ static int do_recv(int timeout, int flags)
 		LOG_WRN("zsock_recv() return 0");
 	} else {
 		rsp_send("\r\n#XRECV: %d\r\n", ret);
-		data_send(slm_data_buf, ret);
+		data_send(sm_data_buf, ret);
 		ret = 0;
 
 		delegate_poll_event(sock, ZSOCK_POLLIN);
@@ -888,7 +888,7 @@ static int do_recvfrom(int timeout, int flags)
 		return -errno;
 	}
 	ret = zsock_recvfrom(
-		sock->fd, (void *)slm_data_buf, sizeof(slm_data_buf), flags, &remote, &addrlen);
+		sock->fd, (void *)sm_data_buf, sizeof(sm_data_buf), flags, &remote, &addrlen);
 	if (ret < 0) {
 		LOG_ERR("zsock_recvfrom() error: %d", -errno);
 		return -errno;
@@ -906,7 +906,7 @@ static int do_recvfrom(int timeout, int flags)
 
 		util_get_peer_addr(&remote, peer_addr, &peer_port);
 		rsp_send("\r\n#XRECVFROM: %d,\"%s\",%d\r\n", ret, peer_addr, peer_port);
-		data_send(slm_data_buf, ret);
+		data_send(sm_data_buf, ret);
 
 		delegate_poll_event(sock, ZSOCK_POLLIN);
 	}
@@ -916,7 +916,7 @@ static int do_recvfrom(int timeout, int flags)
 
 static int do_poll(int timeout)
 {
-	int ret = zsock_poll(fds, SLM_MAX_SOCKET_COUNT, timeout);
+	int ret = zsock_poll(fds, SM_MAX_SOCKET_COUNT, timeout);
 
 	if (ret < 0) {
 		rsp_send("\r\n#XPOLL: %d\r\n", ret);
@@ -924,7 +924,7 @@ static int do_poll(int timeout)
 	}
 	/* ret == 0 means timeout */
 	if (ret > 0) {
-		for (int i = 0; i < SLM_MAX_SOCKET_COUNT; i++) {
+		for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
 			/* If fd is equal to -1	then revents is cleared (set to zero) */
 			if (fds[i].revents != 0) {
 				rsp_send("\r\n#XPOLL: %d,\"0x%04x\"\r\n",
@@ -970,7 +970,7 @@ static int socket_datamode_callback(uint8_t op, const uint8_t *data, int len, ui
 	int ret = 0;
 
 	if (op == DATAMODE_SEND) {
-		if (sock->type == SOCK_DGRAM && (flags & SLM_DATAMODE_FLAGS_MORE_DATA) != 0) {
+		if (sock->type == SOCK_DGRAM && (flags & SM_DATAMODE_FLAGS_MORE_DATA) != 0) {
 			LOG_ERR("Datamode buffer overflow");
 			exit_datamode_handler(-EOVERFLOW);
 			return -EOVERFLOW;
@@ -991,7 +991,7 @@ static int socket_datamode_callback(uint8_t op, const uint8_t *data, int len, ui
 	return ret;
 }
 
-SLM_AT_CMD_CUSTOM(xsocket, "AT#XSOCKET", handle_at_socket);
+SM_AT_CMD_CUSTOM(xsocket, "AT#XSOCKET", handle_at_socket);
 static int handle_at_socket(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			    uint32_t param_count)
 {
@@ -1071,7 +1071,7 @@ error:
 	return err;
 }
 
-SLM_AT_CMD_CUSTOM(xssocket, "AT#XSSOCKET", handle_at_secure_socket);
+SM_AT_CMD_CUSTOM(xssocket, "AT#XSSOCKET", handle_at_secure_socket);
 static int handle_at_secure_socket(enum at_parser_cmd_type cmd_type,
 				   struct at_parser *parser, uint32_t param_count)
 {
@@ -1181,7 +1181,7 @@ error:
 
 }
 
-SLM_AT_CMD_CUSTOM(xsocketselect, "AT#XSOCKETSELECT", handle_at_socket_select);
+SM_AT_CMD_CUSTOM(xsocketselect, "AT#XSOCKETSELECT", handle_at_socket_select);
 static int handle_at_socket_select(enum at_parser_cmd_type cmd_type,
 				   struct at_parser *parser, uint32_t)
 {
@@ -1197,7 +1197,7 @@ static int handle_at_socket_select(enum at_parser_cmd_type cmd_type,
 		if (fd < 0) {
 			return -EINVAL;
 		}
-		for (int i = 0; i < SLM_MAX_SOCKET_COUNT; i++) {
+		for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
 			if (socks[i].fd == fd) {
 				sock = &socks[i];
 				rsp_send("\r\n#XSOCKETSELECT: %d\r\n", sock->fd);
@@ -1208,7 +1208,7 @@ static int handle_at_socket_select(enum at_parser_cmd_type cmd_type,
 		break;
 
 	case AT_PARSER_CMD_TYPE_READ:
-		for (int i = 0; i < SLM_MAX_SOCKET_COUNT; i++) {
+		for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
 			if (socks[i].fd != INVALID_SOCKET) {
 				rsp_send("\r\n#XSOCKETSELECT: %d,%d,%d,%d,%d,%d,%d\r\n",
 					socks[i].fd, socks[i].family, socks[i].role,
@@ -1228,7 +1228,7 @@ static int handle_at_socket_select(enum at_parser_cmd_type cmd_type,
 	return err;
 }
 
-SLM_AT_CMD_CUSTOM(xsocketopt, "AT#XSOCKETOPT", handle_at_socketopt);
+SM_AT_CMD_CUSTOM(xsocketopt, "AT#XSOCKETOPT", handle_at_socketopt);
 static int handle_at_socketopt(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			       uint32_t param_count)
 {
@@ -1274,7 +1274,7 @@ static int handle_at_socketopt(enum at_parser_cmd_type cmd_type, struct at_parse
 	return err;
 }
 
-SLM_AT_CMD_CUSTOM(xssocketopt, "AT#XSSOCKETOPT", handle_at_secure_socketopt);
+SM_AT_CMD_CUSTOM(xssocketopt, "AT#XSSOCKETOPT", handle_at_secure_socketopt);
 static int handle_at_secure_socketopt(enum at_parser_cmd_type cmd_type,
 				      struct at_parser *parser, uint32_t)
 {
@@ -1298,8 +1298,8 @@ static int handle_at_secure_socketopt(enum at_parser_cmd_type cmd_type,
 		}
 		if (op == AT_SOCKETOPT_SET) {
 			int value_int = 0;
-			char value_str[SLM_MAX_URL] = {0};
-			int size = SLM_MAX_URL;
+			char value_str[SM_MAX_URL] = {0};
+			int size = SM_MAX_URL;
 
 			err = at_parser_num_get(parser, 3, &value_int);
 			if (err == -EOPNOTSUPP) {
@@ -1330,7 +1330,7 @@ static int handle_at_secure_socketopt(enum at_parser_cmd_type cmd_type,
 	return err;
 }
 
-SLM_AT_CMD_CUSTOM(xbind, "AT#XBIND", handle_at_bind);
+SM_AT_CMD_CUSTOM(xbind, "AT#XBIND", handle_at_bind);
 static int handle_at_bind(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			  uint32_t)
 {
@@ -1343,7 +1343,7 @@ static int handle_at_bind(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 		if (err < 0) {
 			return err;
 		}
-		err = slm_bind_to_local_addr(sock->fd, sock->family, port);
+		err = sm_bind_to_local_addr(sock->fd, sock->family, port);
 		break;
 
 	default:
@@ -1353,13 +1353,13 @@ static int handle_at_bind(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 	return err;
 }
 
-SLM_AT_CMD_CUSTOM(xconnect, "AT#XCONNECT", handle_at_connect);
+SM_AT_CMD_CUSTOM(xconnect, "AT#XCONNECT", handle_at_connect);
 static int handle_at_connect(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			     uint32_t)
 {
 	int err = -EINVAL;
-	char url[SLM_MAX_URL] = {0};
-	int size = SLM_MAX_URL;
+	char url[SM_MAX_URL] = {0};
+	int size = SM_MAX_URL;
 	uint16_t port;
 
 	if (sock->role != AT_SOCKET_ROLE_CLIENT) {
@@ -1387,7 +1387,7 @@ static int handle_at_connect(enum at_parser_cmd_type cmd_type, struct at_parser 
 	return err;
 }
 
-SLM_AT_CMD_CUSTOM(xlisten, "AT#XLISTEN", handle_at_listen);
+SM_AT_CMD_CUSTOM(xlisten, "AT#XLISTEN", handle_at_listen);
 static int handle_at_listen(enum at_parser_cmd_type cmd_type, struct at_parser *, uint32_t)
 {
 	int err = -EINVAL;
@@ -1409,7 +1409,7 @@ static int handle_at_listen(enum at_parser_cmd_type cmd_type, struct at_parser *
 	return err;
 }
 
-SLM_AT_CMD_CUSTOM(xaccept, "AT#XACCEPT", handle_at_accept);
+SM_AT_CMD_CUSTOM(xaccept, "AT#XACCEPT", handle_at_accept);
 static int handle_at_accept(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			    uint32_t)
 {
@@ -1450,12 +1450,12 @@ static int handle_at_accept(enum at_parser_cmd_type cmd_type, struct at_parser *
 	return err;
 }
 
-SLM_AT_CMD_CUSTOM(xsend, "AT#XSEND", handle_at_send);
+SM_AT_CMD_CUSTOM(xsend, "AT#XSEND", handle_at_send);
 static int handle_at_send(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			  uint32_t param_count)
 {
 	int err = -EINVAL;
-	char data[SLM_MAX_PAYLOAD_SIZE + 1] = {0};
+	char data[SM_MAX_PAYLOAD_SIZE + 1] = {0};
 	int size;
 	bool datamode = false;
 
@@ -1500,7 +1500,7 @@ static int handle_at_send(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 	return err;
 }
 
-SLM_AT_CMD_CUSTOM(xrecv, "AT#XRECV", handle_at_recv);
+SM_AT_CMD_CUSTOM(xrecv, "AT#XRECV", handle_at_recv);
 static int handle_at_recv(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			  uint32_t param_count)
 {
@@ -1530,13 +1530,13 @@ static int handle_at_recv(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 	return err;
 }
 
-SLM_AT_CMD_CUSTOM(xsendto, "AT#XSENDTO", handle_at_sendto);
+SM_AT_CMD_CUSTOM(xsendto, "AT#XSENDTO", handle_at_sendto);
 static int handle_at_sendto(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			    uint32_t param_count)
 {
 
 	int err = -EINVAL;
-	char data[SLM_MAX_PAYLOAD_SIZE + 1] = {0};
+	char data[SM_MAX_PAYLOAD_SIZE + 1] = {0};
 	int size;
 	bool datamode = false;
 
@@ -1591,7 +1591,7 @@ static int handle_at_sendto(enum at_parser_cmd_type cmd_type, struct at_parser *
 	return err;
 }
 
-SLM_AT_CMD_CUSTOM(xrecvfrom, "AT#XRECVFROM", handle_at_recvfrom);
+SM_AT_CMD_CUSTOM(xrecvfrom, "AT#XRECVFROM", handle_at_recvfrom);
 static int handle_at_recvfrom(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			      uint32_t param_count)
 {
@@ -1621,14 +1621,14 @@ static int handle_at_recvfrom(enum at_parser_cmd_type cmd_type, struct at_parser
 	return err;
 }
 
-SLM_AT_CMD_CUSTOM(xgetaddrinfo, "AT#XGETADDRINFO", handle_at_getaddrinfo);
+SM_AT_CMD_CUSTOM(xgetaddrinfo, "AT#XGETADDRINFO", handle_at_getaddrinfo);
 static int handle_at_getaddrinfo(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 				 uint32_t param_count)
 {
 	int err = -EINVAL;
 	char hostname[NI_MAXHOST];
-	char host[SLM_MAX_URL];
-	int size = SLM_MAX_URL;
+	char host[SM_MAX_URL];
+	int size = SM_MAX_URL;
 	struct zsock_addrinfo *result;
 	struct zsock_addrinfo *res;
 	char rsp_buf[256];
@@ -1699,7 +1699,7 @@ static int handle_at_getaddrinfo(enum at_parser_cmd_type cmd_type, struct at_par
 	return err;
 }
 
-SLM_AT_CMD_CUSTOM(xpoll, "AT#XPOLL", handle_at_poll);
+SM_AT_CMD_CUSTOM(xpoll, "AT#XPOLL", handle_at_poll);
 static int handle_at_poll(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			  uint32_t param_count)
 {
@@ -1718,7 +1718,7 @@ static int handle_at_poll(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 		}
 		if (param_count == 2) {
 			/* poll all opened socket */
-			for (int i = 0; i < SLM_MAX_SOCKET_COUNT; i++) {
+			for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
 				fds[i].fd = socks[i].fd;
 				if (fds[i].fd != INVALID_SOCKET) {
 					fds[i].events = ZSOCK_POLLIN;
@@ -1726,7 +1726,7 @@ static int handle_at_poll(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 			}
 		} else {
 			/* poll selected sockets */
-			for (int i = 0; i < SLM_MAX_SOCKET_COUNT; i++) {
+			for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
 				fds[i].fd = INVALID_SOCKET;
 				if (param_count > 2 + i) {
 					err = at_parser_num_get(parser, 2 + i, &handle);
@@ -1788,7 +1788,7 @@ static eventfd_t get_efd_event(struct zsock_pollfd *efd)
 	return value;
 }
 
-static inline void handle_apoll_socket_event(struct slm_socket *s, struct zsock_pollfd *fd)
+static inline void handle_apoll_socket_event(struct sm_socket *s, struct zsock_pollfd *fd)
 {
 	if (fd->revents) {
 		if (fd->revents & (ZSOCK_POLLERR | ZSOCK_POLLNVAL | ZSOCK_POLLHUP)) {
@@ -1807,8 +1807,8 @@ static inline void handle_apoll_socket_event(struct slm_socket *s, struct zsock_
 static void apoll_thread(void*, void*, void*)
 {
 	int ret;
-	struct zsock_pollfd afds[SLM_FDS_COUNT] = {
-		[0 ... SLM_FDS_COUNT - 1] = {
+	struct zsock_pollfd afds[SM_FDS_COUNT] = {
+		[0 ... SM_FDS_COUNT - 1] = {
 			.fd = INVALID_SOCKET
 		}
 	};
@@ -1904,7 +1904,7 @@ static void format_apoll_read_response(char *response, size_t size)
 	offset = snprintf(response, size, "\r\n#XAPOLL: %d,%d", poll_ctx.poll_running,
 			  poll_ctx.poll_events);
 
-	for (int i = 0; i < SLM_MAX_SOCKET_COUNT && offset < size; i++) {
+	for (int i = 0; i < SM_MAX_SOCKET_COUNT && offset < size; i++) {
 		if (socks[i].fd != INVALID_SOCKET &&
 		    (poll_ctx.poll_all || socks[i].async_poll.specific)) {
 			offset += snprintf(&response[offset], size - offset, ",%d", socks[i].fd);
@@ -1920,7 +1920,7 @@ static void format_apoll_read_response(char *response, size_t size)
 static void set_apoll_all_sockets(void)
 {
 	poll_ctx.poll_all = true;
-	for (int i = 0; i < SLM_MAX_SOCKET_COUNT; i++) {
+	for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
 		if (socks[i].fd != INVALID_SOCKET) {
 			atomic_set(&socks[i].async_poll.update_events, poll_ctx.poll_events);
 		}
@@ -1935,7 +1935,7 @@ static int set_apoll_specific_sockets(struct at_parser *parser, uint32_t param_c
 
 	/* Clear previously set values. */
 	poll_ctx.poll_all = false;
-	for (int i = 0; i < SLM_MAX_SOCKET_COUNT; i++) {
+	for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
 		socks[i].async_poll.specific = false;
 	}
 
@@ -1948,7 +1948,7 @@ static int set_apoll_specific_sockets(struct at_parser *parser, uint32_t param_c
 		socket_found = false;
 
 		/* Match given handles to socket handles. */
-		for (int j = 0; j < SLM_MAX_SOCKET_COUNT; j++) {
+		for (int j = 0; j < SM_MAX_SOCKET_COUNT; j++) {
 			if (socks[j].fd == handle) {
 				socks[j].async_poll.specific = true;
 				atomic_set(&socks[j].async_poll.update_events,
@@ -1966,7 +1966,7 @@ static int set_apoll_specific_sockets(struct at_parser *parser, uint32_t param_c
 	return 0;
 }
 
-SLM_AT_CMD_CUSTOM(xapoll, "AT#XAPOLL", handle_at_apoll);
+SM_AT_CMD_CUSTOM(xapoll, "AT#XAPOLL", handle_at_apoll);
 static int handle_at_apoll(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			  uint32_t param_count)
 {
@@ -2012,7 +2012,7 @@ static int handle_at_apoll(enum at_parser_cmd_type cmd_type, struct at_parser *p
 		char response[64];
 
 		format_apoll_read_response(response, sizeof(response));
-		err = slm_at_send_str(response);
+		err = sm_at_send_str(response);
 		break;
 
 	case AT_PARSER_CMD_TYPE_TEST:
@@ -2031,10 +2031,10 @@ static int handle_at_apoll(enum at_parser_cmd_type cmd_type, struct at_parser *p
 
 /**@brief API to initialize Socket AT commands handler
  */
-int slm_at_socket_init(void)
+int sm_at_socket_init(void)
 {
 	init_socket(sock);
-	for (int i = 0; i < SLM_MAX_SOCKET_COUNT; i++) {
+	for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
 		init_socket(&socks[i]);
 	}
 	socket_ranking = 1;
@@ -2046,12 +2046,12 @@ int slm_at_socket_init(void)
 
 /**@brief API to uninitialize Socket AT commands handler
  */
-int slm_at_socket_uninit(void)
+int sm_at_socket_uninit(void)
 {
 	apoll_stop();
 
 	(void)do_socket_close();
-	for (int i = 0; i < SLM_MAX_SOCKET_COUNT; i++) {
+	for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
 		if (socks[i].fd_peer != INVALID_SOCKET) {
 			zsock_close(socks[i].fd_peer);
 		}

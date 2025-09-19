@@ -1,4 +1,4 @@
-.. _SLM_AT_GNSS:
+.. _SM_AT_GNSS:
 
 GNSS AT commands
 ****************
@@ -22,7 +22,7 @@ The set command allows you to start and stop the GNSS module.
 Both the :ref:`lib_nrf_cloud_agnss` service and the :ref:`lib_nrf_cloud_pgps` service can be used with the module, either together or independently of each other.
 Using them reduces the time it takes the GNSS module to estimate its position.
 
-To use either of them, the device must be connected to nRF Cloud (using the :ref:`#XNRFCLOUD <SLM_AT_NRFCLOUD>` AT command) when starting the GNSS module.
+To use either of them, the device must be connected to nRF Cloud (using the :ref:`#XNRFCLOUD <SM_AT_NRFCLOUD>` AT command) when starting the GNSS module.
 In addition, the following Kconfig options must be enabled:
 
    * :kconfig:option:`CONFIG_NRF_CLOUD_AGNSS <CONFIG_NRF_CLOUD_AGNSS>` to use A-GNSS.
@@ -97,7 +97,7 @@ In periodic navigation mode, the ``<interval>`` and ``<timeout>`` parameters are
    When using P-GPS, make sure that the value of the :kconfig:option:`CONFIG_SM_PGPS_INJECT_FIX_DATA` Kconfig option matches your use case.
    It is enabled by default but should be disabled if the device is expected to move distances longer than a few dozen kilometers between fix attempts.
 
-As an alternative to GNSS-based positioning, see :ref:`#XNRFCLOUDPOS <SLM_AT_NRFCLOUDPOS>` for cellular and Wi-Fi® positioning.
+As an alternative to GNSS-based positioning, see :ref:`#XNRFCLOUDPOS <SM_AT_NRFCLOUDPOS>` for cellular and Wi-Fi® positioning.
 
 Unsolicited notification
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -114,7 +114,7 @@ Unsolicited notification
 * The ``<heading>`` value represents the heading of the movement of the user in degrees.
 * The ``<datetime>`` value represents the UTC date-time.
 
-.. slm_gps_status_notif_start
+.. sm_gps_status_notif_start
 
 .. code-block::
 
@@ -132,7 +132,7 @@ Unsolicited notification
   * ``3`` - GNSS enters sleep because of timeout.
   * ``4`` - GNSS enters sleep because a fix is acquired.
 
-.. slm_gps_status_notif_end
+.. sm_gps_status_notif_end
 
 Example
 ~~~~~~~
@@ -264,8 +264,8 @@ Response syntax
 ~~~~~~~~~~~~~~~
 
 .. include:: GNSS_AT_commands.rst
-   :start-after: slm_gps_status_notif_start
-   :end-before: slm_gps_status_notif_end
+   :start-after: sm_gps_status_notif_start
+   :end-before: sm_gps_status_notif_end
 
 Example
 ~~~~~~~

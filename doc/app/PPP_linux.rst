@@ -1,4 +1,4 @@
-.. _slm_as_linux_modem:
+.. _sm_as_linux_modem:
 
 nRF91 Series SiP as a modem for Linux device
 ############################################
@@ -10,7 +10,7 @@ nRF91 Series SiP as a modem for Linux device
 Overview
 ********
 
-You can use the Serial LTE Modem (SLM) application to make an nRF91 Series SiP work as a standalone modem that can be used with a Linux device.
+You can use the Serial Modem (SM) application to make an nRF91 Series SiP work as a standalone modem that can be used with a Linux device.
 The Linux device can use a standard PPP daemon and ldattach utility to connect to the cellular network through the nRF91 Series SiP.
 
 The setup differentiates from a typical dial-up modem connection as the GSM 0710 multiplexer protocol (CMUX) is used to multiplex multiple data streams over a single serial port.
@@ -29,27 +29,27 @@ These should be available on all standard Linux distributions.
 Configuration
 =============
 
-To build the SLM application, use the :file:`overlay-ppp-cmux-linux.conf` configuration overlay.
+To build the Serial Modem application, use the :file:`overlay-ppp-cmux-linux.conf` configuration overlay.
 
 You can adjust the serial port baud rate using the devicetree overlay file.
 The :ref:`baud rate is set to 115200 <test_and_optimize>` by default.
-If you change the baud rate, set the same rate in the :file:`scripts/slm_start_ppp.sh` and :file:`scripts/slm_stop_ppp.sh` scripts.
+If you change the baud rate, set the same rate in the :file:`scripts/sm_start_ppp.sh` and :file:`scripts/sm_stop_ppp.sh` scripts.
 
 .. note::
    The standard ``ldattach`` utility sets MRU and MTU to 127 bytes.
    This is hard-coded and cannot be changed.
-   If you change the SLM configuration, make sure that the :kconfig:option:`CONFIG_MODEM_CMUX_MTU` Kconfig option is set to 127 bytes.
+   If you change the Serial Modem configuration, make sure that the :kconfig:option:`CONFIG_MODEM_CMUX_MTU` Kconfig option is set to 127 bytes.
    This is already configured in the :file:`overlay-ppp-cmux-linux.conf` configuration overlay.
 
 Building and running
 ====================
 
-To build and program the SLM application to the nRF91 Series device, use the :file:`overlay-ppp-cmux-linux.conf` overlay file.
+To build and program the Serial Modem application to the nRF91 Series device, use the :file:`overlay-ppp-cmux-linux.conf` overlay file.
 
 Managing the connection
 ***********************
 
-The start and stop scripts are provided in the :file:`scripts` directory of the SLM application.
+The start and stop scripts are provided in the :file:`scripts` directory of the Serial Modem application.
 The scripts assume that the nRF91 Series SiP is connected to the Linux device using the `/dev/ttyACM0` serial port.
 
 If needed, adjust the serial port settings in the scripts as follows:
@@ -59,8 +59,8 @@ If needed, adjust the serial port settings in the scripts as follows:
    MODEM=/dev/ttyACM0
    BAUD=115200
 
-To start the PPP connection, run the :file:`scripts/slm_start_ppp.sh` script.
-To stop the PPP connection, run the :file:`scripts/slm_stop_ppp.sh` script.
+To start the PPP connection, run the :file:`scripts/sm_start_ppp.sh` script.
+To stop the PPP connection, run the :file:`scripts/sm_stop_ppp.sh` script.
 
 The scripts need superuser privileges to run, so use `sudo`.
 The PPP link is set as a default route if there is no existing default route.
@@ -71,7 +71,7 @@ The following example shows how to start the connection and verify its operation
 
 .. code-block:: shell
 
-   $ sudo scripts/slm_start_ppp.sh
+   $ sudo scripts/sm_start_ppp.sh
    Wait modem to boot
    Attach CMUX channel to modem...
    Connect and wait for PPP link...
@@ -134,7 +134,7 @@ The following example shows how to start the connection and verify its operation
    [  5]   0.00-10.00  sec   128 KBytes   105 Kbits/sec    1             sender
    [  5]   0.00-11.58  sec  89.5 KBytes  63.3 Kbits/sec                  receiver
 
-   $ sudo scripts/slm_stop_ppp.sh
+   $ sudo scripts/sm_stop_ppp.sh
    send (AT+CFUN=0^M)
    expect (#XPPP: 0,0)
 

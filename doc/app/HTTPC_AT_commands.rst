@@ -1,4 +1,4 @@
-.. _SLM_AT_HTTPC:
+.. _SM_AT_HTTPC:
 
 HTTP client AT commands
 ***********************
@@ -158,8 +158,8 @@ Syntax
   * ``0`` - normal mode (default)
   * ``1`` - chunked mode
 
-  If ``<content_length>`` is greater than ``0`` or ``<chunked_transfer>`` is not ``0``, the SLM application enters ``slm_data_mode``.
-  The SLM sends the payload to the HTTP server until the terminator string defined in :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` is received.
+  If ``<content_length>`` is greater than ``0`` or ``<chunked_transfer>`` is not ``0``, the Serial Modem application enters ``sm_data_mode``.
+  The Serial Modem sends the payload to the HTTP server until the terminator string defined in :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` is received.
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -211,7 +211,7 @@ The following example sends a POST request, with headers delimited by "\\r\\n", 
 
 ::
 
-   AT#XHTTPCREQ="POST","/post","User-Agent: slm\r\naccept: */*\r\n","application/json",17
+   AT#XHTTPCREQ="POST","/post","User-Agent: sm\r\naccept: */*\r\n","application/json",17
 
    OK
 
@@ -232,7 +232,7 @@ The following example sends a POST request, with headers delimited by "\\r\\n", 
 
 
    #XHTTPCRSP:342,1
-   {"args":{},"data":{"hello":"world"},"files":{},"form":{},"headers":{"x-forwarded-proto":"http","x-forwarded-port":"80","host":"postman-echo.com","x-amzn-trace-id":"Root=1-621dad94-2fcac1637dc28f172c6346e6","content-length":"17","user-agent":"slm","accept":"*/*","content-type":"application/json"},"json":{"hello":"world"},"url":"http://postman-echo.com/post"}
+   {"args":{},"data":{"hello":"world"},"files":{},"form":{},"headers":{"x-forwarded-proto":"http","x-forwarded-port":"80","host":"postman-echo.com","x-amzn-trace-id":"Root=1-621dad94-2fcac1637dc28f172c6346e6","content-length":"17","user-agent":"sm","accept":"*/*","content-type":"application/json"},"json":{"hello":"world"},"url":"http://postman-echo.com/post"}
    #XHTTPCRSP:359,1
 
 Read command

@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
-#ifndef SLM_AT_FTP_
-#define SLM_AT_FTP_
+#ifndef SM_AT_FTP_
+#define SM_AT_FTP_
 
 /**@file
  *
@@ -19,7 +19,7 @@
  * @retval 0 If the operation was successful.
  *           Otherwise, a (negative) error code is returned.
  */
-int slm_at_ftp_init(void);
+int sm_at_ftp_init(void);
 
 /**
  * @brief Initialize TFTP AT command parser.
@@ -27,7 +27,7 @@ int slm_at_ftp_init(void);
  * @retval 0 If the operation was successful.
  *           Otherwise, a (negative) error code is returned.
  */
-int slm_at_tftp_init(void);
+int sm_at_tftp_init(void);
 
 /**
  * @brief Uninitialize FTP AT command parser.
@@ -35,7 +35,7 @@ int slm_at_tftp_init(void);
  * @retval 0 If the operation was successful.
  *           Otherwise, a (negative) error code is returned.
  */
-int slm_at_ftp_uninit(void);
+int sm_at_ftp_uninit(void);
 /** @} */
 
-#endif /* SLM_AT_FTP_ */
+#endif /* SM_AT_FTP_ */
