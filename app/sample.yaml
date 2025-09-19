@@ -26,8 +26,8 @@ tests:
     sysbuild: true
     build_only: true
     extra_configs:
-      - CONFIG_SLM_POWER_PIN=-1
-      - CONFIG_SLM_INDICATE_PIN=-1
+      - CONFIG_SM_POWER_PIN=-1
+      - CONFIG_SM_INDICATE_PIN=-1
     platform_allow:
       - nrf9151dk/nrf9151/ns
     integration_platforms:
@@ -40,7 +40,7 @@ tests:
     sysbuild: true
     build_only: true
     extra_configs:
-      - CONFIG_SLM_POWER_PIN=-1
+      - CONFIG_SM_POWER_PIN=-1
     platform_allow:
       - nrf9151dk/nrf9151/ns
     integration_platforms:
@@ -53,7 +53,7 @@ tests:
     sysbuild: true
     build_only: true
     extra_configs:
-      - CONFIG_SLM_INDICATE_PIN=-1
+      - CONFIG_SM_INDICATE_PIN=-1
     platform_allow:
       - nrf9151dk/nrf9151/ns
     integration_platforms:
@@ -68,8 +68,8 @@ tests:
     extra_args:
       - EXTRA_DTC_OVERLAY_FILE="overlay-external-mcu.overlay"
     extra_configs:
-      - CONFIG_SLM_POWER_PIN=31
-      - CONFIG_SLM_INDICATE_PIN=30
+      - CONFIG_SM_POWER_PIN=31
+      - CONFIG_SM_INDICATE_PIN=30
     platform_allow:
       - nrf9160dk/nrf9160/ns
       - nrf9161dk/nrf9161/ns
@@ -106,8 +106,8 @@ tests:
       - EXTRA_CONF_FILE="overlay-ppp.conf"
       - EXTRA_DTC_OVERLAY_FILE="overlay-ppp-without-cmux.overlay"
     extra_configs:
-      - CONFIG_SLM_POWER_PIN=31
-      - CONFIG_SLM_INDICATE_PIN=30
+      - CONFIG_SM_POWER_PIN=31
+      - CONFIG_SM_INDICATE_PIN=30
     platform_allow:
       - nrf9160dk/nrf9160/ns
       - nrf9161dk/nrf9161/ns
@@ -145,8 +145,8 @@ tests:
     extra_args:
       - EXTRA_CONF_FILE="overlay-ppp-cmux-linux.conf"
     extra_configs:
-      - CONFIG_SLM_POWER_PIN=31
-      - CONFIG_SLM_INDICATE_PIN=30
+      - CONFIG_SM_POWER_PIN=31
+      - CONFIG_SM_INDICATE_PIN=30
     platform_allow:
       - nrf9160dk/nrf9160/ns
       - nrf9161dk/nrf9161/ns

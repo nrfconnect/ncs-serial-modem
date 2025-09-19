@@ -14,10 +14,10 @@ void slm_cmux_init(void);
 
 /* CMUX channels that are used by other modules. */
 enum cmux_channel {
-#if defined(CONFIG_SLM_PPP)
+#if defined(CONFIG_SM_PPP)
 	CMUX_PPP_CHANNEL,
 #endif
-#if defined(CONFIG_SLM_GNSS_OUTPUT_NMEA_ON_CMUX_CHANNEL)
+#if defined(CONFIG_SM_GNSS_OUTPUT_NMEA_ON_CMUX_CHANNEL)
 	CMUX_GNSS_CHANNEL,
 #endif
 	CMUX_EXT_CHANNEL_COUNT

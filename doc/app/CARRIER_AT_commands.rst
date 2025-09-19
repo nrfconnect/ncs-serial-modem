@@ -438,7 +438,7 @@ The ``<cmd>`` command is a string, and can be used as follows:
 
   Set a flag to automatically apply the enabled settings to the LwM2M carrier library configuration and connect to the device management network.
   This command accepts two possible input parameters: ``0`` to disable or ``1`` to enable.
-  This command is not available when the :kconfig:option:`CONFIG_SLM_CARRIER_AUTO_STARTUP` Kconfig option is enabled.
+  This command is not available when the :kconfig:option:`CONFIG_SM_CARRIER_AUTO_STARTUP` Kconfig option is enabled.
 
 * ``AT#XCARRIERCFG="carriers"[,"all"|<carrier1>[,<carrier2>[,...[,<carrier6>]]]]``
 

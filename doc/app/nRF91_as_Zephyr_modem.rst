@@ -44,11 +44,11 @@ The following configuration files must be included:
 * :file:`overlay-cmux.conf` - To enable CMUX.
 * :file:`overlay-ppp.conf` - To enable PPP.
 * :file:`overlay-zephyr-modem.conf` - To tailor SLM to how Zephyr's cellular modem driver works.
-  This enables the :ref:`CONFIG_SLM_START_SLEEP <CONFIG_SLM_START_SLEEP>` Kconfig option, which makes the nRF91 Series SiP start only when the :ref:`power pin <CONFIG_SLM_POWER_PIN>` is toggled.
+  This enables the :ref:`CONFIG_SM_START_SLEEP <CONFIG_SM_START_SLEEP>` Kconfig option, which makes the nRF91 Series SiP start only when the :ref:`power pin <CONFIG_SM_POWER_PIN>` is toggled.
 
 In addition, if the controlling chip is an external MCU, the following configurations must also be included:
 
-* :kconfig:option:`CONFIG_SLM_POWER_PIN` Kconfig option - To define the power pin so that it matches your setup.
+* :kconfig:option:`CONFIG_SM_POWER_PIN` Kconfig option - To define the power pin so that it matches your setup.
 * :file:`overlay-external-mcu.overlay` - To configure which UART SLM will use.
   The actual configuration of the UART is defined in the :file:`*_ns.overlay` overlay file matching your board in the :file:`boards` directory.
   Make sure to update the UART configuration (pins, baud rate) so that it matches your setup.
@@ -59,7 +59,7 @@ Or, if the controlling chip is the nRF52840 of the nRF9160 DK, the following fil
 * :file:`overlay-zephyr-modem-nrf9160dk-nrf52840.conf` - To define the power pin.
 * :file:`overlay-zephyr-modem-nrf9160dk-nrf52840.overlay` - To configure the UART to be routed between the nRF9160 and the nRF52840 of the DK.
 
-Finally, if you want more verbose logging that includes the AT commands and responses, you can enable debug logging by uncommenting ``CONFIG_SLM_LOG_LEVEL_DBG=y`` in the :file:`prj.conf` configuration file.
+Finally, if you want more verbose logging that includes the AT commands and responses, you can enable debug logging by uncommenting ``CONFIG_SM_LOG_LEVEL_DBG=y`` in the :file:`prj.conf` configuration file.
 
 Controlling chip running Zephyr
 ===============================
@@ -129,7 +129,7 @@ When the Zephyr application starts up, the following happens:
 * If power management is enabled (the :kconfig:option:`CONFIG_PM_DEVICE` Kconfig option is set to ``y``): when the application powers on the modem (by calling ``pm_device_action_run(<dev>, PM_DEVICE_ACTION_RESUME)`` as the sample does), the cellular modem driver will toggle the modem's power pin to wake it up.
 
   If power management is not enabled, the cellular modem driver will automatically proceed and expect SLM to already be started and in a pristine state.
-  In this case, SLM should be compiled with the :ref:`CONFIG_SLM_START_SLEEP <CONFIG_SLM_START_SLEEP>` Kconfig option set to ``n``, and :ref:`CONFIG_SLM_POWER_PIN <CONFIG_SLM_POWER_PIN>` can be left undefined.
+  In this case, SLM should be compiled with the :ref:`CONFIG_SM_START_SLEEP <CONFIG_SM_START_SLEEP>` Kconfig option set to ``n``, and :ref:`CONFIG_SM_POWER_PIN <CONFIG_SM_POWER_PIN>` can be left undefined.
 
 * The cellular modem driver will start sending AT commands to SLM.
   It will enable the network status notifications, gather some information from the modem, enable CMUX, and set the modem to normal mode (with an ``AT+CFUN=1`` command).

@@ -85,7 +85,7 @@ In periodic navigation mode, the ``<interval>`` and ``<timeout>`` parameters are
 
 .. tip::
 
-   Enable the :kconfig:option:`CONFIG_SLM_LOG_LEVEL_DBG` Kconfig option if you have trouble acquiring fixes.
+   Enable the :kconfig:option:`CONFIG_SM_LOG_LEVEL_DBG` Kconfig option if you have trouble acquiring fixes.
    It makes the application print NMEA and PVT data when trying to acquire fixes, which can be of help when solving the issue.
 
 .. note::
@@ -94,7 +94,7 @@ In periodic navigation mode, the ``<interval>`` and ``<timeout>`` parameters are
 
 .. note::
 
-   When using P-GPS, make sure that the value of the :kconfig:option:`CONFIG_SLM_PGPS_INJECT_FIX_DATA` Kconfig option matches your use case.
+   When using P-GPS, make sure that the value of the :kconfig:option:`CONFIG_SM_PGPS_INJECT_FIX_DATA` Kconfig option matches your use case.
    It is enabled by default but should be disabled if the device is expected to move distances longer than a few dozen kilometers between fix attempts.
 
 As an alternative to GNSS-based positioning, see :ref:`#XNRFCLOUDPOS <SLM_AT_NRFCLOUDPOS>` for cellular and Wi-Fi® positioning.

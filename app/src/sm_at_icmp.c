@@ -13,7 +13,7 @@
 #include "sm_at_host.h"
 #include "sm_at_icmp.h"
 
-LOG_MODULE_REGISTER(slm_icmp, CONFIG_SLM_LOG_LEVEL);
+LOG_MODULE_REGISTER(slm_icmp, CONFIG_SM_LOG_LEVEL);
 
 #define ICMP_DEFAULT_LINK_MTU    1500
 #define ICMP_HDR_LEN             8

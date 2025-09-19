@@ -8,7 +8,7 @@
 #include "sm_at_host.h"
 #include "sm_util.h"
 #include "sm_ctrl_pin.h"
-#if defined(CONFIG_SLM_CMUX)
+#if defined(CONFIG_SM_CMUX)
 #include "sm_cmux.h"
 #endif
 #include <modem/lte_lc.h>
@@ -24,7 +24,7 @@
 #include <zephyr/pm/device.h>
 #include <assert.h>
 
-LOG_MODULE_REGISTER(slm_ppp, CONFIG_SLM_LOG_LEVEL);
+LOG_MODULE_REGISTER(slm_ppp, CONFIG_SM_LOG_LEVEL);
 
 /* This keeps track of whether the user is registered to the CGEV notifications.
  * We need them to know when to start/stop the PPP link, but that should not
@@ -32,7 +32,7 @@ LOG_MODULE_REGISTER(slm_ppp, CONFIG_SLM_LOG_LEVEL);
  */
 bool slm_fwd_cgev_notifs;
 
-#if defined(CONFIG_SLM_CMUX)
+#if defined(CONFIG_SM_CMUX)
 BUILD_ASSERT(!DT_NODE_EXISTS(DT_CHOSEN(ncs_slm_ppp_uart)),
 	"When CMUX is enabled PPP is usable only through it so it cannot have its own UART.");
 static const struct device *ppp_uart_dev = DEVICE_DT_GET(DT_CHOSEN(ncs_slm_uart));
@@ -255,7 +255,7 @@ static void ppp_start_failure(void)
 static void ppp_retrieve_pdn_info(struct ppp_context *const ctx)
 {
 	struct pdn_dynamic_info populated_info = {0};
-	unsigned int mtu = CONFIG_SLM_PPP_FALLBACK_MTU;
+	unsigned int mtu = CONFIG_SM_PPP_FALLBACK_MTU;
 
 	if (!pdn_dynamic_info_get(ppp_pdn_cid, &populated_info)) {
 		if (populated_info.ipv6_mtu) {
@@ -300,7 +300,7 @@ static void ppp_retrieve_pdn_info(struct ppp_context *const ctx)
 #endif
 	} else {
 		LOG_DBG("Could not retrieve MTU, using fallback value.");
-		BUILD_ASSERT(sizeof(ppp_data_buf) >= CONFIG_SLM_PPP_FALLBACK_MTU);
+		BUILD_ASSERT(sizeof(ppp_data_buf) >= CONFIG_SM_PPP_FALLBACK_MTU);
 	}
 	net_if_set_mtu(ppp_iface, mtu);
 	LOG_DBG("MTU set to %u.", mtu);
@@ -336,15 +336,15 @@ static int ppp_start(void)
 		goto error;
 	}
 
-#if defined(CONFIG_SLM_CMUX)
+#if defined(CONFIG_SM_CMUX)
 	ppp_pipe = slm_cmux_reserve(CMUX_PPP_CHANNEL);
 	/* The pipe opening is managed by CMUX. */
 #endif
 
 	modem_ppp_attach(&ppp_module, ppp_pipe);
 
-#if !defined(CONFIG_SLM_CMUX)
-	ret = modem_pipe_open(ppp_pipe, K_SECONDS(CONFIG_SLM_MODEM_PIPE_TIMEOUT));
+#if !defined(CONFIG_SM_CMUX)
+	ret = modem_pipe_open(ppp_pipe, K_SECONDS(CONFIG_SM_MODEM_PIPE_TIMEOUT));
 	if (ret) {
 		LOG_ERR("Failed to open PPP pipe (%d).", ret);
 		ppp_start_failure();
@@ -393,13 +393,13 @@ static int ppp_stop(enum ppp_reason reason)
 		LOG_WRN("Failed to bring PPP interface down (%d).", ret);
 	}
 
-#if !defined(CONFIG_SLM_CMUX)
-	modem_pipe_close(ppp_pipe, K_SECONDS(CONFIG_SLM_MODEM_PIPE_TIMEOUT));
+#if !defined(CONFIG_SM_CMUX)
+	modem_pipe_close(ppp_pipe, K_SECONDS(CONFIG_SM_MODEM_PIPE_TIMEOUT));
 #endif
 
 	modem_ppp_release(&ppp_module);
 
-#if defined(CONFIG_SLM_CMUX)
+#if defined(CONFIG_SM_CMUX)
 	slm_cmux_release(CMUX_PPP_CHANNEL, reason == PPP_REASON_PEER_DISCONNECTED);
 #endif
 
@@ -589,7 +589,7 @@ static void ppp_net_mgmt_event_handler(struct net_mgmt_event_callback *cb,
 		}
 		send_status_notification();
 
-		if (IS_ENABLED(CONFIG_SLM_MODEM_CELLULAR)) {
+		if (IS_ENABLED(CONFIG_SM_MODEM_CELLULAR)) {
 			/* With cellular modem driver, the restoration of connection
 			 * is handled by the driver.
 			 */
@@ -610,7 +610,7 @@ static void ppp_net_mgmt_event_handler(struct net_mgmt_event_callback *cb,
 
 int slm_ppp_init(void)
 {
-#if !defined(CONFIG_SLM_CMUX)
+#if !defined(CONFIG_SM_CMUX)
 	if (!device_is_ready(ppp_uart_dev)) {
 		return -EAGAIN;
 	}

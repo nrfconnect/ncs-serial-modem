@@ -15,7 +15,7 @@
 #include "sm_at_host.h"
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(slm_uart_handler, CONFIG_SLM_LOG_LEVEL);
+LOG_MODULE_REGISTER(slm_uart_handler, CONFIG_SM_LOG_LEVEL);
 
 #define UART_RX_TIMEOUT_US		2000
 #define UART_ERROR_DELAY_MS		500
@@ -28,25 +28,25 @@ static struct k_work_delayable rx_process_work;
 struct rx_buf_t {
 	atomic_t ref_counter;
 	size_t len;
-	uint8_t buf[CONFIG_SLM_UART_RX_BUF_SIZE];
+	uint8_t buf[CONFIG_SM_UART_RX_BUF_SIZE];
 };
 
 #define UART_SLAB_BLOCK_SIZE sizeof(struct rx_buf_t)
-#define UART_SLAB_BLOCK_COUNT CONFIG_SLM_UART_RX_BUF_COUNT
+#define UART_SLAB_BLOCK_COUNT CONFIG_SM_UART_RX_BUF_COUNT
 #define UART_SLAB_ALIGNMENT 4
 BUILD_ASSERT((sizeof(struct rx_buf_t) % UART_SLAB_ALIGNMENT) == 0);
 K_MEM_SLAB_DEFINE(rx_slab, UART_SLAB_BLOCK_SIZE, UART_SLAB_BLOCK_COUNT, UART_SLAB_ALIGNMENT);
 
 /* 4 messages for 512 bytes, 32 messages for 4096 bytes. */
-#define UART_RX_EVENT_COUNT ((CONFIG_SLM_UART_RX_BUF_COUNT * CONFIG_SLM_UART_RX_BUF_SIZE) / 128)
-#define UART_RX_EVENT_COUNT_FOR_BUF (UART_RX_EVENT_COUNT / CONFIG_SLM_UART_RX_BUF_COUNT)
+#define UART_RX_EVENT_COUNT ((CONFIG_SM_UART_RX_BUF_COUNT * CONFIG_SM_UART_RX_BUF_SIZE) / 128)
+#define UART_RX_EVENT_COUNT_FOR_BUF (UART_RX_EVENT_COUNT / CONFIG_SM_UART_RX_BUF_COUNT)
 struct rx_event_t {
 	uint8_t *buf;
 	size_t len;
 };
 K_MSGQ_DEFINE(rx_event_queue, sizeof(struct rx_event_t), UART_RX_EVENT_COUNT, 4);
 
-RING_BUF_DECLARE(tx_buf, CONFIG_SLM_UART_TX_BUF_SIZE);
+RING_BUF_DECLARE(tx_buf, CONFIG_SM_UART_TX_BUF_SIZE);
 K_MUTEX_DEFINE(mutex_tx_put); /* Protects the tx_buf from multiple writes. */
 
 enum uart_recovery_state {

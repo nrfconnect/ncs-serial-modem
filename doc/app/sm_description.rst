@@ -41,56 +41,56 @@ Configuration
 Configuration options
 =====================
 
-.. _CONFIG_SLM_CUSTOMER_VERSION:
+.. _CONFIG_SM_CUSTOMER_VERSION:
 
-CONFIG_SLM_CUSTOMER_VERSION - Customer version string
+CONFIG_SM_CUSTOMER_VERSION - Customer version string
    Version string defined by the customer after customizing the application.
    When defined, this version is reported with the baseline versions by the ``#XSLMVER`` AT command.
 
-.. _CONFIG_SLM_AT_MAX_PARAM:
+.. _CONFIG_SM_AT_MAX_PARAM:
 
-CONFIG_SLM_AT_MAX_PARAM - AT command parameter count limit
+CONFIG_SM_AT_MAX_PARAM - AT command parameter count limit
    This defines the maximum number of parameters allowed in an AT command, including the command name.
 
-.. _CONFIG_SLM_CMUX:
+.. _CONFIG_SM_CMUX:
 
-CONFIG_SLM_CMUX - Enable CMUX functionality
+CONFIG_SM_CMUX - Enable CMUX functionality
    This option is enabled by the CMUX overlay.
    It adds support for CMUX.
    See :ref:`SLM_AT_CMUX` for more information.
 
-.. _CONFIG_SLM_PPP:
+.. _CONFIG_SM_PPP:
 
-CONFIG_SLM_PPP - Enable PPP functionality
+CONFIG_SM_PPP - Enable PPP functionality
    This option is enabled by the PPP overlay.
    It adds support for PPP.
-   PPP can be used in conjunction with :ref:`CMUX <CONFIG_SLM_CMUX>` in order to use a single UART for both AT data and PPP.
+   PPP can be used in conjunction with :ref:`CMUX <CONFIG_SM_CMUX>` in order to use a single UART for both AT data and PPP.
    When CMUX is also enabled, PPP is usable only through a CMUX channel.
    See :ref:`SLM_AT_PPP` for more information.
 
-.. _CONFIG_SLM_NATIVE_TLS:
+.. _CONFIG_SM_NATIVE_TLS:
 
-CONFIG_SLM_NATIVE_TLS - Use Zephyr's Mbed TLS for TLS connections
+CONFIG_SM_NATIVE_TLS - Use Zephyr's Mbed TLS for TLS connections
    This option is enabled by the native TLS overlay.
    See :ref:`slm_native_tls` for more information.
 
-.. _CONFIG_SLM_NATIVE_TLS_CREDENTIAL_BUFFER_SIZE:
+.. _CONFIG_SM_NATIVE_TLS_CREDENTIAL_BUFFER_SIZE:
 
-CONFIG_SLM_NATIVE_TLS_CREDENTIAL_BUFFER_SIZE - Buffer space reserved for loading credentials
+CONFIG_SM_NATIVE_TLS_CREDENTIAL_BUFFER_SIZE - Buffer space reserved for loading credentials
    Specifies the credential buffer size available for a single ``sec_tag`` when loading credentials for Mbed TLS.
    The default value is ``4096``.
 
-.. _CONFIG_SLM_NATIVE_TLS_CREDENTIAL_BUFFER_COUNT:
+.. _CONFIG_SM_NATIVE_TLS_CREDENTIAL_BUFFER_COUNT:
 
-CONFIG_SLM_NATIVE_TLS_CREDENTIAL_BUFFER_COUNT - Number of buffers for loading credentials
+CONFIG_SM_NATIVE_TLS_CREDENTIAL_BUFFER_COUNT - Number of buffers for loading credentials
    The number of buffers available for loading ``sec_tag`` credentials for Mbed TLS.
    TLS client only needs the buffer when connecting, while TLS server needs the buffer as long as it is running.
    Increase the value if you need both TLS client and server running simultaneously with different ``sec_tags``.
    The default value is ``1``.
 
-.. _CONFIG_SLM_EXTERNAL_XTAL:
+.. _CONFIG_SM_EXTERNAL_XTAL:
 
-CONFIG_SLM_EXTERNAL_XTAL - Use external XTAL for UARTE
+CONFIG_SM_EXTERNAL_XTAL - Use external XTAL for UARTE
    This option configures the application to use an external XTAL for UARTE.
    For more information, see the UARTE - Universal asynchronous receiver/transmitter with EasyDMA section of the following documentation:
 
@@ -98,15 +98,15 @@ CONFIG_SLM_EXTERNAL_XTAL - Use external XTAL for UARTE
    * `nRF9161 Product Specification`_
    * `nRF9160 Product Specification`_
 
-.. _CONFIG_SLM_START_SLEEP:
+.. _CONFIG_SM_START_SLEEP:
 
-CONFIG_SLM_START_SLEEP - Enter sleep on startup
+CONFIG_SM_START_SLEEP - Enter sleep on startup
    This option makes an nRF91 Series device enter deep sleep after startup.
    It is not enabled by default.
 
-.. _CONFIG_SLM_POWER_PIN:
+.. _CONFIG_SM_POWER_PIN:
 
-CONFIG_SLM_POWER_PIN - Interface GPIO pin to power off the SiP and exit from sleep or idle
+CONFIG_SM_POWER_PIN - Interface GPIO pin to power off the SiP and exit from sleep or idle
    This option specifies which pin to use to power on or off the SiP and make SLM exit idle mode.
    It is set by default as follows:
 
@@ -126,9 +126,9 @@ CONFIG_SLM_POWER_PIN - Interface GPIO pin to power off the SiP and exit from sle
       This pin is configured with a pull up, so it is active low.
       It must be pulled down for a short time to perform one power off or wake up operation.
 
-.. _CONFIG_SLM_INDICATE_PIN:
+.. _CONFIG_SM_INDICATE_PIN:
 
-CONFIG_SLM_INDICATE_PIN - Interface GPIO pin to indicate data available or unsolicited event notifications
+CONFIG_SM_INDICATE_PIN - Interface GPIO pin to indicate data available or unsolicited event notifications
    This option specifies which pin to use for indicating data available or unsolicited event notifications from the modem.
    It is set by default as follows:
 
@@ -147,15 +147,15 @@ CONFIG_SLM_INDICATE_PIN - Interface GPIO pin to indicate data available or unsol
    .. note::
       This pin is configured to be active low, so it will be high when inactive.
 
-.. _CONFIG_SLM_INDICATE_TIME:
+.. _CONFIG_SM_INDICATE_TIME:
 
-CONFIG_SLM_INDICATE_TIME - Indicate GPIO active time
+CONFIG_SM_INDICATE_TIME - Indicate GPIO active time
    This option specifies the length, in milliseconds, of the time interval during which the indicate GPIO must stay active.
    The default value is 100 milliseconds.
 
-.. _CONFIG_SLM_AUTO_CONNECT:
+.. _CONFIG_SM_AUTO_CONNECT:
 
-CONFIG_SLM_AUTO_CONNECT - Connect to LTE network at start-up or reset
+CONFIG_SM_AUTO_CONNECT - Connect to LTE network at start-up or reset
    This option enables connecting to the LTE network at start-up or reset using a defined PDN configuration.
    This option is enabled by the LwM2M Carrier overlay, but is otherwise disabled by default.
 
@@ -177,96 +177,96 @@ CONFIG_SLM_AUTO_CONNECT - Connect to LTE network at start-up or reset
       "",       /* PDN connection authentication username */
       ""        /* PDN connection authentication password */
 
-.. _CONFIG_SLM_CR_TERMINATION:
+.. _CONFIG_SM_CR_TERMINATION:
 
-CONFIG_SLM_CR_TERMINATION - CR termination
+CONFIG_SM_CR_TERMINATION - CR termination
    This option configures the application to accept AT commands ending with a carriage return.
 
    Select this option if you want to connect to the development kit using PuTTY.
    See :ref:`putty` for instructions.
 
-.. _CONFIG_SLM_LF_TERMINATION:
+.. _CONFIG_SM_LF_TERMINATION:
 
-CONFIG_SLM_LF_TERMINATION - LF termination
+CONFIG_SM_LF_TERMINATION - LF termination
    This option configures the application to accept AT commands ending with a line feed.
 
-.. _CONFIG_SLM_CR_LF_TERMINATION:
+.. _CONFIG_SM_CR_LF_TERMINATION:
 
-CONFIG_SLM_CR_LF_TERMINATION - CR+LF termination
+CONFIG_SM_CR_LF_TERMINATION - CR+LF termination
    This option configures the application to accept AT commands ending with a carriage return followed by a line feed.
 
-.. _CONFIG_SLM_TCP_POLL_TIME:
+.. _CONFIG_SM_TCP_POLL_TIME:
 
-CONFIG_SLM_TCP_POLL_TIME - Poll timeout in seconds for TCP connection
+CONFIG_SM_TCP_POLL_TIME - Poll timeout in seconds for TCP connection
    This option specifies the poll timeout for the TCP connection, in seconds.
 
-.. _CONFIG_SLM_SMS:
+.. _CONFIG_SM_SMS:
 
-CONFIG_SLM_SMS - SMS support in SLM
+CONFIG_SM_SMS - SMS support in SLM
    This option enables additional AT commands for using the SMS service.
 
-.. _CONFIG_SLM_GNSS:
+.. _CONFIG_SM_GNSS:
 
-CONFIG_SLM_GNSS - GNSS support in SLM
+CONFIG_SM_GNSS - GNSS support in SLM
    This option enables additional AT commands for using the GNSS service.
 
-.. _CONFIG_SLM_NRF_CLOUD:
+.. _CONFIG_SM_NRF_CLOUD:
 
-CONFIG_SLM_NRF_CLOUD - nRF Cloud support in SLM
+CONFIG_SM_NRF_CLOUD - nRF Cloud support in SLM
    This option enables additional AT commands for using the nRF Cloud service.
 
-.. _CONFIG_SLM_FTPC:
+.. _CONFIG_SM_FTPC:
 
-CONFIG_SLM_FTPC - FTP client support in SLM
+CONFIG_SM_FTPC - FTP client support in SLM
    This option enables additional AT commands for using the FTP client service.
 
-.. _CONFIG_SLM_TFTPC:
+.. _CONFIG_SM_TFTPC:
 
-CONFIG_SLM_TFTPC - TFTP client support in SLM
+CONFIG_SM_TFTPC - TFTP client support in SLM
    This option enables additional AT commands for using the TFTP client service.
 
-.. _CONFIG_SLM_MQTTC:
+.. _CONFIG_SM_MQTTC:
 
-CONFIG_SLM_MQTTC - MQTT client support in SLM
+CONFIG_SM_MQTTC - MQTT client support in SLM
    This option enables additional AT commands for using the MQTT client service.
 
-.. _CONFIG_SLM_MQTTC_MESSAGE_BUFFER_LEN:
+.. _CONFIG_SM_MQTTC_MESSAGE_BUFFER_LEN:
 
-CONFIG_SLM_MQTTC_MESSAGE_BUFFER_LEN - Size of the buffer for the MQTT library
+CONFIG_SM_MQTTC_MESSAGE_BUFFER_LEN - Size of the buffer for the MQTT library
    This option specifies the maximum message size which can be transmitted or received through MQTT (excluding PUBLISH payload).
    The default value is 512, meaning 512 bytes for TX and RX, respectively.
 
-.. _CONFIG_SLM_HTTPC:
+.. _CONFIG_SM_HTTPC:
 
-CONFIG_SLM_HTTPC - HTTP client support in SLM
+CONFIG_SM_HTTPC - HTTP client support in SLM
    This option enables additional AT commands for using the HTTP client service.
 
-.. _CONFIG_SLM_TWI:
+.. _CONFIG_SM_TWI:
 
-CONFIG_SLM_TWI - TWI support in SLM
+CONFIG_SM_TWI - TWI support in SLM
    This option enables additional AT commands for using the TWI service.
 
-.. _CONFIG_SLM_UART_RX_BUF_COUNT:
+.. _CONFIG_SM_UART_RX_BUF_COUNT:
 
-CONFIG_SLM_UART_RX_BUF_COUNT - Receive buffers for UART.
+CONFIG_SM_UART_RX_BUF_COUNT - Receive buffers for UART.
    This option defines the number of buffers for receiving (RX) UART traffic.
    The default value is 3.
 
-.. _CONFIG_SLM_UART_RX_BUF_SIZE:
+.. _CONFIG_SM_UART_RX_BUF_SIZE:
 
-CONFIG_SLM_UART_RX_BUF_SIZE - Receive buffer size for UART.
+CONFIG_SM_UART_RX_BUF_SIZE - Receive buffer size for UART.
    This option defines the size of a single buffer for receiving (RX) UART traffic.
    The default value is 256.
 
-.. _CONFIG_SLM_UART_TX_BUF_SIZE:
+.. _CONFIG_SM_UART_TX_BUF_SIZE:
 
-CONFIG_SLM_UART_TX_BUF_SIZE - Send buffer size for UART.
+CONFIG_SM_UART_TX_BUF_SIZE - Send buffer size for UART.
    This option defines the size of the buffer for sending (TX) UART traffic.
    The default value is 256.
 
-.. _CONFIG_SLM_PPP_FALLBACK_MTU:
+.. _CONFIG_SM_PPP_FALLBACK_MTU:
 
-CONFIG_SLM_PPP_FALLBACK_MTU - Control the MTU used by PPP.
+CONFIG_SM_PPP_FALLBACK_MTU - Control the MTU used by PPP.
    This option controls the MTU used by PPP.
    PPP tries to retrieve the cellular link MTU from the modem (using ``AT+CGCONTRDP=0``).
    If MTU is not returned by the modem, this value will be used as a fallback.
@@ -338,7 +338,7 @@ The following configuration files are provided:
 
 * :file:`overlay-ppp.conf` - Configuration file that adds support for the Point-to-Point Protocol (PPP).
   This disables most of the IP-based protocols available through AT commands (such as FTP and MQTT) as it is expected that the controlling chip's own IP stack is used instead.
-  See :ref:`CONFIG_SLM_PPP <CONFIG_SLM_PPP>` and :ref:`SLM_AT_PPP` for more information.
+  See :ref:`CONFIG_SM_PPP <CONFIG_SM_PPP>` and :ref:`SLM_AT_PPP` for more information.
 
 * :file:`overlay-ppp-without-cmux.overlay` - Devicetree overlay that configures the UART to be used by PPP.
   This configuration file should be included when building SLM with PPP and without CMUX, in addition to :file:`overlay-ppp.conf`.
@@ -349,7 +349,7 @@ The following configuration files are provided:
   For more information about Memfault features in |NCS|, see :ref:`mod_memfault`.
 
 * :file:`overlay-zephyr-modem.conf`, :file:`overlay-zephyr-modem-nrf9160dk-nrf52840.conf`, :file:`overlay-external-mcu.overlay`,  and :file:`overlay-zephyr-modem-nrf9160dk-nrf52840.overlay` - These configuration files are used when compiling SLM to turn an nRF91 Series SiP into a Zephyr-compatible standalone modem.
-  Also set :kconfig:option:`CONFIG_SLM_POWER_PIN` Kconfig option.
+  Also set :kconfig:option:`CONFIG_SM_POWER_PIN` Kconfig option.
   See :ref:`slm_as_zephyr_modem` for more information.
 
 * :file:`boards/nrf9160dk_nrf9160_ns.conf` - Configuration file specific for the nRF9160 DK.
@@ -440,7 +440,7 @@ To connect to an nRF91 Series DK with a PC:
       The default AT command terminator is a carriage return followed by a line feed (``\r\n``).
       The Serial Terminal app supports this format.
       If you want to use another terminal emulator, make sure that the configured AT command terminator corresponds to the line terminator of your terminal.
-      When using PuTTY, you must set the :ref:`CONFIG_SLM_CR_TERMINATION <CONFIG_SLM_CR_TERMINATION>` SLM configuration option.
+      When using PuTTY, you must set the :ref:`CONFIG_SM_CR_TERMINATION <CONFIG_SM_CR_TERMINATION>` SLM configuration option.
       See :ref:`slm_config_options` for more details.
 
 .. slm_connecting_91dk_pc_instr_end
@@ -466,12 +466,12 @@ To connect with an external MCU using UART_2, change the configuration files for
       * In the :file:`nrf9151dk_nrf9151_ns.conf` file::
 
           # When working with PC terminal, unmask the following config.
-          #CONFIG_SLM_POWER_PIN=8
-          #CONFIG_SLM_INDICATE_PIN=0
+          #CONFIG_SM_POWER_PIN=8
+          #CONFIG_SM_INDICATE_PIN=0
 
           # When working with external MCU, unmask the following config.
-          CONFIG_SLM_POWER_PIN=31
-          CONFIG_SLM_INDICATE_PIN=30
+          CONFIG_SM_POWER_PIN=31
+          CONFIG_SM_INDICATE_PIN=30
 
       * In the :file:`nrf9151dk_nrf9151_ns.overlay` file::
 
@@ -501,12 +501,12 @@ To connect with an external MCU using UART_2, change the configuration files for
       * In the :file:`nrf9161dk_nrf9161_ns.conf` file::
 
           # When working with PC terminal, unmask the following config.
-          #CONFIG_SLM_POWER_PIN=8
-          #CONFIG_SLM_INDICATE_PIN=0
+          #CONFIG_SM_POWER_PIN=8
+          #CONFIG_SM_INDICATE_PIN=0
 
           # When working with external MCU, unmask the following config.
-          CONFIG_SLM_POWER_PIN=31
-          CONFIG_SLM_INDICATE_PIN=30
+          CONFIG_SM_POWER_PIN=31
+          CONFIG_SM_INDICATE_PIN=30
 
       * In the :file:`nrf9161dk_nrf9161_ns.overlay` file::
 
@@ -537,12 +537,12 @@ To connect with an external MCU using UART_2, change the configuration files for
       * In the :file:`nrf9160dk_nrf9160_ns.conf` file::
 
           # When working with PC terminal, unmask the following config.
-          #CONFIG_SLM_POWER_PIN=6
-          #CONFIG_SLM_INDICATE_PIN=2
+          #CONFIG_SM_POWER_PIN=6
+          #CONFIG_SM_INDICATE_PIN=2
 
           # When working with external MCU, unmask the following config.
-          CONFIG_SLM_POWER_PIN=31
-          CONFIG_SLM_INDICATE_PIN=30
+          CONFIG_SM_POWER_PIN=31
+          CONFIG_SM_INDICATE_PIN=30
 
 
       * In the :file:`nrf9160dk_nrf9160_ns.overlay` file::
@@ -700,7 +700,7 @@ Using the LwM2M carrier library
 The certificate provisioning can also be done directly in the Serial LTE Modem application by using the same AT commands as described for the :ref:`at_client_sample` sample.
 
 When the :ref:`liblwm2m_carrier_readme` library is in use, by default the application will auto-connect to the network on startup.
-This behavior can be changed by disabling the :kconfig:option:`CONFIG_SLM_AUTO_CONNECT` option.
+This behavior can be changed by disabling the :kconfig:option:`CONFIG_SM_AUTO_CONNECT` option.
 
 Dependencies
 ************
