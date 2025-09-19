@@ -9,7 +9,7 @@
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/shell/shell.h>
 #include <hal/nrf_gpio.h>
-#include <modem_slm.h>
+#include <sm_host.h>
 #include <zephyr/shell/shell_uart.h>
 #include <zephyr/shell/shell_rtt.h>
 #include <zephyr/logging/log.h>

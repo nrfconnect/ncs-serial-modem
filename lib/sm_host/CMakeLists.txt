@@ -5,7 +5,7 @@
 #
 
 zephyr_library()
-zephyr_library_sources(modem_slm.c)
-zephyr_library_sources(modem_slm_monitor.c)
+zephyr_library_sources(sm_host.c)
+zephyr_library_sources(sm_host_monitor.c)
 # SLM monitor's data must be in RAM
-zephyr_linker_sources(RWDATA modem_slm_monitor.ld)
+zephyr_linker_sources(RWDATA sm_host_monitor.ld)
