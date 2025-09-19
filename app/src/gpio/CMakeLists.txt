@@ -5,4 +5,4 @@
 #
 
 zephyr_include_directories(.)
-target_sources_ifdef(CONFIG_SLM_GPIO app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/slm_at_gpio.c)
+target_sources_ifdef(CONFIG_SLM_GPIO app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/sm_at_gpio.c)

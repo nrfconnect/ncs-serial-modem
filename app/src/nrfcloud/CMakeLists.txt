@@ -5,4 +5,4 @@
 #
 
 zephyr_include_directories(.)
-target_sources(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/slm_at_nrfcloud.c)
+target_sources(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/sm_at_nrfcloud.c)
