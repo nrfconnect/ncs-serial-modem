@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
-#ifndef SLM_UART_HANDLER_
-#define SLM_UART_HANDLER_
+#ifndef SM_UART_HANDLER_
+#define SM_UART_HANDLER_
 
-/** @file slm_uart_handler.h
+/** @file sm_uart_handler.h
  *
- * @brief pure UART handler for serial LTE modem
+ * @brief pure UART handler for Serial Modem
  * @{
  */
 #include "sm_trap_macros.h"
@@ -17,12 +17,12 @@
 
 #define UART_RX_MARGIN_MS	10
 
-extern const struct device *const slm_uart_dev;
-extern uint32_t slm_uart_baudrate;
+extern const struct device *const sm_uart_dev;
+extern uint32_t sm_uart_baudrate;
 
 /** @retval 0 on success. Otherwise, the error code is returned. */
-int slm_uart_handler_enable(void);
+int sm_uart_handler_enable(void);
 
 /** @} */
 
-#endif /* SLM_UART_HANDLER_ */
+#endif /* SM_UART_HANDLER_ */

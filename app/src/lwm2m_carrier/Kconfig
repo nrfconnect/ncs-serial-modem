@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 
 config SM_CARRIER
-	bool "LwM2M Carrier support in SLM"
+	bool "LwM2M Carrier support"
 	depends on LWM2M_CARRIER
 
 if SM_CARRIER

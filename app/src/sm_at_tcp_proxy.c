@@ -18,13 +18,13 @@
 #include "sm_native_tls.h"
 #endif
 
-LOG_MODULE_REGISTER(slm_tcp, CONFIG_SM_LOG_LEVEL);
+LOG_MODULE_REGISTER(sm_tcp, CONFIG_SM_LOG_LEVEL);
 
 #define THREAD_STACK_SIZE	KB(4)
 #define THREAD_PRIORITY		K_LOWEST_APPLICATION_THREAD_PRIO
 
 /**@brief Proxy operations. */
-enum slm_tcp_proxy_operation {
+enum sm_tcp_proxy_operation {
 	SERVER_STOP,
 	CLIENT_DISCONNECT = SERVER_STOP,
 	SERVER_START,
@@ -34,7 +34,7 @@ enum slm_tcp_proxy_operation {
 };
 
 /**@brief Proxy roles. */
-enum slm_tcp_role {
+enum sm_tcp_role {
 	TCP_ROLE_CLIENT,
 	TCP_ROLE_SERVER
 };
@@ -55,7 +55,7 @@ static struct tcp_proxy {
 	int family;		/* Socket address family */
 	sec_tag_t sec_tag;	/* Security tag of the credential */
 	int sock_peer;		/* Socket descriptor for peer. */
-	enum slm_tcp_role role;	/* Client or Server proxy */
+	enum sm_tcp_role role;	/* Client or Server proxy */
 	int peer_verify;	/* Peer verification level for TLS connection. */
 	bool hostname_verify;	/* Verify hostname against the certificate. */
 	int efd;		/* Event file descriptor for signaling threads. */
@@ -89,7 +89,7 @@ static int do_tcp_server_start(uint16_t port)
 		LOG_ERR("Not supported");
 		return -ENOTSUP;
 #else
-		ret = slm_native_tls_load_credentials(proxy.sec_tag);
+		ret = sm_native_tls_load_credentials(proxy.sec_tag);
 		if (ret < 0) {
 			LOG_ERR("Failed to load sec tag: %d (%d)", proxy.sec_tag, ret);
 			return ret;
@@ -123,7 +123,7 @@ static int do_tcp_server_start(uint16_t port)
 	}
 
 	/* Bind to local port */
-	ret = slm_bind_to_local_addr(proxy.sock, proxy.family, port);
+	ret = sm_bind_to_local_addr(proxy.sock, proxy.family, port);
 	if (ret) {
 		goto exit_svr;
 	}
@@ -212,7 +212,7 @@ static int do_tcp_client_connect(const char *url, uint16_t port, uint16_t cid)
 
 	if (proxy.sec_tag != SEC_TAG_TLS_INVALID) {
 #if defined(CONFIG_SM_NATIVE_TLS)
-		ret = slm_native_tls_load_credentials(proxy.sec_tag);
+		ret = sm_native_tls_load_credentials(proxy.sec_tag);
 		if (ret < 0) {
 			LOG_ERR("Failed to load sec tag: %d (%d)", proxy.sec_tag, ret);
 			goto exit_cli;
@@ -365,7 +365,7 @@ static int tcp_datamode_callback(uint8_t op, const uint8_t *data, int len, uint8
 		LOG_DBG("datamode send: %d", ret);
 	} else if (op == DATAMODE_EXIT) {
 		LOG_DBG("datamode exit");
-		if ((flags & SLM_DATAMODE_FLAGS_EXIT_HANDLER) != 0) {
+		if ((flags & SM_DATAMODE_FLAGS_EXIT_HANDLER) != 0) {
 			/* Datamode exited unexpectedly. */
 			rsp_send(CONFIG_SM_DATAMODE_TERMINATOR);
 		}
@@ -497,8 +497,8 @@ client_events:
 		if (fds[SOCK_PEER].revents) {
 			/* Process ZSOCK_POLLIN first to get the data, even if there are errors. */
 			if ((fds[SOCK_PEER].revents & ZSOCK_POLLIN) == ZSOCK_POLLIN) {
-				ret = zsock_recv(fds[SOCK_PEER].fd, (void *)slm_data_buf,
-					   sizeof(slm_data_buf), ZSOCK_MSG_DONTWAIT);
+				ret = zsock_recv(fds[SOCK_PEER].fd, (void *)sm_data_buf,
+					   sizeof(sm_data_buf), ZSOCK_MSG_DONTWAIT);
 				if (ret < 0 && errno != EAGAIN) {
 					LOG_ERR("zsock_recv() error: %d", -errno);
 					tcpsvr_terminate_connection(-errno);
@@ -508,7 +508,7 @@ client_events:
 					if (!in_datamode()) {
 						rsp_send("\r\n#XTCPDATA: %d\r\n", ret);
 					}
-					data_send(slm_data_buf, ret);
+					data_send(sm_data_buf, ret);
 				}
 			}
 			if ((fds[SOCK_PEER].revents & ZSOCK_POLLERR) != 0) {
@@ -605,8 +605,8 @@ static void tcpcli_thread_func(void *p1, void *p2, void *p3)
 		LOG_DBG("efd events 0x%08x", fds[EVENT_FD].revents);
 		if ((fds[SOCK].revents & ZSOCK_POLLIN) != 0) {
 			while (true) {
-				ret = zsock_recv(fds[SOCK].fd, (void *)slm_data_buf,
-					sizeof(slm_data_buf), ZSOCK_MSG_DONTWAIT);
+				ret = zsock_recv(fds[SOCK].fd, (void *)sm_data_buf,
+					sizeof(sm_data_buf), ZSOCK_MSG_DONTWAIT);
 				/* No more data to receive */
 				if ((ret == 0) || (ret < 0 && errno == EAGAIN)) {
 					break;
@@ -620,7 +620,7 @@ static void tcpcli_thread_func(void *p1, void *p2, void *p3)
 				if (!in_datamode()) {
 					rsp_send("\r\n#XTCPDATA: %d\r\n", ret);
 				}
-				data_send(slm_data_buf, ret);
+				data_send(sm_data_buf, ret);
 			}
 		}
 		if ((fds[SOCK].revents & ZSOCK_POLLERR) != 0) {
@@ -667,7 +667,7 @@ static void tcpcli_thread_func(void *p1, void *p2, void *p3)
 	LOG_INF("TCP client thread terminated");
 }
 
-SLM_AT_CMD_CUSTOM(xtcpsvr, "AT#XTCPSVR", handle_at_tcp_server);
+SM_AT_CMD_CUSTOM(xtcpsvr, "AT#XTCPSVR", handle_at_tcp_server);
 static int handle_at_tcp_server(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 				uint32_t param_count)
 {
@@ -722,7 +722,7 @@ static int handle_at_tcp_server(enum at_parser_cmd_type cmd_type, struct at_pars
 	return err;
 }
 
-SLM_AT_CMD_CUSTOM(xtcpcli, "AT#XTCPCLI", handle_at_tcp_client);
+SM_AT_CMD_CUSTOM(xtcpcli, "AT#XTCPCLI", handle_at_tcp_client);
 static int handle_at_tcp_client(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 				uint32_t param_count)
 {
@@ -737,8 +737,8 @@ static int handle_at_tcp_client(enum at_parser_cmd_type cmd_type, struct at_pars
 		}
 		if (op == CLIENT_CONNECT || op == CLIENT_CONNECT6) {
 			uint16_t port;
-			char url[SLM_MAX_URL];
-			int size = SLM_MAX_URL;
+			char url[SM_MAX_URL];
+			int size = SM_MAX_URL;
 			uint16_t cid = 0;  /* CID0 for initial PDN connection */
 
 			if (proxy.sock != INVALID_SOCKET || proxy.efd != INVALID_SOCKET) {
@@ -811,12 +811,12 @@ static int handle_at_tcp_client(enum at_parser_cmd_type cmd_type, struct at_pars
 	return err;
 }
 
-SLM_AT_CMD_CUSTOM(xtcpsend, "AT#XTCPSEND", handle_at_tcp_send);
+SM_AT_CMD_CUSTOM(xtcpsend, "AT#XTCPSEND", handle_at_tcp_send);
 static int handle_at_tcp_send(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			      uint32_t param_count)
 {
 	int err = -EINVAL;
-	char data[SLM_MAX_PAYLOAD_SIZE + 1] = {0};
+	char data[SM_MAX_PAYLOAD_SIZE + 1] = {0};
 	int size;
 	bool datamode = false;
 
@@ -854,7 +854,7 @@ static int handle_at_tcp_send(enum at_parser_cmd_type cmd_type, struct at_parser
 	return err;
 }
 
-SLM_AT_CMD_CUSTOM(xtcphangup, "AT#XTCPHANGUP", handle_at_tcp_hangup);
+SM_AT_CMD_CUSTOM(xtcphangup, "AT#XTCPHANGUP", handle_at_tcp_hangup);
 static int handle_at_tcp_hangup(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 				uint32_t)
 {
@@ -899,7 +899,7 @@ static int handle_at_tcp_hangup(enum at_parser_cmd_type cmd_type, struct at_pars
 
 /**@brief API to initialize TCP proxy AT commands handler
  */
-int slm_at_tcp_proxy_init(void)
+int sm_at_tcp_proxy_init(void)
 {
 	proxy.sock	= INVALID_SOCKET;
 	proxy.family	= AF_UNSPEC;
@@ -913,7 +913,7 @@ int slm_at_tcp_proxy_init(void)
 
 /**@brief API to uninitialize TCP proxy AT commands handler
  */
-int slm_at_tcp_proxy_uninit(void)
+int sm_at_tcp_proxy_uninit(void)
 {
 
 	return do_tcp_proxy_close();

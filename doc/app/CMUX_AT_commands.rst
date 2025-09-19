@@ -1,4 +1,4 @@
-.. _SLM_AT_CMUX:
+.. _SM_AT_CMUX:
 
 CMUX AT commands
 ****************
@@ -14,13 +14,13 @@ For example, it can be used to exchange AT data and have a :ref:`Point-to-Point 
 
 .. note::
 
-   To use the nRF91 Series SiP as a standalone modem in Zephyr, see :ref:`slm_as_zephyr_modem`.
-   To use the nRF91 Series SiP as a modem for a Linux device, see :ref:`slm_as_linux_modem`.
+   To use the nRF91 Series SiP as a standalone modem in Zephyr, see :ref:`sm_as_zephyr_modem`.
+   To use the nRF91 Series SiP as a modem for a Linux device, see :ref:`sm_as_linux_modem`.
 
-CMUX is enabled in SLM by compiling it with the appropriate configuration files, depending on your use case.
-See the :ref:`slm_config_files` section for more information.
+CMUX is enabled in Serial Modem by compiling it with the appropriate configuration files, depending on your use case.
+See the :ref:`sm_config_files` section for more information.
 
-.. slm_cmux_baud_rate_note_start
+.. sm_cmux_baud_rate_note_start
 
 .. note::
 
@@ -30,15 +30,15 @@ See the :ref:`slm_config_files` section for more information.
 
    At a baud rate of 460 800, the maximum throughput is slightly below that of the nRF91 Series modem when using LTE-M.
 
-.. slm_cmux_baud_rate_note_end
+.. sm_cmux_baud_rate_note_end
 
 .. note::
 
-   SLM does not have an equivalent to the ``AT+CMUX`` command described in 3GPP TS 27.007.
-   Here is how SLM's implementation of CMUX relates to the standard command's parameters:
+   Serial Modem does not have an equivalent to the ``AT+CMUX`` command described in 3GPP TS 27.007.
+   Here is how Serial Modem's implementation of CMUX relates to the standard command's parameters:
 
    * Only UIH frames are used.
-   * The speed used is the configured baud rate of SLM's UART.
+   * The speed used is the configured baud rate of Serial Modem's UART.
    * The maximum frame size is configured using the :kconfig:option:`CONFIG_MODEM_CMUX_MTU` Kconfig option.
 
 CMUX setup #XCMUX

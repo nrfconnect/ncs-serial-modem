@@ -1,4 +1,4 @@
-.. _SLM_AT_FOTA:
+.. _SM_AT_FOTA:
 
 FOTA AT commands
 ****************
@@ -84,7 +84,7 @@ Example
 ::
 
    application firmware download and update
-   AT#XFOTA=1,"http://remote.host/fota/slm_app_update.bin"
+   AT#XFOTA=1,"http://remote.host/fota/sm_app_update.bin"
    OK
    #XFOTA: 1,0,0
    ...

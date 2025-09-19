@@ -18,7 +18,7 @@
 #include "sm_native_tls.h"
 #endif
 
-LOG_MODULE_REGISTER(slm_udp, CONFIG_SM_LOG_LEVEL);
+LOG_MODULE_REGISTER(sm_udp, CONFIG_SM_LOG_LEVEL);
 
 #define THREAD_STACK_SIZE	KB(4)
 #define THREAD_PRIORITY		K_LOWEST_APPLICATION_THREAD_PRIO
@@ -29,7 +29,7 @@ LOG_MODULE_REGISTER(slm_udp, CONFIG_SM_LOG_LEVEL);
  */
 
 /**@brief Proxy operations. */
-enum slm_udp_proxy_operation {
+enum sm_udp_proxy_operation {
 	SERVER_STOP,
 	CLIENT_DISCONNECT = SERVER_STOP,
 	SERVER_START,
@@ -43,7 +43,7 @@ static K_THREAD_STACK_DEFINE(udp_thread_stack, THREAD_STACK_SIZE);
 static k_tid_t udp_thread_id;
 
 /**@brief Proxy roles. */
-enum slm_udp_role {
+enum sm_udp_role {
 	UDP_ROLE_CLIENT,
 	UDP_ROLE_SERVER
 };
@@ -55,7 +55,7 @@ static struct udp_proxy {
 	int peer_verify;	/* Peer verification level for DTLS connection. */
 	bool hostname_verify;	/* Verify hostname against the certificate. */
 	int dtls_cid;		/* DTLS connection identifier. */
-	enum slm_udp_role role;	/* Client or Server proxy */
+	enum sm_udp_role role;	/* Client or Server proxy */
 	int efd;		/* Event file descriptor for signaling threads. */
 	int send_flags;         /* Send flags */
 	struct sockaddr_storage remote; /* remote host */
@@ -87,7 +87,7 @@ static int do_udp_server_start(uint16_t port)
 		ret = -ENOTSUP;
 		goto exit_svr;
 #else
-		ret = slm_native_tls_load_credentials(proxy.sec_tag);
+		ret = sm_native_tls_load_credentials(proxy.sec_tag);
 		if (ret < 0) {
 			LOG_ERR("Failed to load sec tag: %d (%d)", proxy.sec_tag, ret);
 			goto exit_svr;
@@ -131,7 +131,7 @@ static int do_udp_server_start(uint16_t port)
 	}
 
 	/* Bind to local port */
-	ret = slm_bind_to_local_addr(proxy.sock, proxy.family, port);
+	ret = sm_bind_to_local_addr(proxy.sock, proxy.family, port);
 	if (ret) {
 		goto exit_svr;
 	}
@@ -202,7 +202,7 @@ static int do_udp_client_connect(const char *url, uint16_t port, uint16_t cid)
 
 	if (using_dtls) {
 #if defined(CONFIG_SM_NATIVE_TLS)
-		ret = slm_native_tls_load_credentials(proxy.sec_tag);
+		ret = sm_native_tls_load_credentials(proxy.sec_tag);
 		if (ret < 0) {
 			LOG_ERR("Failed to load sec tag: %d (%d)", proxy.sec_tag, ret);
 			goto cli_exit;
@@ -229,7 +229,7 @@ static int do_udp_client_connect(const char *url, uint16_t port, uint16_t cid)
 		}
 		struct timeval timeout;
 
-		/* Set a timeout shorter than the default one which makes the SLM
+		/* Set a timeout shorter than the default one which makes the Serial Modem
 		 * irresponsive for too long when the connection to a server fails.
 		 */
 		timeout = (struct timeval){ .tv_sec = 10 };
@@ -426,8 +426,8 @@ static void udp_thread_func(void *p1, void *p2, void *p3)
 			unsigned int size = sizeof(proxy.remote);
 
 			memset(&proxy.remote, 0, sizeof(proxy.remote));
-			ret = zsock_recvfrom(proxy.sock, (void *)slm_data_buf,
-					sizeof(slm_data_buf), ZSOCK_MSG_DONTWAIT,
+			ret = zsock_recvfrom(proxy.sock, (void *)sm_data_buf,
+					sizeof(sm_data_buf), ZSOCK_MSG_DONTWAIT,
 					(struct sockaddr *)&proxy.remote, &size);
 			if (ret < 0 && errno != EAGAIN) {
 				LOG_WRN("zsock_recv() error: %d", -errno);
@@ -438,7 +438,7 @@ static void udp_thread_func(void *p1, void *p2, void *p3)
 					rsp_send("\r\n#XUDPDATA: %d,\"%s\",%d\r\n", ret, peer_addr,
 						 peer_port);
 				}
-				data_send(slm_data_buf, ret);
+				data_send(sm_data_buf, ret);
 			}
 		}
 		if ((fds[SOCK].revents & ZSOCK_POLLERR) != 0) {
@@ -514,7 +514,7 @@ static int udp_datamode_callback(uint8_t op, const uint8_t *data, int len, uint8
 	int ret = 0;
 
 	if (op == DATAMODE_SEND) {
-		if ((flags & SLM_DATAMODE_FLAGS_MORE_DATA) != 0) {
+		if ((flags & SM_DATAMODE_FLAGS_MORE_DATA) != 0) {
 			LOG_ERR("Datamode buffer overflow");
 			exit_datamode_handler(-EOVERFLOW);
 			return -EOVERFLOW;
@@ -523,7 +523,7 @@ static int udp_datamode_callback(uint8_t op, const uint8_t *data, int len, uint8
 		LOG_DBG("datamode send: %d", ret);
 	} else if (op == DATAMODE_EXIT) {
 		LOG_DBG("datamode exit");
-		if ((flags & SLM_DATAMODE_FLAGS_EXIT_HANDLER) != 0) {
+		if ((flags & SM_DATAMODE_FLAGS_EXIT_HANDLER) != 0) {
 			/* Datamode exited unexpectedly. */
 			rsp_send(CONFIG_SM_DATAMODE_TERMINATOR);
 		}
@@ -542,7 +542,7 @@ static bool socket_is_in_use(void)
 	return true;
 }
 
-SLM_AT_CMD_CUSTOM(xudpsvr, "AT#XUDPSVR", handle_at_udp_server);
+SM_AT_CMD_CUSTOM(xudpsvr, "AT#XUDPSVR", handle_at_udp_server);
 static int handle_at_udp_server(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 				uint32_t param_count)
 {
@@ -593,7 +593,7 @@ static int handle_at_udp_server(enum at_parser_cmd_type cmd_type, struct at_pars
 	return err;
 }
 
-SLM_AT_CMD_CUSTOM(xudpcli, "AT#XUDPCLI", handle_at_udp_client);
+SM_AT_CMD_CUSTOM(xudpcli, "AT#XUDPCLI", handle_at_udp_client);
 static int handle_at_udp_client(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 				uint32_t param_count)
 {
@@ -608,8 +608,8 @@ static int handle_at_udp_client(enum at_parser_cmd_type cmd_type, struct at_pars
 		}
 		if (op == CLIENT_CONNECT || op == CLIENT_CONNECT6) {
 			uint16_t port;
-			char url[SLM_MAX_URL];
-			int size = SLM_MAX_URL;
+			char url[SM_MAX_URL];
+			int size = SM_MAX_URL;
 			uint16_t cid = 0; /* CID0 for initial PDN connection */
 
 			if (socket_is_in_use()) {
@@ -692,12 +692,12 @@ static int handle_at_udp_client(enum at_parser_cmd_type cmd_type, struct at_pars
 	return err;
 }
 
-SLM_AT_CMD_CUSTOM(xudpsend, "AT#XUDPSEND", handle_at_udp_send);
+SM_AT_CMD_CUSTOM(xudpsend, "AT#XUDPSEND", handle_at_udp_send);
 static int handle_at_udp_send(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			      uint32_t param_count)
 {
 	int err = -EINVAL;
-	char data[SLM_MAX_PAYLOAD_SIZE + 1] = {0};
+	char data[SM_MAX_PAYLOAD_SIZE + 1] = {0};
 	int size;
 	bool datamode = false;
 
@@ -741,7 +741,7 @@ static int handle_at_udp_send(enum at_parser_cmd_type cmd_type, struct at_parser
 
 /**@brief API to initialize UDP Proxy AT commands handler
  */
-int slm_at_udp_proxy_init(void)
+int sm_at_udp_proxy_init(void)
 {
 	proxy.sock	= INVALID_SOCKET;
 	proxy.sec_tag	= SEC_TAG_TLS_INVALID;
@@ -752,7 +752,7 @@ int slm_at_udp_proxy_init(void)
 
 /**@brief API to uninitialize UDP Proxy AT commands handler
  */
-int slm_at_udp_proxy_uninit(void)
+int sm_at_udp_proxy_uninit(void)
 {
 	return do_udp_proxy_close();
 }

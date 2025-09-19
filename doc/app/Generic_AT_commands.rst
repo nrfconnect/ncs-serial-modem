@@ -1,4 +1,4 @@
-.. _SLM_AT_gen:
+.. _SM_AT_gen:
 
 Generic AT commands
 *******************
@@ -9,11 +9,11 @@ Generic AT commands
 
 This page describes generic AT commands.
 
-SLM version #XSLMVER
-====================
+Serial Modem version #XSLMVER
+=============================
 
-The ``#XSLMVER`` command return the versions of the |NCS| in which the SLM application is built.
-It also returns the version of the modem library that SLM uses to communicate with the modem.
+The ``#XSLMVER`` command return the versions of the |NCS| in which the Serial Modem application is built.
+It also returns the version of the modem library that Serial Modem uses to communicate with the modem.
 
 Set command
 -----------
@@ -65,15 +65,15 @@ Test command
 
 The test command is not supported.
 
-SLM proprietary command list #XCLAC
-===================================
+SM proprietary command list #XCLAC
+==================================
 
-The ``#XCLAC`` command requests the list of the proprietary SLM commands.
+The ``#XCLAC`` command requests the list of the proprietary Serial Modem commands.
 
 Set command
 -----------
 
-The set command requests the list of the proprietary SLM commands.
+The set command requests the list of the proprietary Serial Modem commands.
 It is an add-on for ``AT+CLAC``, which lists all modem AT commands.
 
 Syntax
@@ -127,7 +127,7 @@ Power saving #XSLEEP
 
 The ``#XSLEEP`` command makes the nRF91 Series System in Package (SiP) enter idle or sleep mode.
 
-If you want to do power measurements on the nRF91 Series development kit while running the SLM application, disable unused peripherals.
+If you want to do power measurements on the nRF91 Series development kit while running the Serial Modem application, disable unused peripherals.
 
 Set command
 -----------
@@ -144,17 +144,17 @@ Syntax
 The ``<sleep_mode>`` parameter accepts only the following integer values:
 
 * ``1`` - Enter Sleep.
-  In this mode, both the SLM service and the LTE connection are terminated.
+  In this mode, both the Serial Modem service and the LTE connection are terminated.
 
   The nRF91 Series SiP can be woken up using the pin specified with the :ref:`CONFIG_SM_POWER_PIN <CONFIG_SM_POWER_PIN>` Kconfig option.
 
 * ``2`` - Enter Idle.
-  In this mode, both the SLM service and the LTE connection are maintained.
+  In this mode, both the Serial Modem service and the LTE connection are maintained.
 
   The nRF91 Series SiP can be made to exit idle using the pin specified with the :ref:`CONFIG_SM_POWER_PIN <CONFIG_SM_POWER_PIN>` Kconfig option.
-  If the :ref:`CONFIG_SM_INDICATE_PIN <CONFIG_SM_INDICATE_PIN>` Kconfig option is defined, SLM toggles the specified pin when there is data for the MCU to read.
-  The MCU can in turn make SLM exit idle by toggling the pin specified with the :ref:`CONFIG_SM_POWER_PIN <CONFIG_SM_POWER_PIN>` Kconfig option.
-  The data is buffered when SLM is idle and sent to the MCU after having exited idle.
+  If the :ref:`CONFIG_SM_INDICATE_PIN <CONFIG_SM_INDICATE_PIN>` Kconfig option is defined, Serial Modem toggles the specified pin when there is data for the MCU to read.
+  The MCU can in turn make Serial Modem exit idle by toggling the pin specified with the :ref:`CONFIG_SM_POWER_PIN <CONFIG_SM_POWER_PIN>` Kconfig option.
+  The data is buffered when Serial Modem is idle and sent to the MCU after having exited idle.
 
 .. note::
 
@@ -303,7 +303,7 @@ Modem reset #XMODEMRESET
 The ``#XMODEMRESET`` command performs a reset of the modem.
 
 The modem is set to minimal function mode (via ``+CFUN=0``) before being reset.
-The SLM application is not restarted.
+The Serial Modem application is not restarted.
 After the command returns, the modem will be in minimal function mode.
 
 Set command

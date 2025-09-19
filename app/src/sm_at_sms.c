@@ -11,12 +11,12 @@
 #include "sm_util.h"
 #include "sm_at_host.h"
 
-LOG_MODULE_REGISTER(slm_sms, CONFIG_SM_LOG_LEVEL);
+LOG_MODULE_REGISTER(sm_sms, CONFIG_SM_LOG_LEVEL);
 
 #define MAX_CONCATENATED_MESSAGE  3
 
 /**@brief SMS operations. */
-enum slm_sms_operation {
+enum sm_sms_operation {
 	AT_SMS_STOP,
 	AT_SMS_START,
 	AT_SMS_SEND
@@ -166,7 +166,7 @@ static int do_sms_send(const char *number, const char *message)
 	return err;
 }
 
-SLM_AT_CMD_CUSTOM(xsms, "AT#XSMS", handle_at_sms);
+SM_AT_CMD_CUSTOM(xsms, "AT#XSMS", handle_at_sms);
 static int handle_at_sms(enum at_parser_cmd_type cmd_type, struct at_parser *parser, uint32_t)
 {
 	int err = -EINVAL;
@@ -219,7 +219,7 @@ static int handle_at_sms(enum at_parser_cmd_type cmd_type, struct at_parser *par
 
 /**@brief API to initialize SMS AT commands handler
  */
-int slm_at_sms_init(void)
+int sm_at_sms_init(void)
 {
 	sms_handle = -1;
 
@@ -228,7 +228,7 @@ int slm_at_sms_init(void)
 
 /**@brief API to uninitialize SMS AT commands handler
  */
-int slm_at_sms_uninit(void)
+int sm_at_sms_uninit(void)
 {
 	if (sms_handle >= 0) {
 		sms_unregister_listener(sms_handle);

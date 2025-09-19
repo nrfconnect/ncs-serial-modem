@@ -16,17 +16,17 @@
 #include <assert.h>
 
 /* This makes use of part of the Zephyr modem subsystem which has a CMUX module. */
-LOG_MODULE_REGISTER(slm_cmux, CONFIG_SM_LOG_LEVEL);
+LOG_MODULE_REGISTER(sm_cmux, CONFIG_SM_LOG_LEVEL);
 
 #define CHANNEL_COUNT (1 + CMUX_EXT_CHANNEL_COUNT)
 
-#define RECV_BUF_LEN SLM_AT_MAX_CMD_LEN
+#define RECV_BUF_LEN SM_AT_MAX_CMD_LEN
 /* The CMUX module reserves some spare buffer bytes. To achieve a maximum
- * response length of SLM_AT_MAX_RSP_LEN (comprising the "OK" or "ERROR"
+ * response length of SM_AT_MAX_RSP_LEN (comprising the "OK" or "ERROR"
  * that is sent separately), the transmit buffer must be made a bit bigger.
- * 49 extra bytes was manually found to allow SLM_AT_MAX_RSP_LEN long responses.
+ * 49 extra bytes was manually found to allow SM_AT_MAX_RSP_LEN long responses.
  */
-#define TRANSMIT_BUF_LEN (49 + SLM_AT_MAX_RSP_LEN)
+#define TRANSMIT_BUF_LEN (49 + SM_AT_MAX_RSP_LEN)
 
 #define DLCI_TO_INDEX(dlci) ((dlci) - 1)
 #define INDEX_TO_DLCI(index) ((index) + 1)
@@ -93,7 +93,7 @@ static void rx_work_fn(struct k_work *work)
 			}
 
 			LOG_DBG("DLCI %u (AT) received %u bytes of data.", INDEX_TO_DLCI(i), ret);
-			slm_at_receive(recv_buf, ret);
+			sm_at_receive(recv_buf, ret);
 		}
 	}
 }
@@ -120,14 +120,14 @@ static void dlci_pipe_event_handler(struct modem_pipe *pipe,
 	case MODEM_PIPE_EVENT_RECEIVE_READY:
 		LOG_DBG("DLCI %u%s receive ready.", dlci->address, is_at ? " (AT)" : "");
 		atomic_or(&cmux.dlci_channel_rx, BIT(DLCI_TO_INDEX(dlci->address)));
-		k_work_submit_to_queue(&slm_work_q, &cmux.rx_work);
+		k_work_submit_to_queue(&sm_work_q, &cmux.rx_work);
 		break;
 
 	case MODEM_PIPE_EVENT_TRANSMIT_IDLE:
 		if (is_at &&
 		    cmux.dlcis[cmux.at_channel].instance.state == MODEM_CMUX_DLCI_STATE_OPEN &&
 		    !ring_buf_is_empty(&cmux.tx_rb)) {
-			k_work_submit_to_queue(&slm_work_q, &cmux.tx_work);
+			k_work_submit_to_queue(&sm_work_q, &cmux.tx_work);
 		}
 		break;
 	}
@@ -268,15 +268,15 @@ static int cmux_write_at_channel(const uint8_t *data, size_t len)
 	size_t ret;
 
 	/* CMUX work queue needs to be able to run.
-	 * So, we will send only from SLM work queue.
+	 * So, we will send only from Serial Modem work queue.
 	 */
-	if (k_current_get() != &slm_work_q.thread) {
+	if (k_current_get() != &sm_work_q.thread) {
 		ret = cmux_write_at_channel_nonblock(data, len);
 	} else {
 		ret = cmux_write_at_channel_block(data, len);
 	}
 
-	k_work_submit_to_queue(&slm_work_q, &cmux.tx_work);
+	k_work_submit_to_queue(&sm_work_q, &cmux.tx_work);
 
 	return ret;
 }
@@ -318,7 +318,7 @@ static bool cmux_is_started(void)
 	return (cmux.uart_pipe != NULL);
 }
 
-void slm_cmux_init(void)
+void sm_cmux_init(void)
 {
 	const struct modem_cmux_config cmux_config = {
 		.callback = cmux_event_handler,
@@ -361,7 +361,7 @@ static struct cmux_dlci *cmux_get_dlci(enum cmux_channel channel)
 	assert(false);
 }
 
-struct modem_pipe *slm_cmux_reserve(enum cmux_channel channel)
+struct modem_pipe *sm_cmux_reserve(enum cmux_channel channel)
 {
 	/* Return the channel's pipe. The requesting module may attach to it,
 	 * after which this pipe's events and data won't be received here anymore
@@ -370,7 +370,7 @@ struct modem_pipe *slm_cmux_reserve(enum cmux_channel channel)
 	return cmux_get_dlci(channel)->pipe;
 }
 
-void slm_cmux_release(enum cmux_channel channel, bool fallback)
+void sm_cmux_release(enum cmux_channel channel, bool fallback)
 {
 	struct cmux_dlci *dlci = cmux_get_dlci(channel);
 
@@ -397,7 +397,7 @@ static int cmux_start(void)
 
 	{
 		const struct modem_backend_uart_slm_config uart_backend_config = {
-			.uart = DEVICE_DT_GET(DT_CHOSEN(ncs_slm_uart)),
+			.uart = DEVICE_DT_GET(DT_CHOSEN(ncs_sm_uart)),
 			.receive_buf = cmux.uart_backend_receive_buf,
 			.receive_buf_size = sizeof(cmux.uart_backend_receive_buf),
 			.transmit_buf = cmux.uart_backend_transmit_buf,
@@ -425,7 +425,7 @@ static int cmux_start(void)
 
 static void cmux_starter(struct k_work *)
 {
-	const int ret = slm_at_set_backend((struct slm_at_backend) {
+	const int ret = sm_at_set_backend((struct sm_at_backend) {
 		.start = cmux_start,
 		.send = cmux_write_at_channel,
 		.stop = cmux_stop
@@ -438,7 +438,7 @@ static void cmux_starter(struct k_work *)
 	}
 }
 
-SLM_AT_CMD_CUSTOM(xcmux, "AT#XCMUX", handle_at_cmux);
+SM_AT_CMD_CUSTOM(xcmux, "AT#XCMUX", handle_at_cmux);
 static int handle_at_cmux(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			  uint32_t param_count)
 {
@@ -466,7 +466,7 @@ static int handle_at_cmux(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 		const unsigned int at_channel = DLCI_TO_INDEX(at_dlci);
 
 #if defined(CONFIG_SM_PPP)
-		if (!slm_ppp_is_stopped() && at_channel != cmux.at_channel) {
+		if (!sm_ppp_is_stopped() && at_channel != cmux.at_channel) {
 			/* The AT channel cannot be changed when PPP has a channel reserved. */
 			return -ENOTSUP;
 		}
@@ -481,7 +481,7 @@ static int handle_at_cmux(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 	}
 
 	k_work_init_delayable(&cmux_start_work, cmux_starter);
-	ret = k_work_schedule(&cmux_start_work, SLM_UART_RESPONSE_DELAY);
+	ret = k_work_schedule(&cmux_start_work, SM_UART_RESPONSE_DELAY);
 	if (ret == 1) {
 		ret = 0;
 	} else if (ret == 0) {

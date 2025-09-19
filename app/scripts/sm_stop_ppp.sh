@@ -6,7 +6,7 @@
 
 #
 # Script to stop PPP link inside CMUX channel
-# using Serial LTE Modem
+# using Serial Modem
 #
 
 AT_CMUX=/dev/gsmtty1

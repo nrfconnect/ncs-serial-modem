@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
-#ifndef SLM_AT_FOTA_
-#define SLM_AT_FOTA_
+#ifndef SM_AT_FOTA_
+#define SM_AT_FOTA_
 
-/** @file slm_at_fota.h
+/** @file sm_at_fota.h
  *
  * @brief Vendor-specific AT command for FOTA service.
  * @{
@@ -32,12 +32,12 @@ enum fota_status {
 };
 
 /* Whether a modem full firmware update is to be activated. */
-extern bool slm_modem_full_fota;
+extern bool sm_modem_full_fota;
 
-extern uint8_t slm_fota_type; /* FOTA image type. */
-extern enum fota_stage slm_fota_stage; /* Current stage of FOTA process. */
-extern enum fota_status slm_fota_status; /* FOTA process status. */
-extern int32_t slm_fota_info; /* FOTA download percentage or failure cause in case of error. */
+extern uint8_t sm_fota_type; /* FOTA image type. */
+extern enum fota_stage sm_fota_stage; /* Current stage of FOTA process. */
+extern enum fota_status sm_fota_status; /* FOTA process status. */
+extern int32_t sm_fota_info; /* FOTA download percentage or failure cause in case of error. */
 
 /**
  * @brief Initialize FOTA AT command parser.
@@ -45,7 +45,7 @@ extern int32_t slm_fota_info; /* FOTA download percentage or failure cause in ca
  * @retval 0 If the operation was successful.
  *           Otherwise, a (negative) error code is returned.
  */
-int slm_at_fota_init(void);
+int sm_at_fota_init(void);
 
 /**
  * @brief Uninitialize FOTA AT command parser.
@@ -53,15 +53,15 @@ int slm_at_fota_init(void);
  * @retval 0 If the operation was successful.
  *           Otherwise, a (negative) error code is returned.
  */
-int slm_at_fota_uninit(void);
+int sm_at_fota_uninit(void);
 
 /** @brief Sets the FOTA state variables to their default values. */
-void slm_fota_init_state(void);
+void sm_fota_init_state(void);
 
 /**
  * @brief FOTA post-process after reboot.
  */
-void slm_fota_post_process(void);
+void sm_fota_post_process(void);
 
 /**
  * @brief Finishes the full modem firmware update.
@@ -70,8 +70,8 @@ void slm_fota_post_process(void);
  * has been rebooted and a full modem firmware update is ongoing.
  */
 #if defined(CONFIG_SM_FULL_FOTA)
-void slm_finish_modem_full_fota(void);
+void sm_finish_modem_full_fota(void);
 #endif
 
 /** @} */
-#endif /* SLM_AT_FOTA_ */
+#endif /* SM_AT_FOTA_ */

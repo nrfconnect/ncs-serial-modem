@@ -7,7 +7,7 @@ nRF Cloud AT commands
 
 The page describes nRF Cloud-related AT commands.
 
-.. _SLM_AT_NRFCLOUD:
+.. _SM_AT_NRFCLOUD:
 
 nRF Cloud access
 ================
@@ -40,7 +40,7 @@ The ``<op>`` parameter can have the following integer values:
 * ``1`` - Connect to the nRF Cloud service.
 * ``2`` - Send a message in the JSON format to the nRF Cloud service.
 
-When ``<op>`` is ``2``, SLM enters ``slm_data_mode``.
+When ``<op>`` is ``2``, Serial Modem enters ``sm_data_mode``.
 
 The ``<send_location>`` parameter is used only when the value of ``<op>`` is ``1``.
 It can have the following integer values:
@@ -51,7 +51,7 @@ It can have the following integer values:
 
 .. note::
    Sending the device location to nRF Cloud is done in a best-effort way.
-   For it to happen, the device must have :ref:`GNSS <SLM_AT_GNSS>` enabled and it must be acquiring fixes.
+   For it to happen, the device must have :ref:`GNSS <SM_AT_GNSS>` enabled and it must be acquiring fixes.
    The minimal report interval is 5 seconds.
 
 .. note::
@@ -190,7 +190,7 @@ Example
 
   OK
 
-.. _SLM_AT_NRFCLOUDPOS:
+.. _SM_AT_NRFCLOUDPOS:
 
 nRF Cloud location
 ==================
@@ -201,7 +201,7 @@ The request uses information from the cellular network, Wi-Fi® access points, o
 .. note::
    To use ``#XNRFCLOUDPOS``, the following preconditions apply:
 
-   * The device must be connected to nRF Cloud using :ref:`#XNRFCLOUD <SLM_AT_NRFCLOUD>`.
+   * The device must be connected to nRF Cloud using :ref:`#XNRFCLOUD <SM_AT_NRFCLOUD>`.
    * The :kconfig:option:`CONFIG_NRF_CLOUD_LOCATION <CONFIG_NRF_CLOUD_LOCATION>` Kconfig option must be enabled.
 
 Set command

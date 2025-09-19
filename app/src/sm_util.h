@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
-#ifndef SLM_UTIL_
-#define SLM_UTIL_
+#ifndef SM_UTIL_
+#define SM_UTIL_
 
-/**@file slm_util.h
+/**@file sm_util.h
  *
- * @brief Utility functions for serial LTE modem
+ * @brief Utility functions for Serial Modem
  * @{
  */
 #include "sm_trap_macros.h"
@@ -20,26 +20,26 @@
 #include <stdbool.h>
 #include <hal/nrf_gpio.h>
 
-extern struct k_work_q slm_work_q; /* SLM's work queue. */
+extern struct k_work_q sm_work_q; /* Serial Modem's work queue. */
 
 /** @return Whether the modem is in the given functional mode. */
-bool slm_is_modem_functional_mode(enum lte_lc_func_mode mode);
+bool sm_is_modem_functional_mode(enum lte_lc_func_mode mode);
 
 /** @brief Puts the modem in minimal function mode. */
-int slm_power_off_modem(void);
+int sm_power_off_modem(void);
 
 /** @brief Performs a reset of the SiP. */
-FUNC_NORETURN void slm_reset(void);
+FUNC_NORETURN void sm_reset(void);
 
 /** Replacement for @c nrf_modem_at_printf() that cannot be
  *  used so that the AT command interception works properly.
  */
-int slm_util_at_printf(const char *fmt, ...);
+int sm_util_at_printf(const char *fmt, ...);
 
 /** Replacement for @c nrf_modem_at_scanf() that cannot be
  *  used so that the AT command interception works properly.
  */
-int slm_util_at_scanf(const char *cmd, const char *fmt, ...);
+int sm_util_at_scanf(const char *cmd, const char *fmt, ...);
 
 /** Forwards an AT command to the modem while bypassing interception.
  *  @warning This must only be called from code that needs to bypass
@@ -48,7 +48,7 @@ int slm_util_at_scanf(const char *cmd, const char *fmt, ...);
  *  at most two lines long (including the line that holds the result code).
  *  @return Like @c nrf_modem_at_cmd().
  */
-int slm_util_at_cmd_no_intercept(char *buf, size_t len, const char *at_cmd);
+int sm_util_at_cmd_no_intercept(char *buf, size_t len, const char *at_cmd);
 
 /**
  * @brief Compare string ignoring case
@@ -58,7 +58,7 @@ int slm_util_at_cmd_no_intercept(char *buf, size_t len, const char *at_cmd);
  *
  * @return true If two commands match, false if not.
  */
-bool slm_util_casecmp(const char *str1, const char *str2);
+bool sm_util_casecmp(const char *str1, const char *str2);
 
 /**
  * @brief Detect hexdecimal string data type
@@ -68,7 +68,7 @@ bool slm_util_casecmp(const char *str1, const char *str2);
  *
  * @return true if the input is hexdecimal string array, otherwise false
  */
-bool slm_util_hexstr_check(const uint8_t *data, uint16_t data_len);
+bool sm_util_hexstr_check(const uint8_t *data, uint16_t data_len);
 
 /**
  * @brief Encode hex array to hexdecimal string (ASCII text)
@@ -81,7 +81,7 @@ bool slm_util_hexstr_check(const uint8_t *data, uint16_t data_len);
  * @return actual size of ascii string if the operation was successful.
  *           Otherwise, a (negative) error code is returned.
  */
-int slm_util_htoa(const uint8_t *hex, uint16_t hex_len, char *ascii, uint16_t ascii_len);
+int sm_util_htoa(const uint8_t *hex, uint16_t hex_len, char *ascii, uint16_t ascii_len);
 
 /**
  * @brief Decode hexdecimal string (ASCII text) to hex array
@@ -94,7 +94,7 @@ int slm_util_htoa(const uint8_t *hex, uint16_t hex_len, char *ascii, uint16_t as
  * @return actual size of hex array if the operation was successful.
  *           Otherwise, a (negative) error code is returned.
  */
-int slm_util_atoh(const char *ascii, uint16_t ascii_len, uint8_t *hex, uint16_t hex_len);
+int sm_util_atoh(const char *ascii, uint16_t ascii_len, uint8_t *hex, uint16_t hex_len);
 
 /**
  * @brief Get string value from AT command with length check.
@@ -193,4 +193,4 @@ int util_resolve_host(int cid, const char *host, uint16_t port, int family, stru
 int util_get_peer_addr(struct sockaddr *peer, char addr[static INET6_ADDRSTRLEN], uint16_t *port);
 /** @} */
 
-#endif /* SLM_UTIL_ */
+#endif /* SM_UTIL_ */

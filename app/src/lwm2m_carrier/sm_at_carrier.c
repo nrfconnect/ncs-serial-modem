@@ -17,7 +17,7 @@
 #include "sm_util.h"
 #include "sm_at_carrier.h"
 
-LOG_MODULE_REGISTER(slm_carrier, CONFIG_SM_LOG_LEVEL);
+LOG_MODULE_REGISTER(sm_carrier, CONFIG_SM_LOG_LEVEL);
 
 /* Static variable to report the memory free resource. */
 static int m_mem_free;
@@ -119,12 +119,12 @@ static void on_event_app_data(const lwm2m_carrier_event_t *event)
 	}
 
 	if (app_data->type == LWM2M_CARRIER_APP_DATA_EVENT_DATA_WRITE) {
-		/* In theory, slm_data_buf should be twice as large as
-		 * SLM_CARRIER_APP_DATA_BUFFER_LEN to account for the hex string.
-		 * However, slm_data_buf is not expected to receive more than 512 bytes in downlink.
+		/* In theory, sm_data_buf should be twice as large as
+		 * SM_CARRIER_APP_DATA_BUFFER_LEN to account for the hex string.
+		 * However, sm_data_buf is not expected to receive more than 512 bytes in downlink.
 		 */
-		ret = slm_util_htoa(app_data->buffer, app_data->buffer_len,
-				    slm_data_buf, sizeof(slm_data_buf));
+		ret = sm_util_htoa(app_data->buffer, app_data->buffer_len,
+				    sm_data_buf, sizeof(sm_data_buf));
 		if (ret < 0) {
 			LOG_ERR("Failed to encode hex array to hex string: %d", ret);
 			return;
@@ -132,7 +132,7 @@ static void on_event_app_data(const lwm2m_carrier_event_t *event)
 
 		rsp_send("\r\n#XCARRIEREVT: %u,%hhu,\"%s\",%d\r\n\"", event->type, app_data->type,
 			 uri_path, ret);
-		data_send(slm_data_buf, ret);
+		data_send(sm_data_buf, ret);
 		rsp_send("\"");
 	} else {
 		rsp_send("\r\n#XCARRIEREVT: %u,%hhu,\"%s\"\r\n", event->type, app_data->type,
@@ -153,18 +153,18 @@ int lwm2m_carrier_event_handler(const lwm2m_carrier_event_t *event)
 #if defined(CONFIG_SM_CARRIER_AUTO_CONTROL)
 	case LWM2M_CARRIER_EVENT_LTE_LINK_UP:
 		LOG_DBG("LWM2M_CARRIER_EVENT_LTE_LINK_UP");
-		k_work_reschedule(&reconnect_work, SLM_UART_RESPONSE_DELAY);
+		k_work_reschedule(&reconnect_work, SM_UART_RESPONSE_DELAY);
 		break;
 	case LWM2M_CARRIER_EVENT_LTE_LINK_DOWN:
 		LOG_DBG("LWM2M_CARRIER_EVENT_LTE_LINK_DOWN");
-		err = slm_util_at_printf("AT+CFUN=4");
+		err = sm_util_at_printf("AT+CFUN=4");
 		if (err) {
 			err = -1;
 		}
 		break;
 	case LWM2M_CARRIER_EVENT_LTE_POWER_OFF:
 		LOG_DBG("LWM2M_CARRIER_EVENT_LTE_POWER_OFF");
-		err = slm_util_at_printf("AT+CFUN=0");
+		err = sm_util_at_printf("AT+CFUN=0");
 		if (err) {
 			err = -1;
 		}
@@ -241,7 +241,7 @@ int lwm2m_carrier_event_handler(const lwm2m_carrier_event_t *event)
 #if defined(CONFIG_SM_CARRIER_AUTO_CONTROL)
 	/* Allow time for the URC be flushed before reboot */
 	if (event->type == LWM2M_CARRIER_EVENT_REBOOT && err == 0) {
-		k_sleep(SLM_UART_RESPONSE_DELAY);
+		k_sleep(SM_UART_RESPONSE_DELAY);
 	}
 #endif
 
@@ -254,7 +254,7 @@ static int carrier_datamode_callback(uint8_t op, const uint8_t *data, int len, u
 	int ret = 0;
 
 	if (op == DATAMODE_SEND) {
-		if ((flags & SLM_DATAMODE_FLAGS_MORE_DATA) != 0) {
+		if ((flags & SM_DATAMODE_FLAGS_MORE_DATA) != 0) {
 			LOG_ERR("Datamode buffer overflow");
 			exit_datamode_handler(-EOVERFLOW);
 			return -EOVERFLOW;
@@ -262,7 +262,7 @@ static int carrier_datamode_callback(uint8_t op, const uint8_t *data, int len, u
 
 		size_t size = CONFIG_SM_CARRIER_APP_DATA_BUFFER_LEN / 2;
 
-		ret = slm_util_atoh(data, len, slm_data_buf, size);
+		ret = sm_util_atoh(data, len, sm_data_buf, size);
 		if (ret < 0) {
 			LOG_ERR("Failed to decode hex string to hex array");
 			return ret;
@@ -271,7 +271,7 @@ static int carrier_datamode_callback(uint8_t op, const uint8_t *data, int len, u
 		uint16_t path[3] = { LWM2M_CARRIER_OBJECT_APP_DATA_CONTAINER, 0, 0 };
 		uint8_t path_len = 3;
 
-		ret = lwm2m_carrier_app_data_set(path, path_len, slm_data_buf, ret);
+		ret = lwm2m_carrier_app_data_set(path, path_len, sm_data_buf, ret);
 		LOG_INF("datamode send: %d", ret);
 		if (ret < 0) {
 			exit_datamode_handler(ret);
@@ -284,7 +284,7 @@ static int carrier_datamode_callback(uint8_t op, const uint8_t *data, int len, u
 }
 
 /* AT#XCARRIER="app_data_create",<obj_inst_id>,<res_inst_id> */
-SLM_AT_CMD_CUSTOM(xcarrier_app_data_create, "AT#XCARRIER=\"app_data_create\"",
+SM_AT_CMD_CUSTOM(xcarrier_app_data_create, "AT#XCARRIER=\"app_data_create\"",
 		  do_carrier_appdata_create);
 static int do_carrier_appdata_create(enum at_parser_cmd_type, struct at_parser *parser,
 				     uint32_t param_count)
@@ -316,7 +316,7 @@ static int do_carrier_appdata_create(enum at_parser_cmd_type, struct at_parser *
 }
 
 /* AT#XCARRIER="app_data_set"[,<data>][,<obj_inst_id>,<res_inst_id>] */
-SLM_AT_CMD_CUSTOM(xcarrier_app_data_set, "AT#XCARRIER=\"app_data_set\"", do_carrier_appdata_set);
+SM_AT_CMD_CUSTOM(xcarrier_app_data_set, "AT#XCARRIER=\"app_data_set\"", do_carrier_appdata_set);
 static int do_carrier_appdata_set(enum at_parser_cmd_type, struct at_parser *parser,
 				  uint32_t param_count)
 {
@@ -344,7 +344,7 @@ static int do_carrier_appdata_set(enum at_parser_cmd_type, struct at_parser *par
 			return ret;
 		}
 
-		ret = slm_util_atoh(data_ascii, data_ascii_len, data_hex, data_hex_len);
+		ret = sm_util_atoh(data_ascii, data_ascii_len, data_hex, data_hex_len);
 		if (ret < 0) {
 			LOG_ERR("Failed to decode hex string to hex array");
 			return ret;
@@ -379,7 +379,7 @@ static int do_carrier_appdata_set(enum at_parser_cmd_type, struct at_parser *par
 				return ret;
 			}
 
-			ret = slm_util_atoh(data_ascii, data_ascii_len, data_hex, data_hex_len);
+			ret = sm_util_atoh(data_ascii, data_ascii_len, data_hex, data_hex_len);
 			if (ret < 0) {
 				LOG_ERR("Failed to decode hex string to hex array");
 				return ret;
@@ -396,7 +396,7 @@ static int do_carrier_appdata_set(enum at_parser_cmd_type, struct at_parser *par
 }
 
 /* AT#XCARRIER="battery_level",<battery_level> */
-SLM_AT_CMD_CUSTOM(xcarrier_battery_level, "AT#XCARRIER=\"battery_level\"",
+SM_AT_CMD_CUSTOM(xcarrier_battery_level, "AT#XCARRIER=\"battery_level\"",
 	      do_carrier_device_battery_level);
 static int do_carrier_device_battery_level(enum at_parser_cmd_type, struct at_parser *parser,
 					   uint32_t)
@@ -413,7 +413,7 @@ static int do_carrier_device_battery_level(enum at_parser_cmd_type, struct at_pa
 }
 
 /* AT#XCARRIER="battery_status",<battery_status> */
-SLM_AT_CMD_CUSTOM(xcarrier_battery_status, "AT#XCARRIER=\"battery_status\"",
+SM_AT_CMD_CUSTOM(xcarrier_battery_status, "AT#XCARRIER=\"battery_status\"",
 	      do_carrier_device_battery_status);
 static int do_carrier_device_battery_status(enum at_parser_cmd_type,
 					    struct at_parser *parser, uint32_t)
@@ -429,7 +429,7 @@ static int do_carrier_device_battery_status(enum at_parser_cmd_type,
 }
 
 /* AT#XCARRIER="current",<power_source>,<current> */
-SLM_AT_CMD_CUSTOM(xcarrier_current, "AT#XCARRIER=\"current\"", do_carrier_device_current);
+SM_AT_CMD_CUSTOM(xcarrier_current, "AT#XCARRIER=\"current\"", do_carrier_device_current);
 static int do_carrier_device_current(enum at_parser_cmd_type, struct at_parser *parser,
 				     uint32_t)
 {
@@ -450,7 +450,7 @@ static int do_carrier_device_current(enum at_parser_cmd_type, struct at_parser *
 }
 
 /* AT#XCARRIER="error","add|remove",<error> */
-SLM_AT_CMD_CUSTOM(xcarrier_error, "AT#XCARRIER=\"error\"", do_carrier_device_error);
+SM_AT_CMD_CUSTOM(xcarrier_error, "AT#XCARRIER=\"error\"", do_carrier_device_error);
 static int do_carrier_device_error(enum at_parser_cmd_type, struct at_parser *parser,
 				   uint32_t)
 {
@@ -469,9 +469,9 @@ static int do_carrier_device_error(enum at_parser_cmd_type, struct at_parser *pa
 		return ret;
 	}
 
-	if (slm_util_casecmp(operation, "ADD")) {
+	if (sm_util_casecmp(operation, "ADD")) {
 		return lwm2m_carrier_error_code_add(error_code);
-	} else if (slm_util_casecmp(operation, "REMOVE")) {
+	} else if (sm_util_casecmp(operation, "REMOVE")) {
 		return lwm2m_carrier_error_code_remove(error_code);
 	}
 
@@ -497,7 +497,7 @@ int lwm2m_carrier_memory_free_read(void)
 }
 
 /* AT#XCARRIER="memory_free","read|write"[,<memory>] */
-SLM_AT_CMD_CUSTOM(xcarrier_memory_free, "AT#XCARRIER=\"memory_free\"", do_carrier_device_mem_free);
+SM_AT_CMD_CUSTOM(xcarrier_memory_free, "AT#XCARRIER=\"memory_free\"", do_carrier_device_mem_free);
 static int do_carrier_device_mem_free(enum at_parser_cmd_type, struct at_parser *parser,
 				      uint32_t)
 {
@@ -510,11 +510,11 @@ static int do_carrier_device_mem_free(enum at_parser_cmd_type, struct at_parser 
 		return ret;
 	}
 
-	if (slm_util_casecmp(operation, "read")) {
+	if (sm_util_casecmp(operation, "read")) {
 		memory = lwm2m_carrier_memory_free_read();
 
 		rsp_send("\r\n#XCARRIER: %d\r\n", memory);
-	} else if (slm_util_casecmp(operation, "write")) {
+	} else if (sm_util_casecmp(operation, "write")) {
 		ret = at_parser_num_get(parser, 3, &memory);
 		if (ret) {
 			return ret;
@@ -527,7 +527,7 @@ static int do_carrier_device_mem_free(enum at_parser_cmd_type, struct at_parser 
 }
 
 /* AT#XCARRIER="memory_total",<memory> */
-SLM_AT_CMD_CUSTOM(xcarrier_memory_total, "AT#XCARRIER=\"memory_total\"",
+SM_AT_CMD_CUSTOM(xcarrier_memory_total, "AT#XCARRIER=\"memory_total\"",
 	      do_carrier_device_mem_total);
 static int do_carrier_device_mem_total(enum at_parser_cmd_type, struct at_parser *parser,
 				       uint32_t)
@@ -543,7 +543,7 @@ static int do_carrier_device_mem_total(enum at_parser_cmd_type, struct at_parser
 }
 
 /* AT#XCARRIER="power_sources"[,<source1>[<source2>[,...[,<source7>]]]] */
-SLM_AT_CMD_CUSTOM(xcarrier_power_sources, "AT#XCARRIER=\"power_sources\"",
+SM_AT_CMD_CUSTOM(xcarrier_power_sources, "AT#XCARRIER=\"power_sources\"",
 	      do_carrier_device_power_sources);
 static int do_carrier_device_power_sources(enum at_parser_cmd_type, struct at_parser *parser,
 					   uint32_t param_count)
@@ -570,7 +570,7 @@ static int do_carrier_device_power_sources(enum at_parser_cmd_type, struct at_pa
 }
 
 /* AT#XCARRIER="timezone",<timezone> */
-SLM_AT_CMD_CUSTOM(xcarrier_timezone, "AT#XCARRIER=\"timezone\"", do_carrier_device_timezone);
+SM_AT_CMD_CUSTOM(xcarrier_timezone, "AT#XCARRIER=\"timezone\"", do_carrier_device_timezone);
 static int do_carrier_device_timezone(enum at_parser_cmd_type, struct at_parser *parser,
 				      uint32_t)
 {
@@ -583,7 +583,7 @@ static int do_carrier_device_timezone(enum at_parser_cmd_type, struct at_parser 
 		return ret;
 	}
 
-	if (slm_util_casecmp(operation, "READ")) {
+	if (sm_util_casecmp(operation, "READ")) {
 		const char *timezone;
 
 		timezone = lwm2m_carrier_timezone_read();
@@ -595,7 +595,7 @@ static int do_carrier_device_timezone(enum at_parser_cmd_type, struct at_parser 
 		}
 
 		return 0;
-	} else if (slm_util_casecmp(operation, "WRITE")) {
+	} else if (sm_util_casecmp(operation, "WRITE")) {
 		char timezone[64];
 
 		size = sizeof(timezone);
@@ -624,7 +624,7 @@ static void print_utc_time(char *output, int32_t timestamp)
 }
 
 /* AT#XCARRIER="time" */
-SLM_AT_CMD_CUSTOM(xcarrier_time, "AT#XCARRIER=\"time\"", do_carrier_device_time);
+SM_AT_CMD_CUSTOM(xcarrier_time, "AT#XCARRIER=\"time\"", do_carrier_device_time);
 static int do_carrier_device_time(enum at_parser_cmd_type, struct at_parser *, uint32_t)
 {
 	int utc_time, utc_offset;
@@ -647,7 +647,7 @@ static int do_carrier_device_time(enum at_parser_cmd_type, struct at_parser *, u
 }
 
 /* AT#XCARRIER="utc_offset","read|write"[,<utc_offset>] */
-SLM_AT_CMD_CUSTOM(xcarrier_utc_offset, "AT#XCARRIER=\"utc_offset\"",
+SM_AT_CMD_CUSTOM(xcarrier_utc_offset, "AT#XCARRIER=\"utc_offset\"",
 	      do_carrier_device_utc_offset);
 static int do_carrier_device_utc_offset(enum at_parser_cmd_type, struct at_parser *parser,
 					uint32_t)
@@ -661,13 +661,13 @@ static int do_carrier_device_utc_offset(enum at_parser_cmd_type, struct at_parse
 		return ret;
 	}
 
-	if (slm_util_casecmp(operation, "READ")) {
+	if (sm_util_casecmp(operation, "READ")) {
 		utc_offset = lwm2m_carrier_utc_offset_read();
 
 		rsp_send("\r\n#XCARRIER: %d\r\n", utc_offset);
 
 		return 0;
-	} else if (slm_util_casecmp(operation, "WRITE")) {
+	} else if (sm_util_casecmp(operation, "WRITE")) {
 		ret = at_parser_num_get(parser, 3, &utc_offset);
 		if (ret) {
 			return ret;
@@ -682,7 +682,7 @@ static int do_carrier_device_utc_offset(enum at_parser_cmd_type, struct at_parse
 }
 
 /* AT#XCARRIER="utc_time","read|write"[,<utc_time>] */
-SLM_AT_CMD_CUSTOM(xcarrier_utc_time, "AT#XCARRIER=\"utc_time\"", do_carrier_device_utc_time);
+SM_AT_CMD_CUSTOM(xcarrier_utc_time, "AT#XCARRIER=\"utc_time\"", do_carrier_device_utc_time);
 static int do_carrier_device_utc_time(enum at_parser_cmd_type, struct at_parser *parser,
 				      uint32_t)
 {
@@ -696,14 +696,14 @@ static int do_carrier_device_utc_time(enum at_parser_cmd_type, struct at_parser 
 		return ret;
 	}
 
-	if (slm_util_casecmp(operation, "READ")) {
+	if (sm_util_casecmp(operation, "READ")) {
 		utc_time = lwm2m_carrier_utc_time_read();
 		print_utc_time(time_str, utc_time);
 
 		rsp_send("\r\n#XCARRIER: %s\r\n", time_str);
 
 		return 0;
-	} else if (slm_util_casecmp(operation, "WRITE")) {
+	} else if (sm_util_casecmp(operation, "WRITE")) {
 		ret = at_parser_num_get(parser, 3, &utc_time);
 		if (ret) {
 			return ret;
@@ -718,7 +718,7 @@ static int do_carrier_device_utc_time(enum at_parser_cmd_type, struct at_parser 
 }
 
 /* AT#XCARRIER="voltage",<power_source>,<voltage> */
-SLM_AT_CMD_CUSTOM(xcarrier_voltage, "AT#XCARRIER=\"voltage\"", do_carrier_device_voltage);
+SM_AT_CMD_CUSTOM(xcarrier_voltage, "AT#XCARRIER=\"voltage\"", do_carrier_device_voltage);
 static int do_carrier_device_voltage(enum at_parser_cmd_type, struct at_parser *parser,
 				     uint32_t)
 {
@@ -739,7 +739,7 @@ static int do_carrier_device_voltage(enum at_parser_cmd_type, struct at_parser *
 }
 
 /* AT#XCARRIER="log_data",<data> */
-SLM_AT_CMD_CUSTOM(xcarrier_log_data, "AT#XCARRIER=\"log_data\"",
+SM_AT_CMD_CUSTOM(xcarrier_log_data, "AT#XCARRIER=\"log_data\"",
 	      do_carrier_event_log_log_data);
 static int do_carrier_event_log_log_data(enum at_parser_cmd_type, struct at_parser *parser,
 					 uint32_t)
@@ -755,7 +755,7 @@ static int do_carrier_event_log_log_data(enum at_parser_cmd_type, struct at_pars
 		return ret;
 	}
 
-	ret = slm_util_atoh(data_ascii, data_ascii_len, data_hex, data_hex_len);
+	ret = sm_util_atoh(data_ascii, data_ascii_len, data_hex, data_hex_len);
 	if (ret < 0) {
 		LOG_ERR("Failed to decode hex string to hex array");
 		return ret;
@@ -765,7 +765,7 @@ static int do_carrier_event_log_log_data(enum at_parser_cmd_type, struct at_pars
 }
 
 /* AT#XCARRIER="position",<latitude>,<longitude>,<altitude>,<timestamp>,<uncertainty> */
-SLM_AT_CMD_CUSTOM(xcarrier_position, "AT#XCARRIER=\"position\"",
+SM_AT_CMD_CUSTOM(xcarrier_position, "AT#XCARRIER=\"position\"",
 	      do_carrier_location_position);
 static int do_carrier_location_position(enum at_parser_cmd_type, struct at_parser *parser,
 					uint32_t param_count)
@@ -809,7 +809,7 @@ static int do_carrier_location_position(enum at_parser_cmd_type, struct at_parse
 }
 
 /* AT#XCARRIER="velocity",<heading>,<speed_h>,<speed_v>,<uncertainty_h>,<uncertainty_v> */
-SLM_AT_CMD_CUSTOM(xcarrier_velocity, "AT#XCARRIER=\"velocity\"",
+SM_AT_CMD_CUSTOM(xcarrier_velocity, "AT#XCARRIER=\"velocity\"",
 	      do_carrier_location_velocity);
 static int do_carrier_location_velocity(enum at_parser_cmd_type, struct at_parser *parser,
 					uint32_t param_count)
@@ -851,7 +851,7 @@ static int do_carrier_location_velocity(enum at_parser_cmd_type, struct at_parse
 }
 
 /* AT#XCARRIER="portfolio","create|read|write",<obj_inst_id>[,<identity_type>[,<identity>]] */
-SLM_AT_CMD_CUSTOM(xcarrier_portfolio, "AT#XCARRIER=\"portfolio\"", do_carrier_portfolio);
+SM_AT_CMD_CUSTOM(xcarrier_portfolio, "AT#XCARRIER=\"portfolio\"", do_carrier_portfolio);
 static int do_carrier_portfolio(enum at_parser_cmd_type, struct at_parser *parser,
 				uint32_t param_count)
 {
@@ -878,7 +878,7 @@ static int do_carrier_portfolio(enum at_parser_cmd_type, struct at_parser *parse
 		}
 	}
 
-	if (slm_util_casecmp(operation, "READ") && (param_count > 4)) {
+	if (sm_util_casecmp(operation, "READ") && (param_count > 4)) {
 		ret = lwm2m_carrier_identity_read(instance_id, identity_type, buffer, &buf_len);
 		if (ret) {
 			return ret;
@@ -887,7 +887,7 @@ static int do_carrier_portfolio(enum at_parser_cmd_type, struct at_parser *parse
 		rsp_send("\r\n#XCARRIER: %s\r\n", buffer);
 
 		return 0;
-	} else if (slm_util_casecmp(operation, "WRITE") && (param_count > 4)) {
+	} else if (sm_util_casecmp(operation, "WRITE") && (param_count > 4)) {
 		size = sizeof(buffer);
 
 		ret = util_string_get(parser, 5, buffer, &size);
@@ -896,7 +896,7 @@ static int do_carrier_portfolio(enum at_parser_cmd_type, struct at_parser *parse
 		}
 
 		return lwm2m_carrier_identity_write(instance_id, identity_type, buffer);
-	} else if (slm_util_casecmp(operation, "CREATE")) {
+	} else if (sm_util_casecmp(operation, "CREATE")) {
 		return lwm2m_carrier_portfolio_instance_create(instance_id);
 	}
 
@@ -906,28 +906,28 @@ static int do_carrier_portfolio(enum at_parser_cmd_type, struct at_parser *parse
 }
 
 /* AT#XCARRIER="reboot" */
-SLM_AT_CMD_CUSTOM(xcarrier_reboot, "AT#XCARRIER=\"reboot\"", do_carrier_request_reboot);
+SM_AT_CMD_CUSTOM(xcarrier_reboot, "AT#XCARRIER=\"reboot\"", do_carrier_request_reboot);
 static int do_carrier_request_reboot(enum at_parser_cmd_type, struct at_parser *, uint32_t)
 {
 	return lwm2m_carrier_request(LWM2M_CARRIER_REQUEST_REBOOT);
 }
 
 /* AT#XCARRIER="regup" */
-SLM_AT_CMD_CUSTOM(xcarrier_regup, "AT#XCARRIER=\"regup\"", do_carrier_request_regup);
+SM_AT_CMD_CUSTOM(xcarrier_regup, "AT#XCARRIER=\"regup\"", do_carrier_request_regup);
 static int do_carrier_request_regup(enum at_parser_cmd_type, struct at_parser *, uint32_t)
 {
 	return lwm2m_carrier_request(LWM2M_CARRIER_REQUEST_REGISTER);
 }
 
 /* AT#XCARRIER="dereg" */
-SLM_AT_CMD_CUSTOM(xcarrier_dereg, "AT#XCARRIER=\"dereg\"", do_carrier_request_dereg);
+SM_AT_CMD_CUSTOM(xcarrier_dereg, "AT#XCARRIER=\"dereg\"", do_carrier_request_dereg);
 static int do_carrier_request_dereg(enum at_parser_cmd_type, struct at_parser *, uint32_t)
 {
 	return lwm2m_carrier_request(LWM2M_CARRIER_REQUEST_DEREGISTER);
 }
 
 /* AT#XCARRIER="link_down" */
-SLM_AT_CMD_CUSTOM(xcarrier_link_down, "AT#XCARRIER=\"link_down\"",
+SM_AT_CMD_CUSTOM(xcarrier_link_down, "AT#XCARRIER=\"link_down\"",
 	      do_carrier_request_link_down);
 static int do_carrier_request_link_down(enum at_parser_cmd_type, struct at_parser *, uint32_t)
 {
@@ -935,14 +935,14 @@ static int do_carrier_request_link_down(enum at_parser_cmd_type, struct at_parse
 }
 
 /* AT#XCARRIER="link_up" */
-SLM_AT_CMD_CUSTOM(xcarrier_link_up, "AT#XCARRIER=\"link_up\"", do_carrier_request_link_up);
+SM_AT_CMD_CUSTOM(xcarrier_link_up, "AT#XCARRIER=\"link_up\"", do_carrier_request_link_up);
 static int do_carrier_request_link_up(enum at_parser_cmd_type, struct at_parser *, uint32_t)
 {
 	return lwm2m_carrier_request(LWM2M_CARRIER_REQUEST_LINK_UP);
 }
 
 /* AT#XCARRIER="send",<obj_id>,<obj_inst_id>,<res_id>[,<res_inst_id>] */
-SLM_AT_CMD_CUSTOM(xcarrier_send, "AT#XCARRIER=\"send\"", do_carrier_send);
+SM_AT_CMD_CUSTOM(xcarrier_send, "AT#XCARRIER=\"send\"", do_carrier_send);
 static int do_carrier_send(enum at_parser_cmd_type, struct at_parser *parser,
 			   uint32_t param_count)
 {
@@ -968,14 +968,14 @@ static int do_carrier_send(enum at_parser_cmd_type, struct at_parser *parser,
 	return lwm2m_carrier_data_send(path, path_len);
 }
 
-int slm_at_carrier_init(void)
+int sm_at_carrier_init(void)
 {
 	k_work_init_delayable(&reconnect_work, reconnect_wk);
 
 	return 0;
 }
 
-int slm_at_carrier_uninit(void)
+int sm_at_carrier_uninit(void)
 {
 	return 0;
 }

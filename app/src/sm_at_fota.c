@@ -23,7 +23,7 @@
 #include "sm_at_host.h"
 #include "sm_at_fota.h"
 
-LOG_MODULE_REGISTER(slm_fota, CONFIG_SM_LOG_LEVEL);
+LOG_MODULE_REGISTER(sm_fota, CONFIG_SM_LOG_LEVEL);
 
 /* file_uri: scheme://hostname[:port]path[?parameters] */
 #define FILE_URI_MAX	CONFIG_DOWNLOADER_MAX_FILENAME_SIZE
@@ -36,22 +36,22 @@ LOG_MODULE_REGISTER(slm_fota, CONFIG_SM_LOG_LEVEL);
 /* Some features need fota_download update */
 #define FOTA_FUTURE_FEATURE	0
 
-enum slm_fota_operation {
-	SLM_FOTA_STOP = 0,
-	SLM_FOTA_START_APP = 1,
-	SLM_FOTA_START_MFW = 2,
-	SLM_FOTA_START_FULL_FOTA = 3,
-	SLM_FOTA_PAUSE_RESUME = 4,
-	SLM_FOTA_MFW_READ = 7,
-	SLM_FOTA_ERASE_MFW = 9
+enum sm_fota_operation {
+	SM_FOTA_STOP = 0,
+	SM_FOTA_START_APP = 1,
+	SM_FOTA_START_MFW = 2,
+	SM_FOTA_START_FULL_FOTA = 3,
+	SM_FOTA_PAUSE_RESUME = 4,
+	SM_FOTA_MFW_READ = 7,
+	SM_FOTA_ERASE_MFW = 9
 };
 
-bool slm_modem_full_fota;
+bool sm_modem_full_fota;
 
-uint8_t slm_fota_type = DFU_TARGET_IMAGE_TYPE_NONE;
-enum fota_stage slm_fota_stage = FOTA_STAGE_INIT;
-enum fota_status slm_fota_status;
-int32_t slm_fota_info;
+uint8_t sm_fota_type = DFU_TARGET_IMAGE_TYPE_NONE;
+enum fota_stage sm_fota_stage = FOTA_STAGE_INIT;
+enum fota_status sm_fota_status;
+int32_t sm_fota_info;
 
 static char path[FILE_URI_MAX];
 static char hostname[URI_HOST_MAX];
@@ -215,13 +215,13 @@ static int do_fota_start(int op, const char *file_uri, int sec_tag,
 	}
 
 	/* start HTTP(S) FOTA */
-	if (slm_util_casecmp(schema, SCHEMA_HTTPS)) {
+	if (sm_util_casecmp(schema, SCHEMA_HTTPS)) {
 		if (sec_tag == SEC_TAG_TLS_INVALID) {
 			LOG_ERR("Missing sec_tag");
 			return -EINVAL;
 		}
 		ret = fota_download_start_with_image_type(hostname, path, sec_tag, pdn_id, 0, type);
-	} else if (slm_util_casecmp(schema, SCHEMA_HTTP)) {
+	} else if (sm_util_casecmp(schema, SCHEMA_HTTP)) {
 		ret = fota_download_start_with_image_type(hostname, path, -1, pdn_id, 0, type);
 	} else {
 		ret = -EINVAL;
@@ -232,8 +232,8 @@ static int do_fota_start(int op, const char *file_uri, int sec_tag,
 			FOTA_STATUS_ERROR, ret);
 	}
 
-	slm_fota_init_state();
-	slm_fota_type = type;
+	sm_fota_init_state();
+	sm_fota_type = type;
 
 	return ret;
 }
@@ -242,48 +242,48 @@ static void fota_dl_handler(const struct fota_download_evt *evt)
 {
 	switch (evt->id) {
 	case FOTA_DOWNLOAD_EVT_PROGRESS:
-		slm_fota_stage = FOTA_STAGE_DOWNLOAD;
-		slm_fota_status = FOTA_STATUS_OK;
-		slm_fota_info = evt->progress;
+		sm_fota_stage = FOTA_STAGE_DOWNLOAD;
+		sm_fota_status = FOTA_STATUS_OK;
+		sm_fota_info = evt->progress;
 		rsp_send("\r\n#XFOTA: %d,%d,%d\r\n",
-			slm_fota_stage, slm_fota_status, slm_fota_info);
+			sm_fota_stage, sm_fota_status, sm_fota_info);
 		break;
 	case FOTA_DOWNLOAD_EVT_FINISHED:
-		slm_fota_stage = FOTA_STAGE_ACTIVATE;
-		slm_fota_info = 0;
-		slm_modem_full_fota = (slm_fota_type == DFU_TARGET_IMAGE_TYPE_FULL_MODEM);
+		sm_fota_stage = FOTA_STAGE_ACTIVATE;
+		sm_fota_info = 0;
+		sm_modem_full_fota = (sm_fota_type == DFU_TARGET_IMAGE_TYPE_FULL_MODEM);
 		/* Save, in case reboot by reset */
-		slm_settings_fota_save();
-		rsp_send("\r\n#XFOTA: %d,%d\r\n", slm_fota_stage, slm_fota_status);
+		sm_settings_fota_save();
+		rsp_send("\r\n#XFOTA: %d,%d\r\n", sm_fota_stage, sm_fota_status);
 		break;
 	case FOTA_DOWNLOAD_EVT_ERASE_TIMEOUT:
 		LOG_INF("Erasure timeout reached. Erasure continues.");
 		break;
 	case FOTA_DOWNLOAD_EVT_ERASE_PENDING:
-		slm_fota_stage = FOTA_STAGE_DOWNLOAD_ERASE_PENDING;
-		rsp_send("\r\n#XFOTA: %d,%d\r\n", slm_fota_stage, slm_fota_status);
+		sm_fota_stage = FOTA_STAGE_DOWNLOAD_ERASE_PENDING;
+		rsp_send("\r\n#XFOTA: %d,%d\r\n", sm_fota_stage, sm_fota_status);
 		break;
 	case FOTA_DOWNLOAD_EVT_ERASE_DONE:
-		rsp_send("\r\n#XFOTA: %d,%d\r\n", FOTA_STAGE_DOWNLOAD_ERASED, slm_fota_status);
+		rsp_send("\r\n#XFOTA: %d,%d\r\n", FOTA_STAGE_DOWNLOAD_ERASED, sm_fota_status);
 		/* Back to init now that the erasure is complete so that potential pre-start
 		 * error codes are printed with the same stage than if there had been no erasure.
 		 */
-		slm_fota_stage = FOTA_STAGE_INIT;
+		sm_fota_stage = FOTA_STAGE_INIT;
 		break;
 	case FOTA_DOWNLOAD_EVT_ERROR:
-		slm_fota_status = FOTA_STATUS_ERROR;
-		slm_fota_info = evt->cause;
+		sm_fota_status = FOTA_STATUS_ERROR;
+		sm_fota_info = evt->cause;
 		rsp_send("\r\n#XFOTA: %d,%d,%d\r\n",
-			slm_fota_stage, slm_fota_status, slm_fota_info);
+			sm_fota_stage, sm_fota_status, sm_fota_info);
 		/* FOTA session terminated */
-		slm_fota_init_state();
+		sm_fota_init_state();
 		break;
 	case FOTA_DOWNLOAD_EVT_CANCELLED:
-		slm_fota_status = FOTA_STATUS_CANCELLED;
-		slm_fota_info = 0;
-		rsp_send("\r\n#XFOTA: %d,%d\r\n", slm_fota_stage, slm_fota_status);
+		sm_fota_status = FOTA_STATUS_CANCELLED;
+		sm_fota_info = 0;
+		rsp_send("\r\n#XFOTA: %d,%d\r\n", sm_fota_stage, sm_fota_status);
 		/* FOTA session terminated */
-		slm_fota_init_state();
+		sm_fota_init_state();
 		break;
 
 	default:
@@ -291,7 +291,7 @@ static void fota_dl_handler(const struct fota_download_evt *evt)
 	}
 }
 
-SLM_AT_CMD_CUSTOM(xfota, "AT#XFOTA", handle_at_fota);
+SM_AT_CMD_CUSTOM(xfota, "AT#XFOTA", handle_at_fota);
 static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			  uint32_t param_count)
 {
@@ -308,13 +308,13 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 			return err;
 		}
 		switch (op) {
-		case SLM_FOTA_STOP:
+		case SM_FOTA_STOP:
 			err = fota_download_cancel();
 			break;
-		case SLM_FOTA_START_APP:
-		case SLM_FOTA_START_MFW:
+		case SM_FOTA_START_APP:
+		case SM_FOTA_START_MFW:
 #if defined(CONFIG_SM_FULL_FOTA)
-		case SLM_FOTA_START_FULL_FOTA:
+		case SM_FOTA_START_FULL_FOTA:
 #endif
 			char uri[FILE_URI_MAX];
 			uint16_t pdn_id;
@@ -329,11 +329,11 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 			if (param_count > 3) {
 				at_parser_num_get(parser, 3, &sec_tag);
 			}
-			if (op == SLM_FOTA_START_APP) {
+			if (op == SM_FOTA_START_APP) {
 				type = DFU_TARGET_IMAGE_TYPE_MCUBOOT;
 			}
 #if defined(CONFIG_SM_FULL_FOTA)
-			else if (op == SLM_FOTA_START_FULL_FOTA)  {
+			else if (op == SM_FOTA_START_FULL_FOTA)  {
 				fdev.dev = flash_dev;
 				fdev.size = DT_PROP(FLASH_NODE, size) / 8;
 				full_modem_fota_params.buf = fmfu_buf;
@@ -365,7 +365,7 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 			}
 			break;
 #if FOTA_FUTURE_FEATURE
-		case SLM_FOTA_PAUSE_RESUME:
+		case SM_FOTA_PAUSE_RESUME:
 			if (paused) {
 				fota_download_resume();
 				paused = false;
@@ -376,10 +376,10 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 			err = 0;
 			break;
 #endif
-		case SLM_FOTA_MFW_READ:
+		case SM_FOTA_MFW_READ:
 			err = do_fota_mfw_read();
 			break;
-		case SLM_FOTA_ERASE_MFW:
+		case SM_FOTA_ERASE_MFW:
 			err = do_fota_erase_mfw();
 			break;
 		default:
@@ -391,12 +391,12 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 	case AT_PARSER_CMD_TYPE_TEST:
 #if defined(CONFIG_SM_FULL_FOTA)
 		rsp_send("\r\n#XFOTA: (%d,%d,%d,%d,%d,%d)[,<file_url>[,<sec_tag>[,<pdn_id>]]]\r\n",
-			SLM_FOTA_STOP, SLM_FOTA_START_APP, SLM_FOTA_START_MFW,
-			SLM_FOTA_MFW_READ, SLM_FOTA_ERASE_MFW, SLM_FOTA_START_FULL_FOTA);
+			SM_FOTA_STOP, SM_FOTA_START_APP, SM_FOTA_START_MFW,
+			SM_FOTA_MFW_READ, SM_FOTA_ERASE_MFW, SM_FOTA_START_FULL_FOTA);
 #else
 		rsp_send("\r\n#XFOTA: (%d,%d,%d,%d,%d)[,<file_url>[,<sec_tag>[,<pdn_id>]]]\r\n",
-			SLM_FOTA_STOP, SLM_FOTA_START_APP, SLM_FOTA_START_MFW,
-			SLM_FOTA_MFW_READ, SLM_FOTA_ERASE_MFW);
+			SM_FOTA_STOP, SM_FOTA_START_APP, SM_FOTA_START_MFW,
+			SM_FOTA_MFW_READ, SM_FOTA_ERASE_MFW);
 #endif
 		err = 0;
 		break;
@@ -408,23 +408,23 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 	return err;
 }
 
-int slm_at_fota_init(void)
+int sm_at_fota_init(void)
 {
 	return fota_download_init(fota_dl_handler);
 }
 
-int slm_at_fota_uninit(void)
+int sm_at_fota_uninit(void)
 {
 	return 0;
 }
 
-void slm_fota_init_state(void)
+void sm_fota_init_state(void)
 {
-	slm_modem_full_fota = false;
-	slm_fota_type = DFU_TARGET_IMAGE_TYPE_NONE;
-	slm_fota_stage = FOTA_STAGE_INIT;
-	slm_fota_status = FOTA_STATUS_OK;
-	slm_fota_info = 0;
+	sm_modem_full_fota = false;
+	sm_fota_type = DFU_TARGET_IMAGE_TYPE_NONE;
+	sm_fota_stage = FOTA_STAGE_INIT;
+	sm_fota_status = FOTA_STATUS_OK;
+	sm_fota_info = 0;
 }
 
 #if defined(CONFIG_LWM2M_CARRIER)
@@ -444,31 +444,31 @@ bool lwm2m_os_dfu_application_update_validate(void)
 }
 #endif /* CONFIG_LWM2M_CARRIER */
 
-void slm_fota_post_process(void)
+void sm_fota_post_process(void)
 {
 #if defined(CONFIG_LWM2M_CARRIER)
-	if ((slm_fota_type == DFU_TARGET_IMAGE_TYPE_MCUBOOT) &&
-	    (slm_fota_status == FOTA_STATUS_OK) &&
-	    (slm_fota_stage == FOTA_STAGE_COMPLETE)) {
+	if ((sm_fota_type == DFU_TARGET_IMAGE_TYPE_MCUBOOT) &&
+	    (sm_fota_status == FOTA_STATUS_OK) &&
+	    (sm_fota_stage == FOTA_STAGE_COMPLETE)) {
 		carrier_app_fota_success = true;
 	}
 
 	k_sem_give(&carrier_app_fota_status);
 #endif /* CONFIG_LWM2M_CARRIER */
-	if (slm_fota_stage != FOTA_STAGE_COMPLETE && slm_fota_stage != FOTA_STAGE_ACTIVATE) {
+	if (sm_fota_stage != FOTA_STAGE_COMPLETE && sm_fota_stage != FOTA_STAGE_ACTIVATE) {
 		return;
 	}
-	LOG_INF("FOTA result %d,%d,%d", slm_fota_stage, slm_fota_status, slm_fota_info);
+	LOG_INF("FOTA result %d,%d,%d", sm_fota_stage, sm_fota_status, sm_fota_info);
 
-	if (slm_fota_status == FOTA_STATUS_OK) {
-		rsp_send("\r\n#XFOTA: %d,%d\r\n", slm_fota_stage, slm_fota_status);
+	if (sm_fota_status == FOTA_STATUS_OK) {
+		rsp_send("\r\n#XFOTA: %d,%d\r\n", sm_fota_stage, sm_fota_status);
 	} else {
-		rsp_send("\r\n#XFOTA: %d,%d,%d\r\n", slm_fota_stage, slm_fota_status,
-			slm_fota_info);
+		rsp_send("\r\n#XFOTA: %d,%d,%d\r\n", sm_fota_stage, sm_fota_status,
+			sm_fota_info);
 	}
 
-	slm_fota_init_state();
-	slm_settings_fota_save();
+	sm_fota_init_state();
+	sm_settings_fota_save();
 }
 
 #if defined(CONFIG_SM_FULL_FOTA)
@@ -478,9 +478,9 @@ FUNC_NORETURN static void handle_full_fota_activation_fail(int ret)
 	int err;
 
 	/* Send the result notification and terminate the FOTA session. */
-	slm_fota_status = FOTA_STATUS_ERROR;
-	slm_fota_info = ret;
-	slm_fota_post_process();
+	sm_fota_status = FOTA_STATUS_ERROR;
+	sm_fota_info = ret;
+	sm_fota_post_process();
 
 	LOG_ERR("Modem firmware activation failed, error: %d", ret);
 
@@ -496,14 +496,14 @@ FUNC_NORETURN static void handle_full_fota_activation_fail(int ret)
 	sys_reboot(SYS_REBOOT_COLD);
 }
 
-void slm_finish_modem_full_fota(void)
+void sm_finish_modem_full_fota(void)
 {
 	int err;
 
 	/* All erroneous steps in activation stage are
 	 * considered fatal and the device is reset.
 	 */
-	slm_fota_stage = FOTA_STAGE_COMPLETE;
+	sm_fota_stage = FOTA_STAGE_COMPLETE;
 	LOG_INF("Applying full modem firmware update from external flash");
 
 	err = nrf_modem_lib_bootloader_init();
@@ -533,8 +533,8 @@ void slm_finish_modem_full_fota(void)
 		LOG_ERR("fota_download_util_image_reset() failed: %d\n", err);
 	}
 
-	slm_fota_status = FOTA_STATUS_OK;
-	slm_fota_info = 0;
+	sm_fota_status = FOTA_STATUS_OK;
+	sm_fota_info = 0;
 	LOG_INF("Full modem firmware update complete.");
 }
 

@@ -6,7 +6,7 @@
 
 source "Kconfig.zephyr"
 
-menu "Nordic Serial LTE Modem"
+menu "Nordic Serial Modem"
 
 config SM_CUSTOMER_VERSION
 	string "Customer version string"
@@ -99,7 +99,7 @@ config SM_INDICATE_PIN
 	int "Indicate pin"
 	default -1
 	help
-	  Interface GPIO pin used to indicate that data is available when SLM is idle (after #XSLEEP=2 AT command).
+	  Interface GPIO pin used to indicate that data is available when Serial Modem is idle (after #XSLEEP=2 AT command).
 
 config SM_INDICATE_TIME
 	int "Indication period"
@@ -108,12 +108,12 @@ config SM_INDICATE_TIME
 	  GPIO active indication time in milliseconds. This setting specify the period length for the pin to be active
 
 #
-# LTE network automatic attach
+# Automatic network attach
 #
 config SM_AUTO_CONNECT
-	bool "Automatically connect to the LTE network on start-up or after a reset"
+	bool "Automatically connect to the network on start-up or after a reset"
 	help
-	  Enables automatic connection to the LTE network using the PDN configuration defined in 'SM_auto_connect.h'.
+	  Enables automatic connection to the network using the PDN configuration defined in 'SM_auto_connect.h'.
 
 #
 # TCP/TLS proxy
@@ -151,28 +151,28 @@ config SM_DATAMODE_BUF_SIZE
 # Configurable services
 #
 config SM_SMS
-	bool "SMS support in SLM"
+	bool "SMS support"
 	default y
 	select SMS
 	help
 	  Support SMS send/receive in plain text
 
 config SM_GNSS
-	bool "GNSS support in SLM"
+	bool "GNSS support"
 	default y
 
 config SM_NRF_CLOUD
-	bool "nRF Cloud support in SLM"
+	bool "nRF Cloud support"
 	default y
 
 config SM_FULL_FOTA
-	bool "Full modem FOTA support in SLM"
+	bool "Full modem FOTA support"
 	depends on !BOARD_THINGY91_NRF9160_NS
 
 config SM_PPP
-	bool "PPP support in SLM"
+	bool "PPP support"
 	help
-	  When enabled, SLM automatically brings up/down the PPP link
+	  When enabled, Serial Modem automatically brings up/down the PPP link
 	  when the LTE link (default PDN) is connected/disconnected,
 	  regardless of what is done with AT#XPPP.
 
@@ -189,7 +189,7 @@ config SM_PPP_FALLBACK_MTU
 endif
 
 config SM_CMUX
-	bool "CMUX support in SLM"
+	bool "CMUX support"
 
 config SM_CMUX_UART_BUFFER_SIZE
 	int "UART buffer size for CMUX"

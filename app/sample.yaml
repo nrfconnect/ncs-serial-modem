@@ -1,7 +1,7 @@
 sample:
-  name: Serial LTE Modem
+  name: Serial Modem
 tests:
-  applications.serial_lte_modem:
+  serial_modem.default:
     sysbuild: true
     build_only: true
     platform_allow:
@@ -21,8 +21,8 @@ tests:
     tags:
       - ci_build
       - sysbuild
-      - ci_applications_serial_lte_modem
-  applications.serial_lte_modem_no_power_indicate:
+      - ci_applications_serial_modem
+  serial_modem.no_power_indicate:
     sysbuild: true
     build_only: true
     extra_configs:
@@ -35,8 +35,8 @@ tests:
     tags:
       - ci_build
       - sysbuild
-      - ci_applications_serial_lte_modem
-  applications.serial_lte_modem_no_power:
+      - ci_applications_serial_modem
+  serial_modem.no_power:
     sysbuild: true
     build_only: true
     extra_configs:
@@ -48,8 +48,8 @@ tests:
     tags:
       - ci_build
       - sysbuild
-      - ci_applications_serial_lte_modem
-  applications.serial_lte_modem_no_indicate:
+      - ci_applications_serial_modem
+  serial_modem.no_indicate:
     sysbuild: true
     build_only: true
     extra_configs:
@@ -61,8 +61,8 @@ tests:
     tags:
       - ci_build
       - sysbuild
-      - ci_applications_serial_lte_modem
-  applications.serial_lte_modem.extmcu:
+      - ci_applications_serial_modem
+  serial_modem.extmcu:
     sysbuild: true
     build_only: true
     extra_args:
@@ -79,8 +79,8 @@ tests:
     tags:
       - ci_build
       - sysbuild
-      - ci_applications_serial_lte_modem
-  applications.serial_lte_modem.ppp_without_cmux:
+      - ci_applications_serial_modem
+  serial_modem.ppp_without_cmux:
     sysbuild: true
     build_only: true
     extra_args:
@@ -98,8 +98,8 @@ tests:
     tags:
       - ci_build
       - sysbuild
-      - ci_applications_serial_lte_modem
-  applications.serial_lte_modem.ppp_without_cmux_power_indicate_pin:
+      - ci_applications_serial_modem
+  serial_modem.ppp_without_cmux_power_indicate_pin:
     sysbuild: true
     build_only: true
     extra_args:
@@ -120,8 +120,8 @@ tests:
     tags:
       - ci_build
       - sysbuild
-      - ci_applications_serial_lte_modem
-  applications.serial_lte_modem.ppp_cmux_linux:
+      - ci_applications_serial_modem
+  serial_modem.ppp_cmux_linux:
     sysbuild: true
     build_only: true
     extra_args:
@@ -138,8 +138,8 @@ tests:
     tags:
       - ci_build
       - sysbuild
-      - ci_applications_serial_lte_modem
-  applications.serial_lte_modem.ppp_cmux_linux_power_indicate_pin:
+      - ci_applications_serial_modem
+  serial_modem.ppp_cmux_linux_power_indicate_pin:
     sysbuild: true
     build_only: true
     extra_args:
@@ -159,8 +159,8 @@ tests:
     tags:
       - ci_build
       - sysbuild
-      - ci_applications_serial_lte_modem
-  applications.serial_lte_modem.ppp_cmux_zephyr_with_extmcu:
+      - ci_applications_serial_modem
+  serial_modem.ppp_cmux_zephyr_with_extmcu:
     sysbuild: true
     build_only: true
     extra_args:
@@ -178,8 +178,8 @@ tests:
     tags:
       - ci_build
       - sysbuild
-      - ci_applications_serial_lte_modem
-  applications.serial_lte_modem.ppp_cmux_zephyr_with_nrf52840_on_nrf9160dk:
+      - ci_applications_serial_modem
+  serial_modem.ppp_cmux_zephyr_with_nrf52840_on_nrf9160dk:
     sysbuild: true
     build_only: true
     extra_args:
@@ -192,8 +192,8 @@ tests:
     tags:
       - ci_build
       - sysbuild
-      - ci_applications_serial_lte_modem
-  applications.serial_lte_modem.memfault:
+      - ci_applications_serial_modem
+  serial_modem.memfault:
     sysbuild: true
     build_only: true
     extra_args:
@@ -212,8 +212,8 @@ tests:
     tags:
       - ci_build
       - sysbuild
-      - ci_applications_serial_lte_modem
-  applications.serial_lte_modem.native_tls:
+      - ci_applications_serial_modem
+  serial_modem.native_tls:
     sysbuild: true
     build_only: true
     extra_args: EXTRA_CONF_FILE=overlay-native_tls.conf
@@ -228,8 +228,8 @@ tests:
     tags:
       - ci_build
       - sysbuild
-      - ci_applications_serial_lte_modem
-  applications.serial_lte_modem.lwm2m_carrier:
+      - ci_applications_serial_modem
+  serial_modem.lwm2m_carrier:
     sysbuild: true
     build_only: true
     extra_args: EXTRA_CONF_FILE=overlay-carrier.conf
@@ -244,8 +244,8 @@ tests:
     tags:
       - ci_build
       - sysbuild
-      - ci_applications_serial_lte_modem
-  applications.serial_lte_modem.lwm2m_carrier.softbank:
+      - ci_applications_serial_modem
+  serial_modem.lwm2m_carrier.softbank:
     sysbuild: true
     build_only: true
     extra_args:
@@ -259,8 +259,8 @@ tests:
     tags:
       - ci_build
       - sysbuild
-      - ci_applications_serial_lte_modem
-  applications.serial_lte_modem.lwm2m_carrier.lgu:
+      - ci_applications_serial_modem
+  serial_modem.lwm2m_carrier.lgu:
     sysbuild: true
     build_only: true
     extra_args: EXTRA_CONF_FILE="overlay-carrier.conf;overlay-carrier-lgu.conf"
@@ -271,8 +271,8 @@ tests:
     tags:
       - ci_build
       - sysbuild
-      - ci_applications_serial_lte_modem
-  applications.serial_lte_modem.lwm2m_carrier.thingy91:
+      - ci_applications_serial_modem
+  serial_modem.lwm2m_carrier.thingy91:
     sysbuild: true
     build_only: true
     extra_args:
@@ -285,8 +285,8 @@ tests:
     tags:
       - ci_build
       - sysbuild
-      - ci_applications_serial_lte_modem
-  applications.serial_lte_modem.tracing:
+      - ci_applications_serial_modem
+  serial_modem.tracing:
     sysbuild: true
     build_only: true
     platform_allow:
@@ -304,6 +304,6 @@ tests:
     tags:
       - ci_build
       - sysbuild
-      - ci_applications_serial_lte_modem
+      - ci_applications_serial_modem
     extra_args:
-      - serial_lte_modem_SNIPPET=nrf91-modem-trace-uart
+      - app_SNIPPET=nrf91-modem-trace-uart

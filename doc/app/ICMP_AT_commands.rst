@@ -1,4 +1,4 @@
-.. _SLM_AT_ICMP:
+.. _SM_AT_ICMP:
 
 ICMP AT commands
 ****************

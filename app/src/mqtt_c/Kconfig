@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 
 config SM_MQTTC
-	bool "MQTT client support in SLM"
+	bool "MQTT client support"
 	default y
 	select MQTT_LIB
 	select MQTT_LIB_TLS

@@ -37,7 +37,7 @@ static void pgps_event_handler(struct nrf_cloud_pgps_event *event);
 #include "sm_at_host.h"
 #include "sm_at_gnss.h"
 
-LOG_MODULE_REGISTER(slm_gnss, CONFIG_SM_LOG_LEVEL);
+LOG_MODULE_REGISTER(sm_gnss, CONFIG_SM_LOG_LEVEL);
 
 #if defined(CONFIG_SM_GNSS_OUTPUT_NMEA_ON_CMUX_CHANNEL)
 #include "sm_cmux.h"
@@ -59,7 +59,7 @@ static struct modem_pipe *gnss_pipe;
 #define GPS_TO_UTC_LEAP_SECONDS	(18UL)
 
 /** #XGPS operations. */
-enum slm_gnss_operation {
+enum sm_gnss_operation {
 	GPS_STOP,
 	GPS_START,
 };
@@ -113,7 +113,7 @@ static bool is_gnss_activated(void)
 	int cfun_mode = 0;
 
 	/*parse %XSYSTEMMODE=<LTE_M_support>,<NB_IoT_support>,<GNSS_support>,<LTE_preference> */
-	if (slm_util_at_scanf("AT%XSYSTEMMODE?",
+	if (sm_util_at_scanf("AT%XSYSTEMMODE?",
 			       "%%XSYSTEMMODE: %*d,%*d,%d", &activated) == 1) {
 		if (activated == 0) {
 			return false;
@@ -121,7 +121,7 @@ static bool is_gnss_activated(void)
 	}
 
 	/*parse +CFUN: <fun> */
-	if (slm_util_at_scanf("AT+CFUN?", "+CFUN: %d", &cfun_mode) == 1) {
+	if (sm_util_at_scanf("AT+CFUN?", "+CFUN: %d", &cfun_mode) == 1) {
 		if (cfun_mode == 1 || cfun_mode == 31) {
 			return true;
 		}
@@ -150,7 +150,7 @@ static void gnss_status_set(enum gnss_status status)
 	const int put_ret = k_fifo_alloc_put(&gnss_status_fifo, (void *)status);
 
 	if (put_ret == 0) {
-		k_work_submit_to_queue(&slm_work_q, &gnss_status_notify_work);
+		k_work_submit_to_queue(&sm_work_q, &gnss_status_notify_work);
 	} else {
 		LOG_ERR("Failed to set GNSS status to %d (%d).", status, put_ret);
 	}
@@ -181,10 +181,10 @@ static void on_gnss_evt_agnss_req(void)
 #if defined(CONFIG_SM_NRF_CLOUD)
 
 #if defined(CONFIG_NRF_CLOUD_AGNSS)
-	k_work_submit_to_queue(&slm_work_q, &agnss_req_work);
+	k_work_submit_to_queue(&sm_work_q, &agnss_req_work);
 #endif
 #if defined(CONFIG_NRF_CLOUD_PGPS)
-	k_work_submit_to_queue(&slm_work_q, &pgps_req_work);
+	k_work_submit_to_queue(&sm_work_q, &pgps_req_work);
 #endif
 
 #endif /* CONFIG_SM_NRF_CLOUD */
@@ -277,7 +277,7 @@ static int gnss_startup(void)
 		return ret;
 	}
 #if CONFIG_SM_GNSS_OUTPUT_NMEA_ON_CMUX_CHANNEL
-	gnss_pipe = slm_cmux_reserve(CMUX_GNSS_CHANNEL);
+	gnss_pipe = sm_cmux_reserve(CMUX_GNSS_CHANNEL);
 #endif
 	gnss_running = true;
 	gnss_ttff_start = k_uptime_get();
@@ -302,7 +302,7 @@ static int gnss_shutdown(void)
 	gnss_running = false;
 
 #if CONFIG_SM_GNSS_OUTPUT_NMEA_ON_CMUX_CHANNEL
-	slm_cmux_release(CMUX_GNSS_CHANNEL, true);
+	sm_cmux_release(CMUX_GNSS_CHANNEL, true);
 	gnss_pipe = NULL;
 #endif
 	return 0;
@@ -468,7 +468,7 @@ static void on_gnss_evt_nmea(void)
 		ring_buf_reset(&gnss_nmea_rb);
 	}
 	ring_buf_put(&gnss_nmea_rb, nmea_str, len);
-	k_work_submit_to_queue(&slm_work_q, &gnss_nmea_send_work);
+	k_work_submit_to_queue(&sm_work_q, &gnss_nmea_send_work);
 #endif
 
 #if CONFIG_SM_LOG_LEVEL_DBG
@@ -598,7 +598,7 @@ static void gnss_fix_sender(struct k_work *)
 
 #if defined(CONFIG_SM_NRF_CLOUD)
 
-	if (slm_nrf_cloud_send_location && slm_nrf_cloud_ready) {
+	if (sm_nrf_cloud_send_location && sm_nrf_cloud_ready) {
 		/* Report to nRF Cloud by best-effort */
 		send_location(&pvt);
 	}
@@ -635,7 +635,7 @@ static void on_gnss_evt_fix(void)
 		gnss_ttff_start = 0;
 	}
 
-	k_work_submit_to_queue(&slm_work_q, &gnss_fix_send_work);
+	k_work_submit_to_queue(&sm_work_q, &gnss_fix_send_work);
 }
 
 /* NOTE this event handler runs in interrupt context */
@@ -686,7 +686,7 @@ static void gnss_event_handler(int event)
 	}
 }
 
-SLM_AT_CMD_CUSTOM(xgps, "AT#XGPS", handle_at_gps);
+SM_AT_CMD_CUSTOM(xgps, "AT#XGPS", handle_at_gps);
 static int handle_at_gps(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			 uint32_t param_count)
 {
@@ -728,7 +728,7 @@ static int handle_at_gps(enum at_parser_cmd_type cmd_type, struct at_parser *par
 
 			if (gnss_cloud_assistance
 #if defined(CONFIG_SM_NRF_CLOUD)
-			&& !slm_nrf_cloud_ready
+			&& !sm_nrf_cloud_ready
 #endif
 			) {
 				LOG_ERR(
@@ -815,7 +815,7 @@ static int handle_at_gps(enum at_parser_cmd_type cmd_type, struct at_parser *par
 	return err;
 }
 
-SLM_AT_CMD_CUSTOM(xgpsdel, "AT#XGPSDEL", handle_at_gps_delete);
+SM_AT_CMD_CUSTOM(xgpsdel, "AT#XGPSDEL", handle_at_gps_delete);
 static int handle_at_gps_delete(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 				uint32_t)
 {
@@ -845,7 +845,7 @@ static int handle_at_gps_delete(enum at_parser_cmd_type cmd_type, struct at_pars
 
 /**@brief API to initialize GNSS AT commands handler
  */
-int slm_at_gnss_init(void)
+int sm_at_gnss_init(void)
 {
 	int err = 0;
 
@@ -884,7 +884,7 @@ int slm_at_gnss_init(void)
 
 /**@brief API to uninitialize GNSS AT commands handler
  */
-int slm_at_gnss_uninit(void)
+int sm_at_gnss_uninit(void)
 {
 	return 0;
 }

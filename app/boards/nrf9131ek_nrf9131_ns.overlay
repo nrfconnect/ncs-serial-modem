@@ -6,7 +6,7 @@
 
 / {
 	chosen {
-		ncs,slm-uart = &uart0;
+		ncs,sm-uart = &uart0;
 	};
 };
 

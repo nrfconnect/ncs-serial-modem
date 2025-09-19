@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
-#ifndef SLM_AT_UDP_PROXY_
-#define SLM_AT_UDP_PROXY_
+#ifndef SM_AT_UDP_PROXY_
+#define SM_AT_UDP_PROXY_
 
-/**@file slm_at_udp_proxy.h
+/**@file sm_at_udp_proxy.h
  *
  * @brief Vendor-specific AT command for UDP proxy service.
  * @{
@@ -19,7 +19,7 @@
  * @retval 0 If the operation was successful.
  *           Otherwise, a (negative) error code is returned.
  */
-int slm_at_udp_proxy_init(void);
+int sm_at_udp_proxy_init(void);
 
 /**
  * @brief Uninitialize UDP proxy AT command parser.
@@ -27,6 +27,6 @@ int slm_at_udp_proxy_init(void);
  * @retval 0 If the operation was successful.
  *           Otherwise, a (negative) error code is returned.
  */
-int slm_at_udp_proxy_uninit(void);
+int sm_at_udp_proxy_uninit(void);
 /** @} */
-#endif /* SLM_AT_UDP_PROXY_ */
+#endif /* SM_AT_UDP_PROXY_ */

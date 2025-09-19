@@ -1,4 +1,4 @@
-.. _SLM_AT_SOCKET:
+.. _SM_AT_SOCKET:
 
 Socket AT commands
 ******************
@@ -628,7 +628,7 @@ Example
    #XSOCKETOPT: (0,1),<name>,<value>
    OK
 
-.. _SLM_AT_SSOCKETOPT:
+.. _SM_AT_SSOCKETOPT:
 
 Secure socket options #XSSOCKETOPT
 ==================================
@@ -999,7 +999,7 @@ Syntax
 
 * The ``<data>`` parameter is a string that contains the data to be sent.
   The maximum size of the data is 1024 bytes.
-  When the parameter is not specified, SLM enters ``slm_data_mode``.
+  When the parameter is not specified, Serial Modem enters ``sm_data_mode``.
 
 * The ``<flags>`` parameter sets the sending behavior.
   It can be set to the following value:
@@ -1125,7 +1125,7 @@ Syntax
   It represents the port of the UDP service on remote peer.
 * The ``<data>`` parameter is a string that contains the data to be sent.
   Its maximum size is 1024 bytes.
-  When the parameter is not specified, SLM enters ``slm_data_mode``.
+  When the parameter is not specified, Serial Modem enters ``sm_data_mode``.
 * The ``<flags>`` parameter sets the sending behavior.
   It can be set to the following value:
 
@@ -1333,7 +1333,7 @@ Syntax
 Response syntax
 ~~~~~~~~~~~~~~~
 
-When the asynchronous socket events are enabled, SLM sends events as URC notifications.
+When the asynchronous socket events are enabled, Serial Modem sends events as URC notifications.
 
 * For ``POLLIN`` events, the URC notification is sent only for the first incoming data on the socket.
   ``AT#XRECV`` or ``AT#XRECVFROM`` command will re-enable the URC notification for the next incoming data.
