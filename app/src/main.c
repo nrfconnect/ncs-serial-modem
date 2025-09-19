@@ -12,11 +12,11 @@
 #include <dfu/dfu_target.h>
 #include <zephyr/sys/reboot.h>
 #include <net/fota_download.h>
-#include "slm_at_host.h"
-#include "slm_at_fota.h"
-#include "slm_settings.h"
-#include "slm_util.h"
-#include "slm_ctrl_pin.h"
+#include "sm_at_host.h"
+#include "sm_at_fota.h"
+#include "sm_settings.h"
+#include "sm_util.h"
+#include "sm_ctrl_pin.h"
 
 LOG_MODULE_REGISTER(slm, CONFIG_SLM_LOG_LEVEL);
 
@@ -156,7 +156,7 @@ int lte_auto_connect(void)
 		char *pdn_password;    /* PDN connection authentication password */
 	};
 	const struct network_config cfg = {
-#include "slm_auto_connect.h"
+#include "sm_auto_connect.h"
 	};
 
 	ret = slm_util_at_scanf("AT+CEREG?", "+CEREG: %d,%d", &n, &stat);
