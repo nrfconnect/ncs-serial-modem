@@ -1,0 +1,107 @@
+name: Compliance
+
+on:
+  pull_request:
+
+jobs:
+  compliance_job:
+    runs-on: ubuntu-24.04
+    name: Run compliance checks on patch series (PR)
+
+    # Skip job if it was triggered by Renovate Bot
+    if: ${{ !contains(github.actor, 'renovate') }}
+
+    steps:
+      - name: Installation
+        run: |
+          apt-get update && apt-get install --no-install-recommends -y libmagic1 git
+          pip install west gitlint
+
+      - name: Checkout the code
+        uses: actions/checkout@v4
+        with:
+          path: serial_modem
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Initialize
+        working-directory: serial_modem
+        run: |
+          if [ ! -d "../.west" ]; then
+          west init -l .
+          else
+          echo ".west folder already exists, skipping west init."
+          fi
+          west update -o=--depth=1 -n
+
+      - name: Install zephyr requirements
+        run: |
+          pip install -r zephyr/scripts/requirements-actions.txt
+          # Junitparser v3 and 4 don't work with check_compliance.py
+          pip install --upgrade junitparser==2.8.0
+
+      - name: Run Compliance Tests
+        id: compliance
+        shell: bash
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        working-directory: serial_modem
+        run: |
+          export ZEPHYR_BASE="../zephyr"
+          $ZEPHYR_BASE/scripts/ci/check_compliance.py \
+            --annotate \
+            -m Codeowners \
+            -m Devicetree \
+            -m Gitlint \
+            -m Identity \
+            -m Nits \
+            -m pylint \
+            -m checkpatch \
+            -c origin/${BASE_REF}.. || \
+          echo "COMPLIANCE_FAILED=true" >> $GITHUB_ENV
+
+      - name: Process Compliance Results
+        working-directory: serial_modem
+        shell: bash
+        run: |
+          # Check for compliance.xml existence
+          if [[ ! -s "compliance.xml" ]]; then
+            echo "::error::compliance.xml file is missing or empty"
+            exit 1
+          fi
+
+          # Initialize exit code
+          exit_code=0
+
+          # Define error files to check
+          error_files=(
+            "Nits.txt"
+            "checkpatch.txt"
+            "Identity.txt"
+            "Gitlint.txt"
+            "pylint.txt"
+            "Devicetree.txt"
+            "Kconfig.txt"
+            "KconfigBasic.txt"
+            "Codeowners.txt"
+          )
+
+          # Process each error file
+          for file in "${error_files[@]}"; do
+            if [[ -s $file ]]; then
+              errors=$(cat $file)
+              errors="${errors//'%'/'%25'}"
+              errors="${errors//$'\n'/'%0A'}"
+              errors="${errors//$'\r'/'%0D'}"
+              echo "::error file=${file}::$errors"
+              exit_code=1
+            fi
+          done
+
+          # Check if compliance test failed
+          if [[ "$COMPLIANCE_FAILED" == "true" ]]; then
+            echo "::error::Compliance tests failed. Please check the logs for details."
+            exit_code=1
+          fi
+
+          exit $exit_code
