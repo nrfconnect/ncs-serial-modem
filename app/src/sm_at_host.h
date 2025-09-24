@@ -47,15 +47,6 @@ enum sm_datamode_operation {
  */
 typedef int (*sm_datamode_handler_t)(uint8_t op, const uint8_t *data, int len, uint8_t flags);
 
-/* All the AT backend API functions return 0 on success. */
-struct sm_at_backend {
-	int (*start)(void);
-	int (*send)(const uint8_t *data, size_t len);
-	int (*stop)(void);
-};
-/** @retval 0 on success (the new backend is successfully started). */
-int sm_at_set_backend(struct sm_at_backend backend);
-
 /**
  * @brief Sends the given data via the current AT backend.
  *
@@ -66,8 +57,17 @@ int sm_at_send(const uint8_t *data, size_t len);
 /** @brief Identical to sm_at_send(str, strlen(str)). */
 int sm_at_send_str(const char *str);
 
-/** @brief Processes received AT bytes. */
-void sm_at_receive(const uint8_t *data, size_t len);
+/**
+ * @brief Processes received AT bytes.
+ *
+ * @param data AT command bytes received.
+ * @param len Length of AT command bytes received.
+ * @param stop_at_receive Pointer to a boolean variable that will be set to true
+ *        if the reception should be stopped.
+ *
+ * @retval Number of bytes processed.
+ */
+size_t sm_at_receive(const uint8_t *data, size_t len, bool *stop_at_receive);
 
 /**
  * @brief Initialize AT host for Serial Modem
