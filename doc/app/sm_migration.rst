@@ -42,10 +42,10 @@ General renaming
      * Renamed `slm_*` to `sm_*`
      * Renamed `modem_slm_*` to `sm_host_*`
 
-`AT#SOMEOLD` renamed to `AT#SOMENEW`
+`AT#XGPS` renamed to `AT#XGNSS`
 ************************************
 
 .. toggle::
 
-   * `AT#SOMEOLD` command has been renamed to `AT#SOMENEW`
-   * `AT#SOMENEW` command output has changed to include Serial Modem version
+   * `AT#XGPS` command has been renamed to `AT#XGNSS`
+   * `AT#XGPSDEL` command has been renamed to `AT#XGNSSDEL`
