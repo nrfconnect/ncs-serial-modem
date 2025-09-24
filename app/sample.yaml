@@ -85,6 +85,7 @@ tests:
     build_only: true
     extra_args:
       - EXTRA_CONF_FILE="overlay-ppp.conf"
+      - EXTRA_CONF_FILE="overlay-ppp-without-cmux.conf"
       - EXTRA_DTC_OVERLAY_FILE="overlay-ppp-without-cmux.overlay"
     platform_allow:
       - nrf9160dk/nrf9160/ns
@@ -104,6 +105,7 @@ tests:
     build_only: true
     extra_args:
       - EXTRA_CONF_FILE="overlay-ppp.conf"
+      - EXTRA_CONF_FILE="overlay-ppp-without-cmux.conf"
       - EXTRA_DTC_OVERLAY_FILE="overlay-ppp-without-cmux.overlay"
     extra_configs:
       - CONFIG_SM_POWER_PIN=31
