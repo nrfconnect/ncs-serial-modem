@@ -109,7 +109,7 @@ Example
    AT#XSENDTO
    AT#XRECVFROM
    AT#XPING
-   AT#XGPS
+   AT#XGNSS
    OK
 
 Read command
