@@ -193,13 +193,13 @@ static int handle_at_shutdown(enum at_parser_cmd_type cmd_type, struct at_parser
 		return -EINVAL;
 	}
 
+	sm_at_host_uninit();
 	final_call(sm_shutdown);
 	return 0;
 }
 
 FUNC_NORETURN void sm_reset(void)
 {
-	sm_at_host_uninit();
 	sm_power_off_modem();
 	LOG_PANIC();
 	sys_reboot(SYS_REBOOT_COLD);
@@ -212,6 +212,7 @@ static int handle_at_reset(enum at_parser_cmd_type cmd_type, struct at_parser *,
 		return -EINVAL;
 	}
 
+	sm_at_host_uninit();
 	final_call(sm_reset);
 	return 0;
 }

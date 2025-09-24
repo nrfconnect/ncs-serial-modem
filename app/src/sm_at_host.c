@@ -450,18 +450,11 @@ static int sm_at_send_indicate(const uint8_t *data, size_t len,
 {
 	int ret;
 
+	ARG_UNUSED(indicate);
+
 	if (k_is_in_isr()) {
 		LOG_ERR("FIXME: Attempt to send AT response (of size %u) in ISR.", len);
 		return -EINTR;
-	}
-
-	if (indicate) {
-		enum pm_device_state state = PM_DEVICE_STATE_OFF;
-
-		pm_device_state_get(sm_uart_dev, &state);
-		if (state != PM_DEVICE_STATE_ACTIVE) {
-			sm_ctrl_pin_indicate();
-		}
 	}
 
 	ret = sm_tx_write(data, len);
@@ -962,6 +955,7 @@ int sm_at_host_init(void)
 
 static int at_host_power_off(bool shutting_down)
 {
+	// MARKUS TODO: Align with DTR.
 	int err = sm_uart_handler_disable();
 
 	if (!err || shutting_down) {
