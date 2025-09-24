@@ -12,7 +12,7 @@ This page describes GNSS-related AT commands.
 Control GNSS
 ============
 
-The ``#XGPS`` command controls the GNSS.
+The ``#XGNSS`` command controls the GNSS.
 
 Set command
 -----------
@@ -35,7 +35,7 @@ Syntax
 
 ::
 
-   #XGPS=<op>,<cloud_assistance>,<interval>[,<timeout>]
+   #XGNSS=<op>,<cloud_assistance>,<interval>[,<timeout>]
 
 The ``<op>`` parameter can have the following integer values:
 
@@ -104,7 +104,7 @@ Unsolicited notification
 
 .. code-block::
 
-   #XGPS: <latitude>,<longitude>,<altitude>,<accuracy>,<speed>,<heading>,<datetime>
+   #XGNSS: <latitude>,<longitude>,<altitude>,<accuracy>,<speed>,<heading>,<datetime>
 
 * The ``<latitude>`` value represents the latitude in degrees.
 * The ``<longitude>`` value represents the longitude in degrees.
@@ -118,7 +118,7 @@ Unsolicited notification
 
 .. code-block::
 
-   #XGPS: <gnss_service>,<gnss_status>
+   #XGNSS: <gnss_service>,<gnss_status>
 
 * The ``<gnss_service>`` parameter is an integer.
   When it has the value ``1``, it means that GNSS is supported in ``%XSYSTEMMODE`` and activated in ``+CFUN``.
@@ -145,15 +145,15 @@ Example
   AT+CFUN=31
 
   OK
-  AT#XGPS=1,0,0,0
+  AT#XGNSS=1,0,0,0
 
-  #XGPS: 1,1
+  #XGNSS: 1,1
 
   OK
 
-  #XGPS: 1,4
+  #XGNSS: 1,4
 
-  #XGPS: 35.457576,139.625090,121.473785,22.199919,0.442868,0.000000,"2021-06-02 06:25:48"
+  #XGNSS: 35.457576,139.625090,121.473785,22.199919,0.442868,0.000000,"2021-06-02 06:25:48"
 
 ::
 
@@ -176,22 +176,22 @@ Example
 
   OK
   #XNRFCLOUD: 1,0
-  AT#XGPS=1,1,0,1
+  AT#XGNSS=1,1,0,1
 
-  #XGPS: 1,1
+  #XGNSS: 1,1
 
   OK
 
-  #XGPS: 35.457417,139.625211,162.850952,15.621976,1.418092,0.000000,"2021-06-02 05:21:31"
+  #XGNSS: 35.457417,139.625211,162.850952,15.621976,1.418092,0.000000,"2021-06-02 05:21:31"
 
-  #XGPS: 35.457435,139.625348,176.104797,14.245458,1.598184,69.148659,"2021-06-02 05:21:32"
+  #XGNSS: 35.457435,139.625348,176.104797,14.245458,1.598184,69.148659,"2021-06-02 05:21:32"
 
-  #XGPS: 35.457417,139.625415,179.132980,13.318132,1.235241,69.148659,"2021-06-02 05:21:33"
+  #XGNSS: 35.457417,139.625415,179.132980,13.318132,1.235241,69.148659,"2021-06-02 05:21:33"
 
-  #XGPS: 35.457410,139.625469,181.223541,12.667312,0.803951,69.148659,"2021-06-02 05:21:34"
-  AT#XGPS=0
+  #XGNSS: 35.457410,139.625469,181.223541,12.667312,0.803951,69.148659,"2021-06-02 05:21:34"
+  AT#XGNSS=0
 
-  #XGPS: 1,0
+  #XGNSS: 1,0
 
   OK
 
@@ -213,38 +213,38 @@ Example
 
   OK
   #XNRFCLOUD: 1,0
-  AT#XGPS=1,0,1,30
+  AT#XGNSS=1,0,1,30
 
-  #XGPS: 1,1
+  #XGNSS: 1,1
 
   OK
 
-  #XGPS: 1,2
+  #XGNSS: 1,2
 
-  #XGPS: 1,4
+  #XGNSS: 1,4
 
-  #XGPS: 35.457243,139.625435,149.005020,28.184258,10.431827,281.446014,"2021-06-24 04:35:52"
+  #XGNSS: 35.457243,139.625435,149.005020,28.184258,10.431827,281.446014,"2021-06-24 04:35:52"
 
-  #XGPS: 1,2
+  #XGNSS: 1,2
 
-  #XGPS: 1,4
+  #XGNSS: 1,4
 
-  #XGPS: 35.457189,139.625602,176.811203,43.015198,0.601837,281.446014,"2021-06-24 04:36:32"
+  #XGNSS: 35.457189,139.625602,176.811203,43.015198,0.601837,281.446014,"2021-06-24 04:36:32"
 
-  #XGPS: 1,2
+  #XGNSS: 1,2
 
-  #XGPS: 1,4
+  #XGNSS: 1,4
 
-  #XGPS: 35.457498,139.625422,168.243591,31.753956,0.191195,281.446014,"2021-06-24 04:37:12"
+  #XGNSS: 35.457498,139.625422,168.243591,31.753956,0.191195,281.446014,"2021-06-24 04:37:12"
 
-  #XGPS: 1,2
+  #XGNSS: 1,2
 
-  #XGPS: 1,4
+  #XGNSS: 1,4
 
-  #XGPS: 35.457524,139.624667,100.745979,25.324850,6.347160,94.699837,"2021-06-24 04:37:52"
-  AT#XGPS=0
+  #XGNSS: 35.457524,139.624667,100.745979,25.324850,6.347160,94.699837,"2021-06-24 04:37:52"
+  AT#XGNSS=0
 
-  #XGPS: 1,0
+  #XGNSS: 1,0
 
   OK
 
@@ -258,7 +258,7 @@ Syntax
 
 ::
 
-   #XGPS?
+   #XGNSS?
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -272,9 +272,9 @@ Example
 
 ::
 
-  AT#XGPS?
+  AT#XGNSS?
 
-  #XGPS: 1,1
+  #XGNSS: 1,1
 
   OK
 
@@ -288,23 +288,23 @@ Syntax
 
 ::
 
-   #XGPS=?
+   #XGNSS=?
 
 Example
 ~~~~~~~
 
 ::
 
-  AT#XGPS=?
+  AT#XGNSS=?
 
-  #XGPS: (0,1),(0,1),<interval>,<timeout>
+  #XGNSS: (0,1),(0,1),<interval>,<timeout>
 
   OK
 
 Delete GNSS data
 ================
 
-The ``#XGPSDEL`` command deletes GNSS data from non-volatile memory.
+The ``#XGNSSDEL`` command deletes GNSS data from non-volatile memory.
 This command should be issued when GNSS is activated but not started yet.
 
 .. note::
@@ -322,7 +322,7 @@ Syntax
 
 ::
 
-   #XGPSDEL=<mask>
+   #XGNSSDEL=<mask>
 
 The ``<mask>`` parameter accepts an integer that is the ``OR`` value of the following bitmasks :
 
@@ -345,7 +345,7 @@ Example
   OK
   AT+CFUN=31
   OK
-  AT#XGPSDEL=511
+  AT#XGNSSDEL=511
   OK
   AT+CFUN=0
   OK
@@ -365,15 +365,15 @@ Syntax
 
 ::
 
-   #XGPSDEL=?
+   #XGNSSDEL=?
 
 Example
 ~~~~~~~
 
 ::
 
-  AT#XGPSDEL=?
+  AT#XGNSSDEL=?
 
-  #XGPSDEL: <mask>
+  #XGNSSDEL: <mask>
 
   OK

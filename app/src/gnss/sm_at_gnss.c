@@ -58,10 +58,10 @@ static struct modem_pipe *gnss_pipe;
 /* UTC/GPS time offset as of 1st of January 2017. */
 #define GPS_TO_UTC_LEAP_SECONDS	(18UL)
 
-/** #XGPS operations. */
+/** #XGNSS operations. */
 enum sm_gnss_operation {
-	GPS_STOP,
-	GPS_START,
+	GNSS_STOP,
+	GNSS_START,
 };
 
 #if defined(CONFIG_SM_NRF_CLOUD)
@@ -134,7 +134,7 @@ static void gnss_status_notifier(struct k_work *)
 {
 	while (!k_fifo_is_empty(&gnss_status_fifo)) {
 		gnss_status = (enum gnss_status)k_fifo_get(&gnss_status_fifo, K_NO_WAIT);
-		rsp_send("\r\n#XGPS: 1,%d\r\n", gnss_status);
+		rsp_send("\r\n#XGNSS: 1,%d\r\n", gnss_status);
 	}
 }
 
@@ -569,7 +569,7 @@ static void gnss_fix_sender(struct k_work *)
 	}
 
 	/* GIS accuracy: http://wiki.gis.com/wiki/index.php/Decimal_degrees, use default .6lf */
-	rsp_send("\r\n#XGPS: %lf,%lf,%f,%f,%f,%f,\"%04u-%02u-%02u %02u:%02u:%02u\"\r\n",
+	rsp_send("\r\n#XGNSS: %lf,%lf,%f,%f,%f,%f,\"%04u-%02u-%02u %02u:%02u:%02u\"\r\n",
 		pvt.latitude, pvt.longitude, (double)pvt.altitude,
 		(double)pvt.accuracy, (double)pvt.speed, (double)pvt.heading,
 		pvt.datetime.year, pvt.datetime.month, pvt.datetime.day,
@@ -686,8 +686,8 @@ static void gnss_event_handler(int event)
 	}
 }
 
-SM_AT_CMD_CUSTOM(xgps, "AT#XGPS", handle_at_gps);
-static int handle_at_gps(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+SM_AT_CMD_CUSTOM(xgnss, "AT#XGNSS", handle_at_gnss);
+static int handle_at_gnss(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			 uint32_t param_count)
 {
 	int err = 0;
@@ -708,7 +708,7 @@ static int handle_at_gps(enum at_parser_cmd_type cmd_type, struct at_parser *par
 		if (err) {
 			return err;
 		}
-		if (op == GPS_START) {
+		if (op == GNSS_START) {
 			if (gnss_running) {
 				LOG_ERR("GNSS is already running. Stop it first.");
 				return -EBUSY;
@@ -777,7 +777,7 @@ static int handle_at_gps(enum at_parser_cmd_type cmd_type, struct at_parser *par
 				}
 				/* Make sure to configure the timeout unconditionally in single-fix
 				 * and periodic navigation modes.
-				 * An old value might otherwise remain from a previous GPS run.
+				 * An old value might otherwise remain from a previous GNSS run.
 				 */
 				err = nrf_modem_gnss_fix_retry_set(timeout);
 				if (err) {
@@ -787,7 +787,7 @@ static int handle_at_gps(enum at_parser_cmd_type cmd_type, struct at_parser *par
 			}
 
 			err = gnss_startup();
-		} else if (op == GPS_STOP && param_count == 2) {
+		} else if (op == GNSS_STOP && param_count == 2) {
 			if (gnss_running) {
 				err = gnss_shutdown();
 			} else {
@@ -799,12 +799,12 @@ static int handle_at_gps(enum at_parser_cmd_type cmd_type, struct at_parser *par
 		break;
 
 	case AT_PARSER_CMD_TYPE_READ:
-		rsp_send("\r\n#XGPS: %d,%d\r\n", (int)is_gnss_activated(), gnss_status);
+		rsp_send("\r\n#XGNSS: %d,%d\r\n", (int)is_gnss_activated(), gnss_status);
 		break;
 
 	case AT_PARSER_CMD_TYPE_TEST:
-		rsp_send("\r\n#XGPS: (%d,%d),(0,1),<interval>,<timeout>\r\n",
-			GPS_STOP, GPS_START);
+		rsp_send("\r\n#XGNSS: (%d,%d),(0,1),<interval>,<timeout>\r\n",
+			GNSS_STOP, GNSS_START);
 		break;
 
 	default:
@@ -815,8 +815,8 @@ static int handle_at_gps(enum at_parser_cmd_type cmd_type, struct at_parser *par
 	return err;
 }
 
-SM_AT_CMD_CUSTOM(xgpsdel, "AT#XGPSDEL", handle_at_gps_delete);
-static int handle_at_gps_delete(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+SM_AT_CMD_CUSTOM(xgnssdel, "AT#XGNSSDEL", handle_at_gnss_delete);
+static int handle_at_gnss_delete(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 				uint32_t)
 {
 	int err = -EINVAL;
@@ -832,7 +832,7 @@ static int handle_at_gps_delete(enum at_parser_cmd_type cmd_type, struct at_pars
 		break;
 
 	case AT_PARSER_CMD_TYPE_TEST:
-		rsp_send("\r\n#XGPSDEL: <mask>\r\n");
+		rsp_send("\r\n#XGNSSDEL: <mask>\r\n");
 		err = 0;
 		break;
 
