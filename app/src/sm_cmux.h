@@ -10,7 +10,11 @@
 
 struct modem_pipe;
 
+/** @brief Initialize the CMUX subsystem. */
 void sm_cmux_init(void);
+
+/** @brief Uninitialize the CMUX subsystem. */
+void sm_cmux_uninit(void);
 
 /* CMUX channels that are used by other modules. */
 enum cmux_channel {

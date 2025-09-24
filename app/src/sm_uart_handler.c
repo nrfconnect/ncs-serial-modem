@@ -11,11 +11,14 @@
 #include <hal/nrf_gpio.h>
 #include <zephyr/sys/ring_buffer.h>
 #include <zephyr/pm/device.h>
+#include <zephyr/modem/pipe.h>
 #include "sm_uart_handler.h"
 #include "sm_at_host.h"
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(sm_uart_handler, CONFIG_SM_LOG_LEVEL);
+
+#define SM_PIPE CONFIG_SM_CMUX
 
 #define UART_RX_TIMEOUT_US		2000
 #define UART_ERROR_DELAY_MS		500
@@ -49,12 +52,30 @@ K_MSGQ_DEFINE(rx_event_queue, sizeof(struct rx_event_t), UART_RX_EVENT_COUNT, 4)
 RING_BUF_DECLARE(tx_buf, CONFIG_SM_UART_TX_BUF_SIZE);
 K_MUTEX_DEFINE(mutex_tx_put); /* Protects the tx_buf from multiple writes. */
 
-enum uart_recovery_state {
-	RECOVERY_IDLE,
-	RECOVERY_ONGOING,
-	RECOVERY_DISABLED
+enum sm_uart_state {
+	SM_UART_STATE_TX_ENABLED_BIT,
+	SM_UART_STATE_RX_ENABLED_BIT,
+	SM_UART_STATE_RX_RECOVERY_BIT,
+	SM_UART_STATE_RX_RECOVERY_DISABLED_BIT
 };
-static atomic_t recovery_state;
+static atomic_t uart_state;
+
+#if SM_PIPE
+
+enum sm_pipe_state {
+	SM_PIPE_STATE_INIT_BIT,
+	SM_PIPE_STATE_OPEN_BIT,
+};
+static struct {
+	struct modem_pipe pipe;
+	sm_pipe_tx_t tx_cb;
+	atomic_t state;
+
+	struct k_work notify_transmit_idle;
+	struct k_work notify_closed;
+} sm_pipe;
+
+#endif
 
 K_SEM_DEFINE(tx_done_sem, 0, 1);
 
@@ -112,6 +133,10 @@ static int rx_enable(void)
 	struct rx_buf_t *buf;
 	int ret;
 
+	if (atomic_test_bit(&uart_state, SM_UART_STATE_RX_ENABLED_BIT)) {
+		return 0;
+	}
+
 	buf = rx_buf_alloc();
 	if (!buf) {
 		LOG_ERR("UART RX failed to allocate buffer");
@@ -121,25 +146,28 @@ static int rx_enable(void)
 	ret = uart_rx_enable(sm_uart_dev, buf->buf, sizeof(buf->buf), UART_RX_TIMEOUT_US);
 	if (ret) {
 		LOG_ERR("UART RX enable failed: %d", ret);
+		rx_buf_unref(buf);
 		return ret;
 	}
+	atomic_set_bit(&uart_state, SM_UART_STATE_RX_ENABLED_BIT);
 
 	return 0;
 }
 
-static int sm_uart_rx_disable(void)
+static int rx_disable(void)
 {
 	int err;
 
-	/* Wait for possible rx_enable to complete. */
-	if (atomic_set(&recovery_state, RECOVERY_DISABLED) == RECOVERY_ONGOING) {
+	atomic_set_bit(&uart_state, SM_UART_STATE_RX_RECOVERY_DISABLED_BIT);
+
+	while (atomic_test_bit(&uart_state, SM_UART_STATE_RX_RECOVERY_BIT)) {
+		/* Wait until possible recovery is complete. */
 		k_sleep(K_MSEC(10));
 	}
 
 	err = uart_rx_disable(sm_uart_dev);
 	if (err) {
 		LOG_ERR("UART RX disable failed: %d", err);
-		atomic_set(&recovery_state, RECOVERY_IDLE);
 		return err;
 	}
 
@@ -150,29 +178,89 @@ static void rx_recovery(void)
 {
 	int err;
 
-	if (atomic_get(&recovery_state) != RECOVERY_ONGOING) {
+	if (atomic_test_bit(&uart_state, SM_UART_STATE_RX_RECOVERY_DISABLED_BIT)) {
 		return;
 	}
+
+	atomic_set_bit(&uart_state, SM_UART_STATE_RX_RECOVERY_BIT);
 
 	err = rx_enable();
 	if (err) {
 		k_work_schedule(&rx_process_work, K_MSEC(UART_RX_MARGIN_MS));
-		return;
 	}
 
-	atomic_cas(&recovery_state, RECOVERY_ONGOING, RECOVERY_IDLE);
+	atomic_clear_bit(&uart_state, SM_UART_STATE_RX_RECOVERY_BIT);
 }
 
 static void rx_process(struct k_work *work)
 {
+#if SM_PIPE
+	/* With pipe, CMUX layer is notified and it requests the data. */
+	if (atomic_test_bit(&sm_pipe.state, SM_PIPE_STATE_INIT_BIT)) {
+		if (atomic_test_bit(&sm_pipe.state, SM_PIPE_STATE_OPEN_BIT)) {
+			modem_pipe_notify_receive_ready(&sm_pipe.pipe);
+		}
+		return;
+	}
+#endif
+	/* Without pipe, we push the data immediately. */
 	struct rx_event_t rx_event;
+	size_t processed;
+	bool stop_at_receive = false;
+	int err;
 
 	while (k_msgq_get(&rx_event_queue, &rx_event, K_NO_WAIT) == 0) {
-		sm_at_receive(rx_event.buf, rx_event.len);
-		rx_buf_unref(rx_event.buf);
+		processed = sm_at_receive(rx_event.buf, rx_event.len, &stop_at_receive);
+
+		if (processed == rx_event.len) {
+			/* All data processed, release the buffer. */
+			rx_buf_unref(rx_event.buf);
+		} else {
+			rx_event.len -= processed;
+			rx_event.buf += processed;
+			err = k_msgq_put_front(&rx_event_queue, &rx_event, K_NO_WAIT);
+			if (err) {
+				LOG_ERR("RX event queue full, dropped %zu bytes", rx_event.len);
+				rx_buf_unref(rx_event.buf);
+			}
+		}
+
+		if (stop_at_receive) {
+			break;
+		}
 	}
 
 	rx_recovery();
+}
+
+static void tx_enable(void)
+{
+	if (!atomic_test_and_set_bit(&uart_state, SM_UART_STATE_TX_ENABLED_BIT)) {
+		k_sem_give(&tx_done_sem);
+	}
+}
+
+static int tx_disable(k_timeout_t timeout)
+{
+	int err;
+
+	if (!atomic_test_and_clear_bit(&uart_state, SM_UART_STATE_TX_ENABLED_BIT)) {
+		return 0;
+	}
+
+	if (k_sem_take(&tx_done_sem, timeout) == 0) {
+		return 0;
+	}
+
+	err = uart_tx_abort(sm_uart_dev);
+	if (!err) {
+		LOG_INF("TX aborted");
+	} else if (err != -EFAULT) {
+		LOG_ERR("uart_tx_abort failed (%d).", err);
+		return err;
+	}
+
+	return 0;
 }
 
 static int tx_start(void)
@@ -181,6 +269,10 @@ static int tx_start(void)
 	size_t len;
 	int err;
 	enum pm_device_state state = PM_DEVICE_STATE_OFF;
+
+	if (!atomic_test_bit(&uart_state, SM_UART_STATE_TX_ENABLED_BIT)) {
+		return -EAGAIN;
+	}
 
 	pm_device_state_get(sm_uart_dev, &state);
 	if (state != PM_DEVICE_STATE_ACTIVE) {
@@ -196,6 +288,28 @@ static int tx_start(void)
 	}
 
 	return 0;
+}
+
+static inline void uart_callback_notify_pipe_transmit_idle(void)
+{
+#if SM_PIPE
+	if (atomic_test_bit(&sm_pipe.state, SM_PIPE_STATE_OPEN_BIT)) {
+		k_work_submit(&sm_pipe.notify_transmit_idle);
+	}
+#endif
+}
+
+static inline void uart_callback_notify_pipe_closure(void)
+{
+#if SM_PIPE
+	if (atomic_test_bit(&sm_pipe.state, SM_PIPE_STATE_INIT_BIT) &&
+	    !atomic_test_bit(&sm_pipe.state, SM_PIPE_STATE_OPEN_BIT) &&
+	    !atomic_test_bit(&uart_state, SM_UART_STATE_RX_ENABLED_BIT) &&
+	    !atomic_test_bit(&uart_state, SM_UART_STATE_TX_ENABLED_BIT)) {
+		/* Pipe is closed, RX and TX are idle, notify the closure */
+		k_work_submit(&sm_pipe.notify_closed);
+	}
+#endif
 }
 
 static void uart_callback(const struct device *dev, struct uart_event *evt, void *user_data)
@@ -215,10 +329,11 @@ static void uart_callback(const struct device *dev, struct uart_event *evt, void
 			LOG_ERR("UART_TX_%s failure: %d",
 				(evt->type == UART_TX_DONE) ? "DONE" : "ABORTED", err);
 		}
-		if (ring_buf_is_empty(&tx_buf) == false) {
+		if (ring_buf_is_empty(&tx_buf) == false && evt->type == UART_TX_DONE) {
 			tx_start();
 		} else {
 			k_sem_give(&tx_done_sem);
+			uart_callback_notify_pipe_transmit_idle();
 		}
 		break;
 	case UART_RX_RDY:
@@ -227,7 +342,7 @@ static void uart_callback(const struct device *dev, struct uart_event *evt, void
 		rx_event.len = evt->data.rx.len;
 		err = k_msgq_put(&rx_event_queue, &rx_event, K_NO_WAIT);
 		if (err) {
-			LOG_ERR("UART_RX_RDY failure: %d, dropped: %d", err, evt->data.rx.len);
+			LOG_ERR("RX event queue full, dropped %zu bytes", evt->data.rx.len);
 			rx_buf_unref(evt->data.rx.buf);
 			break;
 		}
@@ -255,16 +370,19 @@ static void uart_callback(const struct device *dev, struct uart_event *evt, void
 		}
 		break;
 	case UART_RX_DISABLED:
-		if (atomic_cas(&recovery_state, RECOVERY_IDLE, RECOVERY_ONGOING)) {
-			k_work_submit((struct k_work *)&rx_process_work);
-		}
+		atomic_clear_bit(&uart_state, SM_UART_STATE_RX_ENABLED_BIT);
+		k_work_submit((struct k_work *)&rx_process_work);
 		break;
 	default:
 		break;
 	}
+
+	uart_callback_notify_pipe_closure();
 }
 
-/* Write the data to tx_buffer and trigger sending. */
+/* Write the data to tx_buffer and trigger sending. Repeat until everything is sent.
+ * Returns 0 on success or a negative error code.
+ */
 static int sm_uart_tx_write(const uint8_t *data, size_t len)
 {
 	size_t ret;
@@ -272,33 +390,40 @@ static int sm_uart_tx_write(const uint8_t *data, size_t len)
 	int err;
 
 	k_mutex_lock(&mutex_tx_put, K_FOREVER);
+
 	while (sent < len) {
 		ret = ring_buf_put(&tx_buf, data + sent, len - sent);
 		if (ret) {
 			sent += ret;
-		} else {
-			/* Buffer full, block and start TX. */
-			k_sem_take(&tx_done_sem, K_FOREVER);
-			err = tx_start();
-			if (err) {
-				LOG_ERR("TX buf overflow, %d dropped. Unable to send: %d",
-					len - sent,
-					err);
-				k_sem_give(&tx_done_sem);
-				k_mutex_unlock(&mutex_tx_put);
-				return err;
-			}
+			continue;
+		}
+
+		/* Buffer full, block and start TX. */
+		err = k_sem_take(&tx_done_sem, K_FOREVER);
+		if (err) {
+			LOG_ERR("TX %s failed (%d). TX buf overflow, %zu dropped.",
+				"semaphore take", err, len - sent);
+			k_mutex_unlock(&mutex_tx_put);
+			return err;
+		}
+		err = tx_start();
+		if (err) {
+			LOG_ERR("TX %s failed (%d). TX buf overflow, %zu dropped.", "start", err,
+				len - sent);
+			k_sem_give(&tx_done_sem);
+			k_mutex_unlock(&mutex_tx_put);
+			return err;
 		}
 	}
 	k_mutex_unlock(&mutex_tx_put);
 
 	if (k_sem_take(&tx_done_sem, K_NO_WAIT) == 0) {
 		err = tx_start();
-		if (err == 1) {
+		if (err == 1 || err == -EAGAIN) {
 			k_sem_give(&tx_done_sem);
 			return 0;
 		} else if (err) {
-			LOG_ERR("TX start failed: %d", err);
+			LOG_ERR("TX %s failed (%d).", "start", err);
 			k_sem_give(&tx_done_sem);
 			return err;
 		}
@@ -309,7 +434,17 @@ static int sm_uart_tx_write(const uint8_t *data, size_t len)
 	return 0;
 }
 
-static int sm_uart_handler_init(void)
+int sm_tx_write(const uint8_t *data, size_t len)
+{
+#if SM_PIPE
+	if (atomic_test_bit(&sm_pipe.state, SM_PIPE_STATE_INIT_BIT) && sm_pipe.tx_cb != NULL) {
+		return sm_pipe.tx_cb(data, len);
+	}
+#endif
+	return sm_uart_tx_write(data, len);
+}
+
+int sm_uart_handler_enable(void)
 {
 	int err;
 	uint32_t start_time;
@@ -350,7 +485,9 @@ static int sm_uart_handler_init(void)
 		LOG_ERR("Cannot set callback: %d", err);
 		return -EFAULT;
 	}
-	(void)atomic_set(&recovery_state, RECOVERY_IDLE);
+
+	atomic_clear(&uart_state);
+	tx_enable();
 	err = rx_enable();
 	if (err) {
 		return -EFAULT;
@@ -358,19 +495,220 @@ static int sm_uart_handler_init(void)
 
 	k_work_init_delayable(&rx_process_work, rx_process);
 
-	k_sem_give(&tx_done_sem);
-
 	/* Flush possibly pending data in case Serial Modem was idle. */
 	tx_start();
 
 	return 0;
 }
 
-int sm_uart_handler_enable(void)
+int sm_uart_handler_disable(void)
 {
-	return sm_at_set_backend((struct sm_at_backend) {
-		.start = sm_uart_handler_init,
-		.send = sm_uart_tx_write,
-		.stop = sm_uart_rx_disable
-	});
+	int err;
+
+	err = tx_disable(K_MSEC(50));
+	if (err) {
+		LOG_ERR("TX disable failed (%d).", err);
+		return err;
+	}
+
+	err = rx_disable();
+	if (err) {
+		LOG_ERR("RX disable failed (%d).", err);
+		return err;
+	}
+
+	return 0;
 }
+
+#if SM_PIPE
+
+static int pipe_open(void *data)
+{
+	int ret;
+
+	ARG_UNUSED(data);
+
+	if (!atomic_test_bit(&sm_pipe.state, SM_PIPE_STATE_INIT_BIT)) {
+		return -EINVAL;
+	}
+
+	if (atomic_test_bit(&sm_pipe.state, SM_PIPE_STATE_OPEN_BIT)) {
+		return -EALREADY;
+	}
+
+	atomic_clear_bit(&uart_state, SM_UART_STATE_RX_RECOVERY_DISABLED_BIT);
+	ret = rx_enable();
+	if (ret) {
+		return ret;
+	}
+
+	tx_enable();
+
+	atomic_set_bit(&sm_pipe.state, SM_PIPE_STATE_OPEN_BIT);
+	modem_pipe_notify_opened(&sm_pipe.pipe);
+
+	return 0;
+}
+
+/* Returns the number of bytes written or a negative error code. */
+static int pipe_transmit(void *data, const uint8_t *buf, size_t size)
+{
+	size_t ret;
+	size_t sent = 0;
+
+	ARG_UNUSED(data);
+
+	if (!atomic_test_bit(&sm_pipe.state, SM_PIPE_STATE_OPEN_BIT)) {
+		return -EPERM;
+	}
+
+	if (!buf || size == 0) {
+		return -EINVAL;
+	}
+
+	while (sent < size) {
+		ret = ring_buf_put(&tx_buf, buf + sent, size - sent);
+		if (ret) {
+			sent += ret;
+		} else {
+			/* Buffer full. */
+			break;
+		}
+	}
+
+	if (k_sem_take(&tx_done_sem, K_NO_WAIT) == 0) {
+		int err = tx_start();
+
+		if (err == 1 || err == -EAGAIN) {
+			k_sem_give(&tx_done_sem);
+			return (int)sent;
+		} else if (err) {
+			LOG_ERR("TX %s failed (%d).", "start", err);
+			k_sem_give(&tx_done_sem);
+			return err;
+		}
+	}
+
+	return (int)sent;
+}
+
+static int pipe_receive(void *data, uint8_t *buf, size_t size)
+{
+	struct rx_event_t rx_event;
+	size_t received = 0;
+	size_t copy_size;
+	int err;
+
+	ARG_UNUSED(data);
+
+	if (!buf || size == 0) {
+		return 0;
+	}
+
+	while (size > received) {
+		if (k_msgq_get(&rx_event_queue, &rx_event, K_NO_WAIT)) {
+			break;
+		}
+		copy_size = MIN(size - received, rx_event.len);
+		memcpy(buf, rx_event.buf, copy_size);
+		received += copy_size;
+		buf += copy_size;
+
+		if (rx_event.len == copy_size) {
+			rx_buf_unref(rx_event.buf);
+		} else {
+			rx_event.len -= copy_size;
+			rx_event.buf += copy_size;
+			err = k_msgq_put_front(&rx_event_queue, &rx_event, K_NO_WAIT);
+			if (err) {
+				LOG_ERR("RX event queue full, dropped %zu bytes", rx_event.len);
+				rx_buf_unref(rx_event.buf);
+			}
+		}
+	}
+	if (k_msgq_num_used_get(&rx_event_queue) == 0) {
+		/* Try to recover RX, in case it was disabled. */
+		rx_recovery();
+	}
+
+	return (int)received;
+}
+
+static int pipe_close(void *data)
+{
+	int err;
+
+	ARG_UNUSED(data);
+
+	if (!atomic_test_bit(&sm_pipe.state, SM_PIPE_STATE_OPEN_BIT)) {
+		return -EALREADY;
+	}
+
+	atomic_clear_bit(&sm_pipe.state, SM_PIPE_STATE_OPEN_BIT);
+
+	err = tx_disable(K_MSEC(50));
+	if (err) {
+		LOG_WRN("%s disable failed (%d).", "TX", err);
+	}
+
+	err = rx_disable();
+	if (err) {
+		LOG_ERR("%s disable failed (%d).", "RX", err);
+	}
+
+	return 0;
+}
+
+static const struct modem_pipe_api modem_pipe_api = {
+	.open = pipe_open,
+	.transmit = pipe_transmit,
+	.receive = pipe_receive,
+	.close = pipe_close,
+};
+
+static void notify_transmit_idle_fn(struct k_work *work)
+{
+	ARG_UNUSED(work);
+	modem_pipe_notify_transmit_idle(&sm_pipe.pipe);
+}
+static void notify_closed_fn(struct k_work *work)
+{
+	ARG_UNUSED(work);
+	modem_pipe_notify_closed(&sm_pipe.pipe);
+}
+
+static void at_to_cmux_switch(void)
+{
+	/* TX handling when moving from AT to CMUX:
+	 * - Complete (OK message) TX transmission through regular UART.
+	 */
+	tx_disable(K_MSEC(10));
+
+	/* Possible TX handling improvements:
+	 * - Callers in sm_uart_tx_write need to abort when CMUX change is done. There may be
+	 *   multiple callers and they may be blocked.
+	 * - TX buffer must be flushed or the data must be routed to CMUX.
+	 */
+
+	/* RX handling when moving from AT to CMUX:
+	 * - RX and RX buffers are retained.
+	 * - Data in RX buffers is routed to CMUX AT channel.
+	 */
+}
+
+struct modem_pipe *sm_uart_pipe_init(sm_pipe_tx_t pipe_tx_cb)
+{
+	k_work_init(&sm_pipe.notify_transmit_idle, notify_transmit_idle_fn);
+	k_work_init(&sm_pipe.notify_closed, notify_closed_fn);
+
+	sm_pipe.tx_cb = pipe_tx_cb;
+	atomic_set_bit(&sm_pipe.state, SM_PIPE_STATE_INIT_BIT);
+
+	modem_pipe_init(&sm_pipe.pipe, &sm_pipe, &modem_pipe_api);
+
+	at_to_cmux_switch();
+
+	return &sm_pipe.pipe;
+}
+
+#endif /* SM_PIPE */
