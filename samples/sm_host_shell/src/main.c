@@ -26,18 +26,10 @@ void sm_host_shell_data_indication(const uint8_t *data, size_t datalen)
 	LOG_INF("Data received (len=%d): %.*s", datalen, datalen, (const char *)data);
 }
 
-#if (CONFIG_SM_HOST_INDICATE_PIN >= 0)
-void sm_host_shell_indication_handler(void)
+void sm_host_shell_ri_handler(void)
 {
-	int err;
-
-	LOG_INF("Serial Modem indicate pin triggered");
-	err = sm_host_power_pin_toggle();
-	if (err) {
-		LOG_ERR("Failed to toggle power pin");
-	}
+	LOG_INF("Ring Indicate (RI) triggered");
 }
-#endif /* CONFIG_SM_HOST_INDICATE_PIN */
 
 int main(void)
 {
@@ -45,17 +37,15 @@ int main(void)
 
 	LOG_INF("Serial Modem Host Shell starts on %s", CONFIG_BOARD);
 
-	err = sm_host_init(sm_host_shell_data_indication);
+	err = sm_host_init(sm_host_shell_data_indication, true, K_MSEC(100));
 	if (err) {
 		LOG_ERR("Failed to initialize Serial Modem: %d", err);
 	}
 
-#if (CONFIG_SM_HOST_INDICATE_PIN >= 0)
-	err = sm_host_register_ind(sm_host_shell_indication_handler, true);
+	err = sm_host_register_ri_handler(sm_host_shell_ri_handler);
 	if (err) {
-		LOG_ERR("Failed to register indication: %d", err);
+		LOG_ERR("Failed to register RI handler (%d).", err);
 	}
-#endif /* CONFIG_SM_HOST_INDICATE_PIN */
 
 	return 0;
 }
