@@ -213,10 +213,6 @@ static void rx_process(struct k_work *work)
 	bool stop_at_receive = false;
 	int err;
 
-
-	// MARKUS TODO: Test the RX disablement.
-	k_sleep(K_MSEC(100));
-
 	while (k_msgq_get(&rx_event_queue, &rx_event, K_NO_WAIT) == 0) {
 		processed = sm_at_receive(rx_event.buf, rx_event.len, &stop_at_receive);
 

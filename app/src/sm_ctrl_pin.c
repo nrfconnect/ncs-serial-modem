@@ -229,25 +229,18 @@ static void power_pin_callback_wakeup(const struct device *dev,
 	k_work_submit(&work);
 }
 
+#endif /* POWER_PIN_IS_ENABLED */
+
 void sm_ctrl_pin_enter_idle(void)
 {
 	LOG_INF("Entering idle.");
 	int err;
-
-	gpio_remove_callback(gpio_dev, &gpio_cb);
-
-	err = configure_power_pin_interrupt(power_pin_callback_wakeup, GPIO_INT_LEVEL_LOW);
-	if (err) {
-		return;
-	}
 
 	err = ext_xtal_control(false);
 	if (err < 0) {
 		LOG_WRN("Failed to disable ext XTAL: %d", err);
 	}
 }
-
-#endif /* POWER_PIN_IS_ENABLED */
 
 static void dtr_disable_fn(struct k_work *)
 {

@@ -480,7 +480,7 @@ static int api_tx(const struct device *dev, const uint8_t *buf, size_t len, int3
 		return -EBUSY;
 	}
 
-	if (data->dtr_state == 1) {
+	if (data->dtr_state) {
 		return uart_tx(config->uart, buf, len, timeout);
 	}
 	data->tx_buf = buf;
@@ -610,6 +610,40 @@ static int api_config_get(const struct device *dev, struct uart_config *cfg)
 }
 #endif /* CONFIG_UART_USE_RUNTIME_CONFIGURE */
 
+/* Power management */
+#ifdef CONFIG_PM_DEVICE
+static int dtr_uart_pm_action(const struct device *dev, enum pm_device_action action)
+{
+	struct dtr_uart_data *data = get_dev_data(dev);
+	switch (action) {
+	case PM_DEVICE_ACTION_SUSPEND:
+		/* Disobey DTR signal and disable UART.
+		 * Will go to normal operation after DTR signal changes.
+		 */
+		LOG_DBG("PM SUSPEND - Disabling UART");
+		data->dtr_state = false; // MARKUS TODO: Use same method as with DTR signal?
+		deactivate_tx(data);
+		deactivate_rx(data);
+		power_off_uart(data);
+		break;
+	case PM_DEVICE_ACTION_RESUME:
+		/* Disobey DTR signal and enable UART.
+		 * Will go to normal operation after DTR signal changes.
+		 */
+		LOG_DBG("PM RESUME - Enabling UART");
+		data->dtr_state = true; // MARKUS TODO: Use same method as with DTR signal?
+		power_on_uart(data);
+		activate_rx(data);
+		activate_tx(data);
+		break;
+	default:
+		return -ENOTSUP;
+	}
+
+	return 0;
+}
+#endif
+
 static const struct uart_driver_api dtr_uart_api = {
 	.callback_set = api_callback_set,
 	.tx = api_tx,
@@ -632,7 +666,8 @@ static const struct uart_driver_api dtr_uart_api = {
 		.uart = DEVICE_DT_GET(DT_PARENT(DT_DRV_INST(n))),                                  \
 	};                                                                                         \
 	static struct dtr_uart_data dtr_uart_data_##n;                                             \
-	DEVICE_DT_INST_DEFINE(n, dtr_uart_init, NULL, &dtr_uart_data_##n,      \
+	PM_DEVICE_DT_INST_DEFINE(n, dtr_uart_pm_action);                                           \
+	DEVICE_DT_INST_DEFINE(n, dtr_uart_init, PM_DEVICE_DT_INST_GET(n), &dtr_uart_data_##n,      \
 			      &dtr_uart_config_##n, POST_KERNEL, 51, &dtr_uart_api);
 
 DT_INST_FOREACH_STATUS_OKAY(DTR_UART_INIT)

@@ -955,8 +955,15 @@ int sm_at_host_init(void)
 
 static int at_host_power_off(bool shutting_down)
 {
-	// MARKUS TODO: Align with DTR.
-	int err = sm_uart_handler_disable();
+	// MARKUS TODO: When we do AT#XSLEEP we only want to power down the DTR uart.
+	int err = pm_device_action_run(sm_uart_dev, PM_DEVICE_ACTION_SUSPEND);
+	if (err) {
+		LOG_WRN("Failed to suspend UART. (%d)", err);
+		return err;
+	}
+
+	// // MARKUS TODO: When we do shutdown, we want to do the disable the UART at application level as well.
+	// int err = sm_uart_handler_disable();
 
 	// if (!err || shutting_down) {
 	// 	/* Wait for UART disabling to complete. */
@@ -979,8 +986,12 @@ int sm_at_host_power_off(void)
 {
 	const int err = at_host_power_off(false);
 
-	/* Write sync str to buffer so it is sent first when resuming. */
-	sm_at_send_str(SM_SYNC_STR);
+	/* Write sync str to buffer so it is sent first when resuming.
+	 * Note: This does trigger RI signal.
+	 */
+	if (!IS_ENABLED(CONFIG_SM_SKIP_READY_MSG)) {
+		sm_at_send_str(SM_SYNC_STR);
+	}
 
 	return err;
 }
