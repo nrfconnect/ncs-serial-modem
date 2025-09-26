@@ -583,7 +583,8 @@ static int api_rx_disable(const struct device *dev)
 	}
 
 	data->app_rx_enable = false;
-	return deactivate_rx(data);
+	deactivate_rx(data);
+	return 0;
 }
 
 static int api_err_check(const struct device *dev)

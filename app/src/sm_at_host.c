@@ -958,19 +958,19 @@ static int at_host_power_off(bool shutting_down)
 	// MARKUS TODO: Align with DTR.
 	int err = sm_uart_handler_disable();
 
-	if (!err || shutting_down) {
-		/* Wait for UART disabling to complete. */
-		k_sleep(K_MSEC(100));
+	// if (!err || shutting_down) {
+	// 	/* Wait for UART disabling to complete. */
+	// 	k_sleep(K_MSEC(100));
 
-		/* Power off UART module */
-		err = pm_device_action_run(sm_uart_dev, PM_DEVICE_ACTION_SUSPEND);
-		if (err == -EALREADY) {
-			err = 0;
-		}
-		if (err) {
-			LOG_WRN("Failed to suspend UART. (%d)", err);
-		}
-	}
+	// 	/* Power off UART module */
+	// 	err = pm_device_action_run(sm_uart_dev, PM_DEVICE_ACTION_SUSPEND);
+	// 	if (err == -EALREADY) {
+	// 		err = 0;
+	// 	}
+	// 	if (err) {
+	// 		LOG_WRN("Failed to suspend UART. (%d)", err);
+	// 	}
+	// }
 
 	return err;
 }

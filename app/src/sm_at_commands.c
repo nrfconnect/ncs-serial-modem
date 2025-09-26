@@ -78,12 +78,10 @@ enum sleep_modes {
 	SLEEP_MODE_IDLE
 };
 
-#if POWER_PIN_IS_ENABLED
 static struct {
 	struct k_work_delayable work;
 	uint32_t mode;
 } sleep_control;
-#endif
 
 bool verify_datamode_control(uint16_t time_limit, uint16_t *time_limit_min);
 
@@ -127,13 +125,11 @@ static int handle_at_slmver(enum at_parser_cmd_type cmd_type, struct at_parser *
 	return ret;
 }
 
-#if POWER_PIN_IS_ENABLED
-
 static void go_sleep_wk(struct k_work *)
 {
 	if (sleep_control.mode == SLEEP_MODE_IDLE) {
 		if (sm_at_host_power_off() == 0) {
-			sm_ctrl_pin_enter_idle();
+			// sm_ctrl_pin_enter_idle();
 		} else {
 			LOG_ERR("failed to power off UART");
 		}
@@ -166,8 +162,6 @@ static int handle_at_sleep(enum at_parser_cmd_type cmd_type, struct at_parser *p
 
 	return ret;
 }
-
-#endif /* POWER_PIN_IS_ENABLED */
 
 static void final_call(void (*func)(void))
 {
@@ -378,9 +372,7 @@ int sm_at_init(void)
 {
 	int err;
 
-#if POWER_PIN_IS_ENABLED
 	k_work_init_delayable(&sleep_control.work, go_sleep_wk);
-#endif
 
 	err = sm_at_tcp_proxy_init();
 	if (err) {

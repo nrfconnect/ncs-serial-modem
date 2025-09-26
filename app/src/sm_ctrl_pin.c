@@ -25,8 +25,9 @@ static const struct device *gpio_dev = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 static const struct gpio_dt_spec dtr_gpio =
 	GPIO_DT_SPEC_GET_OR(DT_NODELABEL(dtr_uart), dtr_gpios, {0});
 
-#if POWER_PIN_IS_ENABLED
 static struct gpio_callback gpio_cb;
+
+#if POWER_PIN_IS_ENABLED
 #else
 BUILD_ASSERT(!IS_ENABLED(CONFIG_SM_START_SLEEP),
 	"CONFIG_SM_START_SLEEP requires CONFIG_SM_POWER_PIN to be defined.");
@@ -248,40 +249,42 @@ void sm_ctrl_pin_enter_idle(void)
 
 #endif /* POWER_PIN_IS_ENABLED */
 
-static void sm_ctrl_pin_enter_sleep_work_fn(struct k_work *)
+static void dtr_disable_fn(struct k_work *)
 {
 	LOG_INF("DTR pin callback work function.");
 
-	// sm_at_host_uninit();
+	sm_at_host_uninit();
 
-	// /* Only power off the modem if it has not been put
-	//  * in flight mode to allow reducing NVM wear.
-	//  */
-	// if (!sm_is_modem_functional_mode(LTE_LC_FUNC_MODE_OFFLINE)) {
-	// 	sm_power_off_modem();
-	// }
+	/* Only power off the modem if it has not been put
+	 * in flight mode to allow reducing NVM wear.
+	 */
+	if (!sm_is_modem_functional_mode(LTE_LC_FUNC_MODE_OFFLINE)) {
+		sm_power_off_modem();
+	}
 
-	// LOG_INF("Entering sleep.");
-	// LOG_PANIC();
-	// nrf_gpio_cfg_sense_set(CONFIG_SM_POWER_PIN, NRF_GPIO_PIN_SENSE_LOW);
+	LOG_INF("Entering sleep.");
+	LOG_PANIC();
+	nrf_gpio_cfg_sense_set(dtr_gpio.pin, NRF_GPIO_PIN_SENSE_LOW);
 
-	// k_sleep(K_MSEC(100));
+	k_sleep(K_MSEC(100));
 
-	// nrf_regulators_system_off(NRF_REGULATORS_NS);
-	// assert(false);
+	nrf_regulators_system_off(NRF_REGULATORS_NS);
+	assert(false);
 }
 
 static void dtr_pin_callback(const struct device *dev, struct gpio_callback *gpio_callback,
 			     uint32_t)
 {
-	static K_WORK_DEFINE(work, dtr_disable);
+	static K_WORK_DELAYABLE_DEFINE(work, dtr_disable_fn);
 
 	LOG_INF("DTR pin callback triggered.");
-	k_work_submit(&work);
+	k_work_schedule(&work, K_MSEC(100));
 }
 
 void sm_ctrl_pin_enter_sleep(void)
 {
+	int err;
+
 	LOG_INF("CALLING SLEEP");
 
 	if (!gpio_is_ready_dt(&dtr_gpio)) {
@@ -289,7 +292,7 @@ void sm_ctrl_pin_enter_sleep(void)
 		return;
 	}
 
-	gpio_init_callback_dt(&dtr_gpio, dtr_pin_callback, BIT(dtr_gpio.pin));
+	gpio_init_callback(&gpio_cb, dtr_pin_callback, BIT(dtr_gpio.pin));
 
 	err = gpio_add_callback_dt(&dtr_gpio, &gpio_cb);
 	if (err) {
@@ -302,7 +305,7 @@ void sm_ctrl_pin_enter_sleep_no_uninit(void)
 {
 	LOG_INF("Entering sleep.");
 	LOG_PANIC();
-	nrf_gpio_cfg_sense_set(CONFIG_SM_POWER_PIN, NRF_GPIO_PIN_SENSE_LOW);
+	nrf_gpio_cfg_sense_set(dtr_gpio.pin, NRF_GPIO_PIN_SENSE_LOW);
 
 	k_sleep(K_MSEC(100));
 
