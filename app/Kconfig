@@ -23,6 +23,12 @@ config SM_AT_BUF_SIZE
 	default 4096
 	help
 	  Size of the buffer for incoming AT commands and modem responses.
+
+config SM_SKIP_READY_MSG
+	bool "Skip ready message"
+	help
+	  Skip sending the ready message when the application is powered on.
+
 #
 # external XTAL for UART
 #
@@ -178,11 +184,20 @@ config SM_NRF_CLOUD
 	bool "nRF Cloud support"
 	default y
 
+config SM_MQTTC
+	bool "MQTT client support"
+	default y
+	select MQTT_LIB
+	select MQTT_LIB_TLS
+
 config SM_FULL_FOTA
 	bool "Full modem FOTA support"
 
 config SM_PPP
 	bool "PPP support"
+
+config SM_CMUX
+	bool "CMUX support"
 
 if SM_PPP
 
@@ -194,18 +209,7 @@ config SM_PPP_FALLBACK_MTU
 	  If no MTU is returned by the modem, this value will be used as a fallback.
 	  The MTU will be used for sending and receiving of data on both the PPP and cellular links.
 
-endif
-
-config SM_CMUX
-	bool "CMUX support"
-
-config SM_CMUX_UART_BUFFER_SIZE
-	int "UART buffer size for CMUX"
-	depends on SM_CMUX
-	default 600
-	help
-	  Size of the buffer for data received in CMUX mode.
-	  Same buffer size is used for both RX and TX.
+endif # SM_PPP
 
 if SM_CMUX || SM_PPP
 
@@ -213,20 +217,55 @@ config SM_MODEM_PIPE_TIMEOUT
 	int "Timeout for the CMUX and PPP modem pipe operations in seconds"
 	default 10
 
-endif
+endif # SM_CMUX || SM_PPP
 
-config SM_SKIP_READY_MSG
-	bool "Skip ready message"
+if SM_MQTTC
+
+config SM_MQTTC_MESSAGE_BUFFER_LEN
+	int "Size of the buffer for MQTT library"
+	default 512
 	help
-	  Skip sending the ready message when the application is powered on.
+	  Specifies maximum message size that can be transmitted/received through
+	  MQTT (excluding MQTT PUBLISH payload).
 
+endif # SM_MQTTC
+
+if SM_GNSS
+
+config SM_GNSS_OUTPUT_NMEA_ON_CMUX_CHANNEL
+	bool "Output NMEA messages on a dedicated CMUX channel"
+	depends on SM_CMUX
+
+config SM_GNSS_OUTPUT_NMEA_SATELLITES
+	bool "Output NMEA satellite messages (GSV, GSA)"
+	default y if SM_LOG_LEVEL_DBG
+	depends on SM_LOG_LEVEL_DBG || SM_GNSS_OUTPUT_NMEA_ON_CMUX_CHANNEL
+	help
+	  If enabled, NMEA messages that pertain to the satellites will be output
+	  along with the other NMEA messages. Those are output in debug logs, and
+	  can also be output to a dedicated CMUX channel.
+
+config SM_PGPS_INJECT_FIX_DATA
+	bool "Inject the data obtained when acquiring a fix"
+	default y
+	depends on SM_GNSS
+	depends on SM_NRF_CLOUD
+	depends on NRF_CLOUD_PGPS
+	help
+	  If enabled, when a fix is acquired the current location and time will
+	  be passed to the P-GPS subsystem.
+	  It allows to speed up the time it takes to acquire the next fix when
+	  A-GNSS is disabled or unavailable.
+	  This can be detrimental to short TTFF if the device is expected to move
+	  distances longer than a few dozen kilometers between fix attempts.
+	  In that case this option should be disabled.
+
+endif # SM_GNSS
 
 module = SM
 module-str = serial modem
 source "$(ZEPHYR_BASE)/subsys/logging/Kconfig.template.log_config"
 
-rsource "src/mqtt_c/Kconfig"
 rsource "src/lwm2m_carrier/Kconfig"
-rsource "src/gnss/Kconfig"
 
 endmenu
