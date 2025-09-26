@@ -26,10 +26,10 @@ target_sources(app PRIVATE src/sm_uart_handler.c)
 target_sources_ifdef(CONFIG_SM_SMS app PRIVATE src/sm_at_sms.c)
 target_sources_ifdef(CONFIG_SM_PPP app PRIVATE src/sm_ppp.c)
 target_sources_ifdef(CONFIG_SM_CMUX app PRIVATE src/sm_cmux.c)
+target_sources_ifdef(CONFIG_SM_GNSS app PRIVATE src/sm_at_gnss.c)
+target_sources_ifdef(CONFIG_SM_NRF_CLOUD app PRIVATE src/sm_at_nrfcloud.c)
+target_sources_ifdef(CONFIG_SM_MQTTC app PRIVATE src/sm_at_mqtt.c)
 
-add_subdirectory_ifdef(CONFIG_SM_GNSS src/gnss)
-add_subdirectory_ifdef(CONFIG_SM_NRF_CLOUD src/nrfcloud)
-add_subdirectory_ifdef(CONFIG_SM_MQTTC src/mqtt_c)
 add_subdirectory_ifdef(CONFIG_SM_CARRIER src/lwm2m_carrier)
 
 zephyr_include_directories(src)
