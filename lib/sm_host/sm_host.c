@@ -21,7 +21,7 @@ LOG_MODULE_REGISTER(sm_host, CONFIG_SM_HOST_LOG_LEVEL);
 #define UART_RX_MARGIN_MS	10
 #define UART_RX_TIMEOUT_US      2000
 #define UART_ERROR_DELAY_MS     500
-#define UART_TX_TIMEOUT_US      100000
+#define UART_TX_TIMEOUT_US      1000 * 1000 * 5 /* 5 seconds */
 
 /* Serial Modem has formatted AT response based on TS 27.007 */
 #define AT_CMD_OK_STR    "\r\nOK\r\n"

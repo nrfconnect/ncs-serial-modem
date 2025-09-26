@@ -45,7 +45,7 @@ BUILD_ASSERT((sizeof(struct rx_buf_t) % UART_SLAB_ALIGNMENT) == 0);
 K_MEM_SLAB_DEFINE(rx_slab, UART_SLAB_BLOCK_SIZE, UART_SLAB_BLOCK_COUNT, UART_SLAB_ALIGNMENT);
 
 /* 4 messages for 512 bytes, 32 messages for 4096 bytes. */
-#define UART_RX_EVENT_COUNT ((CONFIG_SM_UART_RX_BUF_COUNT * CONFIG_SM_UART_RX_BUF_SIZE) / 128)
+#define UART_RX_EVENT_COUNT 4 // ((CONFIG_SM_UART_RX_BUF_COUNT * CONFIG_SM_UART_RX_BUF_SIZE) / 128)
 #define UART_RX_EVENT_COUNT_FOR_BUF (UART_RX_EVENT_COUNT / CONFIG_SM_UART_RX_BUF_COUNT)
 struct rx_event_t {
 	uint8_t *buf;
@@ -213,6 +213,10 @@ static void rx_process(struct k_work *work)
 	bool stop_at_receive = false;
 	int err;
 
+
+	// MARKUS TODO: Test the RX disablement.
+	k_sleep(K_MSEC(100));
+
 	while (k_msgq_get(&rx_event_queue, &rx_event, K_NO_WAIT) == 0) {
 		processed = sm_at_receive(rx_event.buf, rx_event.len, &stop_at_receive);
 
@@ -315,7 +319,6 @@ static void uart_callback(const struct device *dev, struct uart_event *evt, void
 	struct rx_buf_t *buf;
 	struct rx_event_t rx_event;
 	int err;
-	static bool hwfc_active;
 
 	ARG_UNUSED(dev);
 	ARG_UNUSED(user_data);
@@ -348,21 +351,17 @@ static void uart_callback(const struct device *dev, struct uart_event *evt, void
 		(void)k_work_submit((struct k_work *)&rx_process_work);
 		break;
 	case UART_RX_BUF_REQUEST:
-		hwfc_active = false;
 		if (k_msgq_num_free_get(&rx_event_queue) < UART_RX_EVENT_COUNT_FOR_BUF) {
-			hwfc_active = true;
 			LOG_WRN("Disabling UART RX: No event space.");
 			break;
 		}
 		buf = rx_buf_alloc();
 		if (!buf) {
-			hwfc_active = true;
 			LOG_WRN("Disabling UART RX: No free buffers.");
 			break;
 		}
 		err = uart_rx_buf_rsp(sm_uart_dev, buf->buf, sizeof(buf->buf));
 		if (err) {
-			hwfc_active = true;
 			LOG_WRN("Disabling UART RX: %d", err);
 			rx_buf_unref(buf);
 		}
@@ -375,10 +374,7 @@ static void uart_callback(const struct device *dev, struct uart_event *evt, void
 	case UART_RX_DISABLED:
 		LOG_INF("UART_RX_DISABLED");
 		atomic_clear_bit(&uart_state, SM_RX_ENABLED_BIT);
-		if (hwfc_active) {
-			LOG_INF("UART RX disabled due to flow control");
-			k_work_submit((struct k_work *)&rx_process_work);
-		}
+		k_work_submit((struct k_work *)&rx_process_work);
 		// MARKUS TODO: Whether we shutdown or go to sleep should
 		// be configurable with AT-commands.
 		// (void)k_work_submit((struct k_work *)&sleep_work);

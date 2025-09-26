@@ -44,14 +44,16 @@ struct dtr_uart_data {
 	size_t tx_len;
 	bool tx_started;
 
+	/* RX state */
 	bool app_rx_enable;
 	bool rx_active;
-
-	uart_callback_t user_callback;
-	void *user_data;
+	int32_t rx_timeout;
 
 	/* Semaphore used to wait for RX to be disabled */
 	struct k_sem rx_disable_sem;
+
+	uart_callback_t user_callback;
+	void *user_data;
 
 	/* DTR state: 0 = deasserted (UART inactive), 1 = asserted (UART active) */
 	bool dtr_state;
@@ -126,7 +128,6 @@ static int deactivate_tx(struct dtr_uart_data *data)
 	const struct dtr_uart_config *config = get_dev_config(get_dev(data));
 	int err;
 
-	// MARKUS TODO: Atomic.
 	if (data->tx_buf && !data->tx_started) {
 		LOG_DBG("TX: Abort - Before started.");
 
@@ -253,7 +254,7 @@ static void uart_dtr_input_gpio_callback(const struct device *port, struct gpio_
 {
 	struct dtr_uart_data *data = CONTAINER_OF(cb, struct dtr_uart_data, dtr_cb);
 
-	k_work_reschedule(&data->dtr_work, K_MSEC(10)); // MARKUS TODO: Debounce time?
+	k_work_reschedule(&data->dtr_work, K_MSEC(10));
 }
 
 static void dtr_work_handler(struct k_work *work)
@@ -368,6 +369,7 @@ static int dtr_uart_init(const struct device *dev)
 	struct dtr_uart_data *data = get_dev_data(dev);
 	const struct dtr_uart_config *cfg = get_dev_config(dev);
 	int err;
+
 	data->dev = dev;
 
 	if (!device_is_ready(cfg->uart)) {
@@ -400,6 +402,7 @@ static int dtr_uart_init(const struct device *dev)
 		return err;
 	}
 
+	data->rx_timeout = SYS_FOREVER_US;
 	k_work_init_delayable(&data->dtr_work, dtr_work_handler);
 	k_work_init_delayable(&data->ri_work, ri_work_fn);
 
@@ -509,6 +512,7 @@ static int api_rx_enable(const struct device *dev, uint8_t *buf, size_t len, int
 		LOG_ERR("RX already enabled");
 		return -EBUSY;
 	}
+	data->rx_timeout = timeout;
 	data->app_rx_enable = true;
 
 	if (!data->dtr_state) {
@@ -520,13 +524,14 @@ static int api_rx_enable(const struct device *dev, uint8_t *buf, size_t len, int
 		return 0;
 	}
 	data->rx_active = true;
-	return uart_rx_enable(config->uart, buf, len, 2000);
+	return uart_rx_enable(config->uart, buf, len, timeout);
 }
 
 static int api_rx_buf_rsp(const struct device *dev, uint8_t *buf, size_t len)
 {
 	const struct dtr_uart_config *config = get_dev_config(dev);
 	struct dtr_uart_data *data = get_dev_data(dev);
+	int err = 0;
 
 	LOG_DBG("api_rx_buf_rsp: %p, %zu", (void *)buf, len);
 
@@ -540,7 +545,19 @@ static int api_rx_buf_rsp(const struct device *dev, uint8_t *buf, size_t len)
 
 	if (!data->rx_active) {
 		data->rx_active = true;
-		uart_rx_enable(config->uart, buf, len, 2000);
+		err = uart_rx_enable(config->uart, buf, len, data->rx_timeout);
+		if (err == -EBUSY) {
+			LOG_ERR("RX: Busy");
+			err = 0;
+			goto release;
+		}
+		if (err) {
+			LOG_ERR("RX: Enable failed (%d).", err);
+			data->rx_active = false;
+			goto release;
+		}
+
+		LOG_DBG("RX: Enabled");
 		return 0;
 	}
 
@@ -551,7 +568,7 @@ release:
 		.data.rx_buf.buf = buf,
 	};
 	user_callback(dev, &evt);
-	return 0;
+	return err;
 }
 
 static int api_rx_disable(const struct device *dev)
@@ -566,8 +583,7 @@ static int api_rx_disable(const struct device *dev)
 	}
 
 	data->app_rx_enable = false;
-	deactivate_rx(data);
-	return 0;
+	return deactivate_rx(data);
 }
 
 static int api_err_check(const struct device *dev)
@@ -593,27 +609,6 @@ static int api_config_get(const struct device *dev, struct uart_config *cfg)
 }
 #endif /* CONFIG_UART_USE_RUNTIME_CONFIGURE */
 
-/* Power management */
-#ifdef CONFIG_PM_DEVICE
-static int dtr_uart_pm_action(const struct device *dev, enum pm_device_action action)
-{
-	switch (action) {
-	case PM_DEVICE_ACTION_SUSPEND:
-		LOG_DBG("PM SUSPEND - Disabling UART");
-		/* TODO */
-		break;
-	case PM_DEVICE_ACTION_RESUME:
-		LOG_DBG("PM RESUME - Enabling UART");
-		/* TODO */
-		break;
-	default:
-		return -ENOTSUP;
-	}
-
-	return 0;
-}
-#endif
-
 static const struct uart_driver_api dtr_uart_api = {
 	.callback_set = api_callback_set,
 	.tx = api_tx,
@@ -636,8 +631,7 @@ static const struct uart_driver_api dtr_uart_api = {
 		.uart = DEVICE_DT_GET(DT_PARENT(DT_DRV_INST(n))),                                  \
 	};                                                                                         \
 	static struct dtr_uart_data dtr_uart_data_##n;                                             \
-	PM_DEVICE_DT_INST_DEFINE(n, dtr_uart_pm_action);                                           \
-	DEVICE_DT_INST_DEFINE(n, dtr_uart_init, PM_DEVICE_DT_INST_GET(n), &dtr_uart_data_##n,      \
+	DEVICE_DT_INST_DEFINE(n, dtr_uart_init, NULL, &dtr_uart_data_##n,      \
 			      &dtr_uart_config_##n, POST_KERNEL, 51, &dtr_uart_api);
 
 DT_INST_FOREACH_STATUS_OKAY(DTR_UART_INIT)
