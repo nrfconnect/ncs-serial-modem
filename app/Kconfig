@@ -184,6 +184,17 @@ config SM_FULL_FOTA
 config SM_PPP
 	bool "PPP support"
 
+config SM_MQTTC
+	bool "MQTT client support"
+	default y
+	select MQTT_LIB
+	select MQTT_LIB_TLS
+
+config SM_HTTPC
+	bool "HTTP client support"
+	default y
+	select HTTP_CLIENT
+
 if SM_PPP
 
 config SM_PPP_FALLBACK_MTU
@@ -220,6 +231,48 @@ config SM_SKIP_READY_MSG
 	help
 	  Skip sending the ready message when the application is powered on.
 
+if SM_MQTTC
+
+config SM_MQTTC_MESSAGE_BUFFER_LEN
+	int "Size of the buffer for MQTT library"
+	default 512
+	help
+	  Specifies maximum message size can be transmitted/received through
+	  MQTT (excluding MQTT PUBLISH payload).
+
+endif # SM_MQTTC
+
+if SM_GNSS
+
+config SM_GNSS_OUTPUT_NMEA_ON_CMUX_CHANNEL
+	bool "Output NMEA messages on a dedicated CMUX channel"
+	depends on SM_CMUX
+
+config SM_GNSS_OUTPUT_NMEA_SATELLITES
+	bool "Output NMEA satellite messages (GSV, GSA)"
+	default y if SM_LOG_LEVEL_DBG
+	depends on SM_LOG_LEVEL_DBG || SM_GNSS_OUTPUT_NMEA_ON_CMUX_CHANNEL
+	help
+	  If enabled, NMEA messages that pertain to the satellites will be output
+	  along with the other NMEA messages. Those are output in debug logs, and
+	  can also be output to a dedicated CMUX channel.
+
+config SM_PGPS_INJECT_FIX_DATA
+	bool "Inject the data obtained when acquiring a fix"
+	default y
+	depends on SM_GNSS
+	depends on SM_NRF_CLOUD
+	depends on NRF_CLOUD_PGPS
+	help
+	  If enabled, when a fix is acquired the current location and time will
+	  be passed to the P-GPS subsystem.
+	  It allows to speed up the time it takes to acquire the next fix when
+	  A-GNSS is disabled or unavailable.
+	  This can be detrimental to short TTFF if the device is expected to move
+	  distances longer than a few dozen kilometers between fix attempts.
+	  In that case this option should be disabled.
+
+endif
 
 module = SM
 module-str = serial modem
