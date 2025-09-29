@@ -61,6 +61,7 @@ struct dtr_uart_data {
 	/* DTR state: 0 = deasserted (UART inactive), 1 = asserted (UART active) */
 	bool dtr_state;
 	struct gpio_callback dtr_cb;
+	struct k_mutex dtr_mutex;
 
 	/* Worker for processing DTR signal changes */
 	struct k_work_delayable dtr_work;
@@ -265,12 +266,20 @@ static void dtr_work_handler(struct k_work *work)
 	struct k_work_delayable *dwork = k_work_delayable_from_work(work);
 	struct dtr_uart_data *data = CONTAINER_OF(dwork, struct dtr_uart_data, dtr_work);
 	const struct dtr_uart_config *cfg = get_dev_config(data->dev);
+
+	if (k_is_in_isr())
+	{
+		LOG_ERR("DTR work handler called from ISR, this is not supported.");
+		return;
+	}
+	k_mutex_lock(&data->dtr_mutex, K_FOREVER);
+
 	bool asserted = gpio_pin_get_dt(&cfg->dtr_gpio) && !data->pm_suspended;
 	int err;
 
 	if (data->dtr_state == asserted) {
 		LOG_WRN("DTR is already %s, ignoring event", asserted ? "asserted" : "deasserted");
-		return;
+		goto exit;
 	}
 
 	data->dtr_state = asserted;
@@ -299,6 +308,8 @@ static void dtr_work_handler(struct k_work *work)
 		}
 		power_off_uart(data);
 	}
+exit:
+	k_mutex_unlock(&data->dtr_mutex);
 }
 
 /****************************** UART ********************************/
@@ -406,6 +417,8 @@ static int dtr_uart_init(const struct device *dev)
 	}
 
 	data->rx_timeout = SYS_FOREVER_US;
+
+	k_mutex_init(&data->dtr_mutex);
 	k_work_init_delayable(&data->dtr_work, dtr_work_handler);
 	k_work_init_delayable(&data->ri_work, ri_work_fn);
 
@@ -617,12 +630,12 @@ static int dtr_uart_pm_action(const struct device *dev, enum pm_device_action ac
 	case PM_DEVICE_ACTION_SUSPEND:
 		LOG_DBG("PM SUSPEND - Disobey DTR and disable UART");
 		data->pm_suspended = true;
-		k_work_reschedule(&data->dtr_work, K_NO_WAIT);
+		dtr_work_handler(&data->dtr_work.work);
 		break;
 	case PM_DEVICE_ACTION_RESUME:
 		LOG_DBG("PM RESUME - Obey DTR");
 		data->pm_suspended = false;
-		k_work_reschedule(&data->dtr_work, K_NO_WAIT);
+		dtr_work_handler(&data->dtr_work.work);
 		break;
 	default:
 		return -ENOTSUP;

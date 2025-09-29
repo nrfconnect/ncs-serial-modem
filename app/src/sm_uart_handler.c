@@ -30,7 +30,6 @@ const struct device *const sm_uart_dev = DEVICE_DT_GET(DT_CHOSEN(ncs_sm_uart));
 uint32_t sm_uart_baudrate;
 
 static struct k_work_delayable rx_process_work;
-static struct k_work sleep_work;
 
 struct rx_buf_t {
 	atomic_t ref_counter;
@@ -45,7 +44,7 @@ BUILD_ASSERT((sizeof(struct rx_buf_t) % UART_SLAB_ALIGNMENT) == 0);
 K_MEM_SLAB_DEFINE(rx_slab, UART_SLAB_BLOCK_SIZE, UART_SLAB_BLOCK_COUNT, UART_SLAB_ALIGNMENT);
 
 /* 4 messages for 512 bytes, 32 messages for 4096 bytes. */
-#define UART_RX_EVENT_COUNT 4 // ((CONFIG_SM_UART_RX_BUF_COUNT * CONFIG_SM_UART_RX_BUF_SIZE) / 128)
+#define UART_RX_EVENT_COUNT ((CONFIG_SM_UART_RX_BUF_COUNT * CONFIG_SM_UART_RX_BUF_SIZE) / 128)
 #define UART_RX_EVENT_COUNT_FOR_BUF (UART_RX_EVENT_COUNT / CONFIG_SM_UART_RX_BUF_COUNT)
 struct rx_event_t {
 	uint8_t *buf;
@@ -371,9 +370,6 @@ static void uart_callback(const struct device *dev, struct uart_event *evt, void
 		LOG_INF("UART_RX_DISABLED");
 		atomic_clear_bit(&uart_state, SM_RX_ENABLED_BIT);
 		k_work_submit((struct k_work *)&rx_process_work);
-		// MARKUS TODO: Whether we shutdown or go to sleep should
-		// be configurable with AT-commands.
-		// (void)k_work_submit((struct k_work *)&sleep_work);
 		break;
 	default:
 		break;
@@ -446,35 +442,6 @@ int sm_tx_write(const uint8_t *data, size_t len)
 	return sm_uart_tx_write(data, len);
 }
 
-static void sleep_work_fn(struct k_work *work)
-{
-	ARG_UNUSED(work);
-
-	// MARKUS TODO: Some of the cleanup code sends UART responses. Those should be handled properly.
-	// This is a problem with having the virtual uart driver. The API between that and the SM is
-	// the default UART API, which does not allow for us to react to DTR before closing the UART.
-	//
-	// It is possible to remove the UART responses in cleanup code. But it would be better to have them.
-
-	sm_at_host_uninit();
-
-	/* Only power off the modem if it has not been put
-	 * in flight mode to allow reducing NVM wear.
-	 */
-	// if (!slm_is_modem_functional_mode(LTE_LC_FUNC_MODE_OFFLINE)) {
-	// 	slm_power_off_modem();
-	// }
-
-	LOG_INF("Entering sleep.");
-	// LOG_PANIC();
-	// nrf_gpio_cfg_sense_set(CONFIG_SLM_POWER_PIN, NRF_GPIO_PIN_SENSE_LOW);
-
-	k_sleep(K_MSEC(100));
-
-	nrf_regulators_system_off(NRF_REGULATORS_NS);
-	assert(false);
-}
-
 int sm_uart_handler_enable(void)
 {
 	int err;
@@ -525,7 +492,6 @@ int sm_uart_handler_enable(void)
 	}
 
 	k_work_init_delayable(&rx_process_work, rx_process);
-	k_work_init(&sleep_work, sleep_work_fn);
 
 	/* Flush possibly pending data in case Serial Modem was idle. */
 	tx_start();

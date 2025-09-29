@@ -62,9 +62,9 @@ config SM_UART_RX_BUF_COUNT
 
 config SM_UART_RX_BUF_SIZE
 	int "Receive buffer size for UART"
-	range 8 4096
+	range 128 4096
 	default 2048 if BOARD_THINGY91_NRF9160_NS || BOARD_THINGY91X_NRF9151_NS
-	default 8
+	default 256
 	help
 	  Amount of received (RX), unprocessed, UART traffic that can be held by single buffer.
 	  Increase buffer space for Thingy:91 and Thingy:91 X as hardware flow control is not used.

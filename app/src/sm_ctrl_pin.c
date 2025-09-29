@@ -231,41 +231,23 @@ static void power_pin_callback_wakeup(const struct device *dev,
 
 #endif /* POWER_PIN_IS_ENABLED */
 
-static void dtr_disable_fn(struct k_work *)
+static void dtr_enable_fn(struct k_work *)
 {
 	LOG_INF("DTR pin callback work function.");
-
-	/* Stop threads, uninitialize host and disable DTR UART. */
-	sm_at_host_uninit();
-
-	/* Only power off the modem if it has not been put
-	 * in flight mode to allow reducing NVM wear.
-	 */
-	if (!sm_is_modem_functional_mode(LTE_LC_FUNC_MODE_OFFLINE)) {
-		sm_power_off_modem();
-	}
-
-	LOG_INF("Entering sleep.");
-	LOG_PANIC();
-	nrf_gpio_cfg_sense_set(dtr_gpio.pin, NRF_GPIO_PIN_SENSE_LOW);
-
-	k_sleep(K_MSEC(100));
-
-	nrf_regulators_system_off(NRF_REGULATORS_NS);
-	assert(false);
+	sm_at_host_power_on();
 }
 
 static void dtr_pin_callback(const struct device *dev, struct gpio_callback *gpio_callback,
 			     uint32_t)
 {
-	static K_WORK_DELAYABLE_DEFINE(work, dtr_disable_fn);
+	static K_WORK_DEFINE(work, dtr_enable_fn);
 	bool asserted = gpio_pin_get_dt(&dtr_gpio);
 
 	LOG_DBG("DTR pin %s.", asserted ? "asserted" : "de-asserted");
 
 	if (asserted) {
 		gpio_remove_callback(dev, gpio_callback);
-		sm_at_host_power_on();
+		k_work_submit(&work);
 	}
 }
 
