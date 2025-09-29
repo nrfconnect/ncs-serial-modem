@@ -1,0 +1,75 @@
+/*
+ * Copyright (c) 2025 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+ */
+
+/ {
+	chosen {
+		ncs,sm-uart = &dtr_uart2;
+	};
+};
+
+/* For logging. TODO: Disable. */
+// &uart0 {
+// 	status = "okay";
+// 	hw-flow-control;
+// };
+
+&uart0 {
+	status = "disabled";
+};
+
+&dtr_uart0 {
+	status = "disabled";
+};
+
+
+&gpio0 {
+	status = "okay";
+	/* Use PORT event for DTR (31) and RI (30) pins to save power */
+	sense-edge-mask = <0xC0000000>;
+};
+
+/* DTR with external MCU */
+&uart2 {
+	compatible = "nordic,nrf-uarte";
+	current-speed = <115200>;
+	hw-flow-control;
+	status = "okay";
+
+	dtr_uart2: dtr-uart {
+		compatible = "nordic,dtr-uart";
+		dtr-gpios = <&gpio0 31 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+		ri-gpios = <&gpio0 30 GPIO_ACTIVE_LOW>;
+		status = "okay";
+	};
+	pinctrl-0 = <&uart2_default_alt>;
+	pinctrl-1 = <&uart2_sleep_alt>;
+	pinctrl-names = "default", "sleep";
+};
+
+
+&pinctrl {
+	uart2_default_alt: uart2_default_alt {
+		group1 {
+			psels = <NRF_PSEL(UART_RX, 0, 11)>;
+			bias-pull-up;
+		};
+		group2 {
+			psels = <NRF_PSEL(UART_TX, 0, 10)>,
+				<NRF_PSEL(UART_RTS, 0, 12)>,
+				<NRF_PSEL(UART_CTS, 0, 13)>;
+		};
+	};
+
+	uart2_sleep_alt: uart2_sleep_alt {
+		group1 {
+			psels = <NRF_PSEL(UART_TX, 0, 10)>,
+				<NRF_PSEL(UART_RX, 0, 11)>,
+				<NRF_PSEL(UART_RTS, 0, 12)>,
+				<NRF_PSEL(UART_CTS, 0, 13)>;
+			low-power-enable;
+		};
+	};
+};

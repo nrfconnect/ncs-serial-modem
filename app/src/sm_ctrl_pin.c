@@ -22,8 +22,12 @@ LOG_MODULE_REGISTER(sm_ctrl_pin, CONFIG_SM_LOG_LEVEL);
 
 static const struct device *gpio_dev = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 
-#if POWER_PIN_IS_ENABLED
+static const struct gpio_dt_spec dtr_gpio =
+	GPIO_DT_SPEC_GET_OR(DT_CHOSEN(ncs_sm_uart), dtr_gpios, {0});
+
 static struct gpio_callback gpio_cb;
+
+#if POWER_PIN_IS_ENABLED
 #else
 BUILD_ASSERT(!IS_ENABLED(CONFIG_SM_START_SLEEP),
 	"CONFIG_SM_START_SLEEP requires CONFIG_SM_POWER_PIN to be defined.");
@@ -225,26 +229,33 @@ static void power_pin_callback_wakeup(const struct device *dev,
 	k_work_submit(&work);
 }
 
-void sm_ctrl_pin_enter_idle(void)
+#endif /* POWER_PIN_IS_ENABLED */
+
+static void dtr_enable_fn(struct k_work *)
 {
-	LOG_INF("Entering idle.");
-	int err;
+	LOG_INF("DTR pin callback work function.");
+	sm_at_host_power_on();
+}
 
-	gpio_remove_callback(gpio_dev, &gpio_cb);
+static void dtr_pin_callback(const struct device *dev, struct gpio_callback *gpio_callback,
+			     uint32_t)
+{
+	static K_WORK_DEFINE(work, dtr_enable_fn);
+	bool asserted = gpio_pin_get_dt(&dtr_gpio);
 
-	err = configure_power_pin_interrupt(power_pin_callback_wakeup, GPIO_INT_LEVEL_LOW);
-	if (err) {
-		return;
-	}
+	LOG_DBG("DTR pin %s.", asserted ? "asserted" : "de-asserted");
 
-	err = ext_xtal_control(false);
-	if (err < 0) {
-		LOG_WRN("Failed to disable ext XTAL: %d", err);
+	if (asserted) {
+		gpio_remove_callback(dev, gpio_callback);
+		k_work_submit(&work);
 	}
 }
 
 void sm_ctrl_pin_enter_sleep(void)
 {
+	int err;
+
+	/* Stop threads, uninitialize host and disable DTR UART. */
 	sm_at_host_uninit();
 
 	/* Only power off the modem if it has not been put
@@ -253,14 +264,12 @@ void sm_ctrl_pin_enter_sleep(void)
 	if (!sm_is_modem_functional_mode(LTE_LC_FUNC_MODE_OFFLINE)) {
 		sm_power_off_modem();
 	}
-	sm_ctrl_pin_enter_sleep_no_uninit();
-}
 
-void sm_ctrl_pin_enter_sleep_no_uninit(void)
-{
+	gpio_pin_interrupt_configure_dt(&dtr_gpio, GPIO_INT_DISABLE);
+
 	LOG_INF("Entering sleep.");
 	LOG_PANIC();
-	nrf_gpio_cfg_sense_set(CONFIG_SM_POWER_PIN, NRF_GPIO_PIN_SENSE_LOW);
+	nrf_gpio_cfg_sense_set(dtr_gpio.pin, NRF_GPIO_PIN_SENSE_LOW); // MARKUS TODO: Correct sense. And do not do this here.
 
 	k_sleep(K_MSEC(100));
 
@@ -268,25 +277,35 @@ void sm_ctrl_pin_enter_sleep_no_uninit(void)
 	assert(false);
 }
 
-#endif /* POWER_PIN_IS_ENABLED */
-
-int sm_ctrl_pin_indicate(void)
+void sm_ctrl_pin_enter_sleep_no_uninit(void)
 {
-	int err = 0;
+	LOG_INF("Entering sleep.");
+	LOG_PANIC();
+	nrf_gpio_cfg_sense_set(dtr_gpio.pin, NRF_GPIO_PIN_SENSE_LOW);
 
-#if INDICATE_PIN_IS_ENABLED
-	if (k_work_delayable_is_pending(&indicate_work)) {
-		return 0;
-	}
-	LOG_DBG("Start indicating");
-	err = gpio_pin_set(gpio_dev, CONFIG_SM_INDICATE_PIN, 1);
+	k_sleep(K_MSEC(100));
+
+	nrf_regulators_system_off(NRF_REGULATORS_NS);
+	assert(false);
+}
+
+void sm_ctrl_pin_enter_idle(void)
+{
+	LOG_INF("Entering idle.");
+	int err;
+
+	gpio_init_callback(&gpio_cb, dtr_pin_callback, BIT(dtr_gpio.pin));
+
+	err = gpio_add_callback_dt(&dtr_gpio, &gpio_cb);
 	if (err) {
-		LOG_ERR("GPIO_0 set error: %d", err);
-	} else {
-		k_work_reschedule(&indicate_work, K_MSEC(CONFIG_SM_INDICATE_TIME));
+		LOG_ERR("gpio_add_callback failed: %d", err);
+		return;
 	}
-#endif
-	return err;
+
+	err = ext_xtal_control(false);
+	if (err < 0) {
+		LOG_WRN("Failed to disable ext XTAL: %d", err);
+	}
 }
 
 void sm_ctrl_pin_enter_shutdown(void)
