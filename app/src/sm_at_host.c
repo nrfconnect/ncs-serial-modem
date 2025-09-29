@@ -1005,9 +1005,9 @@ int sm_at_host_power_on(void)
 		return err;
 	}
 
-	/* Wait for UART enabling to complete. */
-	k_sleep(K_MSEC(100));
-	sm_uart_handler_enable();
+	// /* Wait for UART enabling to complete. */
+	// k_sleep(K_MSEC(100));
+	// sm_uart_handler_enable();
 
 	return 0;
 }

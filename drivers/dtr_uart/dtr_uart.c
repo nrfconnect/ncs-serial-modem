@@ -55,6 +55,9 @@ struct dtr_uart_data {
 	uart_callback_t user_callback;
 	void *user_data;
 
+	/* PM state */
+	bool pm_suspended;
+
 	/* DTR state: 0 = deasserted (UART inactive), 1 = asserted (UART active) */
 	bool dtr_state;
 	struct gpio_callback dtr_cb;
@@ -262,7 +265,7 @@ static void dtr_work_handler(struct k_work *work)
 	struct k_work_delayable *dwork = k_work_delayable_from_work(work);
 	struct dtr_uart_data *data = CONTAINER_OF(dwork, struct dtr_uart_data, dtr_work);
 	const struct dtr_uart_config *cfg = get_dev_config(data->dev);
-	bool asserted = gpio_pin_get_dt(&cfg->dtr_gpio);
+	bool asserted = gpio_pin_get_dt(&cfg->dtr_gpio) && !data->pm_suspended;
 	int err;
 
 	if (data->dtr_state == asserted) {
@@ -420,11 +423,6 @@ static int dtr_uart_init(const struct device *dev)
 	 * Input level 1 → DTR asserted (dtr_state = 1, UART active)
 	 */
 	data->dtr_state = initial_dtr_state;
-
-	/* TODO: How to do this from Zephyr API: Set sense to wake the DCE from possible shutdown */
-	/* MARKUS TODO: -> Possibly through pin_trigger_enable, which is called in interrupt set.
-	 * What if we just don't disable interrupt when shutting down? */
-	/* nrf_gpio_cfg_sense_set(data->dtr_pin, NRF_GPIO_PIN_SENSE_LOW); */
 
 	/* Set up GPIO interrupt for DTR changes */
 	gpio_init_callback(&data->dtr_cb, uart_dtr_input_gpio_callback, BIT(cfg->dtr_gpio.pin));
@@ -617,24 +615,14 @@ static int dtr_uart_pm_action(const struct device *dev, enum pm_device_action ac
 	struct dtr_uart_data *data = get_dev_data(dev);
 	switch (action) {
 	case PM_DEVICE_ACTION_SUSPEND:
-		/* Disobey DTR signal and disable UART.
-		 * Will go to normal operation after DTR signal changes.
-		 */
-		LOG_DBG("PM SUSPEND - Disabling UART");
-		data->dtr_state = false; // MARKUS TODO: Use same method as with DTR signal?
-		deactivate_tx(data);
-		deactivate_rx(data);
-		power_off_uart(data);
+		LOG_DBG("PM SUSPEND - Disobey DTR and disable UART");
+		data->pm_suspended = true;
+		k_work_reschedule(&data->dtr_work, K_NO_WAIT);
 		break;
 	case PM_DEVICE_ACTION_RESUME:
-		/* Disobey DTR signal and enable UART.
-		 * Will go to normal operation after DTR signal changes.
-		 */
-		LOG_DBG("PM RESUME - Enabling UART");
-		data->dtr_state = true; // MARKUS TODO: Use same method as with DTR signal?
-		power_on_uart(data);
-		activate_rx(data);
-		activate_tx(data);
+		LOG_DBG("PM RESUME - Obey DTR");
+		data->pm_suspended = false;
+		k_work_reschedule(&data->dtr_work, K_NO_WAIT);
 		break;
 	default:
 		return -ENOTSUP;

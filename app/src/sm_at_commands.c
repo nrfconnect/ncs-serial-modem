@@ -129,7 +129,7 @@ static void go_sleep_wk(struct k_work *)
 {
 	if (sleep_control.mode == SLEEP_MODE_IDLE) {
 		if (sm_at_host_power_off() == 0) {
-			// sm_ctrl_pin_enter_idle();
+			sm_ctrl_pin_enter_idle();
 		} else {
 			LOG_ERR("failed to power off UART");
 		}
@@ -143,31 +143,18 @@ static int handle_at_sleep(enum at_parser_cmd_type cmd_type, struct at_parser *p
 			   uint32_t)
 {
 	int ret = -EINVAL;
-	uint32_t mode;
 
 	if (cmd_type == AT_PARSER_CMD_TYPE_SET) {
-		ret = at_parser_num_get(parser, 1, &mode);
-		if (ret || (mode != SLEEP_MODE_DEEP && mode != SLEEP_MODE_IDLE)) {
+		ret = at_parser_num_get(parser, 1, &sleep_control.mode);
+		if (ret) {
 			return -EINVAL;
 		}
-
-		rsp_send_ok();
-		if (mode == SLEEP_MODE_DEEP) {
-			LOG_INF("Sleep mode: DEEP");
-			sm_ctrl_pin_enter_sleep();
+		if (sleep_control.mode == SLEEP_MODE_DEEP ||
+		    sleep_control.mode == SLEEP_MODE_IDLE) {
+			k_work_reschedule(&sleep_control.work, SM_UART_RESPONSE_DELAY);
 		} else {
-			LOG_INF("Sleep mode: IDLE");
-			if (sm_at_host_power_off() != 0) {
-				LOG_ERR("failed to power off UART");
-				return -EFAULT;
-			}
-			sm_ctrl_pin_enter_idle();
-
-			/* Enable UART from application side. */
-			// sm_uart_handler_enable();
+			ret = -EINVAL;
 		}
-		ret = -SILENT_AT_COMMAND_RET;
-
 	} else if (cmd_type == AT_PARSER_CMD_TYPE_TEST) {
 		rsp_send("\r\n#XSLEEP: (%d,%d)\r\n", SLEEP_MODE_DEEP, SLEEP_MODE_IDLE);
 		ret = 0;
