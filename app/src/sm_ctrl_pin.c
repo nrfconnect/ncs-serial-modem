@@ -23,7 +23,7 @@ LOG_MODULE_REGISTER(sm_ctrl_pin, CONFIG_SM_LOG_LEVEL);
 static const struct device *gpio_dev = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 
 static const struct gpio_dt_spec dtr_gpio =
-	GPIO_DT_SPEC_GET_OR(DT_NODELABEL(dtr_uart), dtr_gpios, {0});
+	GPIO_DT_SPEC_GET_OR(DT_CHOSEN(ncs_sm_uart), dtr_gpios, {0});
 
 static struct gpio_callback gpio_cb;
 
