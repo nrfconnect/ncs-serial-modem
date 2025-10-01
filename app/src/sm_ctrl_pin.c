@@ -18,22 +18,11 @@
 
 LOG_MODULE_REGISTER(sm_ctrl_pin, CONFIG_SM_LOG_LEVEL);
 
-#define POWER_PIN_DEBOUNCE_MS 50
+#if DT_NODE_HAS_PROP(DT_CHOSEN(ncs_sm_uart), dtr_gpios)
+static const struct gpio_dt_spec dtr_gpio =
+	GPIO_DT_SPEC_GET_OR(DT_CHOSEN(ncs_sm_uart), dtr_gpios, {0});
 
-static const struct device *gpio_dev = DEVICE_DT_GET(DT_NODELABEL(gpio0));
-
-#if POWER_PIN_IS_ENABLED
 static struct gpio_callback gpio_cb;
-#else
-BUILD_ASSERT(!IS_ENABLED(CONFIG_SM_START_SLEEP),
-	"CONFIG_SM_START_SLEEP requires CONFIG_SM_POWER_PIN to be defined.");
-#endif
-
-#if INDICATE_PIN_IS_ENABLED
-static struct k_work_delayable indicate_work;
-#endif
-#if POWER_PIN_IS_ENABLED
-static atomic_t callback_wakeup_running;
 #endif
 
 static int ext_xtal_control(bool xtal_on)
@@ -69,182 +58,50 @@ static int ext_xtal_control(bool xtal_on)
 	return err;
 }
 
-#if POWER_PIN_IS_ENABLED || INDICATE_PIN_IS_ENABLED
-
-static int configure_gpio(gpio_pin_t pin, gpio_flags_t flags)
+#if DT_NODE_HAS_PROP(DT_CHOSEN(ncs_sm_uart), dtr_gpios)
+static void dtr_enable_fn(struct k_work *)
 {
-	const int err = gpio_pin_configure(gpio_dev, pin, flags);
+	LOG_INF("DTR pin callback work function.");
+	sm_at_host_power_on();
+}
 
-	if (err) {
-		LOG_ERR("Failed to configure GPIO pin P0.%d. (%d)", pin, err);
-		return err;
+static void dtr_pin_callback(const struct device *dev, struct gpio_callback *gpio_callback,
+			     uint32_t)
+{
+	static K_WORK_DEFINE(work, dtr_enable_fn);
+	bool asserted = gpio_pin_get_dt(&dtr_gpio);
+
+	LOG_DBG("DTR pin %s.", asserted ? "asserted" : "de-asserted");
+
+	if (asserted) {
+		gpio_remove_callback(dev, gpio_callback);
+		k_work_submit(&work);
 	}
-
-	return 0;
 }
 #endif
 
-#if POWER_PIN_IS_ENABLED
-
-static int configure_power_pin_interrupt(gpio_callback_handler_t handler, gpio_flags_t flags)
+int sm_ctrl_pin_ready(void)
 {
-	int err;
-	const gpio_pin_t pin = CONFIG_SM_POWER_PIN;
-
-	/* First disable the previously configured interrupt. Somehow when in idle mode if
-	 * the wake-up interrupt is configured to be on an edge the power consumption
-	 * drastically increases (3x), which is why it is configured to be level-triggered.
-	 * When entering idle for some reason first disabling the previously edge-level
-	 * configured interrupt is also needed to keep the power consumption down.
-	 */
-	err = gpio_pin_interrupt_configure(gpio_dev, pin, GPIO_INT_DISABLE);
-	if (err) {
-		LOG_ERR("Failed to configure %s (0x%lx) on power pin. (%d)",
-			"interrupt", GPIO_INT_DISABLE, err);
+#if DT_NODE_HAS_PROP(DT_CHOSEN(ncs_sm_uart), dtr_gpios)
+	if (gpio_is_ready_dt(&dtr_gpio)) {
+		return 0;
 	}
-
-	err = gpio_pin_interrupt_configure(gpio_dev, pin, flags);
-	if (err) {
-		LOG_ERR("Failed to configure %s (0x%x) on power pin. (%d)",
-			"interrupt", flags, err);
-		return err;
-	}
-
-	gpio_init_callback(&gpio_cb, handler, BIT(pin));
-
-	err = gpio_add_callback(gpio_dev, &gpio_cb);
-	if (err) {
-		LOG_ERR("Failed to configure %s (0x%x) on power pin. (%d)", "callback", flags, err);
-		return err;
-	}
-
-	LOG_DBG("Configured interrupt (0x%x) on power pin (%u) with handler (%p).",
-		flags, pin, (void *)handler);
-	return 0;
-}
-
-static void sm_ctrl_pin_enter_sleep_work_fn(struct k_work *)
-{
-	sm_ctrl_pin_enter_sleep();
-}
-
-static void power_pin_callback_poweroff(const struct device *dev,
-					struct gpio_callback *gpio_callback, uint32_t)
-{
-	static K_WORK_DEFINE(work, sm_ctrl_pin_enter_sleep_work_fn);
-
-	LOG_INF("Power off triggered.");
-	gpio_remove_callback(dev, gpio_callback);
-	k_work_submit(&work);
-}
-
-#endif /* POWER_PIN_IS_ENABLED */
-
-#if INDICATE_PIN_IS_ENABLED
-
-static void indicate_stop(void)
-{
-	if (gpio_pin_set(gpio_dev, CONFIG_SM_INDICATE_PIN, 0) != 0) {
-		LOG_WRN("GPIO_0 set error");
-	}
-	LOG_DBG("Stop indicating");
-}
-
-static void indicate_wk(struct k_work *work)
-{
-	ARG_UNUSED(work);
-
-	indicate_stop();
-}
-
-#endif /* INDICATE_PIN_IS_ENABLED */
-
-#if POWER_PIN_IS_ENABLED
-
-static void power_pin_callback_enable_poweroff_fn(struct k_work *)
-{
-	LOG_INF("Enabling poweroff interrupt.");
-	configure_power_pin_interrupt(power_pin_callback_poweroff, GPIO_INT_EDGE_RISING);
-}
-
-static K_WORK_DELAYABLE_DEFINE(work_poweroff, power_pin_callback_enable_poweroff_fn);
-
-static void power_pin_callback_enable_poweroff(const struct device *dev,
-					       struct gpio_callback *gpio_callback, uint32_t)
-{
-	LOG_INF("Enabling the poweroff interrupt shortly...");
-	gpio_remove_callback(dev, gpio_callback);
-
-	k_work_reschedule(&work_poweroff, K_MSEC(POWER_PIN_DEBOUNCE_MS));
-}
-
-static void power_pin_callback_wakeup_work_fn(struct k_work *)
-{
-	int err;
-
-	LOG_INF("Resuming from idle.");
-
-#if INDICATE_PIN_IS_ENABLED
-	if (k_work_delayable_is_pending(&indicate_work)) {
-		k_work_cancel_delayable(&indicate_work);
-		indicate_stop();
-	}
-#endif /* INDICATE_PIN_IS_ENABLED */
-
-	err = ext_xtal_control(true);
-	if (err < 0) {
-		LOG_WRN("Failed to enable ext XTAL: %d", err);
-	}
-	err = sm_at_host_power_on();
-	if (err) {
-		LOG_ERR("Failed to power on uart: %d. Resetting Serial Modem.", err);
-		gpio_remove_callback(gpio_dev, &gpio_cb);
-		sm_reset();
-		return;
-	}
-
-	atomic_set(&callback_wakeup_running, false);
-}
-
-static void power_pin_callback_wakeup(const struct device *dev,
-				      struct gpio_callback *gpio_callback, uint32_t)
-{
-	static K_WORK_DEFINE(work, power_pin_callback_wakeup_work_fn);
-
-	/* Prevent level triggered interrupt running this multiple times. */
-	if (!atomic_cas(&callback_wakeup_running, false, true)) {
-		return;
-	}
-
-	LOG_INF("Resuming from idle shortly...");
-	gpio_remove_callback(dev, gpio_callback);
-
-	/* Enable the poweroff interrupt only when the pin will be back to a nonactive state. */
-	configure_power_pin_interrupt(power_pin_callback_enable_poweroff, GPIO_INT_EDGE_FALLING);
-
-	k_work_submit(&work);
-}
-
-void sm_ctrl_pin_enter_idle(void)
-{
-	LOG_INF("Entering idle.");
-	int err;
-
-	gpio_remove_callback(gpio_dev, &gpio_cb);
-
-	err = configure_power_pin_interrupt(power_pin_callback_wakeup, GPIO_INT_LEVEL_LOW);
-	if (err) {
-		return;
-	}
-
-	err = ext_xtal_control(false);
-	if (err < 0) {
-		LOG_WRN("Failed to disable ext XTAL: %d", err);
-	}
+#endif
+	LOG_ERR("dtr-gpios is not ready");
+	return -EFAULT;
 }
 
 void sm_ctrl_pin_enter_sleep(void)
 {
+#if DT_NODE_HAS_PROP(DT_CHOSEN(ncs_sm_uart), dtr_gpios)
+	int err;
+
+	err = sm_ctrl_pin_ready();
+	if (err) {
+		return;
+	}
+
+	/* Stop threads, uninitialize host and disable DTR UART. */
 	sm_at_host_uninit();
 
 	/* Only power off the modem if it has not been put
@@ -253,98 +110,80 @@ void sm_ctrl_pin_enter_sleep(void)
 	if (!sm_is_modem_functional_mode(LTE_LC_FUNC_MODE_OFFLINE)) {
 		sm_power_off_modem();
 	}
-	sm_ctrl_pin_enter_sleep_no_uninit();
-}
 
-void sm_ctrl_pin_enter_sleep_no_uninit(void)
-{
+	gpio_pin_interrupt_configure_dt(&dtr_gpio, GPIO_INT_DISABLE);
+
 	LOG_INF("Entering sleep.");
 	LOG_PANIC();
-	nrf_gpio_cfg_sense_set(CONFIG_SM_POWER_PIN, NRF_GPIO_PIN_SENSE_LOW);
+	nrf_gpio_cfg_sense_set(dtr_gpio.pin, NRF_GPIO_PIN_SENSE_LOW);
 
 	k_sleep(K_MSEC(100));
 
 	nrf_regulators_system_off(NRF_REGULATORS_NS);
 	assert(false);
+#endif
 }
 
-#endif /* POWER_PIN_IS_ENABLED */
-
-int sm_ctrl_pin_indicate(void)
+/* TODO: Cellular modem driver uses pulse triggered power management, which is not suitable with
+ *       the current implementation.
+ */
+void sm_ctrl_pin_enter_sleep_no_uninit(void)
 {
-	int err = 0;
+#if DT_NODE_HAS_PROP(DT_CHOSEN(ncs_sm_uart), dtr_gpios)
+	LOG_INF("Entering sleep.");
+	LOG_PANIC();
+	nrf_gpio_cfg_sense_set(dtr_gpio.pin, NRF_GPIO_PIN_SENSE_LOW);
 
-#if INDICATE_PIN_IS_ENABLED
-	if (k_work_delayable_is_pending(&indicate_work)) {
-		return 0;
-	}
-	LOG_DBG("Start indicating");
-	err = gpio_pin_set(gpio_dev, CONFIG_SM_INDICATE_PIN, 1);
+	k_sleep(K_MSEC(100));
+
+	nrf_regulators_system_off(NRF_REGULATORS_NS);
+	assert(false);
+#endif
+}
+
+void sm_ctrl_pin_enter_idle(void)
+{
+#if DT_NODE_HAS_PROP(DT_CHOSEN(ncs_sm_uart), dtr_gpios)
+	LOG_INF("Entering idle.");
+	int err;
+
+	err = sm_ctrl_pin_ready();
 	if (err) {
-		LOG_ERR("GPIO_0 set error: %d", err);
-	} else {
-		k_work_reschedule(&indicate_work, K_MSEC(CONFIG_SM_INDICATE_TIME));
+		return;
+	}
+
+	gpio_init_callback(&gpio_cb, dtr_pin_callback, BIT(dtr_gpio.pin));
+	err = gpio_add_callback_dt(&dtr_gpio, &gpio_cb);
+	if (err) {
+		LOG_ERR("gpio_add_callback failed: %d", err);
+		return;
+	}
+
+	err = ext_xtal_control(false);
+	if (err < 0) {
+		LOG_WRN("Failed to disable ext XTAL: %d", err);
 	}
 #endif
-	return err;
 }
 
 void sm_ctrl_pin_enter_shutdown(void)
 {
 	LOG_INF("Entering shutdown.");
-
-	/* De-configure GPIOs */
-#if POWER_PIN_IS_ENABLED
-	gpio_pin_interrupt_configure(gpio_dev, CONFIG_SM_POWER_PIN, GPIO_INT_DISABLE);
-	gpio_pin_configure(gpio_dev, CONFIG_SM_POWER_PIN, GPIO_DISCONNECTED);
-#endif
-#if INDICATE_PIN_IS_ENABLED
-	gpio_pin_configure(gpio_dev, CONFIG_SM_INDICATE_PIN, GPIO_DISCONNECTED);
-#endif
-
 	k_sleep(K_MSEC(100));
 
 	nrf_regulators_system_off(NRF_REGULATORS_NS);
 	assert(false);
-}
-
-void sm_ctrl_pin_init_gpios(void)
-{
-	if (!device_is_ready(gpio_dev)) {
-		LOG_ERR("GPIO controller not ready");
-		return;
-	}
-
-#if POWER_PIN_IS_ENABLED
-	(void)configure_gpio(CONFIG_SM_POWER_PIN, GPIO_INPUT | GPIO_PULL_UP | GPIO_ACTIVE_LOW);
-#endif
-
-#if INDICATE_PIN_IS_ENABLED
-	(void)configure_gpio(CONFIG_SM_INDICATE_PIN, GPIO_OUTPUT_INACTIVE | GPIO_ACTIVE_LOW);
-#endif
 }
 
 int sm_ctrl_pin_init(void)
 {
 	int err;
 
-#if INDICATE_PIN_IS_ENABLED
-	k_work_init_delayable(&indicate_work, indicate_wk);
-#endif
-
 	err = ext_xtal_control(true);
 	if (err < 0) {
 		LOG_ERR("Failed to enable ext XTAL: %d", err);
 		return err;
 	}
-#if POWER_PIN_IS_ENABLED
-	/* Do not directly enable the poweroff interrupt so that only a full toggle triggers
-	 * power off. This is because power on is triggered on low level, so if the pin is held
-	 * down until Serial Modem is fully initialized releasing it would directly trigger
-	 * the power off.
-	 */
-	err = configure_power_pin_interrupt(power_pin_callback_enable_poweroff,
-					    GPIO_INT_EDGE_FALLING);
-#endif
+
 	return err;
 }

@@ -46,10 +46,11 @@ int sm_uart_handler_disable(void);
  *
  * @param data Data to write.
  * @param len Length of data to write.
+ * @param flush Whether to flush the data immediately.
  *
  * @retval 0 on success. Otherwise, a negative error code.
  */
-int sm_tx_write(const uint8_t *data, size_t len);
+int sm_tx_write(const uint8_t *data, size_t len, bool flush);
 
 /**
  * @brief Initialize UART pipe for Serial Modem.

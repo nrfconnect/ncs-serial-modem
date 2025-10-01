@@ -6,11 +6,24 @@
 
 / {
 	chosen {
-		ncs,sm-uart = &uart0;
+		ncs,sm-uart = &dtr_uart0;
 	};
 };
 
 &uart0 {
 	status = "okay";
 	hw-flow-control;
+
+	dtr_uart0: dtr-uart {
+		compatible = "nordic,dtr-uart";
+		dtr-gpios = <&gpio0 28 (GPIO_PULL_UP | GPIO_ACTIVE_HIGH)>;
+		ri-gpios = <&gpio0 0 GPIO_ACTIVE_LOW>;
+		status = "okay";
+	};
+};
+
+&gpio0 {
+	status = "okay";
+	/* Use PORT event for DTR (28) pin to save power */
+	sense-edge-mask = <0x10000000>;
 };
