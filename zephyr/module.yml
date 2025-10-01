@@ -9,3 +9,7 @@ build:
   # Path to the folder that contains the CMakeLists.txt file to be included by
   # Zephyr build system. The `.` is the root of this repository.
   cmake: .
+  settings:
+    # Path to the folder containing additional device tree source files. The
+    # `.` is the root of this repository.
+    dts_root: .
