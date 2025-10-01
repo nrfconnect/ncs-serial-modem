@@ -228,8 +228,6 @@ int main(void)
 	nrf_power_resetreas_clear(NRF_POWER_NS, 0x70017);
 	LOG_DBG("RR: 0x%08x", rr);
 
-	sm_ctrl_pin_init_gpios();
-
 	/* Init and load settings */
 	if (sm_settings_init() != 0) {
 		LOG_WRN("Failed to init sm settings");

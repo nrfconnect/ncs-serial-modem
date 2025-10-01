@@ -1799,7 +1799,7 @@ static inline void handle_apoll_socket_event(struct sm_socket *s, struct zsock_p
 			fd->events &= ~fd->revents;
 		}
 		if (!in_datamode()) {
-			rsp_send_indicate("\r\n#XAPOLL: %d,%d\r\n", fd->fd, fd->revents);
+			rsp_send("\r\n#XAPOLL: %d,%d\r\n", fd->fd, fd->revents);
 		}
 	}
 }

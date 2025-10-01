@@ -22,58 +22,33 @@ tests:
       - ci_build
       - sysbuild
       - ci_applications_serial_modem
-  serial_modem.no_power_indicate:
-    sysbuild: true
-    build_only: true
-    extra_configs:
-      - CONFIG_SM_POWER_PIN=-1
-      - CONFIG_SM_INDICATE_PIN=-1
-    platform_allow:
-      - nrf9151dk/nrf9151/ns
-    integration_platforms:
-      - nrf9151dk/nrf9151/ns
-    tags:
-      - ci_build
-      - sysbuild
-      - ci_applications_serial_modem
-  serial_modem.no_power:
-    sysbuild: true
-    build_only: true
-    extra_configs:
-      - CONFIG_SM_POWER_PIN=-1
-    platform_allow:
-      - nrf9151dk/nrf9151/ns
-    integration_platforms:
-      - nrf9151dk/nrf9151/ns
-    tags:
-      - ci_build
-      - sysbuild
-      - ci_applications_serial_modem
-  serial_modem.no_indicate:
-    sysbuild: true
-    build_only: true
-    extra_configs:
-      - CONFIG_SM_INDICATE_PIN=-1
-    platform_allow:
-      - nrf9151dk/nrf9151/ns
-    integration_platforms:
-      - nrf9151dk/nrf9151/ns
-    tags:
-      - ci_build
-      - sysbuild
-      - ci_applications_serial_modem
   serial_modem.extmcu:
     sysbuild: true
     build_only: true
     extra_args:
       - EXTRA_DTC_OVERLAY_FILE="overlay-external-mcu.overlay"
-    extra_configs:
-      - CONFIG_SM_POWER_PIN=31
-      - CONFIG_SM_INDICATE_PIN=30
     platform_allow:
       - nrf9160dk/nrf9160/ns
       - nrf9161dk/nrf9161/ns
       - nrf9151dk/nrf9151/ns
+    integration_platforms:
+      - nrf9151dk/nrf9151/ns
+    tags:
+      - ci_build
+      - sysbuild
+      - ci_applications_serial_modem
+  serial_modem.no_dtr:
+    sysbuild: true
+    build_only: true
+    extra_args:
+      - EXTRA_DTC_OVERLAY_FILE="overlay-disable-dtr.overlay"
+    platform_allow:
+      - nrf9161dk/nrf9161/ns
+      - nrf9151dk/nrf9151/ns
+      - nrf9160dk/nrf9160/ns
+      - nrf9131ek/nrf9131/ns
+      - thingy91/nrf9160/ns
+      - thingy91x/nrf9151/ns
     integration_platforms:
       - nrf9151dk/nrf9151/ns
     tags:
@@ -107,9 +82,6 @@ tests:
       - EXTRA_CONF_FILE="overlay-ppp.conf"
       - EXTRA_CONF_FILE="overlay-ppp-without-cmux.conf"
       - EXTRA_DTC_OVERLAY_FILE="overlay-ppp-without-cmux.overlay"
-    extra_configs:
-      - CONFIG_SM_POWER_PIN=31
-      - CONFIG_SM_INDICATE_PIN=30
     platform_allow:
       - nrf9160dk/nrf9160/ns
       - nrf9161dk/nrf9161/ns
@@ -146,9 +118,6 @@ tests:
     build_only: true
     extra_args:
       - EXTRA_CONF_FILE="overlay-ppp-cmux-linux.conf"
-    extra_configs:
-      - CONFIG_SM_POWER_PIN=31
-      - CONFIG_SM_INDICATE_PIN=30
     platform_allow:
       - nrf9160dk/nrf9160/ns
       - nrf9161dk/nrf9161/ns
@@ -172,9 +141,6 @@ tests:
       - nrf9160dk/nrf9160/ns
       - nrf9161dk/nrf9161/ns
       - nrf9151dk/nrf9151/ns
-      - nrf9131ek/nrf9131/ns
-      - thingy91/nrf9160/ns
-      - thingy91x/nrf9151/ns
     integration_platforms:
       - nrf9151dk/nrf9151/ns
     tags:
@@ -185,7 +151,7 @@ tests:
     sysbuild: true
     build_only: true
     extra_args:
-      - EXTRA_CONF_FILE="overlay-cmux.conf;overlay-ppp.conf;overlay-zephyr-modem.conf;overlay-zephyr-modem-nrf9160dk-nrf52840.conf"
+      - EXTRA_CONF_FILE="overlay-cmux.conf;overlay-ppp.conf;overlay-zephyr-modem.conf;"
       - EXTRA_DTC_OVERLAY_FILE="overlay-zephyr-modem-nrf9160dk-nrf52840.overlay"
     platform_allow:
       - nrf9160dk/nrf9160/ns
@@ -270,20 +236,6 @@ tests:
       - nrf9151dk/nrf9151/ns
     integration_platforms:
       - nrf9151dk/nrf9151/ns
-    tags:
-      - ci_build
-      - sysbuild
-      - ci_applications_serial_modem
-  serial_modem.lwm2m_carrier.thingy91:
-    sysbuild: true
-    build_only: true
-    extra_args:
-      - EXTRA_CONF_FILE=overlay-carrier.conf
-      - SB_CONFIG_THINGY91_STATIC_PARTITIONS_LWM2M_CARRIER=y
-    platform_allow:
-      - thingy91/nrf9160/ns
-    integration_platforms:
-      - thingy91/nrf9160/ns
     tags:
       - ci_build
       - sysbuild
