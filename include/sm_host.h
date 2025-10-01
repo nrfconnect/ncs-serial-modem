@@ -57,45 +57,62 @@ enum at_cmd_state {
 typedef void (*sm_data_handler_t)(const uint8_t *data, size_t datalen);
 
 /**
- * @typedef sm_ind_handler_t
+ * @typedef sm_ri_handler_t
  *
- * Handler to handle @kconfig{CONFIG_SM_HOST_INDICATE_PIN} signal from Serial Modem.
+ * Handler to handle the Ring Indicate (RI) signal from Serial Modem.
  */
-typedef void (*sm_ind_handler_t)(void);
+typedef void (*sm_ri_handler_t)(void);
 
 /**@brief Initialize Serial Modem Host library.
  *
  * @param handler Pointer to a handler function of type @ref sm_data_handler_t.
+ * @param automatic_uart If true, DTR and UART are automatically managed by the library.
+ * @param inactivity_timeout Inactivity timeout for DTR and UART disablement. Only used if @p
+ * automatic is true.
  *
  * @return Zero on success, non-zero otherwise.
  */
-int sm_host_init(sm_data_handler_t handler);
+int sm_host_init(sm_data_handler_t handler, bool automatic_uart, k_timeout_t inactivity_timeout);
 
 /**@brief Un-initialize Serial Modem Host
  */
 int sm_host_uninit(void);
 
 /**
- * @brief Register callback for @kconfig{CONFIG_SM_HOST_INDICATE_PIN} indication
+ * @brief Register callback for Ring Indicate (RI) pin.
  *
- * @param handler Pointer to a handler function of type @ref sm_ind_handler_t.
- * @param wakeup  Enable/disable System Off wakeup by GPIO Sense.
+ * @param handler Pointer to a handler function of type @ref sm_ri_handler_t.
  *
- * @retval Zero    Success.
- * @retval -EFAULT if @kconfig{CONFIG_SM_HOST_INDICATE_PIN} is not defined.
+ * @retval Zero on success. Otherwise, a (negative) error code is returned.
  */
-int sm_host_register_ind(sm_ind_handler_t handler, bool wakeup);
+int sm_host_register_ri_handler(sm_ri_handler_t handler);
 
 /**
- * @brief Toggle power pin of the nRF91 Series device configured with
- * @kconfig{CONFIG_SM_HOST_POWER_PIN}.
+ * @brief Configure automatic DTR UART handling
  *
- * The pin is enabled for the time specified in @kconfig{CONFIG_SM_HOST_POWER_PIN_TIME}
- * and then disabled.
+ * If automatic DTR UART handling is enabled, the library will enable DTR UART when RI
+ * signal is detected, and disable it after inactivity timeout.
+ *
+ * @param automatic If true, DTR UART is automatically managed by the library.
+ * @param inactivity Inactivity timeout for DTR UART disablement. Only used if @p
+ * automatic is true.
  *
  * @return Zero on success, non-zero otherwise.
  */
-int sm_host_power_pin_toggle(void);
+void sm_host_configure_dtr_uart(bool automatic, k_timeout_t inactivity);
+
+/**
+ * @brief Disable DTR UART
+ *
+ * Disables DTR UART. Disables automatic DTR UART handling.
+ */
+void sm_host_disable_dtr_uart(void);
+
+/** @brief Enable DTR UART
+ *
+ * Enables DTR UART. Disables automatic DTR UART handling.
+ */
+void sm_host_enable_dtr_uart(void);
 
 /**
  * @brief Function to send an AT command in Serial Modem command mode
