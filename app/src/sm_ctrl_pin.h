@@ -14,6 +14,13 @@
  */
 
 /**
+ * @brief Check if control pin is ready.
+ *
+ * @retval 0 if ready, nonzero otherwise.
+ */
+int sm_ctrl_pin_ready(void);
+
+/**
  * @brief Enter idle.
  */
 void sm_ctrl_pin_enter_idle(void);
@@ -34,23 +41,12 @@ void sm_ctrl_pin_enter_sleep_no_uninit(void);
 void sm_ctrl_pin_enter_shutdown(void);
 
 /**
- * @brief Temporarily sets the indicate pin high.
- *
- * @retval 0 on success, nonzero otherwise.
- */
-int sm_ctrl_pin_indicate(void);
-
-/**
  * @brief Initialize Serial Modem control pin module.
  *
  * @retval 0 on success, nonzero otherwise.
  */
 int sm_ctrl_pin_init(void);
 
-/**
- * @brief Initialize Serial Modem control pins, that is, power and indicate pins.
- */
-void sm_ctrl_pin_init_gpios(void);
 
 /** @} */
 
