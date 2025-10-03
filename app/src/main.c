@@ -202,7 +202,11 @@ int start_execute(void)
 
 	LOG_INF("Serial Modem");
 
-	sm_ctrl_pin_init();
+	err = sm_ctrl_pin_init();
+	if (err) {
+		LOG_ERR("Failed to init ctrl_pin: %d", err);
+		return err;
+	}
 
 	/* This will send "READY" or "INIT ERROR" to UART so after this nothing
 	 * should be done that can fail
@@ -227,6 +231,8 @@ int main(void)
 
 	nrf_power_resetreas_clear(NRF_POWER_NS, 0x70017);
 	LOG_DBG("RR: 0x%08x", rr);
+
+	sm_ctrl_pin_init_gpios();
 
 	/* Init and load settings */
 	if (sm_settings_init() != 0) {
@@ -254,13 +260,12 @@ int main(void)
 
 	check_app_fota_status();
 
-#if defined(CONFIG_SM_START_SLEEP)
-
+#if DT_HAS_CHOSEN(ncs_sm_power_key)
 	if (!(rr & NRF_POWER_RESETREAS_OFF_MASK)) { /* DETECT signal from GPIO */
 
-		sm_ctrl_pin_enter_sleep_no_uninit();
+		sm_ctrl_pin_enter_sleep_no_uninit(true);
 	}
-#endif /* CONFIG_SM_START_SLEEP */
+#endif
 
 	ret = start_execute();
 exit:

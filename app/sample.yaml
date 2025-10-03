@@ -136,7 +136,7 @@ tests:
     build_only: true
     extra_args:
       - EXTRA_CONF_FILE="overlay-cmux.conf;overlay-ppp.conf;overlay-zephyr-modem.conf"
-      - EXTRA_DTC_OVERLAY_FILE="overlay-external-mcu.overlay"
+      - EXTRA_DTC_OVERLAY_FILE="overlay-external-mcu.overlay;overlay-zephyr-modem.overlay"
     platform_allow:
       - nrf9160dk/nrf9160/ns
       - nrf9161dk/nrf9161/ns

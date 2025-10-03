@@ -1,0 +1,29 @@
+/*
+ * Copyright (c) 2025 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+ */
+
+ / {
+	chosen {
+		ncs,sm-power-key = &power_key;
+	};
+};
+
+&dtr_uart2 {
+	/* Currently Cellular Modem driver does not drive DTR, so set it always active */
+	dtr-gpios = <&gpio0 31 (GPIO_PULL_DOWN | GPIO_ACTIVE_LOW)>;
+};
+/ {
+	power_key: sm-power-key {
+		compatible = "nordic,sm-power-key";
+		gpios = <&gpio0 22 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+		status = "okay";
+	};
+};
+
+&gpio0 {
+	status = "okay";
+	/* Use PORT events to save power */
+	sense-edge-mask = <0xFFFFFFFF>;
+};
