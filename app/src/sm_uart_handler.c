@@ -268,15 +268,9 @@ static int tx_start(void)
 	uint8_t *buf;
 	size_t len;
 	int err;
-	enum pm_device_state state = PM_DEVICE_STATE_OFF;
 
 	if (!atomic_test_bit(&uart_state, SM_UART_STATE_TX_ENABLED_BIT)) {
 		return -EAGAIN;
-	}
-
-	pm_device_state_get(sm_uart_dev, &state);
-	if (state != PM_DEVICE_STATE_ACTIVE) {
-		return 1;
 	}
 
 	len = ring_buf_get_claim(&tx_buf, &buf, ring_buf_capacity_get(&tx_buf));
@@ -383,7 +377,7 @@ static void uart_callback(const struct device *dev, struct uart_event *evt, void
 /* Write the data to tx_buffer and trigger sending. Repeat until everything is sent.
  * Returns 0 on success or a negative error code.
  */
-static int sm_uart_tx_write(const uint8_t *data, size_t len)
+static int sm_uart_tx_write(const uint8_t *data, size_t len, bool flush)
 {
 	size_t ret;
 	size_t sent = 0;
@@ -417,9 +411,9 @@ static int sm_uart_tx_write(const uint8_t *data, size_t len)
 	}
 	k_mutex_unlock(&mutex_tx_put);
 
-	if (k_sem_take(&tx_done_sem, K_NO_WAIT) == 0) {
+	if (flush && k_sem_take(&tx_done_sem, K_NO_WAIT) == 0) {
 		err = tx_start();
-		if (err == 1 || err == -EAGAIN) {
+		if (err == -EAGAIN) {
 			k_sem_give(&tx_done_sem);
 			return 0;
 		} else if (err) {
@@ -427,21 +421,19 @@ static int sm_uart_tx_write(const uint8_t *data, size_t len)
 			k_sem_give(&tx_done_sem);
 			return err;
 		}
-	} else {
-		/* TX already in progress. */
 	}
 
 	return 0;
 }
 
-int sm_tx_write(const uint8_t *data, size_t len)
+int sm_tx_write(const uint8_t *data, size_t len, bool flush)
 {
 #if SM_PIPE
 	if (atomic_test_bit(&sm_pipe.state, SM_PIPE_STATE_INIT_BIT) && sm_pipe.tx_cb != NULL) {
 		return sm_pipe.tx_cb(data, len);
 	}
 #endif
-	return sm_uart_tx_write(data, len);
+	return sm_uart_tx_write(data, len, flush);
 }
 
 int sm_uart_handler_enable(void)
@@ -579,7 +571,7 @@ static int pipe_transmit(void *data, const uint8_t *buf, size_t size)
 	if (k_sem_take(&tx_done_sem, K_NO_WAIT) == 0) {
 		int err = tx_start();
 
-		if (err == 1 || err == -EAGAIN) {
+		if (err == -EAGAIN) {
 			k_sem_give(&tx_done_sem);
 			return (int)sent;
 		} else if (err) {

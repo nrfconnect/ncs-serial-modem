@@ -445,8 +445,7 @@ static void format_final_result(char *buf, size_t buf_len, size_t buf_max_len)
 	}
 }
 
-static int sm_at_send_indicate(const uint8_t *data, size_t len,
-				bool print_full_debug, bool indicate)
+static int sm_at_send_internal(const uint8_t *data, size_t len, bool print_full_debug)
 {
 	int ret;
 
@@ -455,16 +454,7 @@ static int sm_at_send_indicate(const uint8_t *data, size_t len,
 		return -EINTR;
 	}
 
-	if (indicate) {
-		enum pm_device_state state = PM_DEVICE_STATE_OFF;
-
-		pm_device_state_get(sm_uart_dev, &state);
-		if (state != PM_DEVICE_STATE_ACTIVE) {
-			sm_ctrl_pin_indicate();
-		}
-	}
-
-	ret = sm_tx_write(data, len);
+	ret = sm_tx_write(data, len, true);
 	if (!ret) {
 		LOG_HEXDUMP_DBG(data, print_full_debug ? len : MIN(HEXDUMP_LIMIT, len), "TX");
 	}
@@ -473,7 +463,7 @@ static int sm_at_send_indicate(const uint8_t *data, size_t len,
 
 int sm_at_send(const uint8_t *data, size_t len)
 {
-	return sm_at_send_indicate(data, len, true, false);
+	return sm_at_send_internal(data, len, true);
 }
 
 int sm_at_send_str(const char *str)
@@ -713,7 +703,7 @@ static void notification_handler(const char *notification)
 			return;
 		}
 #endif
-		sm_at_send_indicate(CRLF_STR, strlen(CRLF_STR), true, true);
+		sm_at_send_internal(CRLF_STR, strlen(CRLF_STR), true);
 		sm_at_send_str(notification);
 	} else {
 		LOG_DBG("Drop notification: %s", notification);
@@ -730,43 +720,28 @@ void rsp_send_error(void)
 	sm_at_send_str(ERROR_STR);
 }
 
-static void rsp_send_internal(bool indicate, const char *fmt, va_list arg_ptr)
+void rsp_send(const char *fmt, ...)
 {
 	static K_MUTEX_DEFINE(mutex_rsp_buf);
 	static char rsp_buf[SM_AT_MAX_RSP_LEN];
+	va_list arg_ptr;
 	int rsp_len;
 
 	k_mutex_lock(&mutex_rsp_buf, K_FOREVER);
 
+	va_start(arg_ptr, fmt);
 	rsp_len = vsnprintf(rsp_buf, sizeof(rsp_buf), fmt, arg_ptr);
 	rsp_len = MIN(rsp_len, sizeof(rsp_buf) - 1);
+	va_end(arg_ptr);
 
-	sm_at_send_indicate(rsp_buf, rsp_len, true, indicate);
+	sm_at_send_internal(rsp_buf, rsp_len, true);
 
 	k_mutex_unlock(&mutex_rsp_buf);
 }
 
-void rsp_send(const char *fmt, ...)
-{
-	va_list arg_ptr;
-
-	va_start(arg_ptr, fmt);
-	rsp_send_internal(false, fmt, arg_ptr);
-	va_end(arg_ptr);
-}
-
-void rsp_send_indicate(const char *fmt, ...)
-{
-	va_list arg_ptr;
-
-	va_start(arg_ptr, fmt);
-	rsp_send_internal(true, fmt, arg_ptr);
-	va_end(arg_ptr);
-}
-
 void data_send(const uint8_t *data, size_t len)
 {
-	sm_at_send_indicate(data, len, false, true);
+	sm_at_send_internal(data, len, false);
 }
 
 int enter_datamode(sm_datamode_handler_t handler)
@@ -958,20 +933,18 @@ int sm_at_host_init(void)
 
 static int at_host_power_off(bool shutting_down)
 {
-	int err = sm_uart_handler_disable();
+	int err;
 
-	if (!err || shutting_down) {
-		/* Wait for UART disabling to complete. */
-		k_sleep(K_MSEC(100));
-
-		/* Power off UART module */
-		err = pm_device_action_run(sm_uart_dev, PM_DEVICE_ACTION_SUSPEND);
-		if (err == -EALREADY) {
-			err = 0;
-		}
+	if (shutting_down) {
+		err = sm_uart_handler_disable();
 		if (err) {
-			LOG_WRN("Failed to suspend UART. (%d)", err);
+			LOG_WRN("Failed to disable UART. (%d)", err);
 		}
+	}
+
+	err = pm_device_action_run(sm_uart_dev, PM_DEVICE_ACTION_SUSPEND);
+	if (err) {
+		LOG_WRN("Failed to suspend UART. (%d)", err);
 	}
 
 	return err;
@@ -981,8 +954,10 @@ int sm_at_host_power_off(void)
 {
 	const int err = at_host_power_off(false);
 
-	/* Write sync str to buffer so it is sent first when resuming. */
-	sm_at_send_str(SM_SYNC_STR);
+	/* Write sync str to buffer so it is sent first when resuming, do not flush. */
+	if (!IS_ENABLED(CONFIG_SM_SKIP_READY_MSG)) {
+		sm_tx_write(SM_SYNC_STR, strlen(SM_SYNC_STR), false);
+	}
 
 	return err;
 }
@@ -996,9 +971,8 @@ int sm_at_host_power_on(void)
 		return err;
 	}
 
-	/* Wait for UART enabling to complete. */
-	k_sleep(K_MSEC(100));
-	sm_uart_handler_enable();
+	/* Flush the TX buffer. */
+	sm_tx_write(NULL, 0, true);
 
 	return 0;
 }

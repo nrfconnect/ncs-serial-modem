@@ -101,14 +101,6 @@ void sm_at_host_uninit(void);
 void rsp_send(const char *fmt, ...);
 
 /**
- * @brief Send AT command response with indication.
- *
- * @param fmt Response message format string.
- *
- */
-void rsp_send_indicate(const char *fmt, ...);
-
-/**
  * @brief Send AT command response of OK
  */
 void rsp_send_ok(void);
