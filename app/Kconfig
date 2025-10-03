@@ -80,15 +80,6 @@ config SM_UART_TX_BUF_SIZE
 	  These buffers are not used when CMUX is in use.
 
 #
-# GPIO functionality
-#
-config SM_START_SLEEP
-	bool "Enter sleep on startup"
-	help
-	  If enabled, the SiP is put into deep sleep when powered on.
-	  TODO: DTR to wake up from sleep is not implemented yet.
-
-#
 # Automatic network attach
 #
 config SM_AUTO_CONNECT

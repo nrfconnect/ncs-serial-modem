@@ -18,11 +18,20 @@
 
 LOG_MODULE_REGISTER(sm_ctrl_pin, CONFIG_SM_LOG_LEVEL);
 
-#if DT_NODE_HAS_PROP(DT_CHOSEN(ncs_sm_uart), dtr_gpios)
+#define SM_DTR_GPIOS DT_NODE_HAS_PROP(DT_CHOSEN(ncs_sm_uart), dtr_gpios)
+#define SM_HAS_PWR_KEY DT_HAS_CHOSEN(ncs_sm_power_key)
+
+#if SM_DTR_GPIOS
 static const struct gpio_dt_spec dtr_gpio =
 	GPIO_DT_SPEC_GET_OR(DT_CHOSEN(ncs_sm_uart), dtr_gpios, {0});
 
-static struct gpio_callback gpio_cb;
+static struct gpio_callback dtr_gpio_cb;
+#endif
+#if SM_HAS_PWR_KEY
+static const struct gpio_dt_spec mdm_pwr_gpio =
+	GPIO_DT_SPEC_GET_OR(DT_CHOSEN(ncs_sm_power_key), gpios, {0});
+
+static struct gpio_callback mdm_pwr_gpio_cb;
 #endif
 
 static int ext_xtal_control(bool xtal_on)
@@ -58,7 +67,7 @@ static int ext_xtal_control(bool xtal_on)
 	return err;
 }
 
-#if DT_NODE_HAS_PROP(DT_CHOSEN(ncs_sm_uart), dtr_gpios)
+#if SM_DTR_GPIOS
 static void dtr_enable_fn(struct k_work *)
 {
 	LOG_INF("DTR pin callback work function.");
@@ -82,7 +91,7 @@ static void dtr_pin_callback(const struct device *dev, struct gpio_callback *gpi
 
 int sm_ctrl_pin_ready(void)
 {
-#if DT_NODE_HAS_PROP(DT_CHOSEN(ncs_sm_uart), dtr_gpios)
+#if SM_DTR_GPIOS
 	if (gpio_is_ready_dt(&dtr_gpio)) {
 		return 0;
 	}
@@ -91,15 +100,26 @@ int sm_ctrl_pin_ready(void)
 	return -EFAULT;
 }
 
+void sm_ctrl_pin_enter_sleep_no_uninit(bool at_host_power_off)
+{
+#if SM_DTR_GPIOS || SM_HAS_PWR_KEY
+	if (at_host_power_off) {
+		sm_at_host_power_off();
+	}
+
+	LOG_INF("Entering sleep. No uninit.");
+	LOG_PANIC();
+
+	k_sleep(K_MSEC(100));
+
+	nrf_regulators_system_off(NRF_REGULATORS_NS);
+	assert(false);
+#endif
+}
+
 void sm_ctrl_pin_enter_sleep(void)
 {
-#if DT_NODE_HAS_PROP(DT_CHOSEN(ncs_sm_uart), dtr_gpios)
-	int err;
-
-	err = sm_ctrl_pin_ready();
-	if (err) {
-		return;
-	}
+#if SM_DTR_GPIOS || SM_HAS_PWR_KEY
 
 	/* Stop threads, uninitialize host and disable DTR UART. */
 	sm_at_host_uninit();
@@ -111,39 +131,13 @@ void sm_ctrl_pin_enter_sleep(void)
 		sm_power_off_modem();
 	}
 
-	gpio_pin_interrupt_configure_dt(&dtr_gpio, GPIO_INT_DISABLE);
-
-	LOG_INF("Entering sleep.");
-	LOG_PANIC();
-	nrf_gpio_cfg_sense_set(dtr_gpio.pin, NRF_GPIO_PIN_SENSE_LOW);
-
-	k_sleep(K_MSEC(100));
-
-	nrf_regulators_system_off(NRF_REGULATORS_NS);
-	assert(false);
-#endif
-}
-
-/* TODO: Cellular modem driver uses pulse triggered power management, which is not suitable with
- *       the current implementation.
- */
-void sm_ctrl_pin_enter_sleep_no_uninit(void)
-{
-#if DT_NODE_HAS_PROP(DT_CHOSEN(ncs_sm_uart), dtr_gpios)
-	LOG_INF("Entering sleep.");
-	LOG_PANIC();
-	nrf_gpio_cfg_sense_set(dtr_gpio.pin, NRF_GPIO_PIN_SENSE_LOW);
-
-	k_sleep(K_MSEC(100));
-
-	nrf_regulators_system_off(NRF_REGULATORS_NS);
-	assert(false);
+	sm_ctrl_pin_enter_sleep_no_uninit(false);
 #endif
 }
 
 void sm_ctrl_pin_enter_idle(void)
 {
-#if DT_NODE_HAS_PROP(DT_CHOSEN(ncs_sm_uart), dtr_gpios)
+#if SM_DTR_GPIOS
 	LOG_INF("Entering idle.");
 	int err;
 
@@ -152,8 +146,8 @@ void sm_ctrl_pin_enter_idle(void)
 		return;
 	}
 
-	gpio_init_callback(&gpio_cb, dtr_pin_callback, BIT(dtr_gpio.pin));
-	err = gpio_add_callback_dt(&dtr_gpio, &gpio_cb);
+	gpio_init_callback(&dtr_gpio_cb, dtr_pin_callback, BIT(dtr_gpio.pin));
+	err = gpio_add_callback_dt(&dtr_gpio, &dtr_gpio_cb);
 	if (err) {
 		LOG_ERR("gpio_add_callback failed: %d", err);
 		return;
@@ -175,15 +169,70 @@ void sm_ctrl_pin_enter_shutdown(void)
 	assert(false);
 }
 
+void sm_ctrl_pin_init_gpios(void)
+{
+#if SM_DTR_GPIOS
+	nrf_gpio_cfg_sense_set(dtr_gpio.pin, NRF_GPIO_PIN_SENSE_LOW);
+#endif
+
+#if SM_HAS_PWR_KEY
+	/* Configure Modem Power GPIO */
+	if (!gpio_is_ready_dt(&mdm_pwr_gpio)) {
+		LOG_ERR("Modem Power GPIO not ready");
+		return;
+	}
+	int err = gpio_pin_configure_dt(&mdm_pwr_gpio, GPIO_INPUT);
+
+	if (err < 0) {
+		LOG_ERR("Failed to configure Modem Power GPIO (%d).", err);
+		return;
+	}
+	nrf_gpio_cfg_sense_set(mdm_pwr_gpio.pin, NRF_GPIO_PIN_SENSE_LOW);
+#endif
+}
+
+
+#if SM_HAS_PWR_KEY
+static void pwr_pin_fn(struct k_work *)
+{
+	nrf_gpio_cfg_sense_set(mdm_pwr_gpio.pin, NRF_GPIO_PIN_SENSE_LOW);
+	sm_ctrl_pin_enter_sleep();
+}
+
+static void pwr_pin_callback(const struct device *dev, struct gpio_callback *gpio_callback,
+			     uint32_t)
+{
+	static K_WORK_DELAYABLE_DEFINE(work, pwr_pin_fn);
+
+	k_work_reschedule(&work, K_MSEC(10));
+}
+#endif
+
 int sm_ctrl_pin_init(void)
 {
 	int err;
 
 	err = ext_xtal_control(true);
-	if (err < 0) {
+	if (err) {
 		LOG_ERR("Failed to enable ext XTAL: %d", err);
 		return err;
 	}
-
-	return err;
+#if SM_HAS_PWR_KEY
+	if (!gpio_is_ready_dt(&mdm_pwr_gpio)) {
+		LOG_ERR("Modem Power GPIO not ready");
+		return -ENODEV;
+	}
+	err = gpio_pin_interrupt_configure_dt(&mdm_pwr_gpio, GPIO_INT_EDGE_TO_ACTIVE);
+	if (err) {
+		LOG_ERR("Failed to configure Modem Power GPIO interrupt (%d).", err);
+		return err;
+	}
+	gpio_init_callback(&mdm_pwr_gpio_cb, pwr_pin_callback, BIT(mdm_pwr_gpio.pin));
+	err = gpio_add_callback_dt(&mdm_pwr_gpio, &mdm_pwr_gpio_cb);
+	if (err) {
+		LOG_ERR("Failed to add Modem Power GPIO callback (%d).", err);
+		return err;
+	}
+#endif
+	return 0;
 }

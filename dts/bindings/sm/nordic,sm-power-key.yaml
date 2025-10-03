@@ -1,0 +1,13 @@
+# Copyright (c) 2025 Nordic Semiconductor ASA
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+
+description: |
+    Serial Modem power pin for Zephyr Modem.
+
+compatible: "nordic,sm-power-key"
+
+properties:
+  gpios:
+    type: phandle-array
+    description: Input. Power GPIO pin.
+    required: true
