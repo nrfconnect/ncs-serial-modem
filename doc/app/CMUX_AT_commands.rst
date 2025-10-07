@@ -17,7 +17,7 @@ For example, it can be used to exchange AT data and have a :ref:`Point-to-Point 
    To use the nRF91 Series SiP as a standalone modem in Zephyr, see :ref:`sm_as_zephyr_modem`.
    To use the nRF91 Series SiP as a modem for a Linux device, see :ref:`sm_as_linux_modem`.
 
-CMUX is enabled in Serial Modem by compiling it with the appropriate configuration files, depending on your use case.
+CMUX is enabled in |SM| by compiling it with the appropriate configuration files, depending on your use case.
 See the :ref:`sm_config_files` section for more information.
 
 .. sm_cmux_baud_rate_note_start
@@ -34,12 +34,12 @@ See the :ref:`sm_config_files` section for more information.
 
 .. note::
 
-   Serial Modem does not have an equivalent to the ``AT+CMUX`` command described in 3GPP TS 27.007.
-   Here is how Serial Modem's implementation of CMUX relates to the standard command's parameters:
+   |SM| does not have an equivalent to the ``AT+CMUX`` command described in 3GPP TS 27.007.
+   Here is how |SM|'s implementation of CMUX relates to the standard command's parameters:
 
    * Only UIH frames are used.
-   * The speed used is the configured baud rate of Serial Modem's UART.
-   * The maximum frame size is configured using the :kconfig:option:`CONFIG_MODEM_CMUX_MTU` Kconfig option.
+   * The speed used is the configured baud rate of |SM|'s UART.
+   * The maximum frame size is configured using the `CONFIG_MODEM_CMUX_MTU`_ Kconfig option.
 
 CMUX setup #XCMUX
 =================

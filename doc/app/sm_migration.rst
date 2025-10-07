@@ -1,3 +1,5 @@
+:orphan:
+
 .. _sm_migration:
 
 Migration

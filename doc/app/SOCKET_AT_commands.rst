@@ -579,7 +579,7 @@ Syntax
     * ``<value>`` is an integer that indicates whether delayed IPv6 address refresh is enabled.
       It is ``0`` for disabled or ``1`` for enabled.
 
-See :ref:`nRF socket options <nrfxlib:nrf_sockets>` for explanation of the supported options.
+See `nRF socket options <nrfxlib_nrf_sockets_>`_ for explanation of the supported options.
 
 Examples
 ~~~~~~~~
@@ -688,20 +688,20 @@ Syntax
       * ``2`` - :c:macro:`TLS_DTLS_CID_ENABLED`.
 
     This option is only supported with modem firmware 1.3.5 and newer.
-    See :ref:`nrfxlib:dtls_cid_setting` for more details regarding the allowed values.
+    See `NRF_SO_SEC_DTLS_CID <nrfxlib_dtls_cid_settings_>`_ for more details regarding the allowed values.
 
   * ``15`` - :c:macro:`AT_TLS_DTLS_CID_STATUS` (get-only).
     It is the DTLS connection identifier status.
     It can be retrieved after the DTLS handshake.
     This option is only supported with modem firmware 1.3.5 and newer.
-    See :ref:`nrfxlib:dtls_cid_status` for more details regarding the returned values.
+    See `NRF_SO_SEC_DTLS_CID_STATUS <nrfxlib_dtls_cid_status_>`_ for more details regarding the returned values.
 
   * ``18`` - :c:macro:`AT_TLS_DTLS_HANDSHAKE_TIMEO`.
 
     * ``<value>`` is an integer that indicates the DTLS handshake timeout in seconds.
       It can be one of the following values: ``1``, ``3``, ``7``, ``15``, ``31``, ``63``, ``123``.
 
-See :ref:`nRF socket options <nrfxlib:nrf_sockets>` for explanation of the supported options.
+See `nRF socket options <nrfxlib_nrf_sockets_>`_ for explanation of the supported options.
 
 
 Example
@@ -999,7 +999,7 @@ Syntax
 
 * The ``<data>`` parameter is a string that contains the data to be sent.
   The maximum size of the data is 1024 bytes.
-  When the parameter is not specified, Serial Modem enters ``sm_data_mode``.
+  When the parameter is not specified, |SM| enters ``sm_data_mode``.
 
 * The ``<flags>`` parameter sets the sending behavior.
   It can be set to the following value:
@@ -1125,7 +1125,7 @@ Syntax
   It represents the port of the UDP service on remote peer.
 * The ``<data>`` parameter is a string that contains the data to be sent.
   Its maximum size is 1024 bytes.
-  When the parameter is not specified, Serial Modem enters ``sm_data_mode``.
+  When the parameter is not specified, |SM| enters ``sm_data_mode``.
 * The ``<flags>`` parameter sets the sending behavior.
   It can be set to the following value:
 
@@ -1276,7 +1276,7 @@ Syntax
 Response syntax
 ~~~~~~~~~~~~~~~
 
-When the asynchronous socket events are enabled, Serial Modem sends events as URC notifications.
+When the asynchronous socket events are enabled, |SM| sends events as URC notifications.
 
 * For ``POLLIN`` events, the URC notification is sent only for the first incoming data on the socket.
   ``AT#XRECV`` or ``AT#XRECVFROM`` command will re-enable the URC notification for the next incoming data.

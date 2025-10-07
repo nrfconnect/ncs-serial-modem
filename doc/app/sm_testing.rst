@@ -12,7 +12,7 @@ They list the required AT commands and the expected responses.
 
 Some scenarios are generic and should work out of the box, while others require you to set up a server that you can test against.
 
-See :ref:`sm_building` for instructions on how to build and run the Serial LTE modem application.
+See :ref:`sm_building` for instructions on how to build and run the |SM| application.
 :ref:`sm_testing_section` describes how to turn on the modem and conduct the tests.
 
 Generic AT commands
@@ -20,7 +20,7 @@ Generic AT commands
 
 Complete the following steps to test the functionality provided by the :ref:`SM_AT_gen`:
 
-1. Retrieve the version of the Serial Modem application.
+1. Retrieve the version of the |SM| application.
 
    .. parsed-literal::
       :class: highlight
@@ -267,7 +267,7 @@ The following steps assume that you have a UDP echo server available.
 
          OK
 
-#. Test the UDP connection with a UDP socket, using `AT#XCONNECT`:
+#. Test the UDP connection with a UDP socket, using ``AT#XCONNECT``:
 
    a. Open a UDP socket and set connection to UDP server.
       Replace *example.com* with the hostname or IPv4 address of a UDP server, and *1234* with the corresponding port.
@@ -376,7 +376,7 @@ A TLS client connection requires a valid certificate for the TLS server.
 Update your TLS (root) certificate in PEM format with your selected security tag (in this example, 1000), and start the modem:
 
    .. note::
-      Sending multi-line text to Serial Modem requires the terminal to be configured to use `<CR><LF>` as the line ending.
+      Sending multi-line text to |SM| requires the terminal to be configured to use `<CR><LF>` as the line ending.
 
    .. parsed-literal::
       :class: highlight
@@ -618,13 +618,6 @@ Update your hex-encoded PSK and the PSK identity to be used for the DTLS connect
 
 TCP server
 ==========
-
-.. |public_ip_address_req| replace:: the nRF91 Series DK must have a public IP address and the radio network must be configured to route incoming IP packets to the nRF91 Series DK.
-   These depend on the network and SIM card used.
-
-.. |public_ip_address_check| replace:: To check your current setup, use the ``AT+CGDCONT?`` command to check if the IP address allocated by the network is a reserved IPv4 private address of class A, B, or C (see `Private addresses`_).
-   If it is, the device is not reachable from the public network with this IPv4 address and you should try with an IPv6 address instead.
-   Generally, IPv6 addresses are more likely to be reachable from the public network.
 
 To act as a TCP server, |public_ip_address_req|
 
@@ -1159,8 +1152,8 @@ FTP AT commands
 ***************
 
 Note that these commands are available only if :ref:`CONFIG_SM_FTPC <CONFIG_SM_FTPC>` is defined.
-Before you test the FTP AT commands, check the setting of the :kconfig:option:`CONFIG_FTP_CLIENT_KEEPALIVE_TIME` option.
-By default, the :ref:`lib_ftp_client` library keeps the connection to the FTP server alive for 60 seconds, but you can change the duration or turn KEEPALIVE off by setting :kconfig:option:`CONFIG_FTP_CLIENT_KEEPALIVE_TIME` to 0.
+Before you test the FTP AT commands, check the setting of the `CONFIG_FTP_CLIENT_KEEPALIVE_TIME`_ option.
+By default, the `FTP client`_ library keeps the connection to the FTP server alive for 60 seconds, but you can change the duration or turn KEEPALIVE off by setting `CONFIG_FTP_CLIENT_KEEPALIVE_TIME`_ to 0.
 
 The FTP client behavior depends on the FTP server that is used for testing.
 Complete the following steps to test the functionality provided by the :ref:`SM_AT_FTP` with two example servers:
@@ -1483,7 +1476,7 @@ Complete the following steps to test the functionality provided by the :ref:`SM_
          226 1 matches total
          OK
 
-   #. Switch to ASCII transfer mode and create a text file with the content "line #1\\r\\n".
+   #. Switch to ASCII transfer mode and create a text file with the content ``line #1\\r\\n``.
 
       .. parsed-literal::
          :class: highlight

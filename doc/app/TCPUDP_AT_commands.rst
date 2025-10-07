@@ -205,7 +205,7 @@ Syntax
   * ``0`` - Do not verify the hostname against the received certificate.
   * ``1`` - Verify the hostname against the received certificate (default).
 
-See :ref:`nRF socket options <nrfxlib:nrf_sockets>` ``peer_verify`` and ``tls_hostname`` for more information on ``<peer_verify>`` and ``<hostname_verify>``.
+See `nRF socket options <nrfxlib_nrf_sockets_>`_, ``peer_verify`` and ``tls_hostname`` for more information on ``<peer_verify>`` and ``<hostname_verify>``.
 
 * The ``<cid>`` parameter is an integer indicating the used PDN connection.
   It represents ``cid`` in the ``+CGDCONT`` command.
@@ -311,12 +311,12 @@ Syntax
 
 * The ``<data>`` parameter is a string that contains the data to be sent.
   The maximum size of the data is 1024 bytes.
-  When the parameter is not specified, Serial Modem enters ``sm_data_mode``.
+  When the parameter is not specified, |SM| enters ``sm_data_mode``.
 * The ``<flags>`` parameter sets the sending behavior.
   It can be set to the following value:
 
   * ``512`` - Blocks send operation until the request is acknowledged.
-    The request will not return until the send operation is completed by lower layers, or until the timeout given by the AT_SO_SNDTIMEO socket option, is reached.
+    The request will not return until the send operation is completed by lower layers, or until the timeout given by the ``AT_SO_SNDTIMEO`` socket option, is reached.
     Valid timeout values are 1 to 600 seconds.
 
 Response syntax
@@ -431,7 +431,7 @@ TCP receive data
    <data>
 
 * The ``<size>`` parameter is an integer that indicates the size of the received data.
-  This notification comes only when Serial Modem is not operating in :ref:`data mode <sm_data_mode>`.
+  This notification comes only when |SM| is not operating in :ref:`data mode <sm_data_mode>`.
 * The ``<data>`` value is raw data that is being received.
 
 UDP server #XUDPSVR
@@ -597,7 +597,7 @@ Syntax
   * ``0`` - Do not verify the hostname against the received certificate.
   * ``1`` - Verify the hostname against the received certificate (default).
 
-See :ref:`nRF socket options <nrfxlib:nrf_sockets>` ``peer_verify`` and ``tls_hostname`` for more information on ``<peer_verify>`` and ``<hostname_verify>``.
+See `nRF socket options <nrfxlib_nrf_sockets_>`_, ``peer_verify`` and ``tls_hostname`` for more information on ``<peer_verify>`` and ``<hostname_verify>``.
 
 * The ``<cid>`` parameter is an integer indicating the used PDN connection.
   It represents ``cid`` in the ``+CGDCONT`` command.
@@ -694,12 +694,12 @@ Syntax
 
 * The ``<data>`` parameter is a string that contains the data to be sent.
   The maximum size of the data is 1024 bytes.
-  When the parameter is not specified, Serial Modem enters ``sm_data_mode``.
+  When the parameter is not specified, |SM| enters ``sm_data_mode``.
 * The ``<flags>`` parameter sets the sending behavior.
   It can be set to the following value:
 
   * ``512`` - Blocks send operation until the request is acknowledged.
-    The request will not return until the send operation is completed by lower layers, or until the timeout given by the AT_SO_SNDTIMEO socket option, is reached.
+    The request will not return until the send operation is completed by lower layers, or until the timeout given by the ``AT_SO_SNDTIMEO`` socket option, is reached.
     Valid timeout values are 1 to 600 seconds.
 
 Response syntax
@@ -739,7 +739,7 @@ UDP receive data
    #XUDPDATA: <size>,<ip_addr>,<port>
    <data>
 
-* ``#XUDPDATA`` notification comes only when Serial Modem is not operating in :ref:`data mode <sm_data_mode>`.
+* ``#XUDPDATA`` notification comes only when |SM| is not operating in :ref:`data mode <sm_data_mode>`.
 * The ``<size>`` value is an integer that represents the actual number of bytes received.
 * The ``<ip_addr>`` value is a string that represents the IPv4 or IPv6 address of the remote peer.
 * The ``<port>`` value is an integer that represents the UDP port of the remote peer.

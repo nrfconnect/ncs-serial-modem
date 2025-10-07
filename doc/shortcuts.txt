@@ -1,0 +1,32 @@
+.. ### Versions
+
+.. |NCS| replace:: nRF Connect SDK
+.. |addon| replace:: Serial Modem Add-on
+.. |SM| replace:: Serial Modem
+
+.. |VSC| replace:: Visual Studio Code
+.. |nRFVSC| replace:: nRF Connect for VS Code
+
+.. ### Config shortcuts
+
+.. |config| replace:: See `Configuring and building`_ in the |NCS| documentation for information about how to permanently or temporarily change the configuration.
+
+.. |connect_kit| replace:: Connect the kit to the computer using a USB cable.
+   The kit is assigned a serial port.
+   Serial ports are referred to as COM ports on Windows, /dev/ttyACM devices on Linux, and /dev/tty devices on macOS.
+   To list Nordic Semiconductor devices connected to your computer together with their serial ports, open a terminal and run the ``nrfutil device list`` command.
+   Alternatively, check your operating system's device manager or its equivalent.
+
+.. |test_sample| replace:: After programming the sample to your development kit, complete the following steps to test it:
+
+.. ### Other shortcuts
+
+.. |sysbuild_autoenabled_ncs| replace:: When building `repository applications`_ in the `SDK repositories`_, building with sysbuild is `enabled by default <sysbuild_enabled_ncs_>`_.
+   If you work with out-of-tree `freestanding applications <create_application_types_freestanding_>`_, you need to manually pass the ``--sysbuild`` parameter to every build command or `configure west to always use it <sysbuild_enabled_ncs_configuring_>`_.
+
+.. |public_ip_address_req| replace:: the nRF91 Series DK must have a public IP address and the radio network must be configured to route incoming IP packets to the nRF91 Series DK.
+   These depend on the network and SIM card used.
+
+.. |public_ip_address_check| replace:: To check your current setup, use the ``AT+CGDCONT?`` command to check if the IP address allocated by the network is a reserved IPv4 private address of class A, B, or C (see `Private addresses`_).
+   If it is, the device is not reachable from the public network with this IPv4 address and you should try with an IPv6 address instead.
+   Generally, IPv6 addresses are more likely to be reachable from the public network.

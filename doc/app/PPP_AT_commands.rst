@@ -11,9 +11,9 @@ This page describes AT commands related to the Point-to-Point Protocol (PPP).
 
 .. note::
 
-   To use the nRF91 Series SiP as a standalone modem in Zephyr, see :ref:`sm_as_zephyr_modem`.
+   To use the nRF91 Series SiP as a standalone modem in Zephyr, see the :ref:`sm_as_zephyr_modem` documentation.
 
-PPP is enabled in Serial Modem by compiling it with the appropriate configuration files, depending on your use case (with or without CMUX).
+PPP is enabled in |SM| by compiling it with the appropriate configuration files, depending on your use case (with or without CMUX).
 See the :ref:`sm_config_files` section for more information.
 
 .. note::
@@ -31,7 +31,7 @@ The set command allows you to start and stop PPP, and optionally define the PDN 
 
 .. note::
 
-   PPP is automatically started and stopped by Serial Modem when the PDN connection requested for PPP
+   PPP is automatically started and stopped by |SM| when the PDN connection requested for PPP
    is established and lost, respectively.
    This happens even if PPP has previously been stopped or started with this command.
 
@@ -98,13 +98,13 @@ PPP with default PDN connection:
 
   #XPPP: 1,0,0
 
-  // Have the peer connect to Serial Modem's PPP.
+  // Have the peer connect to |SM|'s PPP.
   #XPPP: 1,1,0
 
   // Peer disconnects.
   #XPPP: 1,0,0
 
-  // Serial Modem restarts PPP automatically when peer disconnects.
+  // |SM| restarts PPP automatically when peer disconnects.
   #XPPP: 0,0,0
 
   #XPPP: 1,0,0
@@ -141,7 +141,7 @@ PPP with non-default PDN connection:
   // PPP is automatically started when the PDN connection set for PPP has been activated.
   #XPPP: 1,0,1
 
-  // Have the peer connect to Serial Modem's PPP.
+  // Have the peer connect to |SM|'s PPP.
   #XPPP: 1,1,1
 
 Read command
@@ -166,14 +166,14 @@ Response syntax
 Testing on Linux
 ================
 
-You can test Serial Modem's PPP on Linux by using the ``pppd`` command.
+You can test |SM|'s PPP on Linux by using the ``pppd`` command.
 This section describes a configuration without CMUX.
 If you are using CMUX, see :ref:`sm_as_linux_modem` for more information on setting it up.
 
-For the process described here, Serial Modem's UARTs must be connected to the Linux host.
+For the process described here, |SM|'s UARTs must be connected to the Linux host.
 
-1. Get PPP running on Serial Modem.
-   To do this, start Serial Modem and issue an ``AT+CFUN=1`` command.
+1. Get PPP running on |SM|.
+   To do this, start |SM| and issue an ``AT+CFUN=1`` command.
 #. Wait for ``#XPPP: 1,0,0``, which is sent when the network registration succeeds and PPP has started successfully with the default PDN connection.
 #. Run the following command on the Linux host:
 
@@ -185,11 +185,11 @@ For the process described here, Serial Modem's UARTs must be connected to the Li
    Typically, when ``uart1`` is assigned to be the PPP UART (in the devicetree overlay), the device file assigned to it is :file:`/dev/ttyACM2` for an nRF9160 DK, and :file:`/dev/ttyACM1` for the other nRF91 Series DKs.
 
 #. After the PPP link negotiation has completed successfully, a new network interface will be available, typically ``ppp0``.
-   This network interface will allow sending and receiving IP traffic through the modem of the nRF91 Series SiP running Serial Modem.
+   This network interface will allow sending and receiving IP traffic through the modem of the nRF91 Series SiP running |SM|.
 
 .. note::
 
    You might encounter some issues with DNS resolution.
    Edit the :file:`/etc/resolv.conf` file to work around these issues.
    You can add DNS servers that are reachable with your current network configuration.
-   These added servers can even be the DNS servers that Serial Modem's PPP sends as part of the PPP link negotiation, which are the DNS servers of the default PDN connection obtained from the modem.
+   These added servers can even be the DNS servers that |SM|'s PPP sends as part of the PPP link negotiation, which are the DNS servers of the default PDN connection obtained from the modem.

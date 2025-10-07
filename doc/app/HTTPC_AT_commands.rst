@@ -52,7 +52,7 @@ Syntax
   * ``0`` - Do not verify the hostname against the received certificate.
   * ``1`` - Verify the hostname against the received certificate (default).
 
-See :ref:`nRF socket options <nrfxlib:nrf_sockets>` ``peer_verify`` and ``tls_hostname`` for more information on ``<peer_verify>`` and ``<hostname_verify>``.
+See `nRF socket options <nrfxlib_nrf_sockets_>`_ ``peer_verify`` and ``tls_hostname`` for more information on ``<peer_verify>`` and ``<hostname_verify>``.
 
 
 Response syntax
@@ -158,8 +158,8 @@ Syntax
   * ``0`` - normal mode (default)
   * ``1`` - chunked mode
 
-  If ``<content_length>`` is greater than ``0`` or ``<chunked_transfer>`` is not ``0``, the Serial Modem application enters ``sm_data_mode``.
-  The Serial Modem sends the payload to the HTTP server until the terminator string defined in :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` is received.
+  If ``<content_length>`` is greater than ``0`` or ``<chunked_transfer>`` is not ``0``, the |SM| application enters ``sm_data_mode``.
+  The |SM| sends the payload to the HTTP server until the terminator string defined in :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` is received.
 
 Response syntax
 ~~~~~~~~~~~~~~~

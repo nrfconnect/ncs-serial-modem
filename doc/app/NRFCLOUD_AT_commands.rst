@@ -40,7 +40,7 @@ The ``<op>`` parameter can have the following integer values:
 * ``1`` - Connect to the nRF Cloud service.
 * ``2`` - Send a message in the JSON format to the nRF Cloud service.
 
-When ``<op>`` is ``2``, Serial Modem enters ``sm_data_mode``.
+When ``<op>`` is ``2``, |SM| enters ``sm_data_mode``.
 
 The ``<send_location>`` parameter is used only when the value of ``<op>`` is ``1``.
 It can have the following integer values:
@@ -202,7 +202,7 @@ The request uses information from the cellular network, Wi-Fi® access points, o
    To use ``#XNRFCLOUDPOS``, the following preconditions apply:
 
    * The device must be connected to nRF Cloud using :ref:`#XNRFCLOUD <SM_AT_NRFCLOUD>`.
-   * The :kconfig:option:`CONFIG_NRF_CLOUD_LOCATION <CONFIG_NRF_CLOUD_LOCATION>` Kconfig option must be enabled.
+   * The `CONFIG_NRF_CLOUD_LOCATION`_ Kconfig option must be enabled.
 
 Set command
 -----------

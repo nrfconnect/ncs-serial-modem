@@ -1,9 +1,9 @@
 .. _serial_modem:
 
-Serial modem
-############
+Serial Modem application
+########################
 
-The Serial Modem (SM) application can be used to emulate a stand-alone modem on an nRF91 Series device.
+The |SM| (SM) application can be used to emulate a stand-alone modem on an nRF91 Series device.
 The application accepts both the modem specific AT commands and proprietary AT commands.
 The AT commands are documented in the following guides:
 
@@ -16,10 +16,10 @@ See the subpages for how to use the application, how to extend it, and informati
    :maxdepth: 2
    :caption: Subpages:
 
-   doc/sm_description
-   doc/nRF91_as_Zephyr_modem
-   doc/PPP_linux
-   doc/sm_testing
-   doc/sm_extending
-   doc/sm_data_mode
-   doc/AT_commands
+   sm_description
+   nRF91_as_Zephyr_modem
+   PPP_linux
+   sm_testing
+   sm_extending
+   sm_data_mode
+   AT_commands
