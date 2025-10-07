@@ -118,7 +118,7 @@ void sm_host_enable_dtr_uart(void);
  * @brief Function to send an AT command in Serial Modem command mode
  *
  * This function wait until command result is received. The response of the AT command is received
- * via the @ref sm_ind_handler_t registered in @ref sm_host_init.
+ * through the sm_ind_handler_t registered in @ref sm_host_init.
  *
  * @param command Pointer to null terminated AT command string without command terminator
  * @param timeout Response timeout for the command in seconds, Zero means infinite wait

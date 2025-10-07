@@ -10,23 +10,23 @@ nRF91 Series as a Zephyr-compatible modem
 Overview
 ********
 
-Starting with |NCS| v2.6.0, the Serial Modem (SM) application can be used to turn an nRF91 Series SiP into a standalone modem that can be used through Zephyr's cellular modem driver.
+Starting with |NCS| v2.6.0, the |SM| (SM) application can be used to turn an nRF91 Series SiP into a standalone modem that can be used through Zephyr's cellular modem driver.
 This means that the controlling chip can run a Zephyr application that seamlessly uses Zephyr's IP stack instead of offloaded sockets through AT commands.
 
-This is made possible by Serial Modem's support of CMUX and PPP and Zephyr's cellular modem driver.
+This is made possible by |SM|'s support of CMUX and PPP and Zephyr's cellular modem driver.
 
-The :ref:`nRF52840 SoC present in the nRF9160 DK <zephyr:nrf9160dk_nrf52840>` can even be made to be the controlling chip with the appropriate configuration (described below).
+The `nRF52840 SoC present in the nRF9160 DK <nRF9160dk_nRF52840_>`_ can even be made to be the controlling chip with the appropriate configuration (described below).
 This is only possible on the nRF9160 DK, not on the other nRF91 Series DKs.
 
 .. note::
 
-   As of |NCS| |release|, it is not yet possible to make use of the nRF91 Series' GNSS functionality when Zephyr's cellular modem driver controls the SiP.
+   It is not yet possible to make use of the nRF91 Series' GNSS functionality when Zephyr's cellular modem driver controls the SiP.
    Also, the driver's support of power saving features is quite limited, only allowing complete power off of the SiP.
 
 Configuration
 *************
 
-Both Serial Modem and the Zephyr application running on the controlling chip must be compiled with the appropriate configuration to make them work together.
+Both |SM| and the Zephyr application running on the controlling chip must be compiled with the appropriate configuration to make them work together.
 
 For that, Kconfig fragments and devicetree overlays must be added to the compilation command.
 
@@ -36,20 +36,20 @@ See the :ref:`sm_config_files` section for information on how to compile with ad
    :start-after: sm_cmux_baud_rate_note_start
    :end-before: sm_cmux_baud_rate_note_end
 
-nRF91 Series SiP running Serial Modem
-============================
+nRF91 Series SiP running |SM|
+=============================
 
 The following configuration files must be included:
 
 * :file:`overlay-cmux.conf` - To enable CMUX.
 * :file:`overlay-ppp.conf` - To enable PPP.
-* :file:`overlay-zephyr-modem.conf` - To tailor Serial Modem to how Zephyr's cellular modem driver works.
+* :file:`overlay-zephyr-modem.conf` - To tailor |SM| to how Zephyr's cellular modem driver works.
   This enables the :ref:`CONFIG_SM_START_SLEEP <CONFIG_SM_START_SLEEP>` Kconfig option, which makes the nRF91 Series SiP start only when the :ref:`power pin <CONFIG_SM_POWER_PIN>` is toggled.
 
 In addition, if the controlling chip is an external MCU, the following configurations must also be included:
 
-* :kconfig:option:`CONFIG_SM_POWER_PIN` Kconfig option - To define the power pin so that it matches your setup.
-* :file:`overlay-external-mcu.overlay` - To configure which UART Serial Modem will use.
+* :ref:`CONFIG_SM_POWER_PIN <CONFIG_SM_POWER_PIN>` Kconfig option - To define the power pin so that it matches your setup.
+* :file:`overlay-external-mcu.overlay` - To configure which UART |SM| will use.
   The actual configuration of the UART is defined in the :file:`*_ns.overlay` overlay file matching your board in the :file:`boards` directory.
   Make sure to update the UART configuration (pins, baud rate) so that it matches your setup.
   You can do this by modifying the properties of the node of the UART to be used, by editing either :file:`overlay-external-mcu.overlay` or the overlay file matching your board in the :file:`boards` directory.
@@ -64,12 +64,12 @@ Finally, if you want more verbose logging that includes the AT commands and resp
 Controlling chip running Zephyr
 ===============================
 
-Configuration files found in Zephyr's :zephyr:code-sample:`cellular-modem` sample are a good starting point.
+Configuration files found in `Zephyr’s Cellular modem`_ sample are a good starting point.
 
 Specifically, regardless of what the controlling chip is, the Kconfig options found in the following files are needed:
 
 * :file:`prj.conf` - This file enables various Zephyr APIs, most of which are needed for proper functioning of the application.
-* :file:`boards/nrf9160dk_nrf52840.conf` - This file tailors the configuration of the modem subsystem and driver to the Serial Modem.
+* :file:`boards/nrf9160dk_nrf52840.conf` - This file tailors the configuration of the modem subsystem and driver to the |SM|.
   It makes the application's logs be output on UART 0 and also enables the debug logs of the cellular modem driver.
   If you do not want the debug logs output by the driver, you may turn them off by removing ``CONFIG_MODEM_LOG_LEVEL_DBG=y``.
 
@@ -87,17 +87,17 @@ If the controlling chip is the nRF52840 of the nRF9160 DK:
 Developing the Zephyr application
 *********************************
 
-To get started developing the Zephyr application running on the controlling chip, look at the code of Zephyr's :zephyr:code-sample:`cellular-modem` sample to see how the modem is managed and used.
+To get started developing the Zephyr application running on the controlling chip, look at the code of `Zephyr’s Cellular modem`_ sample to see how the modem is managed and used.
 You can even compile, flash and run the sample to verify proper operation of the modem.
 
 Flashing and running
 ********************
 
-When built with the Zephyr-compatible modem configuration, Serial Modem will put the nRF91 Series SiP to deep sleep when powered on.
-Zephyr's cellular modem driver running on the controlling chip will take care of waking up the nRF91 Series SiP, so it is advised to first flash Serial Modem to the nRF91 Series SiP.
+When built with the Zephyr-compatible modem configuration, |SM| will put the nRF91 Series SiP to deep sleep when powered on.
+Zephyr's cellular modem driver running on the controlling chip will take care of waking up the nRF91 Series SiP, so it is advised to first flash |SM| to the nRF91 Series SiP.
 
-However, before flashing the Serial Modem built with the Zephyr-compatible modem configuration, make sure that the nRF91 Series modem has been set to the desired system mode.
-For this, you will need a regular Serial Modem running in the nRF91 Series SiP to be able to run AT commands manually.
+However, before flashing the |SM| built with the Zephyr-compatible modem configuration, make sure that the nRF91 Series modem has been set to the desired system mode.
+For this, you will need a regular |SM| running in the nRF91 Series SiP to be able to run AT commands manually.
 To set the modem to the desired system mode, issue an ``AT%XSYSTEMMODE`` command followed by an ``AT+CFUN=0`` command so that the modem saves the system mode to NVM.
 For example, to enable only LTE-M, issue the following command: ``AT%XSYSTEMMODE=1,0,0,0``
 You need to do this because the modem's system mode is not automatically set at any point, so the one already configured will be used.
@@ -108,16 +108,16 @@ Additionally, if the controlling chip is an external MCU:
 
 Or if the controlling chip is the nRF52840 of the nRF9160 DK:
 
-* Make sure that the **PROG/DEBUG SW10** switch on the DK is set to **NRF91** when flashing Serial Modem, and to **NRF52** when flashing the Zephyr application.
+* Make sure that the **PROG/DEBUG SW10** switch on the DK is set to **NRF91** when flashing |SM|, and to **NRF52** when flashing the Zephyr application.
   The switch also affects which chip is reset when the Reset button is pressed.
 * No wiring is needed as the routing between the pins happens internally.
 
 To observe the operation sequence, you can view the application logs coming from both chips.
 
-By default, Serial Modem will output its logs through RTT, and the Zephyr application running on the controlling chip through its UART 0.
+By default, |SM| will output its logs through RTT, and the Zephyr application running on the controlling chip through its UART 0.
 The RTT logs can be seen with an RTT client such as ``JLinkRTTViewer``.
-If Serial Modem is running on the nRF9160 DK, the **PROG/DEBUG SW10** switch needs to be set to **NRF91** to be able to receive the RTT logs.
-However, for convenience you may want to redirect Serial Modem's logs to the SiP's UART 0 so that you do not need to reconnect the RTT client every time the board is reset.
+If |SM| is running on the nRF9160 DK, the **PROG/DEBUG SW10** switch needs to be set to **NRF91** to be able to receive the RTT logs.
+However, for convenience you may want to redirect |SM|'s logs to the SiP's UART 0 so that you do not need to reconnect the RTT client every time the board is reset.
 See the :ref:`sm_additional_config` section for information on how to do this.
 
 The logs output through UART can be seen by connecting to the appropriate UART with a serial communication program.
@@ -126,14 +126,14 @@ Under Linux, if the controlling chip is the nRF52840 of the nRF9160 DK, the devi
 After both applications have been flashed to their respective chips and you are connected to receive logs, you can reset the controlling chip.
 When the Zephyr application starts up, the following happens:
 
-* If power management is enabled (the :kconfig:option:`CONFIG_PM_DEVICE` Kconfig option is set to ``y``): when the application powers on the modem (by calling ``pm_device_action_run(<dev>, PM_DEVICE_ACTION_RESUME)`` as the sample does), the cellular modem driver will toggle the modem's power pin to wake it up.
+* If power management is enabled (the `CONFIG_PM_DEVICE`_ Kconfig option is set to ``y``): when the application powers on the modem (by calling ``pm_device_action_run(<dev>, PM_DEVICE_ACTION_RESUME)`` as the sample does), the cellular modem driver will toggle the modem's power pin to wake it up.
 
-  If power management is not enabled, the cellular modem driver will automatically proceed and expect Serial Modem to already be started and in a pristine state.
-  In this case, Serial Modem should be compiled with the :ref:`CONFIG_SM_START_SLEEP <CONFIG_SM_START_SLEEP>` Kconfig option set to ``n``, and :ref:`CONFIG_SM_POWER_PIN <CONFIG_SM_POWER_PIN>` can be left undefined.
+  If power management is not enabled, the cellular modem driver will automatically proceed and expect |SM| to already be started and in a pristine state.
+  In this case, |SM| should be compiled with the :ref:`CONFIG_SM_START_SLEEP <CONFIG_SM_START_SLEEP>` Kconfig option set to ``n``, and :ref:`CONFIG_SM_POWER_PIN <CONFIG_SM_POWER_PIN>` can be left undefined.
 
-* The cellular modem driver will start sending AT commands to Serial Modem.
+* The cellular modem driver will start sending AT commands to |SM|.
   It will enable the network status notifications, gather some information from the modem, enable CMUX, and set the modem to normal mode (with an ``AT+CFUN=1`` command).
-  This will result in Serial Modem's PPP starting automatically when the network registration is complete.
+  This will result in |SM|'s PPP starting automatically when the network registration is complete.
 
 * From this point onwards, once the Zephyr application has brought up the driver's network interface, it will be able to send and receive IP traffic through it.
-  The :zephyr:code-sample:`cellular-modem` sample does this.
+  The `Zephyr’s Cellular modem`_ sample does this.

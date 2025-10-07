@@ -7,16 +7,16 @@ Extending the application
    :local:
    :depth: 2
 
-The AT commands in the Serial LTE modem are implemented with the :ref:`at_cmd_custom_readme` library.
-You can extend the Serial LTE modem application by adding your own AT commands.
+The AT commands in the |SM| are implemented with the `Custom AT commands`_ library.
+You can extend the |SM| application by adding your own AT commands.
 
 Adding AT commands
 ******************
 
-If you want to implement a custom AT command in Serial Modem, you will need to follow the instructions in the :ref:`at_cmd_custom_readme` library documentation.
+If you want to implement a custom AT command in |SM|, you will need to follow the instructions in the `Custom AT commands`_ library documentation.
 Setting the AT command filter and callback with the :c:macro:`AT_CMD_CUSTOM` macro is enough for a custom AT command that does not require setup or teardown.
 
-As a preferred alternative to the :c:macro:`AT_CMD_CUSTOM` macro, Serial Modem defines the :c:macro:`SM_AT_CMD_CUSTOM` macro, which is a wrapper around the :c:macro:`AT_CMD_CUSTOM` macro.
+As a preferred alternative to the :c:macro:`AT_CMD_CUSTOM` macro, |SM| defines the :c:macro:`SM_AT_CMD_CUSTOM` macro, which is a wrapper around the :c:macro:`AT_CMD_CUSTOM` macro.
 The :c:macro:`SM_AT_CMD_CUSTOM` macro pre-processes the AT command parameters for the AT command callback and sets the default ``OK`` response if the callback returns successfully.
 
 If your custom AT command requires setup or teardown, you will need to perform the following steps:

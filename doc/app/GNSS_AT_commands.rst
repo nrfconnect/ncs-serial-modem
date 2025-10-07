@@ -19,14 +19,14 @@ Set command
 
 The set command allows you to start and stop the GNSS module.
 
-Both the :ref:`lib_nrf_cloud_agnss` service and the :ref:`lib_nrf_cloud_pgps` service can be used with the module, either together or independently of each other.
+Both the `nRF Cloud A-GNSS`_ service and the `nRF Cloud P-GPS`_ service can be used with the module, either together or independently of each other.
 Using them reduces the time it takes the GNSS module to estimate its position.
 
 To use either of them, the device must be connected to nRF Cloud (using the :ref:`#XNRFCLOUD <SM_AT_NRFCLOUD>` AT command) when starting the GNSS module.
 In addition, the following Kconfig options must be enabled:
 
-   * :kconfig:option:`CONFIG_NRF_CLOUD_AGNSS <CONFIG_NRF_CLOUD_AGNSS>` to use A-GNSS.
-   * :kconfig:option:`CONFIG_NRF_CLOUD_PGPS <CONFIG_NRF_CLOUD_PGPS>` to use P-GPS.
+   * `CONFIG_NRF_CLOUD_AGNSS`_ to use A-GNSS.
+   * `CONFIG_NRF_CLOUD_PGPS`_ to use P-GPS.
 
 If both assistive services were enabled during compilation, you cannot choose to use only one of them at run time.
 
@@ -76,7 +76,7 @@ In periodic navigation mode, the ``<interval>`` and ``<timeout>`` parameters are
    Make sure that the GNSS antenna is configured properly.
    This can be achieved two ways:
 
-   * Using the :kconfig:option:`CONFIG_MODEM_ANTENNA_AT_MAGPIO` and :kconfig:option:`CONFIG_MODEM_ANTENNA_AT_COEX0` Kconfig options.
+   * Using the `CONFIG_MODEM_ANTENNA_AT_MAGPIO`_ and `CONFIG_MODEM_ANTENNA_AT_COEX0`_ Kconfig options.
    * By issuing the ``%XMAGPIO`` and ``%XCOEX0`` AT commands manually at run time.
 
 .. tip::
@@ -85,16 +85,16 @@ In periodic navigation mode, the ``<interval>`` and ``<timeout>`` parameters are
 
 .. tip::
 
-   Enable the :kconfig:option:`CONFIG_SM_LOG_LEVEL_DBG` Kconfig option if you have trouble acquiring fixes.
+   Enable the ``CONFIG_SM_LOG_LEVEL_DBG`` Kconfig option if you have trouble acquiring fixes.
    It makes the application print NMEA and PVT data when trying to acquire fixes, which can be of help when solving the issue.
 
 .. note::
 
-   See the documentation for the :ref:`lib_nrf_cloud_agnss` and :ref:`lib_nrf_cloud_pgps` libraries for information on how to best configure and use A-GNSS and P-GPS, respectively.
+   See the documentation for the `nRF Cloud A-GNSS`_ and `nRF Cloud P-GPS`_ libraries for information on how to best configure and use A-GNSS and P-GPS, respectively.
 
 .. note::
 
-   When using P-GPS, make sure that the value of the :kconfig:option:`CONFIG_SM_PGPS_INJECT_FIX_DATA` Kconfig option matches your use case.
+   When using P-GPS, make sure that the value of the :ref:`CONFIG_SM_PGPS_INJECT_FIX_DATA <CONFIG_SM_PGPS_INJECT_FIX_DATA>` Kconfig option matches your use case.
    It is enabled by default but should be disabled if the device is expected to move distances longer than a few dozen kilometers between fix attempts.
 
 As an alternative to GNSS-based positioning, see :ref:`#XNRFCLOUDPOS <SM_AT_NRFCLOUDPOS>` for cellular and Wi-Fi® positioning.

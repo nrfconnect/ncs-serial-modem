@@ -1,0 +1,5 @@
+Sphinx
+breathe
+sphinx-ncs-theme==0.7.4
+sphinx-tabs>=3.4
+sphinx-togglebutton

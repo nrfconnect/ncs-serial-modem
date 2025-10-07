@@ -34,7 +34,7 @@ Syntax
 
 * The ``<client_id>`` parameter is a string.
   It indicates the MQTT Client ID.
-  If this command is not issued, Serial Modem uses the default value of ``sm_default_client_id``.
+  If this command is not issued, |SM| uses the default value of ``sm_default_client_id``.
 * The ``<keep_alive>`` parameter is an integer.
   It indicates the maximum Keep Alive time in seconds for MQTT.
   The default Kepp Alive time is 60 seconds.
@@ -499,7 +499,7 @@ Syntax
   It contains the payload on the topic being published.
 
   The maximum size of the payload is 1024 bytes when not empty.
-  If the payload is empty (for example, ``""``), Serial Modem enters ``sm_data_mode``.
+  If the payload is empty (for example, ``""``), |SM| enters ``sm_data_mode``.
 * The ``<qos>`` parameter is an integer.
   It indicates the MQTT Quality of Service type to use.
   It can accept the following values:

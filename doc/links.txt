@@ -1,0 +1,140 @@
+.. ### This page lists links used in Serial modem Add-on docs.
+       Links are grouped by source URL if three or more have the same source URL.
+       Links not separated by blank line are related to one another.
+
+.. ### docs.nordicsemi.com
+
+.. _`nRF Connect SDK`: https://www.nordicsemi.com/Products/Development-software/nRF-Connect-SDK
+.. _`Getting started guide`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/installation.html
+
+.. _`nRF91x1 AT Commands Reference Guide`: https://docs.nordicsemi.com/bundle/ref_at_commands_nrf91x1/page/REF/at_commands/intro_nrf91x1.html
+.. _`nRF9160 AT Commands Reference Guide`: https://docs.nordicsemi.com/bundle/ref_at_commands/page/REF/at_commands/intro_nrf9160.html
+
+.. _`Thingy91X`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/device_guides/thingy91x/index.html#ug-thingy91x
+.. _`Thingy91`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/device_guides/thingy91/index.html#ug-thingy91
+.. _`nRF91 DK`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/device_guides/nrf91/index.html#ug-nrf91
+.. _`nrf9161dk`: https://docs.nordicsemi.com/bundle/ncs-latest/page/zephyr/boards/nordic/nrf9161dk/doc/index.html#nrf9161dk
+.. _`nrf9160dk`: https://docs.nordicsemi.com/bundle/ncs-latest/page/zephyr/boards/nordic/nrf9160dk/doc/index.html#nrf9160dk-nrf9160
+.. _`nrf9151dk`: https://docs.nordicsemi.com/bundle/ncs-latest/page/zephyr/boards/nordic/nrf9151dk/doc/index.html#nrf9151dk
+.. _`nrf9131ek`: https://docs.nordicsemi.com/bundle/ncs-latest/page/zephyr/boards/nordic/nrf9131ek/doc/index.html#nrf9131ek
+.. _`nRF7002dk`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/device_guides/nrf70/index.html#ug-nrf70-developing
+.. _`nRF5340 DK`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/device_guides/nrf53/index.html#ug-nrf5340
+.. _`nrf5340dk`: https://docs.nordicsemi.com/bundle/ncs-latest/page/zephyr/boards/nordic/nrf5340dk/doc/index.html#nrf5340dk
+.. _`nRF52840_DK`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/device_guides/nrf52/index.html#ug-nrf52
+.. _`nrf52840dk`: https://docs.nordicsemi.com/bundle/ncs-latest/page/zephyr/boards/nordic/nrf52840dk/doc/index.html#nrf52840dk
+.. _`nRF9151 Product Specification`: https://docs.nordicsemi.com/bundle/ps_nrf9151/page/nRF9151_html5_keyfeatures.html
+.. _`nRF9161 Product Specification`: https://docs.nordicsemi.com/bundle/ps_nrf9161/page/nRF9161_html5_keyfeatures.html
+.. _`nRF9160 Product Specification`: https://docs.nordicsemi.com/bundle/ps_nrf9160/page/nRF9160_html5_keyfeatures.html
+.. _`Thingy91_firmware_desktop_app`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/device_guides/thingy91/thingy91_updating_fw_celmon.html#programming-thingy
+.. _`shared TF-M logging`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/device_guides/nrf91/nrf91_snippet.html#tfm-enable-share-uart
+.. _`nrf9160_board_revisions`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/device_guides/nrf91/nrf91_building.html#nrf9160-board-revisions
+.. _`VDD supply rail section in the nRF9160 DK User Guide`: https://docs.nordicsemi.com/bundle/ug_nrf9160_dk/page/UG/nrf91_DK/hw_description/power_sources_vdd.html
+
+.. _`app_boards_names`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/board_names.html#app-boards-names
+.. _`Configuring and building`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/security/tfm/index.html#ug-tfm
+.. _`Testing and optimization`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/test_and_optimize.html
+.. _`Build and configuration system`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/config_and_build/config_and_build_system.html
+.. _`Building an application`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/config_and_build/building.html#building
+.. _`Programming an application`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/programming.html#programming
+.. _`repository applications`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/create_application.html#create-application-types-repository
+.. _`SDK repositories`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/dev_model_and_contributions/code_base.html#dm-repo-types
+.. _`sysbuild_enabled_ncs`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/config_and_build/config_and_build_system.html#sysbuild-enabled-ncs
+.. _`create_application_types_freestanding`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/create_application.html#create-application-types-freestanding
+.. _`sysbuild_enabled_ncs_configuring`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/config_and_build/sysbuild/sysbuild_configuring_west.html#sysbuild-enabled-ncs-configuring
+.. _`cmake_options`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/config_and_build/cmake/index.html#cmake-options
+
+.. _`ug_tfm_security_by_separation`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/security/tfm/processing_environments.html#ug-tfm-security-by-separation
+.. _`ug_tfm`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/security/tfm/index.html#ug-tfm
+
+.. _`LwM2M carrier`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/bin/lwm2m_carrier/index.html#liblwm2m-carrier-readme
+.. _`lwm2m_configuration`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/bin/lwm2m_carrier/app_integration.html#configuration
+.. _`general_options_lwm2m`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/bin/lwm2m_carrier/app_integration.html#general_options
+.. _`device_options_lwm2m`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/bin/lwm2m_carrier/app_integration.html#device-options-lwm2m
+.. _`lwm2m_client_provisioning`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/samples/cellular/lwm2m_client/provisioning.html#lwm2m-client-provisioning
+.. _`Cellular: LwM2M carrier`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/samples/cellular/lwm2m_carrier/README.html#lwm2m-carrier
+.. _`Carrier-specific dependencies`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/bin/lwm2m_carrier/requirements.html#lwm2m-carrier-dependent
+.. _`Connectivity bridge`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/applications/connectivity_bridge/README.html#connectivity-bridge
+.. _`Cellular: AT Client`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/samples/cellular/at_client/README.html
+.. _`Nordic UART Service`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/bluetooth/services/nus.html#nus-service-readme
+.. _`AT parser`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/modem/at_parser.html
+.. _`AT Host`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/modem/at_host.html
+.. _`AT monitor`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/modem/at_monitor.html
+.. _`AT shell`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/modem/at_shell.html
+.. _`Modem library integration layer`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/modem/nrf_modem_lib/index.html
+.. _`Modem JWT`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/modem/modem_jwt.html
+.. _`FTP client`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/networking/ftp_client.html
+.. _`SMS`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/modem/sms.html
+.. _`FOTA download`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/networking/fota_download.html
+.. _`Downloader`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/networking/downloader.html
+.. _`nRF Cloud`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/networking/nrf_cloud.html
+.. _`nRF Cloud A-GNSS`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/networking/nrf_cloud_agnss.html
+.. _`nRF Cloud P-GPS`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/networking/nrf_cloud_pgps.html
+.. _`nRF Cloud location`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/networking/nrf_cloud_location.html
+.. _`Modem library`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrfxlib/nrf_modem/README.html
+.. _`Trusted Firmware-M`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/security/tfm/index.html
+.. _`nRF9160dk_nRF52840`: https://docs.nordicsemi.com/bundle/ncs-latest/page/zephyr/boards/nordic/nrf9160dk/doc/index.html#nrf9160dk-nrf52840
+.. _`Zephyr’s Cellular modem`: https://docs.nordicsemi.com/bundle/ncs-latest/page/zephyr/samples/net/cellular_modem/README.html
+.. _`Custom AT commands`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/modem/at_cmd_custom.html
+.. _`nrfxlib_nrf_sockets`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrfxlib/nrf_modem/doc/sockets.html#nrf-sockets
+.. _`nrfxlib_dtls_cid_settings`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrfxlib/nrf_modem/doc/sockets/socket_options_func.html#dtls-cid-setting
+.. _`nrfxlib_dtls_cid_status`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrfxlib/nrf_modem/doc/sockets/socket_options_func.html#dtls-cid-status
+.. _`nordic-nrf-twi`: https://docs.nordicsemi.com/bundle/ncs-latest/page/zephyr/build/dts/api/bindings/i2c/nordic_nrf-twi.html#std-dtcompatible-nordic-nrf-twi
+
+.. _`nRF Cloud Preconnect Provisioning`: https://docs.nordicsemi.com/bundle/nrf-cloud/page/Devices/Associations/Onboarding.html#preconnect-onboarding
+
+.. _`CONFIG_PM_DEVICE`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_PM_DEVICE
+.. _`CONFIG_MODEM_CMUX_MTU`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_MODEM_CMUX_MTU
+.. _`CONFIG_FTP_CLIENT_KEEPALIVE_TIME`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_FTP_CLIENT_KEEPALIVE_TIME
+.. _`CONFIG_NRF_CLOUD_AGNSS`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_NRF_CLOUD_AGNSS
+.. _`CONFIG_NRF_CLOUD_PGPS`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_NRF_CLOUD_PGPS
+.. _`CONFIG_MODEM_ANTENNA_AT_MAGPIO`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_MODEM_ANTENNA_AT_MAGPIO
+.. _`CONFIG_MODEM_ANTENNA_AT_COEX0`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_MODEM_ANTENNA_AT_COEX0
+.. _`CONFIG_SM_LOG_LEVEL_DBG`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_MODEM_ANTENNA_AT_COEX0
+.. _`CONFIG_LWM2M_CARRIER_SETTINGS`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_SETTINGS
+.. _`CONFIG_LWM2M_CARRIER_CUSTOM_APN`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_CUSTOM_APN
+.. _`CONFIG_LWM2M_CARRIER_GENERIC`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_GENERIC
+.. _`CONFIG_LWM2M_CARRIER_VERIZON`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_VERIZON
+.. _`CONFIG_LWM2M_CARRIER_BELL_CA`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_BELL_CA
+.. _`CONFIG_LWM2M_CARRIER_LG_UPLUS`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_LG_UPLUS
+.. _`CONFIG_LWM2M_CARRIER_T_MOBILE`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_T_MOBILE
+.. _`CONFIG_LWM2M_CARRIER_SOFTBANK`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_SOFTBANK
+.. _`CONFIG_LWM2M_CARRIER_COAP_CON_INTERVAL`: https://nordic-dev.zoominsoftware.io/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_COAP_CON_INTERVAL
+.. _`CONFIG_LWM2M_CARRIER_FIRMWARE_DOWNLOAD_TIMEOUT`: https://nordic-dev.zoominsoftware.io/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_FIRMWARE_DOWNLOAD_TIMEOUT
+.. _`CONFIG_LWM2M_CARRIER_DEVICE_TYPE`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_DEVICE_TYPE
+.. _`CONFIG_LWM2M_CARRIER_DEVICE_HARDWARE_VERSION`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_DEVICE_HARDWARE_VERSION
+.. _`CONFIG_LWM2M_CARRIER_DEVICE_MANUFACTURER`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_DEVICE_MANUFACTURER
+.. _`CONFIG_LWM2M_CARRIER_DEVICE_MODEL_NUMBER`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_DEVICE_MODEL_NUMBER
+.. _`CONFIG_LWM2M_CARRIER_DEVICE_SOFTWARE_VERSION`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_DEVICE_SOFTWARE_VERSION
+.. _`CONFIG_LWM2M_CARRIER_LG_UPLUS_IMEI`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_LG_UPLUS_IMEI
+.. _`CONFIG_LWM2M_CARRIER_LG_UPLUS_2DID`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_LG_UPLUS_2DID
+.. _`CONFIG_LWM2M_CARRIER_LG_UPLUS_DEVICE_SERIAL_NUMBER`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_LG_UPLUS_DEVICE_SERIAL_NUMBER
+.. _`CONFIG_LWM2M_CARRIER_LG_UPLUS_SERVICE_CODE`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_LG_UPLUS_SERVICE_CODE
+.. _`CONFIG_LWM2M_CARRIER_PDN_TYPE`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_PDN_TYPE
+.. _`CONFIG_LWM2M_CARRIER_QUEUE_MODE`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_QUEUE_MODE
+.. _`CONFIG_LWM2M_CARRIER_SERVER_BINDING_UDP`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_SERVER_BINDING_UDP
+.. _`CONFIG_LWM2M_CARRIER_SERVER_BINDING_NONIP`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_SERVER_BINDING_NONIP
+.. _`CONFIG_LWM2M_CARRIER_IS_BOOTSTRAP_SERVER`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_IS_BOOTSTRAP_SERVER
+.. _`CONFIG_LWM2M_CARRIER_SERVER_LIFETIME`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_SERVER_LIFETIME
+.. _`CONFIG_LWM2M_CARRIER_SERVER_SEC_TAG`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_SERVER_SEC_TAG
+.. _`CONFIG_LWM2M_CARRIER_CUSTOM_URI`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_CUSTOM_URI
+.. _`CONFIG_LWM2M_CARRIER_SESSION_IDLE_TIMEOUT`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_SESSION_IDLE_TIMEOUT
+.. _`CONFIG_NRF_CLOUD_LOCATION`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_NRF_CLOUD_LOCATION
+
+.. _`Memfault library`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/debug/memfault_ncs.html#mod-memfault
+.. _`modem trace UART snippet`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/device_guides/nrf91/nrf91_snippet.html#nrf91-modem-trace-uart-snippet
+.. _`Memfault`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/debug/memfault_ncs.html#mod-memfault
+
+.. _`Cellular Monitor app`: https://docs.nordicsemi.com/bundle/nrf-connect-cellularmonitor/page/index.html
+.. _`Serial Terminal app`: https://docs.nordicsemi.com/bundle/nrf-connect-serial-terminal/page/index.html
+.. _`Board Configurator app`: https://docs.nordicsemi.com/bundle/nrf-connect-board-configurator/page/index.html
+
+.. ### github.com
+
+.. _`github_release`: https://github.com/divipillai/ncs-serial-modem/releases
+.. _`sdk-nrfxlib`: https://github.com/nrfconnect/sdk-nrfxlib
+
+.. ### others
+
+.. _`Private addresses`: https://en.wikipedia.org/wiki/IP_address#Private_addresses
+.. _`DLPTest.com`: https://dlptest.com/ftp-test/
+.. _`Zephyr Network APIs`: https://docs.zephyrproject.org/latest/connectivity/networking/api/apis.html#network-apis

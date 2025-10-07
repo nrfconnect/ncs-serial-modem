@@ -1,24 +1,43 @@
 .. _sm_shell_sample:
 
-Cellular: Serial Modem Host Shell
-#################################
+|SM| Host Shell sample
+######################
 
 .. contents::
    :local:
    :depth: 2
 
-The Serial Modem Host Shell sample demonstrates how to send AT commands to modem through the :ref:`Serial Modem <sm_description>` application running on nRF91 Series SiP.
-This sample enables an external MCU to send modem or Serial Modem proprietary AT commands for LTE connection and IP services.
+The |SM| Host Shell sample demonstrates how to send AT commands to modem through the :ref:`Serial Modem <sm_description>` application running on nRF91 Series SiP.
+This sample enables an external MCU to send modem or |SM| proprietary AT commands for LTE connection and IP services.
 See more information on the functionality of this sample from the :ref:`lib_sm_host` library, which provides the core functionality for this sample.
 
 Requirements
 ************
 
-The Serial Modem application should be configured to use UART2 on the nRF91 Series DK side with hardware flow control.
+The |SM| application should be configured to use UART2 on the nRF91 Series DK side with hardware flow control.
 
 The sample supports the following development kits:
 
-.. table-from-sample-yaml::
+.. list-table::
+   :widths: auto
+   :header-rows: 1
+
+   * - Hardware platforms
+     - PCA
+     - Board name
+     - Board target
+   * - `nRF7002 DK <nRF7002dk_>`_
+     - PCA10143
+     - `nRF7002dk <nRF7002dk_>`_
+     - ``nrf7002dk/nrf5340/cpuapp``
+   * - `nRF5340 DK <nRF5340 DK_>`_
+     - PCA10095
+     - `nrf5340dk`_
+     - ``nrf5340dk/nrf5340/cpuapp``
+   * - `nRF52840 DK <nRF52840_DK_>`_
+     - PCA10056
+     - `nrf52840dk`_
+     - ``nrf52840dk/nrf52840``
 
 Connect the DK with an nRF91 Series DK based on the pin configuration in DTS overlay files of both sides.
 
@@ -82,7 +101,7 @@ The following table shows how to connect UART1 of the DK to the nRF91 Series DK'
 
          * For nRF91x1 DK, you can set the VDD voltage with the `Board Configurator app`_.
          * For nRF9160 DK, you can set the VDD voltage with the **VDD IO** switch (**SW9**).
-           See the `VDD supply rail section in the nRF9160 DK User Guide`_ for more information related to nRF9160 DK
+           See the `VDD supply rail section in the nRF9160 DK User Guide`_ for more information related to nRF9160 DK.
 
    .. group-tab:: nRF7002 DK
 

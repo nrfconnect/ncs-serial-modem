@@ -1,9 +1,9 @@
 .. _SM_AT_commands:
 
-Serial Modem specific AT commands
-#################################
+|SM| specific AT commands
+#########################
 
-The application sample uses a series of proprietary AT commands to let the nRF91 development kit operate as a Serial Modem (SM).
+The application sample uses a series of proprietary AT commands to let the nRF91 development kit operate as a |SM| (SM).
 
 The AT Commands have standardized syntax rules.
 
