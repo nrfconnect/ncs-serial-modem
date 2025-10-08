@@ -31,15 +31,15 @@
 / {
 	dte_dtr: dte_dtr {
 		compatible = "nordic,dte-dtr";
-		dtr-gpios = <&gpio0 26 GPIO_ACTIVE_LOW>;
-		ri-gpios = <&gpio0 25 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>;
+		dtr-gpios = <&gpio0 23 GPIO_ACTIVE_LOW>;
+		ri-gpios = <&gpio0 28 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>;
 	};
 };
 
 &gpio0 {
 	status = "okay";
-	/* Use PORT event for DTR (26) and RI (25) pins to ensure lower power consumption. */
-	sense-edge-mask = <0x06000000>;
+	/* Use PORT event for RI (28) pin to ensure lower power consumption. */
+	sense-edge-mask = <0x10000000>;
 };
 
 

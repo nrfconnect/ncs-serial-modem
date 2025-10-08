@@ -39,8 +39,8 @@
 
 &gpio0 {
 	status = "okay";
-	/* Use PORT event for DTR (30) and RI (31) pins to ensure lower power consumption. */
-	sense-edge-mask = <0xC0000000>;
+	/* Use PORT event for RI (31) pin to ensure lower power consumption. */
+	sense-edge-mask = <0x80000000>;
 };
 
 &pinctrl {
