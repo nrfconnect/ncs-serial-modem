@@ -16,9 +16,6 @@ General
 *******
 
 The base of the Serial Modem add-on repository was done by taking a copy of NCS SLM and related components from NCS commit 437f372b37849fe215243f8de48847d578976c13.
-
-.. toggle::
-
 The following parts of NCS were copied into this repository:
 
    * applications/serial_lte_modem -> app
@@ -30,22 +27,23 @@ The following parts of NCS were copied into this repository:
 General renaming
 ****************
 
-.. toggle::
-
    * Kconfig options:
 
-     * Rename `CONFIG_SLM_*` to `CONFIG_SM_*`
-     * Rename `CONFIG_MODEM_SLM_*` to `CONFIG_SM_HOST_*`
+     * Rename ``CONFIG_SLM_*`` to ``CONFIG_SM_*``
+     * Rename ``CONFIG_MODEM_SLM_*`` to ``CONFIG_SM_HOST_*``
 
    * Names of files, functions, structures, enumerations etc.:
 
-     * Renamed `slm_*` to `sm_*`
-     * Renamed `modem_slm_*` to `sm_host_*`
+     * Renamed ``slm_*`` to ``sm_*``
+     * Renamed ``modem_slm_*`` to ``sm_host_*``
 
-`AT#XGPS` renamed to `AT#XGNSS`
-************************************
+``AT#XPOLL`` removed
+********************
 
-.. toggle::
+   * ``AT#XPOLL`` command removed. Use ``AT#XAPOLL`` instead.
 
-   * `AT#XGPS` command has been renamed to `AT#XGNSS`
-   * `AT#XGPSDEL` command has been renamed to `AT#XGNSSDEL`
+``AT#XGPS`` renamed to ``AT#XGNSS``
+***********************************
+
+   * ``AT#XGPS`` command has been renamed to ``AT#XGNSS``
+   * ``AT#XGPSDEL`` command has been renamed to ``AT#XGNSSDEL``
