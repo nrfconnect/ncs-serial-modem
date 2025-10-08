@@ -72,7 +72,6 @@ static struct sm_socket {
 	struct sm_async_poll async_poll; /* Async poll info */
 } socks[SM_MAX_SOCKET_COUNT];
 
-static struct zsock_pollfd fds[SM_MAX_SOCKET_COUNT];
 static struct sm_socket *sock = &socks[0]; /* Current socket in use */
 
 enum EFD_COMMAND {
@@ -116,19 +115,6 @@ static void init_socket(struct sm_socket *socket)
 	socket->ranking = 0;
 	socket->cid = 0;
 	socket->async_poll = (struct sm_async_poll){0};
-}
-
-static bool is_opened_socket(int fd)
-{
-	if (fd != INVALID_SOCKET) {
-		for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
-			if (socks[i].fd == fd) {
-				return true;
-			}
-		}
-	}
-
-	return false;
 }
 
 static struct sm_socket *find_avail_socket(void)
@@ -914,28 +900,6 @@ static int do_recvfrom(int timeout, int flags)
 	return 0;
 }
 
-static int do_poll(int timeout)
-{
-	int ret = zsock_poll(fds, SM_MAX_SOCKET_COUNT, timeout);
-
-	if (ret < 0) {
-		rsp_send("\r\n#XPOLL: %d\r\n", ret);
-		return ret;
-	}
-	/* ret == 0 means timeout */
-	if (ret > 0) {
-		for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
-			/* If fd is equal to -1	then revents is cleared (set to zero) */
-			if (fds[i].revents != 0) {
-				rsp_send("\r\n#XPOLL: %d,\"0x%04x\"\r\n",
-					fds[i].fd, fds[i].revents);
-			}
-		}
-	}
-
-	return 0;
-}
-
 static int socket_poll(int sock_fd, int event, int timeout)
 {
 	int ret;
@@ -1690,58 +1654,6 @@ static int handle_at_getaddrinfo(enum at_parser_cmd_type cmd_type, struct at_par
 		strcat(rsp_buf, "\"\r\n");
 		rsp_send("%s", rsp_buf);
 		zsock_freeaddrinfo(result);
-		break;
-
-	default:
-		break;
-	}
-
-	return err;
-}
-
-SM_AT_CMD_CUSTOM(xpoll, "AT#XPOLL", handle_at_poll);
-static int handle_at_poll(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
-			  uint32_t param_count)
-{
-	int err = -EINVAL;
-	int timeout, handle;
-
-	switch (cmd_type) {
-	case AT_PARSER_CMD_TYPE_SET:
-		if (poll_ctx.poll_running) {
-			LOG_ERR("%s cannot be used with AT#XAPOLL", "AT#XPOLL");
-			return -EBUSY;
-		}
-		err = at_parser_num_get(parser, 1, &timeout);
-		if (err) {
-			return err;
-		}
-		if (param_count == 2) {
-			/* poll all opened socket */
-			for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
-				fds[i].fd = socks[i].fd;
-				if (fds[i].fd != INVALID_SOCKET) {
-					fds[i].events = ZSOCK_POLLIN;
-				}
-			}
-		} else {
-			/* poll selected sockets */
-			for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
-				fds[i].fd = INVALID_SOCKET;
-				if (param_count > 2 + i) {
-					err = at_parser_num_get(parser, 2 + i, &handle);
-					if (err) {
-						return err;
-					}
-					if (!is_opened_socket(handle)) {
-						return -EINVAL;
-					}
-					fds[i].fd = handle;
-					fds[i].events = ZSOCK_POLLIN;
-				}
-			}
-		}
-		err = do_poll(timeout);
 		break;
 
 	default:

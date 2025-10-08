@@ -1221,63 +1221,6 @@ Test command
 
 The test command is not supported.
 
-Poll sockets #XPOLL
-===================
-
-The ``#XPOLL`` command allows you to poll selected or all sockets that have already been opened.
-
-Set command
------------
-
-The set command allows you to poll a set of sockets to check whether they are ready for I/O.
-
-Syntax
-~~~~~~
-
-::
-
-   #XPOLL=<timeout>[,<handle1>[,<handle2> ...<handle8>]
-
-* The ``<timeout>`` value sets the timeout value in milliseconds, and the poll blocks up to this timeout.
-  ``0`` means no timeout, and the poll returns without blocking.
-  ``-1`` means indefinite, and the poll blocks indefinitely until any events are received.
-
-* The ``<handleN>`` value sets the socket handles to poll.
-  The handles values could be obtained by ``AT#XSOCKETSELECT?`` command.
-  If no handle values are specified, all opened sockets will be polled.
-
-Response syntax
-~~~~~~~~~~~~~~~
-
-::
-
-   #XPOLL: <error>
-   #XPOLL: <handle>,<revents>
-
-* The ``<error>`` value is an error code when the poll fails.
-* The ``<handle>`` value is an integer.
-  It is the handle of a socket that have events returned, so-called ``revents``.
-* The ``<revents>`` value is a hexadecimal string.
-  It represents the returned events, which could be a combination of ``POLLIN``, ``POLLERR``, ``POLLHUP``, and ``POLLNVAL``.
-
-Examples
-~~~~~~~~
-
-::
-
-   AT#XPOLL=2000,0
-   #XPOLL: 0,"0x0001"
-   OK
-
-   AT#XPOLL=2000,1
-   #XPOLL: 1,"0x0001"
-   OK
-
-   AT#XPOLL=2000
-   #XPOLL: 0,"0x0001"
-   #XPOLL: 1,"0x0001"
-   OK
-
 Read command
 ------------
 
@@ -1295,7 +1238,7 @@ The ``#XAPOLL`` command allows you to receive Unsolicited Result Code (URC) noti
 
 .. note::
 
-    The ``#XAPOLL`` command is not usable at the same time with the socket AT commands that use poll internally (``#XPOLL`` and ``#XACCEPT``).
+    The ``#XAPOLL`` command is not usable at the same time with the socket AT commands that use poll internally (``#XACCEPT``).
 
 Set command
 -----------
