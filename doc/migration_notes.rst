@@ -72,3 +72,71 @@ The |SM| application uses DTR (Data Terminal Ready) and RI (Ring Indicator) pins
 
 See :ref:`sm_dtr_ri` for more information on how DTR and RI pins work in the |SM| application.
 See :ref:`sm_as_zephyr_modem` for information on how to configure DTR and RI pins when using the |SM| application as a Zephyr modem.
+
+Socket AT commands updated to handle-based API
+----------------------------------------------
+
+The socket AT commands have been updated to use a handle-based approach instead of socket selection.
+This provides more flexibility and clearer socket management by directly referencing socket handles in all operations.
+
+   * **Removed commands:**
+
+     * ``AT#XSOCKETSELECT`` - Socket selection is no longer needed. Each command now directly specifies the socket handle.
+
+   * **Updated socket creation:**
+
+     * ``AT#XSOCKET`` - No longer supports closing sockets (``op=0`` removed). Only creates sockets and returns a handle.
+     * ``AT#XSSOCKET`` - No longer supports closing sockets (``op=0`` removed). Only creates secure sockets and returns a handle.
+
+   * **New socket closing:**
+
+     * ``AT#XCLOSE`` - New command to close individual sockets or all sockets at once.
+     * Syntax: ``AT#XCLOSE[=<handle>]`` (handle is optional - omit to close all sockets)
+
+   * **All socket operations now require handle parameter:**
+
+     * ``AT#XSOCKETOPT=<handle>,<op>,<name>[,<value>]`` (handle parameter added)
+     * ``AT#XSSOCKETOPT=<handle>,<op>,<name>[,<value>]`` (handle parameter added)
+     * ``AT#XBIND=<handle>,<port>`` (handle parameter added)
+     * ``AT#XCONNECT=<handle>,<url>,<port>`` (handle parameter added)
+     * ``AT#XLISTEN=<handle>`` (handle parameter added)
+     * ``AT#XACCEPT=<handle>,<timeout>`` (handle parameter added)
+     * ``AT#XSEND=<handle>[,<data>][,<flags>]`` (handle parameter added)
+     * ``AT#XRECV=<handle>,<timeout>[,<flags>]`` (handle parameter added)
+     * ``AT#XSENDTO=<handle>,<url>,<port>[,<data>][,<flags>]`` (handle parameter added)
+     * ``AT#XRECVFROM=<handle>,<timeout>[,<flags>]`` (handle parameter added)
+
+   * **Response format changes:**
+
+     * ``AT#XSOCKETOPT`` - Response to get options now includes socket handle: ``#XSOCKETOPT: <handle>,<value>`` (previously just ``#XSOCKETOPT: <value>``)
+     * ``AT#XSSOCKETOPT`` - Response to get options now includes socket handle: ``#XSSOCKETOPT: <handle>,<value>`` (previously just ``#XSSOCKETOPT: <value>``)
+     * ``AT#XCONNECT`` - Response now includes socket handle: ``#XCONNECT: <handle>,<status>`` (previously just ``#XCONNECT: <status>``)
+     * ``AT#XSEND`` - Response now includes socket handle: ``#XSEND: <handle>,<size>`` (previously just ``#XSEND: <size>``)
+     * ``AT#XRECV`` - Response now includes socket handle: ``#XRECV: <handle>,<size>`` (previously just ``#XRECV: <size>``)
+     * ``AT#XSENDTO`` - Response now includes socket handle: ``#XSENDTO: <handle>,<size>`` (previously just ``#XSENDTO: <size>``)
+     * ``AT#XRECVFROM`` - Response now includes socket handle: ``#XRECVFROM: <handle>,<size>,"<ip_addr>",<port>`` (previously just ``#XRECVFROM: <size>,"<ip_addr>",<port>``)
+
+   * **Migration example:**
+
+     **Old approach (NCS SLM):**
+
+     .. code-block::
+
+        AT#XSOCKET=1,1,0          // Open socket, returns handle 1
+        AT#XCONNECT="server",80   // Connect socket handle 1
+        AT#XSEND="data"           // Send on socket handle 1
+        AT#XSOCKET=1,1,0          // Open socket, returns handle 2
+        AT#XCONNECT="server",80   // Connect socket handle 2
+        AT#XSOCKETSELECT=1        // Select socket handle 1
+        AT#XSOCKET=0              // Close selected socket handle 1
+
+     **New approach (Serial Modem add-on):**
+
+     .. code-block::
+
+        AT#XSOCKET=1,1,0          // Open socket, returns handle 1
+        AT#XCONNECT=1,"server",80 // Connect socket handle 1
+        AT#XSEND=1,"data"         // Send on socket handle 1
+        AT#XSOCKET=1,1,0          // Open socket, returns handle 2
+        AT#XCONNECT=2,"server",80 // Connect socket handle 2
+        AT#XCLOSE=1               // Close socket handle 1

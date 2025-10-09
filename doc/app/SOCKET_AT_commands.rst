@@ -8,36 +8,33 @@ Socket AT commands
    :depth: 2
 
 This page describes socket-related AT commands.
-The application can open up to 8 sockets and select the active one among them.
+The application can open up to 8 sockets.
 
 For more information on the networking services, see the `Zephyr Network APIs`_.
 
 Socket #XSOCKET
 ===============
 
-The ``#XSOCKET`` command allows you to open or close a socket and to check the socket handle.
+The ``#XSOCKET`` command allows you to open a socket and to check the socket handle.
 
 Set command
 -----------
 
-The set command allows you to open or close a socket.
+The set command allows you to open a socket.
 
 Syntax
 ~~~~~~
 
 ::
 
-   #XSOCKET=<op>[,<type>,<role>[,<cid>]]
+   #XSOCKET=<op>,<type>,<role>[,<cid>]
 
 * The ``<op>`` parameter can accept one of the following values:
 
-  * ``0`` - Close a socket.
   * ``1`` - Open a socket for IP protocol family version 4.
     Protocol family is ignored with ``<type>`` parameter value ``3``.
   * ``2`` - Open a socket for IP protocol family version 6.
     Protocol family is ignored with ``<type>`` parameter value ``3``.
-
-  When ``0``, the highest-ranked socket is made active after the current one is closed.
 
 * The ``<type>`` parameter can accept one of the following values:
 
@@ -61,7 +58,6 @@ Response syntax
 ::
 
    #XSOCKET: <handle>,<type>,<protocol>
-   #XSOCKET: <result>,"closed"
 
 * The ``<handle>`` value is an integer and can be interpreted as follows:
 
@@ -80,28 +76,22 @@ Response syntax
   * ``6`` - IPPROTO_TCP.
   * ``17`` - IPPROTO_UDP.
 
-* The ``<result>`` value indicates the result of closing the socket.
-  When ``0``, the socket closed successfully.
-
 Examples
 ~~~~~~~~
 
 ::
 
    AT#XSOCKET=1,1,0
-   #XSOCKET: 3,1,6
+   #XSOCKET: 0,1,6
    OK
    AT#XSOCKET=1,2,0
    #XSOCKET: 1,2,17
    OK
    AT#XSOCKET=2,1,0
-   #XSOCKET: 1,1,6
+   #XSOCKET: 2,1,6
    OK
    AT#XSOCKET=1,3,0
-   #XSOCKET: 1,3,0
-   OK
-   AT#XSOCKET=0
-   #XSOCKET: 0,"closed"
+   #XSOCKET: 3,3,0
    OK
 
 Read command
@@ -153,7 +143,7 @@ Example
 ::
 
    AT#XSOCKET?
-   #XSOCKET: 3,1,0,1,0
+   #XSOCKET: 0,1,0,1,0
    OK
 
 Test command
@@ -173,7 +163,7 @@ Response syntax
 
 ::
 
-   #XSOCKET: <list of ops>,<list of types>,<list of roles>,<cid>
+   #XSOCKET: <handle>,<list of ops>,<list of types>,<list of roles>,<cid>
 
 Example
 ~~~~~~~~
@@ -181,13 +171,13 @@ Example
 ::
 
    AT#XSOCKET=?
-   #XSOCKET: (0,1,2),(1,2,3),(0,1),<cid>
+   #XSOCKET: <handle>,(1,2),(1,2,3),(0,1),<cid>
    OK
 
 Secure socket #XSSOCKET
 =======================
 
-The ``#XSSOCKET`` command allows you to open or close a secure socket, and to check the socket handle.
+The ``#XSSOCKET`` command allows you to open a secure socket and to check the socket handle.
 
 .. note::
    TLS and DTLS servers are currently not supported.
@@ -195,22 +185,19 @@ The ``#XSSOCKET`` command allows you to open or close a secure socket, and to ch
 Set command
 -----------
 
-The set command allows you to open or close a secure socket.
+The set command allows you to open a secure socket.
 
 Syntax
 ~~~~~~
 
 ::
 
-   #XSSOCKET=<op>[,<type>,<role>,<sec_tag>[,<peer_verify>[,<cid>]]
+   #XSSOCKET=<op>,<type>,<role>,<sec_tag>[,<peer_verify>[,<cid>]]
 
 * The ``<op>`` parameter can accept one of the following values:
 
-  * ``0`` - Close a socket.
   * ``1`` - Open a socket for IP protocol family version 4.
   * ``2`` - Open a socket for IP protocol family version 6.
-
-  When ``0``, the highest-ranked socket is made active after the current one is closed.
 
 * The ``<type>`` parameter can accept one of the following values:
 
@@ -243,7 +230,6 @@ Response syntax
 ::
 
    #XSSOCKET: <handle>,<type>,<protocol>
-   #XSOCKET: <result>,"closed"
 
 * The ``<handle>`` value is an integer and can be interpreted as follows:
 
@@ -260,26 +246,16 @@ Response syntax
   * ``258`` - IPPROTO_TLS_1_2.
   * ``273`` - IPPROTO_DTLS_1_2.
 
-* The ``<result>`` value indicates the result of closing the socket.
-  When ``0``, the socket closed successfully.
-
 Examples
 ~~~~~~~~
 
 ::
 
    AT#XSSOCKET=1,1,0,16842753,2
-   #XSSOCKET: 2,1,258
+   #XSSOCKET: 0,1,258
    OK
-   AT#XSOCKET=0
-   #XSOCKET: 0,"closed"
-   OK
-
    AT#XSSOCKET=1,2,0,16842753
-   #XSSOCKET: 2,2,273
-   OK
-   AT#XSOCKET=0
-   #XSOCKET: 0,"closed"
+   #XSSOCKET: 1,2,273
    OK
 
 Read command
@@ -331,7 +307,7 @@ Example
 ::
 
    AT#XSSOCKET?
-   #XSSOCKET: 2,1,0,1,16842753,0
+   #XSSOCKET: 0,1,0,1,16842753,0
    OK
 
 Test command
@@ -351,7 +327,7 @@ Response syntax
 
 ::
 
-   #XSSOCKET: <list of ops>,<list of types>,<list of roles>,<sec_tag>,<peer_verify>,<cid>
+   #XSSOCKET: <handle>,<list of ops>,<list of types>,<list of roles>,<sec_tag>,<peer_verify>,<cid>
 
 Example
 ~~~~~~~~
@@ -359,128 +335,69 @@ Example
 ::
 
    AT#XSSOCKET=?
-   #XSSOCKET: (0,1,2),(1,2),(0,1),<sec_tag>,<peer_verify>,<cid>
+   #XSSOCKET: <handle>,(1,2),(1,2),(0,1),<sec_tag>,<peer_verify>,<cid>
    OK
 
-Select Socket #XSOCKETSELECT
-============================
+Close socket #XCLOSE
+====================
 
-The ``#XSOCKETSELECT`` command allows you to select an active socket among multiple opened ones.
+The ``#XCLOSE`` command allows you to close one or all sockets.
 
 Set command
 -----------
 
-The set command allows you to select an active socket.
+The set command allows you to close a specific socket or all open sockets.
 
 Syntax
 ~~~~~~
 
 ::
 
-   #XSOCKETSELECT=<handle>
+   #XCLOSE[=<handle>]
 
-* The ``<handle>`` parameter is the handle value returned from the #XSOCKET or #XSSOCKET commands.
+* The ``<handle>`` parameter is an optional integer that specifies the socket handle to close.
+  This is the handle value returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
+  If omitted, all open sockets will be closed.
 
 Response syntax
 ~~~~~~~~~~~~~~~
 
 ::
 
-   #XSOCKETSELECT: <handle>
+   #XCLOSE: <handle>,<result>
 
-* The ``<handle>`` value is an integer.
-  When positive or ``0``, the socket is valid.
+* The ``<handle>`` value is an integer indicating the handle of the closed socket.
 
-Example
+* The ``<result>`` value indicates the result of closing the socket.
+  When ``0``, the socket closed successfully.
+
+When closing all sockets (no handle parameter provided), multiple responses will be sent, one for each socket that was closed.
+
+Examples
 ~~~~~~~~
+
+Close a specific socket:
 
 ::
 
-   AT#XSOCKETSELECT=4
-   #XSOCKETSELECT: 4
+   AT#XCLOSE=0
+   #XCLOSE: 0,0
+   OK
+
+Close all open sockets:
+
+::
+
+   AT#XCLOSE
+   #XCLOSE: 0,0
+   #XCLOSE: 1,0
+   #XCLOSE: 2,0
    OK
 
 Read command
 ------------
 
-The read command allows you to list all sockets that have been opened and the active socket.
-
-Syntax
-~~~~~~
-
-::
-
-   #XSOCKETSELECT?
-
-Response syntax
-~~~~~~~~~~~~~~~
-
-::
-
-   #XSOCKETSELECT: <handle>,<family>,<role>,<type>,<sec_tag>,<ranking>,<cid>
-   #XSOCKETSELECT: <handle_active>
-
-* The ``<handle>`` value is an integer that indicates the handle of the socket.
-
-* The ``<family>`` value can be one of the following integers:
-
-  * ``1`` - IP protocol family version 4.
-  * ``2`` - IP protocol family version 6.
-
-* The ``<role>`` value can be one of the following integers:
-
-  * ``0`` - Client.
-  * ``1`` - Server.
-
-* The ``<type>`` value can return one of the following:
-
-  * ``1`` - Set ``SOCK_STREAM`` for the stream socket type using the TLS 1.2 protocol.
-  * ``2`` - Set ``SOCK_DGRAM`` for the datagram socket type using the DTLS 1.2 protocol.
-
-* The ``<sec_tag>`` value is an integer.
-  It indicates to the modem the credential of the security tag to be used for establishing a secure connection.
-  For a non-secure socket, it returns the value of –1.
-
-* The ``<ranking>`` value is an integer.
-  It indicates the ranking value of this socket, where the largest value means the highest ranking.
-
-* The ``<cid>`` value is an integer indicating the used PDN connection.
-  It represents ``cid`` in the ``+CGDCONT`` command.
-
-* The ``<handle_active>`` value is an integer that indicates the handle of the active socket.
-
-Examples
-~~~~~~~~
-
-::
-
-  AT#XSOCKETSELECT?
-  #XSOCKETSELECT: 0,1,0,1,-1,2,0
-  #XSOCKETSELECT: 1,1,0,2,-1,3,0
-  #XSOCKETSELECT: 2,1,0,1,16842755,4,0
-  #XSOCKETSELECT: 3,1,0,2,16842755,5,0
-  #XSOCKETSELECT: 4,1,1,1,-1,6,0
-  #XSOCKETSELECT: 5,1,1,2,-1,7,0
-  #XSOCKETSELECT: 6,1,1,1,16842755,8,0
-  #XSOCKETSELECT: 7,1,0,1,-1,9,0
-  #XSOCKETSELECT: 7
-  OK
-
-  AT#XSOCKETSELECT=4
-  #XSOCKETSELECT: 4,1,1
-  OK
-
-  AT#XSOCKETSELECT?
-  #XSOCKETSELECT: 0,1,0,1,-1,2,0
-  #XSOCKETSELECT: 1,1,0,2,-1,3,0
-  #XSOCKETSELECT: 2,1,0,1,16842755,4,0
-  #XSOCKETSELECT: 3,1,0,2,16842755,5,0
-  #XSOCKETSELECT: 4,1,1,1,-1,6,0
-  #XSOCKETSELECT: 5,1,1,2,-1,7,0
-  #XSOCKETSELECT: 6,1,1,1,16842755,8,0
-  #XSOCKETSELECT: 7,1,0,1,-1,9,0
-  #XSOCKETSELECT: 4
-  OK
+The read command is not supported.
 
 Test command
 ------------
@@ -502,7 +419,9 @@ Syntax
 
 ::
 
-   #XSOCKETOPT=<op>,<name>[,<value>]
+   #XSOCKETOPT=<handle>,<op>,<name>[,<value>]
+
+* The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
 
 * The ``<op>`` parameter can accept one of the following values:
 
@@ -586,13 +505,13 @@ Examples
 
 ::
 
-   AT#XSOCKETOPT=1,20,30
+   AT#XSOCKETOPT=0,1,20,30
    OK
 
 ::
 
-   AT#XSOCKETOPT=0,20
-   #XSOCKETOPT: 30
+   AT#XSOCKETOPT=0,0,20
+   #XSOCKETOPT: 0,30
    OK
 
 Read command
@@ -617,7 +536,7 @@ Response syntax
 
 ::
 
-   #XSOCKETOPT: <list of ops>,<name>,<value>
+   #XSOCKETOPT: <handle>,<list of ops>,<name>,<value>
 
 Example
 ~~~~~~~~
@@ -625,7 +544,7 @@ Example
 ::
 
    AT#XSOCKETOPT=?
-   #XSOCKETOPT: (0,1),<name>,<value>
+   #XSOCKETOPT: <handle>,(0,1),<name>,<value>
    OK
 
 .. _SM_AT_SSOCKETOPT:
@@ -633,19 +552,21 @@ Example
 Secure socket options #XSSOCKETOPT
 ==================================
 
-The ``#XSSOCKETOPT`` command allows you to set secure socket options.
+The ``#XSSOCKETOPT`` command allows you to get and set socket options for secure sockets.
 
 Set command
 -----------
 
-The set command allows you to set secure socket options.
+The set command allows you to get and set socket options for secure sockets.
 
 Syntax
 ~~~~~~
 
 ::
 
-   #XSSOCKETOPT=<op>,<name>[,<value>]
+   #XSSOCKETOPT=<handle>,<op>,<name>[,<value>]
+
+* The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSSOCKET`` command.
 
 * The ``<op>`` parameter can accept one of the following values:
 
@@ -709,7 +630,7 @@ Example
 
 ::
 
-   AT#XSSOCKETOPT=1,5,2
+   AT#XSSOCKETOPT=0,1,5,2
    OK
 
 Read command
@@ -734,7 +655,7 @@ Response syntax
 
 ::
 
-   #XSSOCKETOPT: <list of ops>,<name>,<value>
+   #XSSOCKETOPT: <handle>,<list of ops>,<name>,<value>
 
 Example
 ~~~~~~~~
@@ -742,7 +663,7 @@ Example
 ::
 
    AT#XSSOCKETOPT=?
-   #XSSOCKETOPT: (0,1),<name>,<value>
+   #XSSOCKETOPT: <handle>,(0,1),<name>,<value>
    OK
 
 
@@ -763,7 +684,9 @@ Syntax
 
 ::
 
-   #XBIND=<port>
+   #XBIND=<handle>,<port>
+
+* The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
 
 * The ``<port>`` parameter is an unsigned 16-bit integer (0 - 65535).
   It represents the specific port to use for binding the socket.
@@ -773,14 +696,13 @@ Example
 
 ::
 
-   AT#XBIND=1234
+   AT#XBIND=0,1234
    OK
 
 Read command
 ------------
 
 The read command is not supported.
-
 
 Test command
 ------------
@@ -804,7 +726,9 @@ Syntax
 
 ::
 
-   #XCONNECT=<url>,<port>
+   #XCONNECT=<handle>,<url>,<port>
+
+* The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
 
 * The ``<url>`` parameter is a string.
   It indicates the hostname or the IP address of the server.
@@ -819,33 +743,35 @@ Response syntax
 
 ::
 
-   #XCONNECT: <status>
+   #XCONNECT: <handle>,<status>
+
+* The ``<handle>`` value is an integer indicating the socket handle.
 
 * The ``<status>`` value is an integer.
   It can return one of the following values:
 
-* ``1`` - Connected.
-* ``0`` - Disconnected.
+  * ``1`` - Connected.
+  * ``0`` - Disconnected.
 
 Examples
 ~~~~~~~~
 
 ::
 
-   AT#XCONNECT="test.server.com",1234
-   #XCONNECT: 1
+   AT#XCONNECT=0,"test.server.com",1234
+   #XCONNECT: 0,1
    OK
 
 ::
 
-   AT#XCONNECT="192.168.0.1",1234
-   #XCONNECT: 1
+   AT#XCONNECT=1,"192.168.0.1",1234
+   #XCONNECT: 1,1
    OK
 
 ::
 
-   AT#XCONNECT="2a02:c207:2051:8976::1",4567
-   #XCONNECT: 1
+   AT#XCONNECT=2,"2a02:c207:2051:8976::1",4567
+   #XCONNECT: 2,1
    OK
 
 Read command
@@ -875,7 +801,9 @@ Syntax
 
 ::
 
-   #XLISTEN
+   #XLISTEN=<handle>
+
+* The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -887,7 +815,7 @@ Example
 
 ::
 
-   AT#XLISTEN
+   AT#XLISTEN=0
    OK
 
 Read command
@@ -917,7 +845,9 @@ Syntax
 
 ::
 
-   #XACCEPT=<timeout>
+   #XACCEPT=<handle>,<timeout>
+
+* The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
 
 * The ``<timeout>`` value sets the timeout value in seconds.
   ``0`` means no timeout, and it makes this request become blocking.
@@ -931,6 +861,7 @@ Response syntax
 
 * The ``<handle>`` value is an integer.
   It represents the socket handle of the accepted connection.
+
 * The ``<ip_addr>`` value indicates the IP address of the peer host.
 
 Example
@@ -938,42 +869,14 @@ Example
 
 ::
 
-   AT#XACCEPT=60
-   #XACCEPT: 2,"192.168.0.2"
+   AT#XACCEPT=0,60
+   #XACCEPT: 0,"192.168.0.2"
    OK
 
 Read command
 ------------
 
-The read command allows you to check socket handle of the accepted connection.
-
-Syntax
-~~~~~~
-
-::
-
-   #XACCEPT?
-
-Response syntax
-~~~~~~~~~~~~~~~
-
-::
-
-   #XACCEPT: <handle>
-
-* The ``<handle>`` value is an integer and can be interpreted as follows:
-
-  * Positive - The incoming socket is valid.
-  * ``0`` - There is no active incoming connection.
-
-Example
-~~~~~~~~
-
-::
-
-   AT#XACCEPT?
-   #XACCEPT: 192.168.0.2
-   OK
+The read command is not supported.
 
 Test command
 ------------
@@ -995,7 +898,9 @@ Syntax
 
 ::
 
-   #XSEND=[<data>][,<flags>]
+   #XSEND=<handle>[,<data>][,<flags>]
+
+* The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
 
 * The ``<data>`` parameter is a string that contains the data to be sent.
   The maximum size of the data is 1024 bytes.
@@ -1013,7 +918,9 @@ Response syntax
 
 ::
 
-   #XSEND: <size>
+   #XSEND: <handle>,<size>
+
+* The ``<handle>`` value is an integer indicating the socket handle.
 
 * The ``<size>`` value is an integer.
   It represents the actual number of bytes that has been sent.
@@ -1023,11 +930,11 @@ Example
 
 ::
 
-   AT#XSEND="Test TCP"
-   #XSEND: 8
+   AT#XSEND=0,"Test TCP"
+   #XSEND: 0,8
    OK
 
-   AT#XSEND=,512
+   AT#XSEND=1,,512
    OK
    Test datamode with flags
    +++
@@ -1057,27 +964,32 @@ Syntax
 
 ::
 
-   #XRECV=<timeout>[,<flags>]
+   #XRECV=<handle>,<timeout>[,<flags>]
 
-The ``<timeout>`` value sets the timeout value in seconds.
-When ``0``, it means no timeout, and it makes this request become blocking.
+* The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
 
-The ``<flags>`` value sets the receiving behavior based on the BSD socket definition.
-It can be set to one of the following values:
+* The ``<timeout>`` value sets the timeout value in seconds.
+  When ``0``, it means no timeout, and it makes this request become blocking.
 
-* ``2`` means reading data without removing it from the socket input queue.
-* ``64`` means overriding the operation to non-blocking.
-* ``256`` (TCP only) means blocking until the full amount of data can be returned.
+* The ``<flags>`` value sets the receiving behavior based on the BSD socket definition.
+  It can be set to one of the following values:
+
+  * ``2`` means reading data without removing it from the socket input queue.
+  * ``64`` means overriding the operation to non-blocking.
+  * ``256`` (TCP only) means blocking until the full amount of data can be returned.
 
 Response syntax
 ~~~~~~~~~~~~~~~
 
 ::
 
-   #XRECV: <size>
+   #XRECV: <handle>,<size>
    <data>
 
+* The ``<handle>`` value is an integer indicating the socket handle.
+
 * The ``<data>`` value is a string that contains the data being received.
+
 * The ``<size>`` value is an integer that represents the actual number of bytes received.
 
 Example
@@ -1085,8 +997,8 @@ Example
 
 ::
 
-   AT#XRECV=10
-   #XRECV: 7
+   AT#XRECV=0,10
+   #XRECV: 0,7
    Test OK
    OK
 
@@ -1115,17 +1027,22 @@ Syntax
 
 ::
 
-   #XSENDTO=<url>,<port>[,<data>][,<flags>]
+   #XSENDTO=<handle>,<url>,<port>[,<data>][,<flags>]
+
+* The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
 
 * The ``<url>`` parameter is a string.
   It indicates the hostname or the IP address of the remote peer.
   The maximum size of the hostname is 128 bytes.
   When using IP addresses, it supports both IPv4 and IPv6.
+
 * The ``<port>`` parameter is an unsigned 16-bit integer (0 - 65535).
   It represents the port of the UDP service on remote peer.
+
 * The ``<data>`` parameter is a string that contains the data to be sent.
   Its maximum size is 1024 bytes.
   When the parameter is not specified, |SM| enters ``sm_data_mode``.
+
 * The ``<flags>`` parameter sets the sending behavior.
   It can be set to the following value:
 
@@ -1138,7 +1055,9 @@ Response syntax
 
 ::
 
-   #XSENDTO: <size>
+   #XSENDTO: <handle>,<size>
+
+* The ``<handle>`` value is an integer indicating the socket handle.
 
 * The ``<size>`` value is an integer.
   It represents the actual number of bytes that has been sent.
@@ -1148,8 +1067,8 @@ Example
 
 ::
 
-   AT#XSENDTO="test.server.com",1234,"Test UDP"
-   #XSENDTO: 8
+   AT#XSENDTO=0,"test.server.com",1234,"Test UDP"
+   #XSENDTO: 0,8
    OK
 
 Read command
@@ -1177,28 +1096,35 @@ Syntax
 
 ::
 
-   #XRECVFROM=<timeout>[,<flags>]
+   #XRECVFROM=<handle>,<timeout>[,<flags>]
 
-The ``<timeout>`` value sets the timeout value in seconds.
-When ``0``, it means no timeout, and it makes this request become blocking.
+* The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
 
-The ``<flags>`` value sets the receiving behavior based on the BSD socket definition.
-It can be set to one of the following values:
+* The ``<timeout>`` value sets the timeout value in seconds.
+  When ``0``, it means no timeout, and it makes this request become blocking.
 
-* ``2`` means reading data without removing it from the socket input queue.
-* ``64`` means overriding the operation to non-blocking.
+* The ``<flags>`` value sets the receiving behavior based on the BSD socket definition.
+  It can be set to one of the following values:
+
+  * ``2`` means reading data without removing it from the socket input queue.
+  * ``64`` means overriding the operation to non-blocking.
 
 Response syntax
 ~~~~~~~~~~~~~~~
 
 ::
 
-   #XRECVFROM: <size>,"<ip_addr>",<port>
+   #XRECVFROM: <handle>,<size>,"<ip_addr>",<port>
    <data>
 
+* The ``<handle>`` value is an integer indicating the socket handle.
+
 * The ``<data>`` value is a string that contains the data being received.
+
 * The ``<size>`` value is an integer that represents the actual number of bytes received.
+
 * The ``<ip_addr>`` value is a string that represents the IPv4 or IPv6 address of the remote peer.
+
 * The ``<port>`` value is an integer that represents the UDP port of the remote peer.
 
 Example
@@ -1206,20 +1132,10 @@ Example
 
 ::
 
-   AT#XRECVFROM=10
-   #XRECVFROM: 7,"192.168.1.100",24210
+   AT#XRECVFROM=0,10
+   #XRECVFROM: 0,7,"192.168.1.100",24210
    Test OK
    OK
-
-Read command
-------------
-
-The read command is not supported.
-
-Test command
-------------
-
-The test command is not supported.
 
 Read command
 ------------
@@ -1269,8 +1185,8 @@ Syntax
   * ``4`` - Write events (``POLLOUT``) are polled, in addition to the default events.
 
 * The ``<handleN>`` value sets the socket handle to poll.
-  Handles are sent in the ``AT#XSOCKET`` response.
-  Handles can also be obtained with ``AT#XSOCKET?`` or ``AT#XSOCKETSELECT?`` commands.
+  Handles are sent in the ``AT#XSOCKET`` or ``AT#XSSOCKET`` responses.
+  Handles can also be obtained with ``AT#XSOCKET?`` or ``AT#XSSOCKET?`` commands.
   If no handles are specified, all open sockets will be polled, including any new sockets that are created after ``#XAPOLL`` has been started.
 
 Response syntax
@@ -1293,6 +1209,7 @@ When the asynchronous socket events are enabled, |SM| sends events as URC notifi
 
 * The ``<handle>`` value is an integer.
   It is the handle of the socket that has events.
+
 * The ``<revents>`` value is an integer, which must be interpreted as a bit field.
   It represents the returned events as a combination of ``POLLIN`` (1), ``POLLOUT`` (4), ``POLLERR`` (8), ``POLLHUP`` (16), and ``POLLNVAL`` (32) summed up.
   Hexadecimal representation is avoided to support AT command parsers that do not support hexadecimal values.
@@ -1312,18 +1229,18 @@ Example
 
    OK
 
-   AT#XCONNECT="test.server.com",1234
+   AT#XCONNECT=1,"test.server.com",1234
 
-   #XCONNECT: 1
+   #XCONNECT: 1,1
 
    OK
 
    #XAPOLL: 1,4
 
    // Send data to the test server, which will echo it back.
-   AT#XSEND="echo"
+   AT#XSEND=1,"echo"
 
-   #XSEND: 4
+   #XSEND: 1,4
 
    OK
 
@@ -1332,15 +1249,15 @@ Example
    // Test server sends the data back and closes the connection. POLLIN and POLLHUP events are received.
    #XAPOLL: 1,17
 
-   AT#XRECV=1
+   AT#XRECV=1,1
 
-   #XRECV: 4
+   #XRECV: 1,4
    echo
    OK
 
-   AT#XSOCKET=0
+   AT#XCLOSE=1
 
-   #XSOCKET: 0,"closed"
+   #XCLOSE: 1,0
 
    OK
 
@@ -1417,7 +1334,7 @@ Syntax
 
 ::
 
-   AT#XAPOLL=?
+   #XAPOLL=?
 
 Response syntax
 ~~~~~~~~~~~~~~~
