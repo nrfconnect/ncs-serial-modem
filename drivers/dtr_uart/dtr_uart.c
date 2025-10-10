@@ -215,6 +215,7 @@ static void ri_work_fn(struct k_work *work)
 		CONTAINER_OF(delayed_work, struct dtr_uart_data, ri_work);
 	const struct dtr_uart_config *config = data->dev->config;
 
+	LOG_DBG("RI: Stop");
 	gpio_pin_set_dt(&config->ri_gpio, 0);
 }
 
@@ -222,6 +223,7 @@ static void ri_start(struct dtr_uart_data *data)
 {
 	const struct dtr_uart_config *config = data->dev->config;
 
+	LOG_DBG("RI: Start");
 	gpio_pin_set_dt(&config->ri_gpio, 1);
 	k_work_schedule(&data->ri_work, K_MSEC(100));
 }

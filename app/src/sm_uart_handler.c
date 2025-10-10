@@ -323,11 +323,14 @@ static void uart_callback(const struct device *dev, struct uart_event *evt, void
 			LOG_ERR("UART_TX_%s failure: %d",
 				(evt->type == UART_TX_DONE) ? "DONE" : "ABORTED", err);
 		}
-		if (ring_buf_is_empty(&tx_buf) == false && evt->type == UART_TX_DONE) {
-			tx_start();
-		} else {
+		if (ring_buf_is_empty(&tx_buf) ||
+		    (evt->type == UART_TX_ABORTED &&
+		     !atomic_test_bit(&uart_state, SM_UART_STATE_TX_ENABLED_BIT))) {
+			/* TX buffer is empty or we aborted due to TX being disabled. */
 			k_sem_give(&tx_done_sem);
 			uart_callback_notify_pipe_transmit_idle();
+		} else {
+			tx_start();
 		}
 		break;
 	case UART_RX_RDY:

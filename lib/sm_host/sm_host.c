@@ -625,6 +625,9 @@ static int dtr_uart_disable(void)
 {
 	int err;
 
+	/* Set DTR state at beginning so that we have correct state when RI comes. */
+	dtr_config.active = false;
+
 	/* Wait until TX is done and disable TX. */
 	err = tx_disable(K_NO_WAIT);
 	if (err) {
@@ -656,8 +659,6 @@ static int dtr_uart_disable(void)
 		return err;
 	}
 
-	dtr_config.active = false;
-
 	LOG_DBG("DTR UART disabled");
 	return 0;
 }
@@ -677,6 +678,9 @@ static void dtr_uart_disable_work_fn(struct k_work *work)
 static int dtr_uart_enable(void)
 {
 	int err;
+
+	/* Set DTR state at beginning so that we have correct state when RI comes. */
+	dtr_config.active = true;
 
 	/* Power on UART module */
 	err = uart_power_state_action(PM_DEVICE_ACTION_RESUME);
@@ -716,10 +720,6 @@ static int dtr_uart_enable(void)
 		LOG_ERR("Failed to start TX (%d).", err);
 		return err;
 	}
-
-	dtr_config.active = true;
-
-	reschedule_disable();
 
 	LOG_DBG("DTR UART enabled");
 	return 0;
