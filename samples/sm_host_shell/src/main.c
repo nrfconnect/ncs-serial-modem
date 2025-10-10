@@ -23,7 +23,10 @@ static void cereg_mon(const char *notif)
 
 void sm_host_shell_data_indication(const uint8_t *data, size_t datalen)
 {
-	LOG_INF("Data received (len=%d): %.*s", datalen, datalen, (const char *)data);
+	ARG_UNUSED(data);
+	ARG_UNUSED(datalen);
+
+	/* Add data handler implementation in here. */
 }
 
 void sm_host_shell_ri_handler(void)
