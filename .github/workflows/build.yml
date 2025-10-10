@@ -60,9 +60,9 @@ jobs:
       - name: Build Serial Modem for PR
         if: github.event_name == 'pull_request'
         run: |
-          ./nrfutil toolchain-manager launch --chdir serial_modem -- west twister -T . -v --inline-logs --integration
+          ./nrfutil toolchain-manager launch --chdir serial_modem -- west twister -T . -v --inline-logs --overflow-as-errors --integration
 
       - name: Build Serial Modem nightly
         if: github.event_name == 'schedule'
         run: |
-          ./nrfutil toolchain-manager launch --chdir serial_modem -- west twister -T . -v --inline-logs
+          ./nrfutil toolchain-manager launch --chdir serial_modem -- west twister -T . -v --inline-logs --overflow-as-errors --all
