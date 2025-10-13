@@ -7,14 +7,14 @@
    :local:
    :depth: 2
 
-The |SM| Host Shell sample demonstrates how to send AT commands to modem through the :ref:`Serial Modem <sm_description>` application running on nRF91 Series SiP.
-This sample enables an external MCU to send modem or |SM| proprietary AT commands for LTE connection and IP services.
+The |SM| Host Shell sample demonstrates how to send AT commands to the modem through the :ref:`Serial Modem <sm_description>` application running on an nRF91 Series SiP.
+This sample enables an external MCU to send modem and |SM| proprietary AT commands for LTE connection and IP services.
 See more information on the functionality of this sample from the :ref:`lib_sm_host` library, which provides the core functionality for this sample.
 
 Requirements
 ************
 
-The |SM| application should be configured to use UART2 on the nRF91 Series DK side with hardware flow control.
+The |SM| application should be configured with :file:`app/overlay-external-mcu.overlay` on the nRF91 Series DK side.
 
 The sample supports the following development kits:
 
@@ -39,9 +39,9 @@ The sample supports the following development kits:
      - `nrf52840dk`_
      - ``nrf52840dk/nrf52840``
 
-Connect the DK with an nRF91 Series DK based on the pin configuration in DTS overlay files of both sides.
+Connect the DK pins that are defined in the board-specific overlay files :file:`samples/sm_host_shell/boards/*.overlay` to the corresponding pins in the nRF91 Series DK, which are defined in :file:`app/overlay-external-mcu.overlay`.
 
-The following table shows how to connect UART1 of the DK to the nRF91 Series DK's UART2 for communication through UART:
+The following table shows how to connect UART, DTR and RI pins of the DK to the corresponding pins in the nRF91 Series DKs:
 
 .. tabs::
 
@@ -60,10 +60,10 @@ The following table shows how to connect UART1 of the DK to the nRF91 Series DK'
            - UART RTS P0.12
          * - UART RTS P1.06
            - UART CTS P0.13
-         * - GPIO OUT P0.11 (Button1)
-           - GPIO IN P0.31
-         * - GPIO IN P0.13 (LED1 optional)
-           - GPIO OUT P0.30 (optional)
+         * - DTR OUT P0.11
+           - DTR IN P0.31
+         * - RI IN P0.13
+           - RI OUT P0.30
          * - GPIO GND
            - GPIO GND
 
@@ -89,10 +89,10 @@ The following table shows how to connect UART1 of the DK to the nRF91 Series DK'
            - UART RTS P0.12
          * - UART RTS P1.06
            - UART CTS P0.13
-         * - GPIO OUT P0.23 (Button1)
-           - GPIO IN P0.31
-         * - GPIO IN P0.28 (LED1 optional)
-           - GPIO OUT P0.30 (optional)
+         * - DTR OUT P0.23
+           - DTR IN P0.31
+         * - RI IN P0.28
+           - RI OUT P0.30
          * - GPIO GND
            - GPIO GND
 
@@ -118,10 +118,10 @@ The following table shows how to connect UART1 of the DK to the nRF91 Series DK'
            - UART RTS P0.12
          * - UART RTS P1.06
            - UART CTS P0.13
-         * - GPIO OUT P0.31
-           - GPIO IN P0.31
-         * - GPIO IN P0.30 (optional)
-           - GPIO OUT P0.30 (optional)
+         * - DTR OUT P0.31
+           - DTR IN P0.31
+         * - RI IN P0.30
+           - RI OUT P0.30
          * - GPIO GND
            - GPIO GND
 

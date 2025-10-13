@@ -14,6 +14,7 @@ It includes host examples in the form of the |SM| Host library and the |SM| Host
    gsg_guide
    app/README
    samples/sm_host_shell
+   drivers/dtr_uart
    lib/sm_host
    migration_notes
    release_notes

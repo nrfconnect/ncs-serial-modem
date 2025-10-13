@@ -125,14 +125,24 @@ The test command is not supported.
 Power saving #XSLEEP
 ====================
 
-The ``#XSLEEP`` command makes the nRF91 Series System in Package (SiP) enter idle or sleep mode.
+The ``#XSLEEP`` command makes the |SM| application to enter idle or sleep mode.
 
-If you want to do power measurements on the nRF91 Series development kit while running the |SM| application, disable unused peripherals.
+.. note::
+
+   The ``#XSLEEP`` command is intended for experimentation and power consumption measurements and must not be used in production.
+
+   You can use the DTR (Data Terminal Ready) and RI (Ring Indicator) signals to control the power state of the UART between the |SM| and the host.
+   See the :ref:`sm_dtr_ri` section for more information about DTR and RI.
+
+.. note::
+
+   If you want to do power measurements on the nRF91 Series development kit while running the |SM| application, remember to disable unused peripherals.
+
 
 Set command
 -----------
 
-The set command makes the nRF91 Series SiP enter either Idle or Sleep mode.
+The set command makes the |SM| application enter either Idle or Sleep mode.
 
 Syntax
 ~~~~~~
@@ -146,15 +156,17 @@ The ``<sleep_mode>`` parameter accepts only the following integer values:
 * ``1`` - Enter Sleep.
   In this mode, both the |SM| service and the LTE connection are terminated.
 
-  The nRF91 Series SiP can be woken up using the pin specified with the :ref:`CONFIG_SM_POWER_PIN <CONFIG_SM_POWER_PIN>` Kconfig option.
+  |SM| can be woken up using the DTR pin (``dtr-gpios``).
 
 * ``2`` - Enter Idle.
-  In this mode, both the |SM| service and the LTE connection are maintained.
+  In this mode, both the |SM| service and the LTE connection are maintained, but the UART is disabled to save power.
+  Received data is buffered and sent to the host after idle mode is exited.
 
-  The nRF91 Series SiP can be made to exit idle using the pin specified with the :ref:`CONFIG_SM_POWER_PIN <CONFIG_SM_POWER_PIN>` Kconfig option.
-  If the :ref:`CONFIG_SM_INDICATE_PIN <CONFIG_SM_INDICATE_PIN>` Kconfig option is defined, |SM| toggles the specified pin when there is data for the MCU to read.
-  The MCU can in turn make |SM| exit idle by toggling the pin specified with the :ref:`CONFIG_SM_POWER_PIN <CONFIG_SM_POWER_PIN>` Kconfig option.
-  The data is buffered when |SM| is idle and sent to the MCU after having exited idle.
+  |SM| can exit the idle mode using the DTR pin (``dtr-gpios``).
+  When the |SM| is in idle mode, and there is data to be read by the host, the RI pin (``ri-gpios``) is asserted for a short period of time to notify the host.
+  The host can then deassert and assert DTR to exit idle mode and read the data.
+
+The DTR pin is defined either in the :file:`boards/*_ns.overlay` overlay file matching your board or in the :file:`overlay-external-mcu.overlay` overlay file, if it is included.
 
 .. note::
 
@@ -240,7 +252,7 @@ Syntax
 
 .. note::
 
-   In this case the nRF91 Series SiP cannot be woken up using the pin specified with the :ref:`CONFIG_SM_POWER_PIN <CONFIG_SM_POWER_PIN>` Kconfig option.
+   In this case the nRF91 Series SiP cannot be woken up using the DTR pin (``dtr-gpios``).
 
 Example
 ~~~~~~~~

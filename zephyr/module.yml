@@ -10,6 +10,6 @@ build:
   # Zephyr build system. The `.` is the root of this repository.
   cmake: .
   settings:
-    # Path to the folder containing additional device tree source files. The
+    # Path to the folder containing additional devicetree source files. The
     # `.` is the root of this repository.
     dts_root: .

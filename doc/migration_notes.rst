@@ -54,3 +54,21 @@ The following changes are mandatory to make your application work in the same wa
 
    * Removed the ``AT#XPOLL`` command.
      Use ``AT#XAPOLL`` instead.
+
+DTR and RI GPIOs replace Power and Indicate pins
+------------------------------------------------
+
+The |SM| application uses DTR (Data Terminal Ready) and RI (Ring Indicator) pins to manage the UART power state instead of Power and Indicate pins used in the |NCS| SLM.
+
+* Removed:
+
+  * The Power pin, which was active low input, expected a short pulse and was configured with ``CONFIG_SLM_POWER_PIN``.
+  * The Indicate pin, which was active low output, sent a pulse configured with ``CONFIG_SLM_INDICATE_TIME`` and was configured with ``CONFIG_SLM_INDICATE_PIN``.
+
+* Added:
+
+  * DTR pin, which is a level based input, that is configured in the devicetree with the ``dtr-gpios`` property.
+  * RI pin, which is a pulse based output, that is configured in the devicetree with the ``ri-gpios`` property.
+
+See :ref:`sm_dtr_ri` for more information on how DTR and RI pins work in the |SM| application.
+See :ref:`sm_as_zephyr_modem` for information on how to configure DTR and RI pins when using the |SM| application as a Zephyr modem.
