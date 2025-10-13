@@ -405,7 +405,7 @@ The ``#XCARRIERCFG`` command allows you to configure the LwM2M carrier library.
 The settings are stored and applied persistently.
 
 .. note::
-   To use ``#XCARRIERCFG``, the `CONFIG_LWM2M_CARRIER_SETTINGS`_ Kconfig option must be enabled.
+   To use ``#XCARRIERCFG``, the ``CONFIG_LWM2M_CARRIER_SETTINGS`` Kconfig option must be enabled.
    For more details on LwM2M carrier library configuration, see the `Configuration <lwm2m_configuration_>`_ section of the library's documentation.
 
 Set command
@@ -426,7 +426,7 @@ The ``<cmd>`` command is a string, and can be used as follows:
 
   Configure the LwM2M carrier library to use a custom APN specified in ``<apn>`` when connecting to the device management network.
   ``<apn>`` must be a string in double quotes.
-  For details, see the `CONFIG_LWM2M_CARRIER_CUSTOM_APN`_ Kconfig option.
+  For details, see the ``CONFIG_LWM2M_CARRIER_CUSTOM_APN`` Kconfig option.
 
 * ``AT#XCARRIERCFG="auto_register"[,<0|1>]``
 
@@ -446,26 +446,26 @@ The ``<cmd>`` command is a string, and can be used as follows:
   By default, any network is allowed. The input parameters are mapped as follows:
 
   * ``all`` - Any network allowed.
-  * ``0`` - `CONFIG_LWM2M_CARRIER_GENERIC`_
-  * ``1`` - `CONFIG_LWM2M_CARRIER_VERIZON`_
-  * ``2`` - `CONFIG_LWM2M_CARRIER_BELL_CA`_
-  * ``3`` - `CONFIG_LWM2M_CARRIER_LG_UPLUS`_
-  * ``4`` - `CONFIG_LWM2M_CARRIER_T_MOBILE`_
-  * ``5`` - `CONFIG_LWM2M_CARRIER_SOFTBANK`_
+  * ``0`` - ``CONFIG_LWM2M_CARRIER_GENERIC``
+  * ``1`` - ``CONFIG_LWM2M_CARRIER_VERIZON``
+  * ``2`` - ``CONFIG_LWM2M_CARRIER_BELL_CA``
+  * ``3`` - ``CONFIG_LWM2M_CARRIER_LG_UPLUS``
+  * ``4`` - ``CONFIG_LWM2M_CARRIER_T_MOBILE``
+  * ``5`` - ``CONFIG_LWM2M_CARRIER_SOFTBANK``
 
 * ``AT#XCARRIERCFG="coap_con_interval"[,<interval>]``
 
   Configure how often the LwM2M carrier library is to send the Notify operation as a CoAP Confirmable message instead of a Non-Confirmable message.
   ``<interval>`` must be an integer value specified in seconds.
   Two special values may also be used: ``-1`` to always use Confirmable notifications, or ``0`` to use the default interval of 86400 seconds.
-  For details, see the `CONFIG_LWM2M_CARRIER_COAP_CON_INTERVAL`_ Kconfig option.
+  For details, see the ``CONFIG_LWM2M_CARRIER_COAP_CON_INTERVAL`` Kconfig option.
 
 * ``AT#XCARRIERCFG="download_timeout"[,<timeout>]``
 
   Configure the time allowed for a single firmware image download before it is aborted.
   This configuration is only supported for Push delivery method of firmware images.
   ``<timeout>`` must be an integer value specified in minutes.
-  For details, see the `CONFIG_LWM2M_CARRIER_FIRMWARE_DOWNLOAD_TIMEOUT`_ Kconfig option.
+  For details, see the ``CONFIG_LWM2M_CARRIER_FIRMWARE_DOWNLOAD_TIMEOUT`` Kconfig option.
 
 * ``AT#XCARRIERCFG="config_enable"[,<0|1>]``
 
@@ -479,31 +479,31 @@ The ``<cmd>`` command is a string, and can be used as follows:
 
   Configure the value in ``<device_type>`` to be put into the Device Type resource (ID: 17) of the Device object (ID: 3).
   ``<device_type>`` must be a string in double quotes.
-  For details, see the `CONFIG_LWM2M_CARRIER_DEVICE_TYPE`_ Kconfig option.
+  For details, see the ``CONFIG_LWM2M_CARRIER_DEVICE_TYPE`` Kconfig option.
 
 * ``AT#XCARRIERCFG="hardware_version"[,<version>]``
 
   Configure the value in ``<version>`` to be put into the Hardware Version resource (ID: 18) of the Device object (ID: 3).
   ``<version>`` must be a string in double quotes.
-  For details, see the `CONFIG_LWM2M_CARRIER_DEVICE_HARDWARE_VERSION`_ Kconfig option.
+  For details, see the ``CONFIG_LWM2M_CARRIER_DEVICE_HARDWARE_VERSION`` Kconfig option.
 
 * ``AT#XCARRIERCFG="manufacturer"[,<manufacturer>]``
 
   Configure the value in ``<manufacturer>`` to be put into the Manufacturer resource (ID: 0) of the Device object (ID: 3).
   ``<manufacturer>`` must be a string in double quotes.
-  For details, see the `CONFIG_LWM2M_CARRIER_DEVICE_MANUFACTURER`_ Kconfig option.
+  For details, see the ``CONFIG_LWM2M_CARRIER_DEVICE_MANUFACTURER`` Kconfig option.
 
 * ``AT#XCARRIERCFG="model_number"[,<model_number>]``
 
   Configure the value in ``<model_number>`` to be put into the Model Number resource (ID: 1) of the Device object (ID: 3).
   ``<model_number>`` must be a string in double quotes.
-  For details, see the `CONFIG_LWM2M_CARRIER_DEVICE_MODEL_NUMBER`_ Kconfig option.
+  For details, see the ``CONFIG_LWM2M_CARRIER_DEVICE_MODEL_NUMBER`` Kconfig option.
 
 * ``AT#XCARRIERCFG="software_version"[,<version>]``
 
   Configure the value in ``<version>`` to be put into the Software Version resource (ID: 19) of the Device object (ID: 3).
   ``<version>`` must be a string in double quotes.
-  For details, see the `CONFIG_LWM2M_CARRIER_DEVICE_SOFTWARE_VERSION`_ Kconfig option.
+  For details, see the ``CONFIG_LWM2M_CARRIER_DEVICE_SOFTWARE_VERSION`` Kconfig option.
 
 * ``AT#XCARRIERCFG="device_serial_no_type"[,<device_serial_no_type>]``
 
@@ -511,16 +511,16 @@ The ``<cmd>`` command is a string, and can be used as follows:
   The ``<device_serial_no_type>`` must be an integer value.
   It accepts the following values:
 
-  * ``0`` - `CONFIG_LWM2M_CARRIER_LG_UPLUS_IMEI`_.
-  * ``1`` - `CONFIG_LWM2M_CARRIER_LG_UPLUS_2DID`_.
+  * ``0`` - ``CONFIG_LWM2M_CARRIER_LG_UPLUS_IMEI``.
+  * ``1`` - ``CONFIG_LWM2M_CARRIER_LG_UPLUS_2DID``.
 
-  For details, see the `CONFIG_LWM2M_CARRIER_LG_UPLUS_DEVICE_SERIAL_NUMBER`_ Kconfig option.
+  For details, see the ``CONFIG_LWM2M_CARRIER_LG_UPLUS_DEVICE_SERIAL_NUMBER`` Kconfig option.
 
 * ``AT#XCARRIERCFG="service_code"[,<service_code>]``
 
   Configure the Service Code registered for this device with LG U+.
   ``<service_code>`` must be a string in double quotes.
-  For details, see the `CONFIG_LWM2M_CARRIER_LG_UPLUS_SERVICE_CODE`_ Kconfig option.
+  For details, see the ``CONFIG_LWM2M_CARRIER_LG_UPLUS_SERVICE_CODE`` Kconfig option.
 
 * ``AT#XCARRIERCFG="pdn_type"[,<pdn_type>]``
 
@@ -533,22 +533,22 @@ The ``<cmd>`` command is a string, and can be used as follows:
   * ``2`` - :c:macro:`LWM2M_CARRIER_PDN_TYPE_IPV6`.
   * ``3`` - :c:macro:`LWM2M_CARRIER_PDN_TYPE_NONIP`.
 
-  For details, see the `CONFIG_LWM2M_CARRIER_PDN_TYPE`_ Kconfig option.
+  For details, see the ``CONFIG_LWM2M_CARRIER_PDN_TYPE`` Kconfig option.
 
 * ``AT#XCARRIERCFG="queue_mode"[,<0|1>]``
 
   Configure whether the LwM2M carrier library is to inform the server that it may be disconnected for an extended period of time.
   This configuration corresponds to the Queue Mode Operation as defined in the OMA LwM2M specification.
   This command accepts two possible input parameters: ``0`` to disable or ``1`` to enable.
-  For details, see the `CONFIG_LWM2M_CARRIER_QUEUE_MODE`_ Kconfig option.
+  For details, see the ``CONFIG_LWM2M_CARRIER_QUEUE_MODE`` Kconfig option.
 
 * ``AT#XCARRIERCFG="binding"[,<binding>]``
 
   Configure the binding over which the LwM2M carrier library is to connect to the device management network.
   ``<binding>`` must be a string in double quotes. It accepts any combination of the following values:
 
-  * ``"U"`` - `CONFIG_LWM2M_CARRIER_SERVER_BINDING_UDP`_.
-  * ``"N"`` - `CONFIG_LWM2M_CARRIER_SERVER_BINDING_NONIP`_.
+  * ``"U"`` - ``CONFIG_LWM2M_CARRIER_SERVER_BINDING_UDP``.
+  * ``"N"`` - ``CONFIG_LWM2M_CARRIER_SERVER_BINDING_NONIP``.
 
   Additionally, an empty ``<binding>`` resets the configuration to default setting (factory configuration).
 
@@ -556,34 +556,34 @@ The ``<cmd>`` command is a string, and can be used as follows:
 
   Indicate whether the custom server configured through the ``AT#XCARRIERCFG="uri"`` command is a bootstrap server.
   This command accepts two possible input parameters: ``0`` if it is not a bootstrap server or ``1`` if it is a bootstrap server.
-  For details, see the `CONFIG_LWM2M_CARRIER_IS_BOOTSTRAP_SERVER`_ Kconfig option.
+  For details, see the ``CONFIG_LWM2M_CARRIER_IS_BOOTSTRAP_SERVER`` Kconfig option.
 
 * ``AT#XCARRIERCFG="lifetime"[,<lifetime>]``
 
   Configure the lifetime of the custom server configured through the ``AT#XCARRIERCFG="uri"`` command.
   ``<lifetime>`` must an integer value specified in seconds.
   This configuration is ignored if the custom server is a bootstrap server.
-  For details, see the `CONFIG_LWM2M_CARRIER_SERVER_LIFETIME`_ Kconfig option.
+  For details, see the ``CONFIG_LWM2M_CARRIER_SERVER_LIFETIME`` Kconfig option.
 
 * ``AT#XCARRIERCFG="sec_tag"[,<sec_tag>]``
 
   Configure the security tag that stores the credentials to be used to set up the DTLS session with the custom server configured through the ``AT#XCARRIERCFG="uri"`` command.
   ``<sec_tag>`` must be an integer value specifying the security tag number to be used.
   This configuration is ignored for non-secure connections.
-  For details, see the `CONFIG_LWM2M_CARRIER_SERVER_SEC_TAG`_ Kconfig option.
+  For details, see the ``CONFIG_LWM2M_CARRIER_SERVER_SEC_TAG`` Kconfig option.
 
 * ``AT#XCARRIERCFG="uri"[,<uri>]``
 
   Configure the URI of a custom server that the library is to connect to.
   ``<uri>`` must be a string in double quotes.
-  For details, see the `CONFIG_LWM2M_CARRIER_CUSTOM_URI`_ Kconfig option.
+  For details, see the ``CONFIG_LWM2M_CARRIER_CUSTOM_URI`` Kconfig option.
 
 * ``AT#XCARRIERCFG="session_idle_timeout"[,<session_idle_timeout>]``
 
   Configure how long a DTLS session used by the library can be idle before it is closed.
   ``<session_idle_timeout>`` must be an integer value specified in seconds.
   Two special values may also be used: ``-1`` to disable the session idle timeout, or ``0`` to use the default interval of 60 seconds.
-  For details, see the `CONFIG_LWM2M_CARRIER_SESSION_IDLE_TIMEOUT`_ Kconfig option.
+  For details, see the ``CONFIG_LWM2M_CARRIER_SESSION_IDLE_TIMEOUT`` Kconfig option.
 
 
 If a valid command string is used without any parameter, the current value of the corresponding configuration will be returned in the response, as in the examples shown below.

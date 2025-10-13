@@ -38,7 +38,7 @@ If you change the baud rate, set the same rate in the :file:`scripts/sm_start_pp
 .. note::
    The standard ``ldattach`` utility sets MRU and MTU to 127 bytes.
    This is hard-coded and cannot be changed.
-   If you change the |SM| configuration, make sure that the `CONFIG_MODEM_CMUX_MTU`_ Kconfig option is set to 127 bytes.
+   If you change the |SM| configuration, make sure that the ``CONFIG_MODEM_CMUX_MTU`` Kconfig option is set to 127 bytes.
    This is already configured in the :file:`overlay-ppp-cmux-linux.conf` configuration overlay.
 
 Building and running

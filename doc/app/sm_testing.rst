@@ -1152,8 +1152,8 @@ FTP AT commands
 ***************
 
 Note that these commands are available only if :ref:`CONFIG_SM_FTPC <CONFIG_SM_FTPC>` is defined.
-Before you test the FTP AT commands, check the setting of the `CONFIG_FTP_CLIENT_KEEPALIVE_TIME`_ option.
-By default, the `FTP client`_ library keeps the connection to the FTP server alive for 60 seconds, but you can change the duration or turn KEEPALIVE off by setting `CONFIG_FTP_CLIENT_KEEPALIVE_TIME`_ to 0.
+Before you test the FTP AT commands, check the setting of the ``CONFIG_FTP_CLIENT_KEEPALIVE_TIME`` option.
+By default, the `FTP client`_ library keeps the connection to the FTP server alive for 60 seconds, but you can change the duration or turn KEEPALIVE off by setting ``CONFIG_FTP_CLIENT_KEEPALIVE_TIME`` to 0.
 
 The FTP client behavior depends on the FTP server that is used for testing.
 Complete the following steps to test the functionality provided by the :ref:`SM_AT_FTP` with two example servers:

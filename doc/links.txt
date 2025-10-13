@@ -46,6 +46,7 @@
 .. _`ug_tfm_security_by_separation`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/security/tfm/processing_environments.html#ug-tfm-security-by-separation
 .. _`ug_tfm`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/security/tfm/index.html#ug-tfm
 
+.. _`Serial LTE modem`: https://docs.nordicsemi.com/bundle/ncs-3.1.1/page/nrf/applications/serial_lte_modem/README.html
 .. _`LwM2M carrier`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/bin/lwm2m_carrier/index.html#liblwm2m-carrier-readme
 .. _`lwm2m_configuration`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/bin/lwm2m_carrier/app_integration.html#configuration
 .. _`general_options_lwm2m`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/bin/lwm2m_carrier/app_integration.html#general_options
@@ -81,44 +82,6 @@
 .. _`nordic-nrf-twi`: https://docs.nordicsemi.com/bundle/ncs-latest/page/zephyr/build/dts/api/bindings/i2c/nordic_nrf-twi.html#std-dtcompatible-nordic-nrf-twi
 
 .. _`nRF Cloud Preconnect Provisioning`: https://docs.nordicsemi.com/bundle/nrf-cloud/page/Devices/Associations/Onboarding.html#preconnect-onboarding
-
-.. _`CONFIG_PM_DEVICE`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_PM_DEVICE
-.. _`CONFIG_MODEM_CMUX_MTU`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_MODEM_CMUX_MTU
-.. _`CONFIG_FTP_CLIENT_KEEPALIVE_TIME`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_FTP_CLIENT_KEEPALIVE_TIME
-.. _`CONFIG_NRF_CLOUD_AGNSS`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_NRF_CLOUD_AGNSS
-.. _`CONFIG_NRF_CLOUD_PGPS`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_NRF_CLOUD_PGPS
-.. _`CONFIG_MODEM_ANTENNA_AT_MAGPIO`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_MODEM_ANTENNA_AT_MAGPIO
-.. _`CONFIG_MODEM_ANTENNA_AT_COEX0`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_MODEM_ANTENNA_AT_COEX0
-.. _`CONFIG_SM_LOG_LEVEL_DBG`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_MODEM_ANTENNA_AT_COEX0
-.. _`CONFIG_LWM2M_CARRIER_SETTINGS`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_SETTINGS
-.. _`CONFIG_LWM2M_CARRIER_CUSTOM_APN`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_CUSTOM_APN
-.. _`CONFIG_LWM2M_CARRIER_GENERIC`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_GENERIC
-.. _`CONFIG_LWM2M_CARRIER_VERIZON`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_VERIZON
-.. _`CONFIG_LWM2M_CARRIER_BELL_CA`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_BELL_CA
-.. _`CONFIG_LWM2M_CARRIER_LG_UPLUS`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_LG_UPLUS
-.. _`CONFIG_LWM2M_CARRIER_T_MOBILE`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_T_MOBILE
-.. _`CONFIG_LWM2M_CARRIER_SOFTBANK`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_SOFTBANK
-.. _`CONFIG_LWM2M_CARRIER_COAP_CON_INTERVAL`: https://nordic-dev.zoominsoftware.io/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_COAP_CON_INTERVAL
-.. _`CONFIG_LWM2M_CARRIER_FIRMWARE_DOWNLOAD_TIMEOUT`: https://nordic-dev.zoominsoftware.io/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_FIRMWARE_DOWNLOAD_TIMEOUT
-.. _`CONFIG_LWM2M_CARRIER_DEVICE_TYPE`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_DEVICE_TYPE
-.. _`CONFIG_LWM2M_CARRIER_DEVICE_HARDWARE_VERSION`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_DEVICE_HARDWARE_VERSION
-.. _`CONFIG_LWM2M_CARRIER_DEVICE_MANUFACTURER`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_DEVICE_MANUFACTURER
-.. _`CONFIG_LWM2M_CARRIER_DEVICE_MODEL_NUMBER`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_DEVICE_MODEL_NUMBER
-.. _`CONFIG_LWM2M_CARRIER_DEVICE_SOFTWARE_VERSION`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_DEVICE_SOFTWARE_VERSION
-.. _`CONFIG_LWM2M_CARRIER_LG_UPLUS_IMEI`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_LG_UPLUS_IMEI
-.. _`CONFIG_LWM2M_CARRIER_LG_UPLUS_2DID`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_LG_UPLUS_2DID
-.. _`CONFIG_LWM2M_CARRIER_LG_UPLUS_DEVICE_SERIAL_NUMBER`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_LG_UPLUS_DEVICE_SERIAL_NUMBER
-.. _`CONFIG_LWM2M_CARRIER_LG_UPLUS_SERVICE_CODE`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_LG_UPLUS_SERVICE_CODE
-.. _`CONFIG_LWM2M_CARRIER_PDN_TYPE`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_PDN_TYPE
-.. _`CONFIG_LWM2M_CARRIER_QUEUE_MODE`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_QUEUE_MODE
-.. _`CONFIG_LWM2M_CARRIER_SERVER_BINDING_UDP`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_SERVER_BINDING_UDP
-.. _`CONFIG_LWM2M_CARRIER_SERVER_BINDING_NONIP`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_SERVER_BINDING_NONIP
-.. _`CONFIG_LWM2M_CARRIER_IS_BOOTSTRAP_SERVER`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_IS_BOOTSTRAP_SERVER
-.. _`CONFIG_LWM2M_CARRIER_SERVER_LIFETIME`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_SERVER_LIFETIME
-.. _`CONFIG_LWM2M_CARRIER_SERVER_SEC_TAG`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_SERVER_SEC_TAG
-.. _`CONFIG_LWM2M_CARRIER_CUSTOM_URI`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_CUSTOM_URI
-.. _`CONFIG_LWM2M_CARRIER_SESSION_IDLE_TIMEOUT`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_LWM2M_CARRIER_SESSION_IDLE_TIMEOUT
-.. _`CONFIG_NRF_CLOUD_LOCATION`: https://docs.nordicsemi.com/bundle/ncs-latest/page/kconfig/index.html#CONFIG_NRF_CLOUD_LOCATION
 
 .. _`Memfault library`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/debug/memfault_ncs.html#mod-memfault
 .. _`modem trace UART snippet`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/device_guides/nrf91/nrf91_snippet.html#nrf91-modem-trace-uart-snippet
