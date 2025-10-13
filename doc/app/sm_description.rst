@@ -131,61 +131,6 @@ CONFIG_SM_EXTERNAL_XTAL - Use external XTAL for UARTE
    * `nRF9161 Product Specification`_
    * `nRF9160 Product Specification`_
 
-.. _CONFIG_SM_START_SLEEP:
-
-CONFIG_SM_START_SLEEP - Enter sleep on startup
-   This option makes an nRF91 Series device enter deep sleep after startup.
-   It is not enabled by default.
-
-.. _CONFIG_SM_POWER_PIN:
-
-CONFIG_SM_POWER_PIN - Interface GPIO pin to power off the SiP and exit from sleep or idle
-   This option specifies which pin to use to power on or off the SiP and make |SM| exit idle mode.
-   It is set by default as follows:
-
-   * On an nRF91x1 DK:
-
-     * **P0.8** (Button 1 on the nRF91x1 DK) is used when UART_0 is used.
-     * **P0.31** is used when UART_1 is used.
-
-   * On the nRF9160 DK:
-
-     * **P0.6** (Button 1 on the nRF9160 DK) is used when UART_0 is used.
-     * **P0.31** is used when UART_1 is used.
-
-   * On Thingy:91 and Thingy:91 X, **P0.26** (Multi-function button) is used.
-
-   .. note::
-      This pin is configured with a pull up, so it is active low.
-      It must be pulled down for a short time to perform one power off or wake up operation.
-
-.. _CONFIG_SM_INDICATE_PIN:
-
-CONFIG_SM_INDICATE_PIN - Interface GPIO pin to indicate data available or unsolicited event notifications
-   This option specifies which pin to use for indicating data available or unsolicited event notifications from the modem.
-   It is set by default as follows:
-
-   * On an nRF91x1 DK:
-
-     * **P0.00** (LED 1 on an nRF91x1 DK) is used when UART_0 is selected.
-     * **P0.30** is used when UART_2 is selected.
-
-   * On the nRF9160 DK:
-
-     * **P0.2** (LED 1 on the nRF9160 DK) is used when UART_0 is selected.
-     * **P0.30** is used when UART_2 is selected.
-
-   * It is not defined when the targets are Thingy:91 and Thingy:91 X.
-
-   .. note::
-      This pin is configured to be active low, so it will be high when inactive.
-
-.. _CONFIG_SM_INDICATE_TIME:
-
-CONFIG_SM_INDICATE_TIME - Indicate GPIO active time
-   This option specifies the length, in milliseconds, of the time interval during which the indicate GPIO must stay active.
-   The default value is 100 milliseconds.
-
 .. _CONFIG_SM_AUTO_CONNECT:
 
 CONFIG_SM_AUTO_CONNECT - Connect to the network at start-up or reset
@@ -362,6 +307,10 @@ The following configuration files are provided:
 
 * :file:`prj.conf` - This configuration file contains the standard configuration for the |SM| application and is included by default by the build system.
 
+* :file:`overlay-external-mcu.overlay` - This configures the |SM| application to communicate with external MCU over ``uart2``, using specific pins for UART, DTR, and RI.
+  The overlay is pin compatible with nRF9160DK, nRF9151DK, and nRF9161DK.
+  For other setups, you can customize the overlay to fit your configuration.
+
 * :file:`overlay-native_tls.conf` - This configuration file contains additional configuration options that are required to use :ref:`sm_native_tls`.
   Not supported with the ``thingy91/nrf9160/ns`` board target due to flash memory constraints.
   If you need to use native TLS with Thingy:91, you must disable features to free up flash memory.
@@ -400,24 +349,15 @@ The following configuration files are provided:
 * :file:`overlay-memfault.conf` - Configuration file that enables `Memfault`_.
   For more information about Memfault features in |NCS|, see the `Memfault library`_ docs.
 
-* :file:`overlay-zephyr-modem.conf`, :file:`overlay-zephyr-modem-nrf9160dk-nrf52840.conf`, :file:`overlay-external-mcu.overlay`,  and :file:`overlay-zephyr-modem-nrf9160dk-nrf52840.overlay` - These configuration files are used when compiling |SM| to turn an nRF91 Series SiP into a Zephyr-compatible standalone modem.
-  Also set :ref:`CONFIG_SM_POWER_PIN` Kconfig option.
+* :file:`overlay-disable-dtr.overlay` - Devicetree overlay that disables the DTR and RI pins and related functionality.
+  This overlay can be used if your setup does not have the need or means for managing the power externally.
+  Modify the overlay to fit your configuration.
+
+* :file:`overlay-zephyr-modem.conf`, :file:`overlay-zephyr-modem-external-mcu.overlay`, :file:`overlay-zephyr-modem-nrf9160dk-nrf52840.conf`, and :file:`overlay-zephyr-modem-nrf9160dk-nrf52840.overlay` - These configuration files are used when compiling |SM| to turn an nRF91 Series SiP into a Zephyr-compatible standalone modem.
   See :ref:`sm_as_zephyr_modem` for more information.
 
-* :file:`boards/nrf9160dk_nrf9160_ns.conf` - Configuration file specific for the nRF9160 DK.
-  This file is automatically merged with the :file:`prj.conf` file when you build for the ``nrf9160dk/nrf9160/ns`` board target.
-
-* :file:`boards/nrf9151dk_nrf9151_ns.conf` - Configuration file specific for the nRF9151 DK.
-  This file is automatically merged with the :file:`prj.conf` file when you build for the ``nrf9151dk/nrf9151/ns`` board target.
-
-* :file:`boards/nrf9161dk_nrf9161_ns.conf` - Configuration file specific for the nRF9161 DK.
-  This file is automatically merged with the :file:`prj.conf` file when you build for the ``nrf9161dk/nrf9161/ns`` board target.
-
-* :file:`boards/thingy91_nrf9160_ns.conf` - Configuration file specific for Thingy:91.
-  This file is automatically merged with the :file:`prj.conf` file when you build for the ``thingy91/nrf9160/ns`` board target.
-
-* :file:`boards/thingy91x_nrf9151_ns.conf` - Configuration file specific for Thingy:91 X.
-  This file is automatically merged with the :file:`prj.conf` file when you build for the ``thingy91x/nrf9151/ns`` board target.
+The board-specific devicetree overlays (:file:`boards/*.overlay`) set up configurations that are specific to each supported development kit.
+All of them configure the DTR to be deasserted from a button and RI to blink an LED.
 
 .. _sm_native_tls:
 
@@ -518,121 +458,60 @@ Connecting with an external MCU
 
 .. note::
 
-   This section does not apply to Thingy:91 or Thingy:91 X.
+   This section does not apply to Thingy:91, Thingy:91 X, or nRF9131 EK.
 
-If you run your user application on an external MCU (for example, an nRF52 Series development kit), you can control the modem on an nRF91 Series device directly from the application.
+If you run your user application on an external MCU (for example, an nRF52 Series development kit), you can control the |SM| application on an nRF91 Series device directly from the application.
 See the :ref:`sm_shell_sample` for a sample implementation of such an application.
 
-To connect with an external MCU using UART_2, change the configuration files for the default board as follows:
+To connect with an external MCU using UART_2, include the :file:`overlay-external-mcu.overlay` devicetree overlay in your build.
+This overlay configures the UART_2 pins, DTR pin, and RI pin for the nRF9160 DK, nRF9151 DK, and nRF9161 DK.
 
-.. tabs::
+If you use a different setup, you can customize the :file:`overlay-external-mcu.overlay` file to match your hardware configuration in (for example) the following ways:
 
-   .. group-tab:: nRF9151 DK
+* Change the highlighted UART baud rate or DTR and RI pins::
 
-      * In the :file:`nrf9151dk_nrf9151_ns.conf` file::
+   &uart2 {
+      compatible = "nordic,nrf-uarte";
+      current-speed = <**115200**>;
+      hw-flow-control;
+      status = "okay";
 
-          # When working with PC terminal, unmask the following config.
-          #CONFIG_SM_POWER_PIN=8
-          #CONFIG_SM_INDICATE_PIN=0
+      dtr_uart2: dtr-uart {
+         compatible = "nordic,dtr-uart";
+         dtr-gpios = <**&gpio0 31** (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+         ri-gpios = <**&gpio0 30** GPIO_ACTIVE_LOW>;
+         status = "okay";
+      };
+      pinctrl-0 = <&uart2_default_alt>;
+      pinctrl-1 = <&uart2_sleep_alt>;
+      pinctrl-names = "default", "sleep";
+   };
 
-          # When working with external MCU, unmask the following config.
-          CONFIG_SM_POWER_PIN=31
-          CONFIG_SM_INDICATE_PIN=30
+* Change the highlighted UART pins::
 
-      * In the :file:`nrf9151dk_nrf9151_ns.overlay` file::
+   &pinctrl {
+      uart2_default_alt: uart2_default_alt {
+         group1 {
+            psels = <NRF_PSEL(UART_RX, **0, 11**)>,
+                    <NRF_PSEL(UART_CTS, **0, 13**)>;
+            bias-pull-up;
+         };
+         group2 {
+            psels = <NRF_PSEL(UART_TX, **0, 10**)>,
+                    <NRF_PSEL(UART_RTS, **0, 12**)>;
+         };
+      };
 
-          / {
-              chosen {
-                       ncs,sm-uart = &uart2;
-                     }
-            };
-
-          &uart0 {
-             status = "disabled";
-          };
-
-          &uart2 {
-             compatible = "nordic,nrf-uarte";
-             current-speed = <115200>;
-             status = "okay";
-             hw-flow-control;
-
-             pinctrl-0 = <&uart2_default_alt>;
-             pinctrl-1 = <&uart2_sleep_alt>;
-             pinctrl-names = "default", "sleep";
-          };
-
-   .. group-tab:: nRF9161 DK
-
-      * In the :file:`nrf9161dk_nrf9161_ns.conf` file::
-
-          # When working with PC terminal, unmask the following config.
-          #CONFIG_SM_POWER_PIN=8
-          #CONFIG_SM_INDICATE_PIN=0
-
-          # When working with external MCU, unmask the following config.
-          CONFIG_SM_POWER_PIN=31
-          CONFIG_SM_INDICATE_PIN=30
-
-      * In the :file:`nrf9161dk_nrf9161_ns.overlay` file::
-
-          / {
-              chosen {
-                       ncs,sm-uart = &uart2;
-                     }
-            };
-
-          &uart0 {
-             status = "disabled";
-          };
-
-          &uart2 {
-             compatible = "nordic,nrf-uarte";
-             current-speed = <115200>;
-             status = "okay";
-             hw-flow-control;
-
-             pinctrl-0 = <&uart2_default_alt>;
-             pinctrl-1 = <&uart2_sleep_alt>;
-             pinctrl-names = "default", "sleep";
-          };
-
-
-   .. group-tab:: nRF9160 DK
-
-      * In the :file:`nrf9160dk_nrf9160_ns.conf` file::
-
-          # When working with PC terminal, unmask the following config.
-          #CONFIG_SM_POWER_PIN=6
-          #CONFIG_SM_INDICATE_PIN=2
-
-          # When working with external MCU, unmask the following config.
-          CONFIG_SM_POWER_PIN=31
-          CONFIG_SM_INDICATE_PIN=30
-
-
-      * In the :file:`nrf9160dk_nrf9160_ns.overlay` file::
-
-          / {
-              chosen {
-                       ncs,sm-uart = &uart2;
-                     }
-            };
-
-          &uart0 {
-             status = "disabled";
-          };
-
-          &uart2 {
-             compatible = "nordic,nrf-uarte";
-             current-speed = <115200>;
-             status = "okay";
-             hw-flow-control;
-
-             pinctrl-0 = <&uart2_default_alt>;
-             pinctrl-1 = <&uart2_sleep_alt>;
-             pinctrl-names = "default", "sleep";
-          };
+      uart2_sleep_alt: uart2_sleep_alt {
+         group1 {
+            psels = <NRF_PSEL(UART_TX, **0, 10**)>,
+                    <NRF_PSEL(UART_RX, **0, 11**)>,
+                    <NRF_PSEL(UART_RTS, **0, 12**)>,
+                    <NRF_PSEL(UART_CTS, **0, 13**)>;
+            low-power-enable;
+         };
+      };
+   };
 
 The following table shows how to connect selected development kit to an nRF91 Series development kit to be able to communicate through UART:
 
@@ -653,10 +532,10 @@ The following table shows how to connect selected development kit to an nRF91 Se
            - UART RTS P0.12
          * - UART RTS P1.06
            - UART CTS P0.13
-         * - GPIO OUT P0.11
-           - GPIO IN P0.31
-         * - GPIO IN P0.13
-           - GPIO OUT P0.30
+         * - DTR OUT P0.11
+           - DTR IN P0.31
+         * - RI IN P0.13
+           - RI OUT P0.30
          * - GPIO GND
            - GPIO GND
 
@@ -675,10 +554,10 @@ The following table shows how to connect selected development kit to an nRF91 Se
            - UART RTS P0.12
          * - UART RTS P1.06
            - UART CTS P0.13
-         * - GPIO OUT P0.23
-           - GPIO IN P0.31
-         * - GPIO IN P0.28
-           - GPIO OUT P0.30
+         * - DTR OUT P0.23
+           - DTR IN P0.31
+         * - RI IN P0.28
+           - RI OUT P0.30
          * - GPIO GND
            - GPIO GND
 
@@ -687,12 +566,12 @@ Use the following UART devices:
 * nRF52 or nRF53 Series DK - UART0
 * nRF91 Series DK - UART2
 
-Use the following UART configuration, which is different from the `default serial port connection settings <Testing and optimization_>`_:
+The UART configuration must match on both sides.
+By default the |SM| application and :ref:`sm_shell_sample` use the following settings:
 
 * Hardware flow control: enabled
 * Baud rate: 115200
 * Parity bit: no
-* Operation mode: IRQ
 
 .. note::
    The GPIO output level on the nRF91 Series device side must be 3 V.

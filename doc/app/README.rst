@@ -22,4 +22,5 @@ See the subpages for how to use the application, how to extend it, and informati
    sm_testing
    sm_extending
    sm_data_mode
+   sm_dtr_ri
    AT_commands
