@@ -126,7 +126,7 @@ Under Linux, if the controlling chip is the nRF52840 of the nRF9160 DK, the devi
 After both applications have been flashed to their respective chips and you are connected to receive logs, you can reset the controlling chip.
 When the Zephyr application starts up, the following happens:
 
-* If power management is enabled (the `CONFIG_PM_DEVICE`_ Kconfig option is set to ``y``): when the application powers on the modem (by calling ``pm_device_action_run(<dev>, PM_DEVICE_ACTION_RESUME)`` as the sample does), the cellular modem driver will toggle the modem's power pin to wake it up.
+* If power management is enabled (the ``CONFIG_PM_DEVICE`` Kconfig option is set to ``y``): when the application powers on the modem (by calling ``pm_device_action_run(<dev>, PM_DEVICE_ACTION_RESUME)`` as the sample does), the cellular modem driver will toggle the modem's power pin to wake it up.
 
   If power management is not enabled, the cellular modem driver will automatically proceed and expect |SM| to already be started and in a pristine state.
   In this case, |SM| should be compiled with the :ref:`CONFIG_SM_START_SLEEP <CONFIG_SM_START_SLEEP>` Kconfig option set to ``n``, and :ref:`CONFIG_SM_POWER_PIN <CONFIG_SM_POWER_PIN>` can be left undefined.

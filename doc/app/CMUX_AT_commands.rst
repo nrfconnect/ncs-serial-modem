@@ -39,7 +39,7 @@ See the :ref:`sm_config_files` section for more information.
 
    * Only UIH frames are used.
    * The speed used is the configured baud rate of |SM|'s UART.
-   * The maximum frame size is configured using the `CONFIG_MODEM_CMUX_MTU`_ Kconfig option.
+   * The maximum frame size is configured using the ``CONFIG_MODEM_CMUX_MTU`` Kconfig option.
 
 CMUX setup #XCMUX
 =================

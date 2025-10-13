@@ -25,8 +25,8 @@ Using them reduces the time it takes the GNSS module to estimate its position.
 To use either of them, the device must be connected to nRF Cloud (using the :ref:`#XNRFCLOUD <SM_AT_NRFCLOUD>` AT command) when starting the GNSS module.
 In addition, the following Kconfig options must be enabled:
 
-   * `CONFIG_NRF_CLOUD_AGNSS`_ to use A-GNSS.
-   * `CONFIG_NRF_CLOUD_PGPS`_ to use P-GPS.
+   * ``CONFIG_NRF_CLOUD_AGNSS`` to use A-GNSS.
+   * ``CONFIG_NRF_CLOUD_PGPS`` to use P-GPS.
 
 If both assistive services were enabled during compilation, you cannot choose to use only one of them at run time.
 
@@ -76,7 +76,7 @@ In periodic navigation mode, the ``<interval>`` and ``<timeout>`` parameters are
    Make sure that the GNSS antenna is configured properly.
    This can be achieved two ways:
 
-   * Using the `CONFIG_MODEM_ANTENNA_AT_MAGPIO`_ and `CONFIG_MODEM_ANTENNA_AT_COEX0`_ Kconfig options.
+   * Using the ``CONFIG_MODEM_ANTENNA_AT_MAGPIO`` and ``CONFIG_MODEM_ANTENNA_AT_COEX0`` Kconfig options.
    * By issuing the ``%XMAGPIO`` and ``%XCOEX0`` AT commands manually at run time.
 
 .. tip::
