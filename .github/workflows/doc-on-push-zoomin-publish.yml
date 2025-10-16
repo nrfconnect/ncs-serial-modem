@@ -1,0 +1,20 @@
+# Publish latest documentation on push to main
+name: Publish latest documentation on push
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'doc/**'
+
+jobs:
+  deploy:
+    permissions:
+      contents: write
+    uses: ./.github/workflows/doc-build-and-publish-zooomin.yml
+    with:
+      documentation_tag: "latest"
+      publish_to_prod: true
+      publish_to_dev: true
+    secrets: inherit
