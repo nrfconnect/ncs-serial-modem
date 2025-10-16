@@ -79,6 +79,32 @@ config SM_UART_TX_BUF_SIZE
 	  If the buffers are full, will send synchronously.
 	  These buffers are not used when CMUX is in use.
 
+config SM_URC_BUFFER_SIZE
+	int "TX buffer size for unsolicited result codes (URC)"
+	default 4096
+	help
+	  Buffer, in which unsolicited result codes (URC) are stored before being sent to the host.
+	  The buffer has to be large enough to hold the largest URC that can be sent by the modem.
+	  Result codes longer than this size will get dropped.
+
+	  The URC in here means an URC from the Modem or from a thread which is not serving sm_work_queue.
+	  Messages that are originally sent from sm_work_queue are part of AT-command responses, even though they are indistinguishable from the URCs.
+
+	  This can be reduced if your use cases do not require lengthy notifications.
+	  Note: %NCELLMEAS notifications can be nearly 4kB in size,
+	  which explains the default value.
+
+config SM_URC_DELAY_WITH_INCOMPLETE_ECHO_MS
+	int "Delay for URC transmission when incomplete AT command echo is in progress (ms)"
+	default 1000
+	help
+	  When AT command echo is enabled, and the command is spread over multiple RX buffers,
+	  due to its length, or the speed of incoming data (typing), the command echo is considered incomplete
+	  until the final part of the command (terminating character) has been received and echoed back to the host.
+
+	  When the AT command echo is incomplete, URC transmissions are delayed by this amount of time for every
+	  RX buffer (keystroke, while typing) received until the command echo is complete.
+
 #
 # Automatic network attach
 #
@@ -166,19 +192,6 @@ config SM_CMUX_UART_BUFFER_SIZE
 	help
 	  Size of the buffer for data received in CMUX mode.
 	  Same buffer size is used for both RX and TX.
-
-config SM_CMUX_TX_BUFFER_SIZE
-	int "TX buffer size for CMUX"
-	depends on SM_CMUX
-	default 4096
-	help
-	  Size of the buffer for data sent in CMUX mode. The buffer has to be large enough
-	  to hold the largest unsolicited notification that can be sent by the modem.
-	  Notifications longer than this size will get dropped.
-
-	  This can be reduced if your use cases do not require lengthy notifications.
-	  Note: %NCELLMEAS notifications can be nearly 4kB in size,
-	  which explains the default value.
 
 if SM_CMUX && SM_PPP
 

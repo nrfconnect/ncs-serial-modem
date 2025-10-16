@@ -371,6 +371,22 @@ static int handle_at_clac(enum at_parser_cmd_type cmd_type, struct at_parser *, 
 	return 0;
 }
 
+SM_AT_CMD_CUSTOM(ate0, "ATE0", handle_ate0);
+static int handle_ate0(enum at_parser_cmd_type cmd_type, struct at_parser *, uint32_t)
+{
+	sm_at_host_echo(false);
+
+	return 0;
+}
+
+SM_AT_CMD_CUSTOM(ate1, "ATE1", handle_ate1);
+static int handle_ate1(enum at_parser_cmd_type cmd_type, struct at_parser *, uint32_t)
+{
+	sm_at_host_echo(true);
+
+	return 0;
+}
+
 int sm_at_init(void)
 {
 	int err;

@@ -33,6 +33,20 @@ extern uint8_t sm_at_buf[SM_AT_MAX_CMD_LEN + 1]; /* AT command buffer. */
 
 extern uint16_t sm_datamode_time_limit; /* Send trigger by time in data mode. */
 
+enum sm_urc_owner {
+	SM_URC_OWNER_NONE,
+	SM_URC_OWNER_AT,
+	SM_URC_OWNER_CMUX
+};
+
+/* Buffer for URC messages. */
+struct sm_urc_ctx {
+	struct ring_buf rb;
+	uint8_t buf[CONFIG_SM_URC_BUFFER_SIZE];
+	struct k_mutex mutex;
+	enum sm_urc_owner owner;
+};
+
 /** @brief Operations in data mode. */
 enum sm_datamode_operation {
 	DATAMODE_SEND,  /* Send data in datamode */
@@ -168,6 +182,29 @@ typedef int sm_at_callback(enum at_parser_cmd_type cmd_type, struct at_parser *p
  * @retval 0 on success.
  */
 int sm_at_cb_wrapper(char *buf, size_t len, char *at_cmd, sm_at_callback cb);
+
+/**
+ * @brief Enable or disable echo of received characters.
+ *
+ * @param enable True to enable echo, false to disable.
+ */
+void sm_at_host_echo(bool enable);
+
+/**
+ * @brief Acquire ownership of the URC context for a specific owner.
+ *
+ * If the context is unowned (NONE) or already owned by the given owner,
+ * set the owner and return the context pointer.
+ * Otherwise, return NULL.
+ */
+struct sm_urc_ctx *sm_at_host_urc_ctx_acquire(enum sm_urc_owner owner);
+
+/**
+ * @brief Release ownership of the URC context.
+ *
+ * Only releases if the current owner matches.
+ */
+void sm_at_host_urc_ctx_release(struct sm_urc_ctx *ctx, enum sm_urc_owner owner);
 
 /**
  * @brief Define a wrapper for a Serial Modem custom AT command callback.
