@@ -1,0 +1,106 @@
+name: Documentation Build and Publish to Zoomin
+
+on:
+  workflow_dispatch:
+    inputs:
+      documentation_tag:
+        type: string
+        required: false
+        default: "latest"
+        description: "Label of the documentation"
+      publish_to_prod:
+        type: boolean
+        default: true
+      publish_to_dev:
+        type: boolean
+        default: true
+
+  workflow_call:
+    inputs:
+      documentation_tag:
+        type: string
+        required: true
+        default: "latest"
+      publish_to_prod:
+        type: boolean
+        default: true
+      publish_to_dev:
+        type: boolean
+        default: true
+
+jobs:
+  doc-build-and-publish:
+    env:
+      ARCHIVE: "addon-serial_modem-${{inputs.documentation_tag}}.zip"
+
+    runs-on: ubuntu-latest
+
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3 python3-pip
+
+      - name: Install Python dependencies
+        working-directory: doc
+        run: |
+          python3 -m pip install -r requirements.txt
+
+      - name: Build documentation
+        working-directory: doc
+        run: |
+          sphinx-build -M html . build
+
+          cp custom.properties build/html
+          sed -i 's/__VERSION__/'"${{inputs.documentation_tag}}"'/g' build/html/custom.properties
+
+          cp tags.yml build/html
+          sed -i 's/__VERSION__/'"${{inputs.documentation_tag}}"'/g' build/html/tags.yml
+
+          cd build/html
+
+          zip -rq "${{env.ARCHIVE}}" .
+          ls -lah .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: doc-build
+          if-no-files-found: error
+          retention-days: 2
+          path: |
+            doc/build/html/${{env.ARCHIVE}}
+
+      - name: Prepare Key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan upload-v1.zoominsoftware.io >> ~/.ssh/known_hosts
+
+          echo "${{ secrets.ZOOMIN_KEY }}" > zoomin_key
+          chmod 600 zoomin_key
+
+      - name: Publish documentation - prod
+        if: ${{inputs.publish_to_prod}}
+        run: |
+          sftp -v -i zoomin_key nordic@upload-v1.zoominsoftware.io <<EOF
+            cd docs-be.nordicsemi.com/sphinx-html/incoming
+            put doc/build/html/${{env.ARCHIVE}}
+          EOF
+
+      - name: Publish documentation - dev
+        if: ${{inputs.publish_to_dev}}
+        run: |
+          sftp -v -i zoomin_key nordic@upload-v1.zoominsoftware.io <<EOF
+            cd nordic-be-dev.zoominsoftware.io/sphinx-html/incoming
+            put doc/build/html/${{env.ARCHIVE}}
+          EOF
