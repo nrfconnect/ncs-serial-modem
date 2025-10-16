@@ -57,6 +57,12 @@ The following changes are mandatory to make your application work in the same wa
    * Removed the ``AT#XPOLL`` command.
      Use ``AT#XAPOLL`` instead.
 
+   * PPP connection must be requested using the ``AT#XPPP=1`` command to get it started when the modem is put into online mode using the ``AT+CFUN=1`` command.
+     The ``AT#XPPP=1`` command can be run before or after the ``AT+CFUN=1`` command.
+     So PPP connection is not started automatically anymore when the ``AT+CFUN=1`` command is run.
+     After the ``AT#XPPP=1`` command is run, the PPP connection is started when the ``AT+CFUN=1`` command is run and stopped when network is lost (for example, with ``AT+CFUN=4`` or ``AT+CFUN=0``).
+     When the ``AT#XPPP=0`` command is run, the PPP connection is stopped permanently.
+
 DTR and RI GPIOs replace Power and Indicate pins
 ------------------------------------------------
 
