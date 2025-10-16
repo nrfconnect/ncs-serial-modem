@@ -476,7 +476,7 @@ static void subscribe_cgev_notifications(void)
 	}
 }
 
-AT_MONITOR(sm_ppp_on_cgev, "CGEV", at_notif_on_cgev);
+AT_MONITOR(sm_ppp_on_cgev, "CGEV", at_notif_on_cgev, PAUSED);
 
 static void at_notif_on_cgev(const char *notify)
 {
@@ -694,8 +694,10 @@ static int handle_at_ppp(enum at_parser_cmd_type cmd_type, struct at_parser *par
 		/* Store PPP PDN if given */
 		at_parser_num_get(parser, 2, &ppp_pdn_cid);
 		delegate_ppp_event(PPP_START, PPP_REASON_DEFAULT);
+		at_monitor_resume(&sm_ppp_on_cgev);
 	} else {
 		delegate_ppp_event(PPP_STOP, PPP_REASON_DEFAULT);
+		at_monitor_pause(&sm_ppp_on_cgev);
 	}
 	return -SILENT_AT_COMMAND_RET;
 }
