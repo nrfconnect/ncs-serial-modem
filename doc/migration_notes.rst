@@ -41,6 +41,7 @@ The following changes are mandatory to make your application work in the same wa
 
      * Rename ``CONFIG_SLM_*`` to ``CONFIG_SM_*``
      * Rename ``CONFIG_MODEM_SLM_*`` to ``CONFIG_SM_HOST_*``
+     * Rename ``CONFIG_SLM_CMUX_TX_BUFFER_SIZE`` to ``CONFIG_SM_URC_BUFFER_SIZE``
 
    * Code patches:
 

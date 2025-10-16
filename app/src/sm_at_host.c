@@ -53,6 +53,15 @@ K_MUTEX_DEFINE(mutex_data); /* Protects the data_rb and quit_str_partial_match. 
 
 static struct k_work raw_send_scheduled_work;
 
+enum sm_debug_print {
+	SM_DEBUG_PRINT_NONE,
+	SM_DEBUG_PRINT_SHORT,
+	SM_DEBUG_PRINT_FULL
+};
+static bool echo;
+static bool incomplete_echo; /* Are we in progress of echoing a command? */
+static struct sm_urc_ctx urc_ctx;
+
 /* global functions defined in different files */
 int sm_at_init(void);
 void sm_at_uninit(void);
@@ -293,6 +302,8 @@ static size_t raw_rx_handler(const uint8_t *buf, const size_t len)
 /*
  * Check AT command grammar based on below.
  *  AT<NULL>
+ *  ATE0<NULL>
+ *  ATE1<NULL>
  *  AT<separator><body><NULL>
  *  AT<separator><body>=<NULL>
  *  AT<separator><body>?<NULL>
@@ -315,6 +326,12 @@ static int cmd_grammar_check(const char *cmd, size_t length)
 	/* check AT<NULL> */
 	cmd += 2;
 	if (*cmd == '\0') {
+		return 0;
+	}
+
+	/* Check ATE0 and ATE1 */
+	if (toupper(*cmd) == 'E' && (*(cmd + 1) == '0' || *(cmd + 1) == '1') &&
+	    *(cmd + 2) == '\0') {
 		return 0;
 	}
 
@@ -445,7 +462,7 @@ static void format_final_result(char *buf, size_t buf_len, size_t buf_max_len)
 	}
 }
 
-static int sm_at_send_internal(const uint8_t *data, size_t len, bool print_full_debug)
+static int sm_at_send_internal(const uint8_t *data, size_t len, enum sm_debug_print print_debug)
 {
 	int ret;
 
@@ -454,16 +471,21 @@ static int sm_at_send_internal(const uint8_t *data, size_t len, bool print_full_
 		return -EINTR;
 	}
 
-	ret = sm_tx_write(data, len, true);
+	ret = sm_tx_write(data, len, true, incomplete_echo ?
+			  K_MSEC(CONFIG_SM_URC_DELAY_WITH_INCOMPLETE_ECHO_MS) : K_NO_WAIT);
 	if (!ret) {
-		LOG_HEXDUMP_DBG(data, print_full_debug ? len : MIN(HEXDUMP_LIMIT, len), "TX");
+		if (print_debug == SM_DEBUG_PRINT_FULL) {
+			LOG_HEXDUMP_DBG(data, len, "TX");
+		} else if (print_debug == SM_DEBUG_PRINT_SHORT) {
+			LOG_HEXDUMP_DBG(data, MIN(HEXDUMP_LIMIT, len), "TX");
+		}
 	}
 	return ret;
 }
 
 int sm_at_send(const uint8_t *data, size_t len)
 {
-	return sm_at_send_internal(data, len, true);
+	return sm_at_send_internal(data, len, SM_DEBUG_PRINT_FULL);
 }
 
 int sm_at_send_str(const char *str)
@@ -599,6 +621,15 @@ static size_t cmd_rx_handler(const uint8_t *buf, const size_t len, bool *stop_at
 		}
 	}
 
+	if (echo) {
+		/* Echoing incomplete AT-command will cause
+		 * CONFIG_SM_URC_DELAY_WITH_INCOMPLETE_ECHO_MS delay in URCs after every
+		 * UART RX buffer (keystroke, when typing).
+		 */
+		incomplete_echo = !send;
+		(void)sm_at_send_internal(buf, processed, SM_DEBUG_PRINT_NONE);
+	}
+
 	if (send) {
 		if (at_cmd_len > sizeof(sm_at_buf) - 1) {
 			LOG_ERR("AT command buffer overflow, %d dropped", at_cmd_len);
@@ -703,7 +734,7 @@ static void notification_handler(const char *notification)
 			return;
 		}
 #endif
-		sm_at_send_internal(CRLF_STR, strlen(CRLF_STR), true);
+		sm_at_send_internal(CRLF_STR, strlen(CRLF_STR), SM_DEBUG_PRINT_FULL);
 		sm_at_send_str(notification);
 	} else {
 		LOG_DBG("Drop notification: %s", notification);
@@ -734,14 +765,14 @@ void rsp_send(const char *fmt, ...)
 	rsp_len = MIN(rsp_len, sizeof(rsp_buf) - 1);
 	va_end(arg_ptr);
 
-	sm_at_send_internal(rsp_buf, rsp_len, true);
+	sm_at_send_internal(rsp_buf, rsp_len, SM_DEBUG_PRINT_FULL);
 
 	k_mutex_unlock(&mutex_rsp_buf);
 }
 
 void data_send(const uint8_t *data, size_t len)
 {
-	sm_at_send_internal(data, len, false);
+	sm_at_send_internal(data, len, SM_DEBUG_PRINT_SHORT);
 }
 
 int enter_datamode(sm_datamode_handler_t handler)
@@ -891,6 +922,9 @@ int sm_at_host_init(void)
 {
 	int err;
 
+	ring_buf_init(&urc_ctx.rb, sizeof(urc_ctx.buf), urc_ctx.buf);
+	k_mutex_init(&urc_ctx.mutex);
+
 	k_mutex_lock(&mutex_mode, K_FOREVER);
 	sm_datamode_time_limit = 0;
 	datamode_handler = NULL;
@@ -956,7 +990,7 @@ int sm_at_host_power_off(void)
 
 	/* Write sync str to buffer so it is sent first when resuming, do not flush. */
 	if (!IS_ENABLED(CONFIG_SM_SKIP_READY_MSG)) {
-		sm_tx_write(SM_SYNC_STR, strlen(SM_SYNC_STR), false);
+		sm_tx_write(SM_SYNC_STR, strlen(SM_SYNC_STR), false, K_NO_WAIT);
 	}
 
 	return err;
@@ -972,9 +1006,45 @@ int sm_at_host_power_on(void)
 	}
 
 	/* Flush the TX buffer. */
-	sm_tx_write(NULL, 0, true);
+	sm_tx_write(NULL, 0, true, K_NO_WAIT);
 
 	return 0;
+}
+
+void sm_at_host_echo(bool enable)
+{
+	echo = enable;
+	incomplete_echo = false;
+}
+
+struct sm_urc_ctx *sm_at_host_urc_ctx_acquire(enum sm_urc_owner owner)
+{
+	k_mutex_lock(&urc_ctx.mutex, K_FOREVER);
+
+	if (urc_ctx.owner == SM_URC_OWNER_NONE || urc_ctx.owner == owner) {
+		urc_ctx.owner = owner;
+		k_mutex_unlock(&urc_ctx.mutex);
+		return &urc_ctx;
+	}
+
+	k_mutex_unlock(&urc_ctx.mutex);
+	return NULL;
+}
+
+void sm_at_host_urc_ctx_release(struct sm_urc_ctx *ctx, enum sm_urc_owner owner)
+{
+	if (ctx != &urc_ctx) {
+		LOG_ERR("Invalid URC context");
+		return;
+	}
+
+	k_mutex_lock(&ctx->mutex, K_FOREVER);
+
+	if (ctx->owner == owner) {
+		ctx->owner = SM_URC_OWNER_NONE;
+	}
+
+	k_mutex_unlock(&ctx->mutex);
 }
 
 void sm_at_host_uninit(void)

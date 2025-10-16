@@ -9,6 +9,60 @@ Generic AT commands
 
 This page describes generic AT commands.
 
+|SM| echo E[0|1]
+================
+
+The ``E`` command enables or disables the AT command echo feature of the |SM| application.
+
+Set command
+-----------
+
+The set command enables or disables the AT command echo feature.
+While enabled, the |SM| application echoes back all the characters that are received in the AT command mode.
+
+.. note::
+
+   When working with a terminal, you should disable local echo to avoid double echoing of characters.
+
+Syntax
+~~~~~~
+
+::
+
+   E1 - Enable AT command echo.
+   E0 - Disable AT command echo (default).
+
+Example
+~~~~~~~
+
+Set the AT command echo:
+
+::
+
+   ATE1
+   OK
+
+   AT
+   AT    // Echoed command
+   OK
+
+   ATE0
+   ATE0  // Echoed command
+   OK
+
+   AT
+   OK
+
+Read command
+------------
+
+The read command is not supported.
+
+Test command
+------------
+
+The test command is not supported.
+
 |SM| version #XSLMVER
 =====================
 

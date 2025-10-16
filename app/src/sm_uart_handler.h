@@ -26,7 +26,7 @@ extern uint32_t sm_uart_baudrate;
  *
  * @retval Amount of bytes written on success, otherwise a negative error code.
  */
-typedef int (*sm_pipe_tx_t)(const uint8_t *data, size_t len);
+typedef int (*sm_pipe_tx_t)(const uint8_t *data, size_t len, k_timeout_t urc_delay);
 
 /**
  * @brief Enable the UART handler.
@@ -47,10 +47,11 @@ int sm_uart_handler_disable(void);
  * @param data Data to write.
  * @param len Length of data to write.
  * @param flush Whether to flush the data immediately.
+ * @param urc_delay Delay before sending URC after data is written.
  *
  * @retval 0 on success. Otherwise, a negative error code.
  */
-int sm_tx_write(const uint8_t *data, size_t len, bool flush);
+int sm_tx_write(const uint8_t *data, size_t len, bool flush, k_timeout_t urc_delay);
 
 /**
  * @brief Initialize UART pipe for Serial Modem.
