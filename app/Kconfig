@@ -143,10 +143,6 @@ config SM_FULL_FOTA
 
 config SM_PPP
 	bool "PPP support"
-	help
-	  When enabled, Serial Modem automatically brings up/down the PPP link
-	  when the LTE link (default PDN) is connected/disconnected,
-	  regardless of what is done with AT#XPPP.
 
 if SM_PPP
 
