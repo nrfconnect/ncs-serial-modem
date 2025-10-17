@@ -300,7 +300,7 @@ static size_t raw_rx_handler(const uint8_t *buf, const size_t len)
  *  AT<separator><body>=<parameters><NULL>
  * In which
  * <separator>: +, %, #
- * <body>: alphanumeric char only, size > 0
+ * <body>: alphanumeric char or '_' only, size > 0
  * <parameters>: arbitrary, size > 0
  */
 static int cmd_grammar_check(const char *cmd, size_t length)
@@ -327,8 +327,8 @@ static int cmd_grammar_check(const char *cmd, size_t length)
 	cmd += 1;
 	body = cmd;
 	while (true) {
-		/* check body is alphanumeric */
-		if (!isalpha((int)*cmd) && !isdigit((int)*cmd)) {
+		/* check body is alphanumeric or '_' */
+		if (!isalpha((int)*cmd) && !isdigit((int)*cmd) && *cmd != '_') {
 			break;
 		}
 		cmd++;
