@@ -25,7 +25,6 @@ sys.path.insert(0, str("_extensions"))
 
 extensions = [
     'breathe',
-    'sphinxcontrib.mscgen',
     'sphinx_tabs.tabs',
     'sphinx_togglebutton',
 ]

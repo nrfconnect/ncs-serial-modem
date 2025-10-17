@@ -96,8 +96,6 @@ int sm_host_register_ri_handler(sm_ri_handler_t handler);
  * @param automatic If true, DTR UART is automatically managed by the library.
  * @param inactivity Inactivity timeout for DTR UART disablement. Only used if @p
  * automatic is true.
- *
- * @return Zero on success, non-zero otherwise.
  */
 void sm_host_configure_dtr_uart(bool automatic, k_timeout_t inactivity);
 

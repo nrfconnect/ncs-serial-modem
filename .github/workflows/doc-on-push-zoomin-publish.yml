@@ -12,7 +12,7 @@ jobs:
   deploy:
     permissions:
       contents: write
-    uses: ./.github/workflows/doc-build-and-publish-zooomin.yml
+    uses: ./.github/workflows/doc-build-and-publish-zoomin.yml
     with:
       documentation_tag: "latest"
       publish_to_prod: true
