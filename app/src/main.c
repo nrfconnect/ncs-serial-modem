@@ -208,6 +208,10 @@ int start_execute(void)
 		return err;
 	}
 
+	k_work_queue_start(&sm_work_q, sm_wq_stack_area,
+		   K_THREAD_STACK_SIZEOF(sm_wq_stack_area),
+		   SM_WQ_PRIORITY, NULL);
+
 	/* This will send "READY" or "INIT ERROR" to UART so after this nothing
 	 * should be done that can fail
 	 */
@@ -217,9 +221,6 @@ int start_execute(void)
 		return err;
 	}
 
-	k_work_queue_start(&sm_work_q, sm_wq_stack_area,
-			   K_THREAD_STACK_SIZEOF(sm_wq_stack_area),
-			   SM_WQ_PRIORITY, NULL);
 	(void)lte_auto_connect();
 
 	return 0;
