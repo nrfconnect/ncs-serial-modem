@@ -55,6 +55,11 @@ enum sm_socket_send_mode {
 	AT_SOCKET_SEND_MODE_DATA	/* Enter data mode */
 };
 
+/**@brief Socket receive modes. */
+enum sm_socket_recv_mode {
+	AT_SOCKET_RECV_MODE_BINARY	/* Receive binary data */
+};
+
 static char udp_url[SM_MAX_URL];
 static uint16_t udp_port;
 
@@ -756,10 +761,13 @@ static int do_send(struct sm_socket *sock, const uint8_t *data, int len, int fla
 	return sent > 0 ? sent : ret;
 }
 
-static int do_recv(struct sm_socket *sock, int timeout, int flags)
+static int do_recv(struct sm_socket *sock, int timeout, int flags, uint16_t mode)
 {
 	int ret;
 	int sockfd = sock->fd;
+
+	/* mode is reserved for future use */
+	(void)mode;
 
 	/* For TCP/TLS Server, receive from incoming socket */
 	if (sock->type == SOCK_STREAM && sock->role == AT_SOCKET_ROLE_SERVER) {
@@ -846,12 +854,15 @@ static int do_sendto(struct sm_socket *sock, const char *url, uint16_t port, con
 	return sent > 0 ? sent : ret;
 }
 
-static int do_recvfrom(struct sm_socket *sock, int timeout, int flags)
+static int do_recvfrom(struct sm_socket *sock, int timeout, int flags, uint16_t mode)
 {
 	int ret;
 	struct sockaddr remote;
 	socklen_t addrlen = sizeof(struct sockaddr);
 	struct timeval tmo = {.tv_sec = timeout};
+
+	/* mode is reserved for future use */
+	(void)mode;
 
 	ret = zsock_setsockopt(sock->fd, SOL_SOCKET, SO_RCVTIMEO, &tmo, sizeof(tmo));
 	if (ret) {
@@ -1521,6 +1532,7 @@ static int handle_at_recv(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 {
 	int err = -EINVAL;
 	int fd;
+	uint16_t mode;
 	int timeout;
 	int flags = 0;
 	struct sm_socket *sock = NULL;
@@ -1535,17 +1547,22 @@ static int handle_at_recv(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 		if (sock == NULL) {
 			return -EINVAL;
 		}
-		err = at_parser_num_get(parser, 2, &timeout);
+		err = at_parser_num_get(parser, 2, &mode);
 		if (err) {
 			return err;
 		}
-		if (param_count > 3) {
-			err = at_parser_num_get(parser, 3, &flags);
-			if (err) {
-				return err;
-			}
+		if (mode != AT_SOCKET_RECV_MODE_BINARY) {
+			return -EINVAL;
 		}
-		err = do_recv(sock, timeout, flags);
+		err = at_parser_num_get(parser, 3, &flags);
+		if (err) {
+			return err;
+		}
+		err = at_parser_num_get(parser, 4, &timeout);
+		if (err) {
+			return err;
+		}
+		err = do_recv(sock, timeout, flags, mode);
 		break;
 
 	default:
@@ -1632,6 +1649,7 @@ static int handle_at_recvfrom(enum at_parser_cmd_type cmd_type, struct at_parser
 {
 	int err = -EINVAL;
 	int fd;
+	uint16_t mode;
 	int timeout;
 	int flags = 0;
 	struct sm_socket *sock = NULL;
@@ -1646,17 +1664,22 @@ static int handle_at_recvfrom(enum at_parser_cmd_type cmd_type, struct at_parser
 		if (sock == NULL) {
 			return -EINVAL;
 		}
-		err = at_parser_num_get(parser, 2, &timeout);
+		err = at_parser_num_get(parser, 2, &mode);
 		if (err) {
 			return err;
 		}
-		if (param_count > 3) {
-			err = at_parser_num_get(parser, 3, &flags);
-			if (err) {
-				return err;
-			}
+		if (mode != AT_SOCKET_RECV_MODE_BINARY) {
+			return -EINVAL;
 		}
-		err = do_recvfrom(sock, timeout, flags);
+		err = at_parser_num_get(parser, 3, &flags);
+		if (err) {
+			return err;
+		}
+		err = at_parser_num_get(parser, 4, &timeout);
+		if (err) {
+			return err;
+		}
+		err = do_recvfrom(sock, timeout, flags, mode);
 		break;
 
 	default:

@@ -971,19 +971,22 @@ Syntax
 
 ::
 
-   #XRECV=<handle>,<timeout>[,<flags>]
+   #XRECV=<handle>,<mode>,<flags>,<timeout>
 
 * The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
 
-* The ``<timeout>`` value sets the timeout value in seconds.
-  When ``0``, it means no timeout, and it makes this request become blocking.
+* The ``<mode>`` parameter specifies the receive mode (reserved for future use, currently should be set to ``0``).
 
-* The ``<flags>`` value sets the receiving behavior based on the BSD socket definition.
+* The ``<flags>`` parameter sets the receiving behavior based on the BSD socket definition.
   It can be set to one of the following values:
 
-  * ``2`` means reading data without removing it from the socket input queue.
-  * ``64`` means overriding the operation to non-blocking.
-  * ``256`` (TCP only) means blocking until the full amount of data can be returned.
+  * ``0`` - No flags set.
+  * ``2`` - Read data without removing it from the socket input queue.
+  * ``64`` - Override the operation to non-blocking.
+  * ``256`` (TCP only) - Block until the full amount of data can be returned.
+
+* The ``<timeout>`` parameter sets the timeout value in seconds.
+  When ``0``, it means no timeout, and it makes this request block indefinitely.
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -1004,7 +1007,7 @@ Example
 
 ::
 
-   AT#XRECV=0,10
+   AT#XRECV=0,0,0,10
    #XRECV: 0,7
    Test OK
    OK
@@ -1110,18 +1113,21 @@ Syntax
 
 ::
 
-   #XRECVFROM=<handle>,<timeout>[,<flags>]
+   #XRECVFROM=<handle>,<mode>,<flags>,<timeout>
 
 * The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
 
-* The ``<timeout>`` value sets the timeout value in seconds.
-  When ``0``, it means no timeout, and it makes this request become blocking.
+* The ``<mode>`` parameter specifies the receive mode (reserved for future use, currently should be set to ``0``).
 
-* The ``<flags>`` value sets the receiving behavior based on the BSD socket definition.
+* The ``<flags>`` parameter sets the receiving behavior based on the BSD socket definition.
   It can be set to one of the following values:
 
-  * ``2`` means reading data without removing it from the socket input queue.
-  * ``64`` means overriding the operation to non-blocking.
+  * ``0`` - No flags set.
+  * ``2`` - Read data without removing it from the socket input queue.
+  * ``64`` - Override the operation to non-blocking.
+
+* The ``<timeout>`` parameter sets the timeout value in seconds.
+  When ``0``, it means no timeout, and it makes this request block indefinitely.
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -1146,7 +1152,7 @@ Example
 
 ::
 
-   AT#XRECVFROM=0,10
+   AT#XRECVFROM=0,0,0,10
    #XRECVFROM: 0,7,"192.168.1.100",24210
    Test OK
    OK
