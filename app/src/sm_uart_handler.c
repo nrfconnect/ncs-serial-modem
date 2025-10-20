@@ -14,6 +14,7 @@
 #include <zephyr/modem/pipe.h>
 #include "sm_uart_handler.h"
 #include "sm_at_host.h"
+#include "sm_util.h"
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(sm_uart_handler, CONFIG_SM_LOG_LEVEL);
@@ -186,7 +187,7 @@ static void rx_recovery(void)
 
 	err = rx_enable();
 	if (err) {
-		k_work_schedule(&rx_process_work, K_MSEC(UART_RX_MARGIN_MS));
+		k_work_schedule_for_queue(&sm_work_q, &rx_process_work, K_MSEC(UART_RX_MARGIN_MS));
 	}
 
 	atomic_clear_bit(&uart_state, SM_UART_STATE_RX_RECOVERY_BIT);
@@ -343,7 +344,7 @@ static void uart_callback(const struct device *dev, struct uart_event *evt, void
 			rx_buf_unref(evt->data.rx.buf);
 			break;
 		}
-		(void)k_work_submit((struct k_work *)&rx_process_work);
+		k_work_schedule_for_queue(&sm_work_q, &rx_process_work, K_NO_WAIT);
 		break;
 	case UART_RX_BUF_REQUEST:
 		if (k_msgq_num_free_get(&rx_event_queue) < UART_RX_EVENT_COUNT_FOR_BUF) {
@@ -368,7 +369,7 @@ static void uart_callback(const struct device *dev, struct uart_event *evt, void
 		break;
 	case UART_RX_DISABLED:
 		atomic_clear_bit(&uart_state, SM_UART_STATE_RX_ENABLED_BIT);
-		k_work_submit((struct k_work *)&rx_process_work);
+		k_work_schedule_for_queue(&sm_work_q, &rx_process_work, K_NO_WAIT);
 		break;
 	default:
 		break;
