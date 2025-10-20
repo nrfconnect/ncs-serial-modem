@@ -898,20 +898,27 @@ Syntax
 
 ::
 
-   #XSEND=<handle>[,<data>][,<flags>]
+   #XSEND=<handle>,<mode>,<flags>[,<data>]
 
 * The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
 
-* The ``<data>`` parameter is a string that contains the data to be sent.
-  The maximum size of the data is 1024 bytes.
-  When the parameter is not specified, |SM| enters ``sm_data_mode``.
+* The ``<mode>`` parameter specifies the data sending mode:
+
+  * ``0`` - String mode. Data is provided directly in the command as the ``<data>`` parameter.
+  * ``1`` - Data mode. |SM| enters ``sm_data_mode`` for data input.
 
 * The ``<flags>`` parameter sets the sending behavior.
   It can be set to the following value:
 
+  * ``0`` - No flags set.
   * ``512`` - Blocks send operation until the request is acknowledged.
     The request will not return until the send operation is completed by lower layers, or until the timeout given by the AT_SO_SNDTIMEO socket option, is reached.
     Valid timeout values are 1 to 600 seconds.
+
+* The ``<data>`` parameter is required when ``<mode>`` is ``0`` (string mode).
+  It is a string that contains the data to be sent.
+  The maximum size of the data is 1024 bytes.
+  This parameter is not used when ``<mode>`` is ``1`` (data mode).
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -930,11 +937,11 @@ Example
 
 ::
 
-   AT#XSEND=0,"Test TCP"
+   AT#XSEND=0,0,0,"Test TCP"
    #XSEND: 0,8
    OK
 
-   AT#XSEND=1,,512
+   AT#XSEND=1,1,512
    OK
    Test datamode with flags
    +++
@@ -1027,9 +1034,22 @@ Syntax
 
 ::
 
-   #XSENDTO=<handle>,<url>,<port>[,<data>][,<flags>]
+   #XSENDTO=<handle>,<mode>,<flags>,<url>,<port>[,<data>]
 
 * The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
+
+* The ``<mode>`` parameter specifies the data sending mode:
+
+  * ``0`` - String mode. Data is provided directly in the command as the ``<data>`` parameter.
+  * ``1`` - Data mode. |SM| enters ``sm_data_mode`` for data input.
+
+* The ``<flags>`` parameter sets the sending behavior.
+  It can be set to the following value:
+
+  * ``0`` - No flags set.
+  * ``512`` - Blocks send operation until the request is acknowledged.
+    The request will not return until the send operation is completed by lower layers, or until the timeout given by the AT_SO_SNDTIMEO socket option, is reached.
+    Valid timeout values are 1 to 600 seconds.
 
 * The ``<url>`` parameter is a string.
   It indicates the hostname or the IP address of the remote peer.
@@ -1039,16 +1059,10 @@ Syntax
 * The ``<port>`` parameter is an unsigned 16-bit integer (0 - 65535).
   It represents the port of the UDP service on remote peer.
 
-* The ``<data>`` parameter is a string that contains the data to be sent.
+* The ``<data>`` parameter is required when ``<mode>`` is ``0`` (string mode).
+  It is a string that contains the data to be sent.
   Its maximum size is 1024 bytes.
-  When the parameter is not specified, |SM| enters ``sm_data_mode``.
-
-* The ``<flags>`` parameter sets the sending behavior.
-  It can be set to the following value:
-
-  * ``512`` - Blocks send operation until the request is acknowledged.
-    The request will not return until the send operation is completed by lower layers, or until the timeout given by the AT_SO_SNDTIMEO socket option, is reached.
-    Valid timeout values are 1 to 600 seconds.
+  This parameter is not used when ``<mode>`` is ``1`` (data mode).
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -1067,7 +1081,7 @@ Example
 
 ::
 
-   AT#XSENDTO=0,"test.server.com",1234,"Test UDP"
+   AT#XSENDTO=0,0,0,"test.server.com",1234,"Test UDP"
    #XSENDTO: 0,8
    OK
 

@@ -95,6 +95,20 @@ This provides more flexibility and clearer socket management by directly referen
      * ``AT#XCLOSE`` - New command to close individual sockets or all sockets at once.
      * Syntax: ``AT#XCLOSE[=<handle>]`` (handle is optional - omit to close all sockets)
 
+   * **AT#XSEND command parameter changes:**
+
+    Added ``<handle>`` and ``<mode>`` parameters to the ``AT#XSEND`` command. Changed parameter order.
+
+     * Old syntax: ``AT#XSEND[=<data>][,<flags>]``
+     * New syntax: ``AT#XSEND=<handle>,<mode>,<flags>[,<data>]``
+
+   * **AT#XSENDTO parameter changes:**
+
+    Added ``<handle>`` and ``<mode>`` parameters to the ``AT#XSENDTO`` command. Changed parameter order.
+
+    * Old syntax: ``AT#XSENDTO=<url>,<port>[,<data>][,<flags>]``
+    * New syntax: ``AT#XSENDTO=<handle>,<mode>,<flags>,<url>,<port>[,<data>]``
+
    * **All socket operations now require handle parameter:**
 
      * ``AT#XSOCKETOPT=<handle>,<op>,<name>[,<value>]`` (handle parameter added)
@@ -103,9 +117,9 @@ This provides more flexibility and clearer socket management by directly referen
      * ``AT#XCONNECT=<handle>,<url>,<port>`` (handle parameter added)
      * ``AT#XLISTEN=<handle>`` (handle parameter added)
      * ``AT#XACCEPT=<handle>,<timeout>`` (handle parameter added)
-     * ``AT#XSEND=<handle>[,<data>][,<flags>]`` (handle parameter added)
+     * ``AT#XSEND=<handle>,<mode>,<flags>[,<data>]`` (handle parameter added, mode parameter added, parameter order changed)
      * ``AT#XRECV=<handle>,<timeout>[,<flags>]`` (handle parameter added)
-     * ``AT#XSENDTO=<handle>,<url>,<port>[,<data>][,<flags>]`` (handle parameter added)
+     * ``AT#XSENDTO=<handle>,<mode>,<flags>,<url>,<port>[,<data>]`` (handle parameter added, mode parameter added, parameter order changed)
      * ``AT#XRECVFROM=<handle>,<timeout>[,<flags>]`` (handle parameter added)
 
    * **Response format changes:**
@@ -138,7 +152,7 @@ This provides more flexibility and clearer socket management by directly referen
 
         AT#XSOCKET=1,1,0          // Open socket, returns handle 1
         AT#XCONNECT=1,"server",80 // Connect socket handle 1
-        AT#XSEND=1,"data"         // Send on socket handle 1
+        AT#XSEND=1,0,0,"data"     // Send on socket handle 1
         AT#XSOCKET=1,1,0          // Open socket, returns handle 2
         AT#XCONNECT=2,"server",80 // Connect socket handle 2
         AT#XCLOSE=1               // Close socket handle 1
