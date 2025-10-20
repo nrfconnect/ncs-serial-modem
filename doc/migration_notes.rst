@@ -115,6 +115,20 @@ This provides more flexibility and clearer socket management by directly referen
     * Old syntax: ``AT#XSENDTO=<url>,<port>[,<data>][,<flags>]``
     * New syntax: ``AT#XSENDTO=<handle>,<mode>,<flags>,<url>,<port>[,<data>]``
 
+   * **AT#XRECV parameter changes:**
+
+    Added ``<handle>`` and ``<mode>`` parameters to the ``AT#XRECV`` command. Changed parameter order.
+
+    * Old syntax: ``AT#XRECV=<timeout>[,<flags>]``
+    * New syntax: ``AT#XRECV=<handle>,<mode>,<flags>,<timeout>``
+
+   * **AT#XRECVFROM parameter changes:**
+
+    Added ``<handle>`` and ``<mode>`` parameters to the ``AT#XRECVFROM`` command. Changed parameter order.
+
+    * Old syntax: ``AT#XRECVFROM=<timeout>[,<flags>]``
+    * New syntax: ``AT#XRECVFROM=<handle>,<mode>,<flags>,<timeout>``
+
    * **All socket operations now require handle parameter:**
 
      * ``AT#XSOCKETOPT=<handle>,<op>,<name>[,<value>]`` (handle parameter added)
@@ -124,9 +138,9 @@ This provides more flexibility and clearer socket management by directly referen
      * ``AT#XLISTEN=<handle>`` (handle parameter added)
      * ``AT#XACCEPT=<handle>,<timeout>`` (handle parameter added)
      * ``AT#XSEND=<handle>,<mode>,<flags>[,<data>]`` (handle parameter added, mode parameter added, parameter order changed)
-     * ``AT#XRECV=<handle>,<timeout>[,<flags>]`` (handle parameter added)
+     * ``AT#XRECV=<handle>,<mode>,<flags>,<timeout>`` (handle parameter added, mode parameter added, parameter order changed)
      * ``AT#XSENDTO=<handle>,<mode>,<flags>,<url>,<port>[,<data>]`` (handle parameter added, mode parameter added, parameter order changed)
-     * ``AT#XRECVFROM=<handle>,<timeout>[,<flags>]`` (handle parameter added)
+     * ``AT#XRECVFROM=<handle>,<mode>,<flags>,<timeout>`` (handle parameter added, mode parameter added, parameter order changed)
 
    * **Response format changes:**
 
@@ -149,6 +163,7 @@ This provides more flexibility and clearer socket management by directly referen
         AT#XSEND="data"           // Send on socket handle 1
         AT#XSOCKET=1,1,0          // Open socket, returns handle 2
         AT#XCONNECT="server",80   // Connect socket handle 2
+        AT#XRECV=10               // Receive data from socket handle 2 with 10s timeout, no flags
         AT#XSOCKETSELECT=1        // Select socket handle 1
         AT#XSOCKET=0              // Close selected socket handle 1
 
@@ -161,4 +176,5 @@ This provides more flexibility and clearer socket management by directly referen
         AT#XSEND=1,0,0,"data"     // Send on socket handle 1
         AT#XSOCKET=1,1,0          // Open socket, returns handle 2
         AT#XCONNECT=2,"server",80 // Connect socket handle 2
+        AT#XRECV=2,0,0,10         // Receive data from socket handle 2 with mode 0, no flags, 10s timeout
         AT#XCLOSE=1               // Close socket handle 1
