@@ -49,6 +49,12 @@ enum sm_socket_role {
 	AT_SOCKET_ROLE_SERVER
 };
 
+/**@brief Socket send modes. */
+enum sm_socket_send_mode {
+	AT_SOCKET_SEND_MODE_STRING,	/* String data in command */
+	AT_SOCKET_SEND_MODE_DATA	/* Enter data mode */
+};
+
 static char udp_url[SM_MAX_URL];
 static uint16_t udp_port;
 
@@ -1455,9 +1461,9 @@ static int handle_at_send(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 {
 	int err = -EINVAL;
 	int fd;
+	uint16_t mode;
 	char data[SM_MAX_PAYLOAD_SIZE + 1] = {0};
 	int size;
-	bool datamode = false;
 	struct sm_socket *sock = NULL;
 
 	switch (cmd_type) {
@@ -1470,35 +1476,35 @@ static int handle_at_send(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 		if (sock == NULL) {
 			return -EINVAL;
 		}
-		sock->send_flags = 0;
-		if (param_count > 2) {
-			size = sizeof(data);
-			err = util_string_get(parser, 2, data, &size);
-			if (err == -ENODATA) {
-				/* -ENODATA means data is empty so we go into datamode */
-				datamode = true;
-			} else if (err != 0) {
-				return err;
-			}
-			if (param_count > 3) {
-				err = at_parser_num_get(parser, 3, &sock->send_flags);
+		err = at_parser_num_get(parser, 2, &mode);
+		if (err) {
+			return err;
+		}
+		err = at_parser_num_get(parser, 3, &sock->send_flags);
+		if (err) {
+			return err;
+		}
+		if (mode == AT_SOCKET_SEND_MODE_STRING) {
+			if (param_count > 4) {
+				size = sizeof(data);
+				err = util_string_get(parser, 4, data, &size);
 				if (err) {
 					return err;
 				}
+			} else {
+				return -EINVAL; /* Missing string data */
 			}
-		} else {
-			datamode = true;
-		}
-		if (datamode) {
-			datamode_sock = sock;
-			err = enter_datamode(socket_datamode_callback);
-		} else {
 			err = do_send(sock, data, size, sock->send_flags);
 			if (err == size) {
 				err = 0;
 			} else {
 				err = err < 0 ? err : -EAGAIN;
 			}
+		} else if (mode == AT_SOCKET_SEND_MODE_DATA) {
+			datamode_sock = sock;
+			err = enter_datamode(socket_datamode_callback);
+		} else {
+			return -EINVAL;
 		}
 		break;
 
@@ -1556,9 +1562,9 @@ static int handle_at_sendto(enum at_parser_cmd_type cmd_type, struct at_parser *
 
 	int err = -EINVAL;
 	int fd;
+	uint16_t mode;
 	char data[SM_MAX_PAYLOAD_SIZE + 1] = {0};
 	int size;
-	bool datamode = false;
 	struct sm_socket *sock = NULL;
 
 	switch (cmd_type) {
@@ -1571,38 +1577,33 @@ static int handle_at_sendto(enum at_parser_cmd_type cmd_type, struct at_parser *
 		if (sock == NULL) {
 			return -EINVAL;
 		}
-		sock->send_flags = 0;
+		err = at_parser_num_get(parser, 2, &mode);
+		if (err) {
+			return err;
+		}
+		err = at_parser_num_get(parser, 3, &sock->send_flags);
+		if (err) {
+			return err;
+		}
 		size = sizeof(udp_url);
-		err = util_string_get(parser, 2, udp_url, &size);
+		err = util_string_get(parser, 4, udp_url, &size);
 		if (err) {
 			return err;
 		}
-		err = at_parser_num_get(parser, 3, &udp_port);
+		err = at_parser_num_get(parser, 5, &udp_port);
 		if (err) {
 			return err;
 		}
-		if (param_count > 4) {
-			size = sizeof(data);
-			err = util_string_get(parser, 4, data, &size);
-			if (err == -ENODATA) {
-				/* -ENODATA means data is empty so we go into datamode */
-				datamode = true;
-			} else if (err != 0) {
-				return err;
-			}
-			if (param_count > 5) {
-				err = at_parser_num_get(parser, 5, &sock->send_flags);
+		if (mode == AT_SOCKET_SEND_MODE_STRING) {
+			if (param_count > 6) {
+				size = sizeof(data);
+				err = util_string_get(parser, 6, data, &size);
 				if (err) {
 					return err;
 				}
+			} else {
+				return -EINVAL; /* Missing string data */
 			}
-		} else {
-			datamode = true;
-		}
-		if (datamode) {
-			datamode_sock = sock;
-			err = enter_datamode(socket_datamode_callback);
-		} else {
 			err = do_sendto(sock, udp_url, udp_port, data, size, sock->send_flags);
 			if (err == size) {
 				err = 0;
@@ -1610,6 +1611,11 @@ static int handle_at_sendto(enum at_parser_cmd_type cmd_type, struct at_parser *
 				err = err < 0 ? err : -EAGAIN;
 			}
 			memset(udp_url, 0, sizeof(udp_url));
+		} else if (mode == AT_SOCKET_SEND_MODE_DATA) {
+			datamode_sock = sock;
+			err = enter_datamode(socket_datamode_callback);
+		} else {
+			return -EINVAL;
 		}
 		break;
 
