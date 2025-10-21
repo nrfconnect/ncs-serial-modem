@@ -38,7 +38,7 @@ The ``<index>`` parameter corresponds to the following TWI instances:
 Example
 ~~~~~~~
 
-The following example is meant for Thingy:91.
+The following example is meant for Thingy:91 X.
 
 It shows that TWI2 (``i2c2``) is available.
 ::
@@ -98,7 +98,7 @@ There is no response.
 Example
 ~~~~~~~
 
-The following example is meant for Thingy:91.
+The following example is meant for Thingy:91 X.
 
 It performs a write operation to the device address ``0x76`` (BME680), and it writes ``D0`` to the device.
 ::
@@ -161,7 +161,7 @@ Response syntax
 Example
 ~~~~~~~
 
-The following example is meant for Thingy:91.
+The following example is meant for Thingy:91 X.
 
 It performs a read operation to the device address ``0x76`` (BME680), and it reads 1 byte from the device.
 The value returned (``61``) indicates ``0x61`` as the ``CHIP ID``.
@@ -232,7 +232,7 @@ Response syntax
 Examples
 ~~~~~~~~
 
-* The following example is meant for Thingy:91.
+* The following example is meant for Thingy:91 X.
 
   It performs a write-then-read operation to the device address ``0x76`` (BME680) to get the ``CHIP ID`` of the device.
   The value returned (``61``) indicates ``0x61`` as the ``CHIP ID``.
@@ -244,7 +244,7 @@ Examples
      #XTWIWR: 61
      OK
 
-* The following example is meant for Thingy:91.
+* The following example is meant for Thingy:91 X.
 
   It performs a write-then-read operation to the device address ``0x38`` (BH1749) to get the ``MANUFACTURER ID`` of the device.
   The value returned (``E0``) indicates ``0xE0`` as the ``MANUFACTURER ID`` of the device.

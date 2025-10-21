@@ -179,3 +179,12 @@ This provides more flexibility and clearer socket management by directly referen
         AT#XCONNECT=2,"server",80 // Connect socket handle 2
         AT#XRECV=2,0,0,10         // Receive data from socket handle 2 with mode 0, no flags, 10s timeout
         AT#XCLOSE=1               // Close socket handle 1
+
+Removed features
+****************
+
+This section lists features that have been removed from the |addon| compared to the |NCS| v3.1.x `Serial LTE modem (SLM) <Serial LTE modem_>`_.
+If you need any of those features with this |addon|, please contact customer support and describe your use case.
+
+   * Remove board support for the following chipsets: ``nrf9161dk/nrf9161/ns``, ``nrf9160dk/nrf9160/ns``, ``thingy91/nrf9160/ns`` and ``nrf9131ek/nrf9131/ns``.
+     * Use ``nrf9151dk/nrf9151/ns`` instead.

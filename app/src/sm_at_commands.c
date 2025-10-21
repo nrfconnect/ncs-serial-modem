@@ -96,7 +96,7 @@ bool sm_is_modem_functional_mode(enum lte_lc_func_mode mode)
 int sm_power_off_modem(void)
 {
 	/* "[...] there may be a delay until modem is disconnected from the network."
-	 * https://infocenter.nordicsemi.com/topic/ps_nrf9160/chapters/pmu/doc/operationmodes/system_off_mode.html
+	 * https://docs.nordicsemi.com/bundle/ps_nrf9151/page/chapters/pmu/doc/operationmodes/system_off_mode.html
 	 * This will return once the modem responds, which means it has actually stopped.
 	 * This has been observed to take between 1 and 2 seconds when it is not already stopped.
 	 */
