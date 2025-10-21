@@ -38,7 +38,7 @@ The ``<index>`` parameter corresponds to the following TWI instances:
 Example
 ~~~~~~~
 
-The following example is meant for Thingy:91.
+The following example is meant for Thingy:91 X.
 
 It shows that TWI2 (``i2c2``) is available.
 ::

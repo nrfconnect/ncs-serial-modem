@@ -70,9 +70,7 @@ The following table shows how to connect UART, DTR and RI pins of the DK to the 
       .. note::
          The GPIO output level on the nRF91 Series device side must be 3 V to work with the nRF52 Series DK.
 
-         * For nRF91x1 DK, you can set the VDD voltage with the `Board Configurator app`_.
-         * For nRF9160 DK, you can set the VDD voltage with the **VDD IO** switch (**SW9**).
-           See the `VDD supply rail section in the nRF9160 DK User Guide`_ for more information related to nRF9160 DK.
+         * For nRF9151 DK, you can set the VDD voltage with the `Board Configurator app`_.
 
    .. group-tab:: nRF5340 DK
 
@@ -99,9 +97,7 @@ The following table shows how to connect UART, DTR and RI pins of the DK to the 
       .. note::
          The GPIO output level on the nRF91 Series device side must be 3 V to work with the nRF53 Series DK.
 
-         * For nRF91x1 DK, you can set the VDD voltage with the `Board Configurator app`_.
-         * For nRF9160 DK, you can set the VDD voltage with the **VDD IO** switch (**SW9**).
-           See the `VDD supply rail section in the nRF9160 DK User Guide`_ for more information related to nRF9160 DK.
+         * For nRF9151 DK, you can set the VDD voltage with the `Board Configurator app`_.
 
    .. group-tab:: nRF7002 DK
 
@@ -128,15 +124,12 @@ The following table shows how to connect UART, DTR and RI pins of the DK to the 
       .. note::
          The GPIO output level on the nRF91 Series device side must be 1.8 V to work with the nRF7002 DK.
 
-         * For nRF91x1 DK, you can set the VDD voltage with the `Board Configurator app`_.
-         * For nRF9160 DK, you can set the VDD voltage with the **VDD IO** switch (**SW9**).
-           See the `VDD supply rail section in the nRF9160 DK User Guide`_ for more information related to nRF9160 DK.
+         * For nRF9151 DK, you can set the VDD voltage with the `Board Configurator app`_.
 
 References
 **********
 
 * `nRF91x1 AT Commands Reference Guide`_
-* `nRF9160 AT Commands Reference Guide`_
 * :ref:`SM_AT_commands`
 
 Dependencies
