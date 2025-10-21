@@ -8,27 +8,18 @@
 .. _`Getting started guide`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/installation.html
 
 .. _`nRF91x1 AT Commands Reference Guide`: https://docs.nordicsemi.com/bundle/ref_at_commands_nrf91x1/page/REF/at_commands/intro_nrf91x1.html
-.. _`nRF9160 AT Commands Reference Guide`: https://docs.nordicsemi.com/bundle/ref_at_commands/page/REF/at_commands/intro_nrf9160.html
 
 .. _`Thingy91X`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/device_guides/thingy91x/index.html#ug-thingy91x
-.. _`Thingy91`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/device_guides/thingy91/index.html#ug-thingy91
 .. _`nRF91 DK`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/device_guides/nrf91/index.html#ug-nrf91
-.. _`nrf9161dk`: https://docs.nordicsemi.com/bundle/ncs-latest/page/zephyr/boards/nordic/nrf9161dk/doc/index.html#nrf9161dk
-.. _`nrf9160dk`: https://docs.nordicsemi.com/bundle/ncs-latest/page/zephyr/boards/nordic/nrf9160dk/doc/index.html#nrf9160dk-nrf9160
 .. _`nrf9151dk`: https://docs.nordicsemi.com/bundle/ncs-latest/page/zephyr/boards/nordic/nrf9151dk/doc/index.html#nrf9151dk
-.. _`nrf9131ek`: https://docs.nordicsemi.com/bundle/ncs-latest/page/zephyr/boards/nordic/nrf9131ek/doc/index.html#nrf9131ek
 .. _`nRF7002dk`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/device_guides/nrf70/index.html#ug-nrf70-developing
 .. _`nRF5340 DK`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/device_guides/nrf53/index.html#ug-nrf5340
 .. _`nrf5340dk`: https://docs.nordicsemi.com/bundle/ncs-latest/page/zephyr/boards/nordic/nrf5340dk/doc/index.html#nrf5340dk
 .. _`nRF52840_DK`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/device_guides/nrf52/index.html#ug-nrf52
 .. _`nrf52840dk`: https://docs.nordicsemi.com/bundle/ncs-latest/page/zephyr/boards/nordic/nrf52840dk/doc/index.html#nrf52840dk
 .. _`nRF9151 Product Specification`: https://docs.nordicsemi.com/bundle/ps_nrf9151/page/nRF9151_html5_keyfeatures.html
-.. _`nRF9161 Product Specification`: https://docs.nordicsemi.com/bundle/ps_nrf9161/page/nRF9161_html5_keyfeatures.html
-.. _`nRF9160 Product Specification`: https://docs.nordicsemi.com/bundle/ps_nrf9160/page/nRF9160_html5_keyfeatures.html
-.. _`Thingy91_firmware_desktop_app`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/device_guides/thingy91/thingy91_updating_fw_celmon.html#programming-thingy
+.. _`Thingy91x_firmware_update`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/device_guides/thingy91x/thingy91x_updating_fw_programmer.html#updating_the_firmware_on_the_nrf5340_soc
 .. _`shared TF-M logging`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/device_guides/nrf91/nrf91_snippet.html#tfm-enable-share-uart
-.. _`nrf9160_board_revisions`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/device_guides/nrf91/nrf91_building.html#nrf9160-board-revisions
-.. _`VDD supply rail section in the nRF9160 DK User Guide`: https://docs.nordicsemi.com/bundle/ug_nrf9160_dk/page/UG/nrf91_DK/hw_description/power_sources_vdd.html
 
 .. _`app_boards_names`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/board_names.html#app-boards-names
 .. _`Configuring and building`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/security/tfm/index.html#ug-tfm
@@ -73,7 +64,6 @@
 .. _`nRF Cloud location`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/networking/nrf_cloud_location.html
 .. _`Modem library`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrfxlib/nrf_modem/README.html
 .. _`Trusted Firmware-M`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/security/tfm/index.html
-.. _`nRF9160dk_nRF52840`: https://docs.nordicsemi.com/bundle/ncs-latest/page/zephyr/boards/nordic/nrf9160dk/doc/index.html#nrf9160dk-nrf52840
 .. _`Zephyr’s Cellular modem`: https://docs.nordicsemi.com/bundle/ncs-latest/page/zephyr/samples/net/cellular_modem/README.html
 .. _`Custom AT commands`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/modem/at_cmd_custom.html
 .. _`nrfxlib_nrf_sockets`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrfxlib/nrf_modem/doc/sockets.html#nrf-sockets

@@ -19,7 +19,7 @@ However, if you want to run your application on a different chip and use the nRF
 The application accepts both the modem specific AT commands and proprietary AT commands.
 The AT commands are documented in the following guides:
 
-* Modem specific AT commands - `nRF91x1 AT Commands Reference Guide`_  and `nRF9160 AT Commands Reference Guide`_
+* Modem specific AT commands - `nRF91x1 AT Commands Reference Guide`_
 * Proprietary AT commands - :ref:`SM_AT_commands`
 
 Requirements
@@ -35,30 +35,14 @@ The application supports the following development kits:
      - PCA
      - Board name
      - Board target
-   * - `Thingy:91 X <Thingy91X_>`_
-     - PCA20065
-     - `thingy91x <Thingy91X_>`_
-     - ``thingy91x/nrf9151/ns``
-   * - `Thingy:91 <Thingy91_>`_
-     - PCA20035
-     - `thingy91 <Thingy91_>`_
-     - ``thingy91/nrf9160/ns``
-   * - `nRF9161 DK <nRF91 DK_>`_
-     - PCA10153
-     - `nrf9161dk`_
-     - ``nrf9161dk/nrf9161/ns``
-   * - `nRF9160 DK <nRF91 DK_>`_
-     - PCA10090
-     - `nrf9160dk`_
-     - ``nrf9160dk/nrf9160/ns``
    * - `nRF9151 DK <nRF91 DK_>`_
      - PCA10171
      - `nrf9151dk`_
      - ``nrf9151dk/nrf9151/ns``
-   * - `nRF9131 EK <nRF91 DK_>`_
-     - PCA10165
-     - `nrf9131ek`_
-     - ``nrf9131ek/nrf9131/ns``
+   * - `Thingy:91 X <Thingy91X_>`_
+     - PCA20065
+     - `thingy91x <Thingy91X_>`_
+     - ``thingy91x/nrf9151/ns``
 
 For more security, it is recommended to use the ``*/ns`` `variant <app_boards_names_>`_ of the board target.
 When built for this variant, the sample is configured to compile and run as a non-secure application using `security by separation <ug_tfm_security_by_separation_>`_.
@@ -125,11 +109,7 @@ CONFIG_SM_NATIVE_TLS_CREDENTIAL_BUFFER_COUNT - Number of buffers for loading cre
 
 CONFIG_SM_EXTERNAL_XTAL - Use external XTAL for UARTE
    This option configures the application to use an external XTAL for UARTE.
-   For more information, see the UARTE - Universal asynchronous receiver/transmitter with EasyDMA section of the following documentation:
-
-   * `nRF9151 Product Specification`_
-   * `nRF9161 Product Specification`_
-   * `nRF9160 Product Specification`_
+   For more information, see the UARTE - Universal asynchronous receiver/transmitter with EasyDMA section of the `nRF9151 Product Specification`_ documentation.
 
 .. _CONFIG_SM_AUTO_CONNECT:
 
@@ -309,18 +289,13 @@ The following configuration files are provided:
 * :file:`prj.conf` - This configuration file contains the standard configuration for the |SM| application and is included by default by the build system.
 
 * :file:`overlay-external-mcu.overlay` - This configures the |SM| application to communicate with external MCU over ``uart2``, using specific pins for UART, DTR, and RI.
-  The overlay is pin compatible with nRF9160DK, nRF9151DK, and nRF9161DK.
+  The overlay is pin compatible with nRF9151DK.
   For other setups, you can customize the overlay to fit your configuration.
 
 * :file:`overlay-native_tls.conf` - This configuration file contains additional configuration options that are required to use :ref:`sm_native_tls`.
-  Not supported with the ``thingy91/nrf9160/ns`` board target due to flash memory constraints.
-  If you need to use native TLS with Thingy:91, you must disable features to free up flash memory.
 
 * :file:`overlay-carrier.conf` - Configuration file that adds |NCS| `LwM2M carrier`_ support.
   See :ref:`sm_carrier_library_support` for more information on how to connect to an operator's device management platform.
-  With the ``thingy91/nrf9160/ns`` board target, you must additionally pass the sysbuild option ``-DSB_CONFIG_THINGY91_STATIC_PARTITIONS_LWM2M_CARRIER=y`` to fit the application in the flash memory.
-  This means that you will need an external debug probe to program the application.
-  See the `Updating the Thingy:91 firmware using nRF Connect for Desktop apps <Thingy91_firmware_desktop_app_>`_ for more information.
 
 * :file:`overlay-carrier-softbank.conf` and :file:`sysbuild-softbank.conf` - Configuration files that add SoftBank configurations needed by the carrier library.
   Used in conjunction with :file:`overlay-carrier.conf`.
@@ -354,7 +329,7 @@ The following configuration files are provided:
   This overlay can be used if your setup does not have the need or means for managing the power externally.
   Modify the overlay to fit your configuration.
 
-* :file:`overlay-zephyr-modem.conf`, :file:`overlay-zephyr-modem-external-mcu.overlay`, :file:`overlay-zephyr-modem-nrf9160dk-nrf52840.conf`, and :file:`overlay-zephyr-modem-nrf9160dk-nrf52840.overlay` - These configuration files are used when compiling |SM| to turn an nRF91 Series SiP into a Zephyr-compatible standalone modem.
+* :file:`overlay-zephyr-modem.conf` and :file:`overlay-zephyr-modem-external-mcu.overlay` - These configuration files are used when compiling |SM| to turn an nRF91 Series SiP into a Zephyr-compatible standalone modem.
   See :ref:`sm_as_zephyr_modem` for more information.
 
 The board-specific devicetree overlays (:file:`boards/*.overlay`) set up configurations that are specific to each supported development kit.
@@ -458,13 +433,13 @@ Connecting with an external MCU
 
 .. note::
 
-   This section does not apply to Thingy:91, Thingy:91 X, or nRF9131 EK.
+   This section does not apply to Thingy:91 X.
 
 If you run your user application on an external MCU (for example, an nRF52 Series development kit), you can control the |SM| application on an nRF91 Series device directly from the application.
 See the :ref:`sm_shell_sample` for a sample implementation of such an application.
 
 To connect with an external MCU using UART_2, include the :file:`overlay-external-mcu.overlay` devicetree overlay in your build.
-This overlay configures the UART_2 pins, DTR pin, and RI pin for the nRF9160 DK, nRF9151 DK, and nRF9161 DK.
+This overlay configures the UART_2 pins, DTR pin, and RI pin for the nRF9151 DK.
 
 If you use a different setup, you can customize the :file:`overlay-external-mcu.overlay` file to match your hardware configuration in (for example) the following ways:
 
@@ -576,35 +551,29 @@ By default the |SM| application and :ref:`sm_shell_sample` use the following set
 .. note::
    The GPIO output level on the nRF91 Series device side must be 3 V.
 
-   * For nRF91x1 DK, you can set the VDD voltage with the `Board Configurator app`_.
-   * For nRF9160 DK, you can set the VDD voltage with the **VDD IO** switch (**SW9**).
-     See the `VDD supply rail section in the nRF9160 DK User Guide`_ for more information related to nRF9160 DK.
+   * For nRF9151 DK, you can set the VDD voltage with the `Board Configurator app`_.
 
-.. _sm_connecting_thingy91:
+Communicating with the modem on Thingy:91 X
+===========================================
 
-Communicating with the modem on Thingy:91
-=========================================
-
-In this scenario, Thingy:91 running the |SM| application serves as the host.
+In this scenario, Thingy:91 X running the |SM| application serves as the host.
 You can use a PC as a client.
-
-.. _sm_connecting_thingy91_pc:
 
 Connecting with a PC
 --------------------
 
-The nRF52840 SoC of Thingy:91 is pre-programmed with the `Connectivity bridge`_ application.
-To update the Connectivity bridge application, see the `Updating the Thingy:91 firmware using nRF Connect for Desktop apps <Thingy91_firmware_desktop_app_>`_  documentation.
-The Connectivity bridge application routes ``UART_0`` to ``USB_CDC0`` on Thingy:91.
+The nRF5340 SoC of Thingy:91 X is pre-programmed with the `Connectivity bridge`_ application.
+To update the Connectivity bridge application, see the `Updating the Thingy:91 X firmware using nRF Util <Thingy91x_firmware_update_>`_  documentation.
+The Connectivity bridge application routes ``UART_0`` to ``USB_CDC0`` on Thingy:91 X.
 By enabling the ``CONFIG_BRIDGE_BLE_ENABLE`` Kconfig option in the Connectivity bridge application, you can also use |SM| over `Nordic UART Service (NUS) <Nordic UART Service_>`_.
 
-To connect to a Thingy:91 with a PC:
+To connect to a Thingy:91 X with a PC:
 
 .. include:: sm_description.rst
    :start-after: .. sm_connecting_91dk_pc_instr_start
    :end-before: .. sm_connecting_91dk_pc_instr_end
 
-You can also test the i2c sensor on Thingy:91 using :ref:`SM_AT_TWI`.
+You can also test the i2c sensor on Thingy:91 X using :ref:`SM_AT_TWI`.
 See :ref:`sm_testing_twi` for more details.
 
 .. _sm_testing_section:

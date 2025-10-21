@@ -1556,7 +1556,7 @@ Complete the following steps to test the functionality provided by the :ref:`SM_
 TWI AT commands
 ***************
 
-Complete the following steps to test the functionality provided by the i2c sensors on the Thingy:91 or Thingy:91 X using the two-wire interface (TWI):
+Complete the following steps to test the functionality provided by the i2c sensors on the Thingy:91 X using the two-wire interface (TWI):
 
 1. Test the TWI list command using ``AT#XTWILS``.
    As the device connects to the sensors through i2c2, it shows that TWI2 is available:

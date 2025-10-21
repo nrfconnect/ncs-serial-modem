@@ -15,9 +15,6 @@ This means that the controlling chip can run a Zephyr application that seamlessl
 
 This is made possible by |SM|'s support of CMUX and PPP and Zephyr's cellular modem driver.
 
-The `nRF52840 SoC present in the nRF9160 DK <nRF9160dk_nRF52840_>`_ can even be made to be the controlling chip with the appropriate configuration (described below).
-This is only possible on the nRF9160 DK, not on the other nRF91 Series DKs.
-
 .. note::
 
    It is not yet possible to make use of the nRF91 Series' GNSS functionality when Zephyr's cellular modem driver controls the SiP.
@@ -49,12 +46,6 @@ In addition, if the controlling chip is an external MCU, the following configura
   On the controlling chip, running Zephyr, the power GPIO is configured with the ``mdm-power-gpios``.
   This overlay also sets the DTR pin to be always asserted, as the Zephyr's cellular modem driver does not currently manage it.
 
-Or, if the controlling chip is the nRF52840 of the nRF9160 DK, the following files must also be included:
-
-* :file:`overlay-zephyr-modem-nrf9160dk-nrf52840.overlay` - To configure the UART, DTR, and RI pins, to be routed between the nRF9160 and the nRF52840 of the DK.
-  This overlay also sets the DTR pin to be always asserted, as the Zephyr's cellular modem driver does not currently manage it.
-  Note that there is no power pin as there are not enough GPIOs available to use it.
-
 Finally, if you want more verbose logging that includes the AT commands and responses, you can enable debug logging by uncommenting ``CONFIG_SM_LOG_LEVEL_DBG=y`` in the :file:`prj.conf` configuration file.
 
 Controlling chip running Zephyr
@@ -65,7 +56,7 @@ Configuration files found in `Zephyr’s Cellular modem`_ sample are a good star
 Specifically, regardless of what the controlling chip is, the Kconfig options found in the following files are needed:
 
 * :file:`prj.conf` - This file enables various Zephyr APIs, most of which are needed for proper functioning of the application.
-* :file:`boards/nrf9160dk_nrf9160_ns.conf` (or :file:`boards/nrf9160dk_nrf52840.conf`) - This file tailors the configuration of the modem subsystem and driver to the |SM|.
+* :file:`boards/nrf91601dk_nrf9160_ns.conf`  - This file tailors the configuration of the modem subsystem and driver to the |SM|.
   It makes the application's logs be output on UART 0 and also enables the debug logs of the cellular modem driver.
   If you do not want the debug logs output by the driver, you may turn them off by removing ``CONFIG_MODEM_LOG_LEVEL_DBG=y``.
 
@@ -75,10 +66,6 @@ They define the modem along with the UART it is connected to and its power pin.
 If the controlling chip is an external MCU:
 
 * :file:`boards/nrf9160dk_nrf9160_ns.overlay` - The UART configuration and power pin can be customized according to your setup.
-
-If the controlling chip is the nRF52840 of the nRF9160 DK:
-
-* :file:`boards/nrf9160dk_nrf52840.overlay` - The UART and power pin are configured to be routed to the nRF9160.
 
 Developing the Zephyr application
 *********************************
@@ -98,26 +85,16 @@ To set the modem to the desired system mode, issue an ``AT%XSYSTEMMODE`` command
 For example, to enable only LTE-M, issue the following command: ``AT%XSYSTEMMODE=1,0,0,0``
 You need to do this because the modem's system mode is not automatically set at any point, so the one already configured will be used.
 
-Additionally, if the controlling chip is an external MCU:
-
-* Make sure that the UART and the power pin are wired according to how they are configured in both the external MCU and the nRF91 Series SiP.
-
-Or if the controlling chip is the nRF52840 of the nRF9160 DK:
-
-* Make sure that the **PROG/DEBUG SW10** switch on the DK is set to **NRF91** when flashing |SM|, and to **NRF52** when flashing the Zephyr application.
-  The switch also affects which chip is reset when the Reset button is pressed.
-* No wiring is needed as the routing between the pins happens internally.
+Additionally, if the controlling chip is an external MCU, make sure that the UART and the power pin are wired according to how they are configured in both the external MCU and the nRF91 Series SiP.
 
 To observe the operation sequence, you can view the application logs coming from both chips.
 
 By default, |SM| will output its logs through RTT, and the Zephyr application running on the controlling chip through its UART 0.
 The RTT logs can be seen with an RTT client such as ``JLinkRTTViewer``.
-If |SM| is running on the nRF9160 DK, the **PROG/DEBUG SW10** switch needs to be set to **NRF91** to be able to receive the RTT logs.
 However, for convenience you may want to redirect |SM|'s logs to the SiP's UART 0 so that you do not need to reconnect the RTT client every time the board is reset.
 See the :ref:`sm_additional_config` section for information on how to do this.
 
 The logs output through UART can be seen by connecting to the appropriate UART with a serial communication program.
-Under Linux, if the controlling chip is the nRF52840 of the nRF9160 DK, the device file of its UART 0 will typically be :file:`/dev/ttyACM1`.
 
 After both applications have been flashed to their respective chips and you are connected to receive logs, you can reset the controlling chip.
 When the Zephyr application starts up, the following happens:
