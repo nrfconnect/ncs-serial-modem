@@ -55,6 +55,13 @@ The following changes are mandatory to make your application work in the same wa
    * Removed the ``AT#XPOLL`` command.
      Use ``AT#XAPOLL`` instead.
 
+   * Removed the native TLS overlay, TCP and UDP server AT commands:
+
+     * ``AT#XTCPSVR``
+     * ``AT#XTCPHANGUP``
+     * ``AT#XUDPSVR``
+     There is no direct replacement for these commands.
+
 DTR and RI GPIOs replace Power and Indicate pins
 ------------------------------------------------
 

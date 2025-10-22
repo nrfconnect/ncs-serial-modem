@@ -11,7 +11,6 @@
 #include "sm_trap_macros.h"
 
 #define INVALID_SOCKET       -1
-#define INVALID_ROLE         -1
 #define INVALID_DTLS_CID     -1
 
 enum {
