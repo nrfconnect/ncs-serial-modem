@@ -29,7 +29,7 @@ config SM_EXTERNAL_XTAL
 #
 choice
 	prompt "Termination mode"
-	default SM_CR_LF_TERMINATION
+	default SM_CR_TERMINATION
 	help
 	  Sets the command terminator used by the serial terminal.
 	  Available options are:

@@ -46,9 +46,9 @@ Optionally configure the following Kconfig options based on need:
 
 Use one of the following options to select the termination character:
 
-* ``CONFIG_SM_HOST_CR_TERMINATION`` - Enables ``<CR>`` as the termination character.
+* ``CONFIG_SM_HOST_CR_TERMINATION`` - Enables ``<CR>`` as the termination character, which is selected by default.
 * ``CONFIG_SM_HOST_LF_TERMINATION`` - Enables ``<LF>`` as the termination character.
-* ``CONFIG_SM_HOST_CR_LF_TERMINATION`` - Enables ``<CR+LF>`` as the termination character, which is selected by default.
+* ``CONFIG_SM_HOST_CR_LF_TERMINATION`` - Enables ``<CR+LF>`` as the termination character.
 
 You must configure the same termination character as that configured in |SM| on the nRF91 Series SiP.
 The library sends the termination character automatically after an AT command.

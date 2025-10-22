@@ -159,6 +159,7 @@ CONFIG_SM_AUTO_CONNECT - Connect to the network at start-up or reset
 
 CONFIG_SM_CR_TERMINATION - CR termination
    This option configures the application to accept AT commands ending with a carriage return.
+   This is the default AT command terminator.
 
    Select this option if you want to connect to the development kit using PuTTY.
    See `Testing and optimization`_  for instructions.
@@ -443,11 +444,10 @@ To connect to an nRF91 Series DK with a PC:
 
    .. note::
 
-      The default AT command terminator is a carriage return followed by a line feed (``\r\n``).
-      The Serial Terminal app supports this format.
-      If you want to use another terminal emulator, make sure that the configured AT command terminator corresponds to the line terminator of your terminal.
-      When using PuTTY, you must set the :ref:`CONFIG_SM_CR_TERMINATION <CONFIG_SM_CR_TERMINATION>` |SM| configuration option.
-      See :ref:`sm_config_options` for more details.
+      The default AT command terminator is a carriage return (``\r``).
+      The Serial Terminal app, PuTTY and many terminal emulators support this format by default.
+      However, make sure that the configured AT command terminator corresponds to the line terminator of your terminal.
+      See :ref:`sm_config_options` for more details on AT command terminator choices.
 
 .. sm_connecting_91dk_pc_instr_end
 

@@ -47,6 +47,8 @@ The following changes are mandatory to make your application work in the same wa
      * Renamed the file name from ``slm_`` to ``sm_`` and ``modem_slm`` to ``sm_host``.
      * Functions and other symbols in the code have been renamed accordingly making automatic patching to likely fail.
 
+   * Default AT command terminator changed from ``\r\n`` (``CONFIG_SM_CR_LF_TERMINATION`` and ``CONFIG_SM_HOST_CR_LF_TERMINATION``) to ``\r`` (``CONFIG_SM_CR_TERMINATION`` and ``CONFIG_SM_HOST_CR_TERMINATION``).
+
    * Rename the following AT commands:
 
      * ``AT#GPS`` to ``AT#GNSS``
