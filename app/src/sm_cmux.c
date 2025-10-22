@@ -38,8 +38,8 @@ static struct {
 
 	/* CMUX */
 	struct modem_cmux instance;
-	uint8_t cmux_receive_buf[CONFIG_MODEM_CMUX_WORK_BUFFER_SIZE];
-	uint8_t cmux_transmit_buf[CONFIG_MODEM_CMUX_WORK_BUFFER_SIZE];
+	uint8_t cmux_receive_buf[MODEM_CMUX_WORK_BUFFER_SIZE];
+	uint8_t cmux_transmit_buf[MODEM_CMUX_WORK_BUFFER_SIZE];
 
 	/* CMUX channels (Data Link Connection Identifier); index = address - 1 */
 	struct cmux_dlci {
