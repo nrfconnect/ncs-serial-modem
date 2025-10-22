@@ -55,7 +55,7 @@ config SM_HOST_SHELL
 
 choice
 	prompt "AT command terminator"
-	default SM_HOST_CR_LF_TERMINATION
+	default SM_HOST_CR_TERMINATION
 	help
 	  Sets the termination ending from the serial terminal
 	  Levels are:
