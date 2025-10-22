@@ -441,6 +441,11 @@ static void tx_write_nonblock_fn(struct k_work *)
 		return;
 	}
 
+	if (in_datamode()) {
+		/* Do not send URCs in datamode. */
+		return;
+	}
+
 	/* Do not lock the URC mutex.
 	 * This is the only reader and URC context ownership cannot be transferred as we
 	 * are in the same work queue that processes AT-commands.
