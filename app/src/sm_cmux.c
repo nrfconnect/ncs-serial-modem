@@ -198,6 +198,10 @@ static void nonblock_tx_work_fn(struct k_work *work)
 		LOG_ERR("No URC context");
 		return;
 	}
+	if (in_datamode()) {
+		/* Do not send URCs in datamode. */
+		return;
+	}
 
 	/* Do not lock the URC mutex. */
 	do {

@@ -12,7 +12,8 @@ The |SM| (SM) application can run in the two operation modes defined by the AT c
 When running in data mode, the application does the following:
 
 * It considers all the data received from the MCU over the UART bus as arbitrary data to be streamed through the LTE network by various service modules.
-* It considers all the data streamed from a remote service as arbitrary data to be sent to the MCU over the UART bus.
+* It buffers the URCs received from modem and threads and sends them to the MCU only after exiting data mode.
+* For TLS and UDP client (and servers), it considers all the data streamed from a remote service as arbitrary data to be sent to the MCU over the UART bus.
 
 Overview
 ********

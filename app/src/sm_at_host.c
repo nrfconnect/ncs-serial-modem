@@ -133,6 +133,9 @@ static bool exit_datamode(void)
 
 	k_mutex_unlock(&mutex_mode);
 
+	/* Flush the TX buffer. */
+	sm_tx_write(NULL, 0, true, K_NO_WAIT);
+
 	return ret;
 }
 
@@ -725,20 +728,14 @@ AT_MONITOR(at_notify, ANY, notification_handler);
 
 static void notification_handler(const char *notification)
 {
-	if (get_sm_mode() == SM_AT_COMMAND_MODE) {
-
 #if defined(CONFIG_SM_PPP)
-		if (!sm_fwd_cgev_notifs
-		 && !strncmp(notification, "+CGEV: ", strlen("+CGEV: "))) {
-			/* CGEV notifications are silenced. Do not forward them. */
-			return;
-		}
-#endif
-		sm_at_send_internal(CRLF_STR, strlen(CRLF_STR), SM_DEBUG_PRINT_FULL);
-		sm_at_send_str(notification);
-	} else {
-		LOG_DBG("Drop notification: %s", notification);
+	if (!sm_fwd_cgev_notifs && !strncmp(notification, "+CGEV: ", strlen("+CGEV: "))) {
+		/* CGEV notifications are silenced. Do not forward them. */
+		return;
 	}
+#endif
+	sm_at_send_internal(CRLF_STR, strlen(CRLF_STR), SM_DEBUG_PRINT_FULL);
+	sm_at_send_str(notification);
 }
 
 void rsp_send_ok(void)
