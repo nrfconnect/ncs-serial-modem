@@ -16,20 +16,11 @@
 #include "sm_at_host.h"
 #include "sm_at_socket.h"
 #include "sm_sockopt.h"
-#if defined(CONFIG_SM_NATIVE_TLS)
-#include "sm_native_tls.h"
-#endif
 
 LOG_MODULE_REGISTER(sm_sock, CONFIG_SM_LOG_LEVEL);
 
 #define SM_FDS_COUNT CONFIG_POSIX_OPEN_MAX
 #define SM_MAX_SOCKET_COUNT (SM_FDS_COUNT - 1)
-
-/*
- * Known limitation in this version
- * - Multiple concurrent sockets
- * - TCP server accept one connection only
- */
 
 /**@brief Socket operations. */
 enum sm_socket_operation {
@@ -262,20 +253,6 @@ static int do_secure_socket_open(struct sm_socket *sock, int peer_verify)
 	}
 	sock->fd = ret;
 
-#if defined(CONFIG_SM_NATIVE_TLS)
-	ret = sm_native_tls_load_credentials(sock->sec_tag);
-	if (ret < 0) {
-		LOG_ERR("Failed to load sec tag: %d (%d)", sock->sec_tag, ret);
-		goto error;
-	}
-	int tls_native = 1;
-
-	/* Must be the first socket option to set. */
-	ret = zsock_setsockopt(sock->fd, SOL_TLS, TLS_NATIVE, &tls_native, sizeof(tls_native));
-	if (ret) {
-		goto error;
-	}
-#endif
 	struct timeval tmo = {.tv_sec = SOCKET_SEND_TMO_SEC};
 
 	ret = zsock_setsockopt(sock->fd, SOL_SOCKET, SO_SNDTIMEO, &tmo, sizeof(tmo));

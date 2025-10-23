@@ -32,9 +32,6 @@
 #include "sm_at_icmp.h"
 #include "sm_at_sms.h"
 #include "sm_at_fota.h"
-#if defined(CONFIG_SM_NATIVE_TLS)
-#include "sm_at_cmng.h"
-#endif
 #if defined(CONFIG_SM_NRF_CLOUD)
 #include "sm_at_nrfcloud.h"
 #endif
@@ -379,12 +376,12 @@ int sm_at_init(void)
 
 	err = sm_at_tcp_proxy_init();
 	if (err) {
-		LOG_ERR("%s initialization failed (%d).", "TCP Server", err);
+		LOG_ERR("%s initialization failed (%d).", "TCP client", err);
 		return -EFAULT;
 	}
 	err = sm_at_udp_proxy_init();
 	if (err) {
-		LOG_ERR("%s initialization failed (%d).", "UDP Server", err);
+		LOG_ERR("%s initialization failed (%d).", "UDP client", err);
 		return -EFAULT;
 	}
 	err = sm_at_socket_init();
@@ -494,11 +491,11 @@ void sm_at_uninit(void)
 
 	err = sm_at_tcp_proxy_uninit();
 	if (err) {
-		LOG_WRN("%s uninitialization failed (%d).", "TCP Server", err);
+		LOG_WRN("%s uninitialization failed (%d).", "TCP client", err);
 	}
 	err = sm_at_udp_proxy_uninit();
 	if (err) {
-		LOG_WRN("%s uninitialization failed (%d).", "UDP Server", err);
+		LOG_WRN("%s uninitialization failed (%d).", "UDP client", err);
 	}
 	err = sm_at_socket_uninit();
 	if (err) {
