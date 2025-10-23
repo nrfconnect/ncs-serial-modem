@@ -905,7 +905,8 @@ Syntax
 * The ``<mode>`` parameter specifies the data sending mode:
 
   * ``0`` - String mode. Data is provided directly in the command as the ``<data>`` parameter.
-  * ``1`` - Data mode. |SM| enters ``sm_data_mode`` for data input.
+  * ``1`` - Hex string mode. Data is provided as a hexadecimal string in the ``<data>`` parameter.
+  * ``2`` - Data mode. |SM| enters ``sm_data_mode`` for data input.
 
 * The ``<flags>`` parameter sets the sending behavior.
   It can be set to the following value:
@@ -915,10 +916,12 @@ Syntax
     The request will not return until the send operation is completed by lower layers, or until the timeout given by the AT_SO_SNDTIMEO socket option, is reached.
     Valid timeout values are 1 to 600 seconds.
 
-* The ``<data>`` parameter is required when ``<mode>`` is ``0`` (string mode).
-  It is a string that contains the data to be sent.
-  The maximum size of the data is 1024 bytes.
-  This parameter is not used when ``<mode>`` is ``1`` (data mode).
+* The ``<data>`` parameter is required when ``<mode>`` is ``0`` (string mode) or ``1`` (hex string mode).
+  For string mode (``0``), it is a string that contains the data to be sent.
+  For hex string mode (``1``), it is a hexadecimal string representation of the data to be sent.
+  The maximum payload size in hexadecimal string mode is up to 2800 characters (1400 bytes).
+  For large packets, it is recommended to use data mode (``2``) since AT parser's memory limits the maximum size of data that can be sent in string or hex string modes.
+  This parameter is not used when ``<mode>`` is ``2`` (data mode).
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -941,7 +944,11 @@ Example
    #XSEND: 0,8
    OK
 
-   AT#XSEND=1,1,512
+   AT#XSEND=0,1,0,"48656C6C6F"
+   #XSEND: 0,5
+   OK
+
+   AT#XSEND=1,2,512
    OK
    Test datamode with flags
    +++
@@ -975,7 +982,10 @@ Syntax
 
 * The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
 
-* The ``<mode>`` parameter specifies the receive mode (reserved for future use, currently should be set to ``0``).
+* The ``<mode>`` parameter specifies the receive mode:
+
+  * ``0`` - Binary mode. Data is received as binary data.
+  * ``1`` - Hex string mode. Data is received as a hexadecimal string representation.
 
 * The ``<flags>`` parameter sets the receiving behavior based on the BSD socket definition.
   It can be set to one of the following values:
@@ -993,14 +1003,17 @@ Response syntax
 
 ::
 
-   #XRECV: <handle>,<size>
+   #XRECV: <handle>,<mode>,<size>
    <data>
 
 * The ``<handle>`` value is an integer indicating the socket handle.
 
+* The ``<mode>`` value is an integer indicating the receive mode used.
+
 * The ``<data>`` value is a string that contains the data being received.
 
 * The ``<size>`` value is an integer that represents the actual number of bytes received.
+  In case of hex string mode, it represents the number of bytes before conversion to hexadecimal format.
 
 Example
 ~~~~~~~~
@@ -1008,8 +1021,13 @@ Example
 ::
 
    AT#XRECV=0,0,0,10
-   #XRECV: 0,7
+   #XRECV: 0,0,7
    Test OK
+   OK
+
+   AT#XRECV=0,1,0,10
+   #XRECV: 0,1,5
+   74205A6F63
    OK
 
 Read command
@@ -1044,7 +1062,8 @@ Syntax
 * The ``<mode>`` parameter specifies the data sending mode:
 
   * ``0`` - String mode. Data is provided directly in the command as the ``<data>`` parameter.
-  * ``1`` - Data mode. |SM| enters ``sm_data_mode`` for data input.
+  * ``1`` - Hex string mode. Data is provided as a hexadecimal string in the ``<data>`` parameter.
+  * ``2`` - Data mode. |SM| enters ``sm_data_mode`` for data input.
 
 * The ``<flags>`` parameter sets the sending behavior.
   It can be set to the following value:
@@ -1062,10 +1081,14 @@ Syntax
 * The ``<port>`` parameter is an unsigned 16-bit integer (0 - 65535).
   It represents the port of the UDP service on remote peer.
 
-* The ``<data>`` parameter is required when ``<mode>`` is ``0`` (string mode).
-  It is a string that contains the data to be sent.
-  Its maximum size is 1024 bytes.
-  This parameter is not used when ``<mode>`` is ``1`` (data mode).
+* The ``<data>`` parameter is required when ``<mode>`` is ``0`` (string mode) or ``1`` (hex string mode).
+  For string mode (``0``), it is a string that contains the data to be sent.
+  For hex string mode (``1``), it is a hexadecimal string representation of the data to be sent.
+  The maximum payload size in hexadecimal string mode is up to 2800 characters (1400 bytes).
+  For large packets, it is recommended to use data mode (``2``) since AT parser's memory limits the maximum size of data that can be sent in string or hex string modes.
+  This parameter is not used when ``<mode>`` is ``2`` (data mode).
+
+* UDP packets that exceed 1500 bytes, including headers, may be dropped by the network due to MTU (Maximum Transmission Unit) restrictions.
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -1086,6 +1109,10 @@ Example
 
    AT#XSENDTO=0,0,0,"test.server.com",1234,"Test UDP"
    #XSENDTO: 0,8
+   OK
+
+   AT#XSENDTO=0,1,0,"test.server.com",1234,"48656C6C6F"
+   #XSENDTO: 0,5
    OK
 
 Read command
@@ -1117,7 +1144,10 @@ Syntax
 
 * The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
 
-* The ``<mode>`` parameter specifies the receive mode (reserved for future use, currently should be set to ``0``).
+* The ``<mode>`` parameter specifies the receive mode:
+
+  * ``0`` - Binary mode. Data is received as binary data.
+  * ``1`` - Hex string mode. Data is received as a hexadecimal string representation.
 
 * The ``<flags>`` parameter sets the receiving behavior based on the BSD socket definition.
   It can be set to one of the following values:
@@ -1134,14 +1164,17 @@ Response syntax
 
 ::
 
-   #XRECVFROM: <handle>,<size>,"<ip_addr>",<port>
+   #XRECVFROM: <handle>,<mode>,<size>,"<ip_addr>",<port>
    <data>
 
 * The ``<handle>`` value is an integer indicating the socket handle.
 
+* The ``<mode>`` value is an integer indicating the receive mode used.
+
 * The ``<data>`` value is a string that contains the data being received.
 
 * The ``<size>`` value is an integer that represents the actual number of bytes received.
+  In case of hex string mode, it represents the number of bytes before conversion to hexadecimal format.
 
 * The ``<ip_addr>`` value is a string that represents the IPv4 or IPv6 address of the remote peer.
 
@@ -1153,8 +1186,13 @@ Example
 ::
 
    AT#XRECVFROM=0,0,0,10
-   #XRECVFROM: 0,7,"192.168.1.100",24210
+   #XRECVFROM: 0,0,7,"192.168.1.100",24210
    Test OK
+   OK
+
+   AT#XRECVFROM=0,1,0,10
+   #XRECVFROM: 0,1,7,"192.168.1.100",24210
+   54657374205A4D
    OK
 
 Read command
