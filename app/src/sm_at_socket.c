@@ -51,13 +51,15 @@ enum sm_socket_role {
 
 /**@brief Socket send modes. */
 enum sm_socket_send_mode {
-	AT_SOCKET_SEND_MODE_STRING,	/* String data in command */
-	AT_SOCKET_SEND_MODE_DATA	/* Enter data mode */
+	AT_SOCKET_SEND_MODE_STRING = 0,	/* String data in command */
+	AT_SOCKET_SEND_MODE_HEXSTRING = 1,	/* Hexadecimal string data */
+	AT_SOCKET_SEND_MODE_DATA = 2	/* Enter data mode */
 };
 
 /**@brief Socket receive modes. */
 enum sm_socket_recv_mode {
-	AT_SOCKET_RECV_MODE_BINARY	/* Receive binary data */
+	AT_SOCKET_RECV_MODE_BINARY = 0,	/* Receive binary data */
+	AT_SOCKET_RECV_MODE_HEXSTRING = 1	/* Receive hexadecimal string data */
 };
 
 static char udp_url[SM_MAX_URL];
@@ -82,6 +84,7 @@ static struct sm_socket {
 } socks[SM_MAX_SOCKET_COUNT];
 
 static struct sm_socket *datamode_sock; /* Socket for data mode */
+static char hex_data[1400 + 1]; /* Buffer for hex data conversion */
 
 enum EFD_COMMAND {
 	EFD_POLL = 0x1,
@@ -761,13 +764,33 @@ static int do_send(struct sm_socket *sock, const uint8_t *data, int len, int fla
 	return sent > 0 ? sent : ret;
 }
 
-static int do_recv(struct sm_socket *sock, int timeout, int flags, uint16_t mode)
+static int data_send_hex(struct sm_socket *sock, const uint8_t *buf, int recv_len)
+{
+	int consumed = 0;
+	char hex_buf[256] = {0};
+	uint16_t data_len = recv_len < (sizeof(hex_buf) / 2) ? recv_len : (sizeof(hex_buf) / 2);
+
+	/* For hex string mode, convert the received data to hex string */
+	while (consumed < recv_len) {
+		int size = sm_util_htoa(buf + consumed, data_len, hex_buf, sizeof(hex_buf));
+
+		if (size < 0) {
+			LOG_ERR("Failed to convert binary data to hex string");
+			return size;
+		}
+		data_send(hex_buf, size);
+		consumed += size / 2; /* size is in hex string length */
+		if (recv_len - consumed < data_len) {
+			data_len = recv_len - consumed;
+		}
+	}
+	return 0;
+}
+
+static int do_recv(struct sm_socket *sock, int timeout, int flags, enum sm_socket_recv_mode mode)
 {
 	int ret;
 	int sockfd = sock->fd;
-
-	/* mode is reserved for future use */
-	(void)mode;
 
 	/* For TCP/TLS Server, receive from incoming socket */
 	if (sock->type == SOCK_STREAM && sock->role == AT_SOCKET_ROLE_SERVER) {
@@ -800,8 +823,16 @@ static int do_recv(struct sm_socket *sock, int timeout, int flags, uint16_t mode
 	if (ret == 0) {
 		LOG_WRN("zsock_recv() return 0");
 	} else {
-		rsp_send("\r\n#XRECV: %d,%d\r\n", sock->fd, ret);
-		data_send(sm_data_buf, ret);
+		rsp_send("\r\n#XRECV: %d,%d,%d\r\n", sock->fd, mode, ret);
+
+		if (mode == AT_SOCKET_RECV_MODE_HEXSTRING) {
+			ret = data_send_hex(sock, sm_data_buf, ret);
+			if (ret) {
+				return ret;
+			}
+		} else {
+			data_send(sm_data_buf, ret);
+		}
 		ret = 0;
 
 		delegate_poll_event(sock, ZSOCK_POLLIN);
@@ -854,15 +885,13 @@ static int do_sendto(struct sm_socket *sock, const char *url, uint16_t port, con
 	return sent > 0 ? sent : ret;
 }
 
-static int do_recvfrom(struct sm_socket *sock, int timeout, int flags, uint16_t mode)
+static int do_recvfrom(struct sm_socket *sock, int timeout, int flags,
+		       enum sm_socket_recv_mode mode)
 {
 	int ret;
 	struct sockaddr remote;
 	socklen_t addrlen = sizeof(struct sockaddr);
 	struct timeval tmo = {.tv_sec = timeout};
-
-	/* mode is reserved for future use */
-	(void)mode;
 
 	ret = zsock_setsockopt(sock->fd, SOL_SOCKET, SO_RCVTIMEO, &tmo, sizeof(tmo));
 	if (ret) {
@@ -887,9 +916,17 @@ static int do_recvfrom(struct sm_socket *sock, int timeout, int flags, uint16_t 
 		uint16_t peer_port = 0;
 
 		util_get_peer_addr(&remote, peer_addr, &peer_port);
-		rsp_send("\r\n#XRECVFROM: %d,%d,\"%s\",%d\r\n", sock->fd, ret, peer_addr,
+		rsp_send("\r\n#XRECVFROM: %d,%d,%d,\"%s\",%d\r\n", sock->fd, mode, ret, peer_addr,
 			 peer_port);
-		data_send(sm_data_buf, ret);
+
+		if (mode == AT_SOCKET_RECV_MODE_HEXSTRING) {
+			ret = data_send_hex(sock, sm_data_buf, ret);
+			if (ret) {
+				return ret;
+			}
+		} else {
+			data_send(sm_data_buf, ret);
+		}
 
 		delegate_poll_event(sock, ZSOCK_POLLIN);
 	}
@@ -1473,9 +1510,9 @@ static int handle_at_send(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 	int err = -EINVAL;
 	int fd;
 	uint16_t mode;
-	char data[SM_MAX_PAYLOAD_SIZE + 1] = {0};
 	int size;
 	struct sm_socket *sock = NULL;
+	const char *str_ptr;
 
 	switch (cmd_type) {
 	case AT_PARSER_CMD_TYPE_SET:
@@ -1495,17 +1532,28 @@ static int handle_at_send(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 		if (err) {
 			return err;
 		}
-		if (mode == AT_SOCKET_SEND_MODE_STRING) {
+		if (mode == AT_SOCKET_SEND_MODE_STRING || mode == AT_SOCKET_SEND_MODE_HEXSTRING) {
 			if (param_count > 4) {
-				size = sizeof(data);
-				err = util_string_get(parser, 4, data, &size);
+				err = at_parser_string_ptr_get(parser, 4, &str_ptr, &size);
 				if (err) {
 					return err;
 				}
 			} else {
 				return -EINVAL; /* Missing string data */
 			}
-			err = do_send(sock, data, size, sock->send_flags);
+
+			/* Convert hex string to binary data */
+			if (mode == AT_SOCKET_SEND_MODE_HEXSTRING) {
+				err = sm_util_atoh(str_ptr, size, hex_data, sizeof(hex_data));
+				if (err < 0) {
+					LOG_ERR("Failed to convert hex string to binary data");
+					return err;
+				}
+				str_ptr = hex_data;
+				size = err;
+			}
+
+			err = do_send(sock, str_ptr, size, sock->send_flags);
 			if (err == size) {
 				err = 0;
 			} else {
@@ -1551,7 +1599,7 @@ static int handle_at_recv(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 		if (err) {
 			return err;
 		}
-		if (mode != AT_SOCKET_RECV_MODE_BINARY) {
+		if (mode != AT_SOCKET_RECV_MODE_BINARY && mode != AT_SOCKET_RECV_MODE_HEXSTRING) {
 			return -EINVAL;
 		}
 		err = at_parser_num_get(parser, 3, &flags);
@@ -1580,9 +1628,9 @@ static int handle_at_sendto(enum at_parser_cmd_type cmd_type, struct at_parser *
 	int err = -EINVAL;
 	int fd;
 	uint16_t mode;
-	char data[SM_MAX_PAYLOAD_SIZE + 1] = {0};
 	int size;
 	struct sm_socket *sock = NULL;
+	const char *str_ptr;
 
 	switch (cmd_type) {
 	case AT_PARSER_CMD_TYPE_SET:
@@ -1611,17 +1659,28 @@ static int handle_at_sendto(enum at_parser_cmd_type cmd_type, struct at_parser *
 		if (err) {
 			return err;
 		}
-		if (mode == AT_SOCKET_SEND_MODE_STRING) {
+		if (mode == AT_SOCKET_SEND_MODE_STRING || mode == AT_SOCKET_SEND_MODE_HEXSTRING) {
 			if (param_count > 6) {
-				size = sizeof(data);
-				err = util_string_get(parser, 6, data, &size);
+				err = at_parser_string_ptr_get(parser, 6, &str_ptr, &size);
 				if (err) {
 					return err;
 				}
 			} else {
 				return -EINVAL; /* Missing string data */
 			}
-			err = do_sendto(sock, udp_url, udp_port, data, size, sock->send_flags);
+
+			/* Convert hex string to binary data */
+			if (mode == AT_SOCKET_SEND_MODE_HEXSTRING) {
+				err = sm_util_atoh(str_ptr, size, hex_data, sizeof(hex_data));
+				if (err < 0) {
+					LOG_ERR("Failed to convert hex string to binary data");
+					return err;
+				}
+				str_ptr = hex_data;
+				size = err;
+			}
+
+			err = do_sendto(sock, udp_url, udp_port, str_ptr, size, sock->send_flags);
 			if (err == size) {
 				err = 0;
 			} else {
@@ -1668,7 +1727,7 @@ static int handle_at_recvfrom(enum at_parser_cmd_type cmd_type, struct at_parser
 		if (err) {
 			return err;
 		}
-		if (mode != AT_SOCKET_RECV_MODE_BINARY) {
+		if (mode != AT_SOCKET_RECV_MODE_BINARY && mode != AT_SOCKET_RECV_MODE_HEXSTRING) {
 			return -EINVAL;
 		}
 		err = at_parser_num_get(parser, 3, &flags);

@@ -130,6 +130,19 @@ This provides more flexibility and clearer socket management by directly referen
     * Old syntax: ``AT#XRECVFROM=<timeout>[,<flags>]``
     * New syntax: ``AT#XRECVFROM=<handle>,<mode>,<flags>,<timeout>``
 
+   * **New mode parameter for send/receive commands:**
+
+    The ``<mode>`` parameter provides different data handling modes:
+
+    **For send commands (AT#XSEND, AT#XSENDTO):**
+     * ``0`` - String mode. Data provided directly as string parameter.
+     * ``1`` - Hex string mode. Data provided as hexadecimal string representation.
+     * ``2`` - Data mode. Enter data input mode for binary data.
+
+    **For receive commands (AT#XRECV, AT#XRECVFROM):**
+     * ``0`` - Binary mode. Data received as binary data.
+     * ``1`` - Hex string mode. Data received as hexadecimal string representation.
+
    * **All socket operations now require handle parameter:**
 
      * ``AT#XSOCKETOPT=<handle>,<op>,<name>[,<value>]`` (handle parameter added)
@@ -149,9 +162,9 @@ This provides more flexibility and clearer socket management by directly referen
      * ``AT#XSSOCKETOPT`` - Response to get options now includes socket handle: ``#XSSOCKETOPT: <handle>,<value>`` (previously just ``#XSSOCKETOPT: <value>``)
      * ``AT#XCONNECT`` - Response now includes socket handle: ``#XCONNECT: <handle>,<status>`` (previously just ``#XCONNECT: <status>``)
      * ``AT#XSEND`` - Response now includes socket handle: ``#XSEND: <handle>,<size>`` (previously just ``#XSEND: <size>``)
-     * ``AT#XRECV`` - Response now includes socket handle: ``#XRECV: <handle>,<size>`` (previously just ``#XRECV: <size>``)
+     * ``AT#XRECV`` - Response now includes socket handle and mode: ``#XRECV: <handle>,<mode>,<size>`` (previously just ``#XRECV: <size>``)
      * ``AT#XSENDTO`` - Response now includes socket handle: ``#XSENDTO: <handle>,<size>`` (previously just ``#XSENDTO: <size>``)
-     * ``AT#XRECVFROM`` - Response now includes socket handle: ``#XRECVFROM: <handle>,<size>,"<ip_addr>",<port>`` (previously just ``#XRECVFROM: <size>,"<ip_addr>",<port>``)
+     * ``AT#XRECVFROM`` - Response now includes socket handle and mode: ``#XRECVFROM: <handle>,<mode>,<size>,"<ip_addr>",<port>`` (previously just ``#XRECVFROM: <size>,"<ip_addr>",<port>``)
 
    * **Migration example:**
 
