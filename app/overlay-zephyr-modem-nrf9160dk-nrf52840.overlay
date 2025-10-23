@@ -8,21 +8,46 @@
 
 / {
 	chosen {
-		ncs,sm-uart = &dtr_uart;
+		ncs,sm-uart = &dtr_uart1;
 	};
 };
 
 /* nRF52 <=> nRF91 interface pins.
- * (see https://docs.nordicsemi.com/bundle/ug_nrf91_dk/page/UG/nrf91_DK/board_controller.html)
+ * (see https://docs.nordicsemi.com/bundle/ug_nrf9160_dk/page/UG/nrf91_DK/hw_description/nrf9160_board_controller.html)
  */
 &uart1 {
 	current-speed = <115200>;
 	hw-flow-control;
 	status = "okay";
-	dtr_uart: dtr-uart {
+	pinctrl-0 = <&uart1_default_alt>;
+	pinctrl-1 = <&uart1_sleep_pull>;
+	pinctrl-names = "default", "sleep";
+
+	dtr_uart1: dtr_uart1 {
 		compatible = "nordic,dtr-uart";
-		dtr-gpios = <&interface_to_nrf52840 4 (GPIO_PULL_DOWN | GPIO_ACTIVE_LOW)>;
+		dtr-gpios = <&interface_to_nrf52840 4 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
 		ri-gpios = <&interface_to_nrf52840 5 (GPIO_ACTIVE_LOW)>;
 		status = "okay";
 	};
+};
+
+&pinctrl {
+	uart1_sleep_pull: uart1_sleep_pull {
+		/* Enable pull-up when sleeping */
+		group1 {
+			psels = <NRF_PSEL(UART_TX, 0, 18)>,
+				<NRF_PSEL(UART_RTS, 0, 21)>;
+			low-power-enable;
+			bias-pull-up;
+		};
+		group2 {
+			psels = <NRF_PSEL(UART_RX, 0, 17)>,
+				<NRF_PSEL(UART_CTS, 0, 19)>;
+			low-power-enable;
+		};
+	};
+};
+
+&dtr_uart0 {
+	status = "disabled";
 };

@@ -16,3 +16,7 @@ manifest:
       repo-path: sdk-nrf
       revision: v3.2.0-preview2
       import: true
+    - name: zephyr
+      url: https://github.com/SeppoTakalo/sdk-zephyr
+      revision: ncs_cmux_power_control
+      import: true
