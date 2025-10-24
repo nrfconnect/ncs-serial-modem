@@ -115,6 +115,16 @@ void sm_at_host_uninit(void);
 void rsp_send(const char *fmt, ...);
 
 /**
+ * @brief Send URC message
+ *
+ * URC messages are queued and sent when possible.
+ *
+ * @param fmt URC message format string
+ *
+ */
+void urc_send(const char *fmt, ...);
+
+/**
  * @brief Send AT command response of OK
  */
 void rsp_send_ok(void);
