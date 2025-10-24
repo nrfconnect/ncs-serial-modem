@@ -702,7 +702,7 @@ static int handle_at_mqtt_publish(enum at_parser_cmd_type cmd_type, struct at_pa
 		}
 		if (strlen(pub_msg) == 0) {
 			/* Publish payload in data mode */
-			err = enter_datamode(mqtt_datamode_callback);
+			err = enter_datamode(mqtt_datamode_callback, 0);
 		} else {
 			err = do_mqtt_publish(pub_msg, msg_sz);
 		}

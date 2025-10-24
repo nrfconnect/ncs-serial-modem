@@ -780,7 +780,7 @@ static int handle_at_tcp_send(enum at_parser_cmd_type cmd_type, struct at_parser
 			datamode = true;
 		}
 		if (datamode) {
-			err = enter_datamode(tcp_datamode_callback);
+			err = enter_datamode(tcp_datamode_callback, 0);
 		} else {
 			err = do_tcp_send(data, size);
 		}

@@ -43,6 +43,7 @@ static sm_datamode_handler_t datamode_handler;
 static int datamode_handler_result;
 uint16_t sm_datamode_time_limit; /* Send trigger by time in data mode */
 K_MUTEX_DEFINE(mutex_mode); /* Protects the operation mode variables. */
+static size_t datamode_data_len; /* Expected data length in data mode. */
 
 uint8_t sm_at_buf[SM_AT_MAX_CMD_LEN + 1];
 uint8_t sm_data_buf[SM_MAX_MESSAGE_SIZE];
@@ -117,6 +118,8 @@ static bool exit_datamode(void)
 			(void)datamode_handler(DATAMODE_EXIT, NULL, 0, SM_DATAMODE_FLAGS_NONE);
 		}
 		datamode_handler = NULL;
+		datamode_data_len = 0;
+		quit_str_partial_match = 0;
 
 		k_mutex_lock(&mutex_data, K_FOREVER);
 		ring_buf_reset(&data_rb);
@@ -248,53 +251,67 @@ static size_t raw_rx_handler(const uint8_t *buf, const size_t len)
 	uint8_t prev_quit_str_match_count = quit_str_partial_match;
 	uint8_t prev_quit_str_match_count_original = quit_str_partial_match;
 
-	/* Find quit_str or partial match at the end of the buffer. */
-	for (processed = 0; processed < len && quit_str_match == false; processed++) {
-		if (buf[processed] == quit_str[quit_str_match_count]) {
-			quit_str_match_count++;
-			if (quit_str_match_count == strlen(quit_str)) {
-				quit_str_match = true;
-			}
-		} else if (quit_str_match_count > 0) {
-			/* Check if we match a beginning of a new quit_str.
-			 * We either match the first character, or in the edge case of
-			 * quit_str starting with multiple same characters, e.g. "aaabbb",
-			 * we match all but the current character (with input aaaa).
-			 */
-			for (int i = 0; i < quit_str_match_count; i++) {
-				if (buf[processed] != quit_str[i]) {
-					quit_str_match_count = i;
-					break;
+	/* If <data_len> is set in datamode, skip searching for quit_str. Just send data until
+	 * length is reached.
+	 */
+	if (datamode_data_len > 0) {
+		for (processed = 0; processed < len && datamode_data_len > 0; processed++) {
+			write_data_buf(&buf[processed], 1);
+			datamode_data_len--;
+		}
+		if (datamode_data_len == 0) {
+			raw_send(SM_DATAMODE_FLAGS_NONE);
+			(void)exit_datamode();
+		}
+	} else {
+		/* Find quit_str or partial match at the end of the buffer. */
+		for (processed = 0; processed < len && quit_str_match == false; processed++) {
+			if (buf[processed] == quit_str[quit_str_match_count]) {
+				quit_str_match_count++;
+				if (quit_str_match_count == strlen(quit_str)) {
+					quit_str_match = true;
+				}
+			} else if (quit_str_match_count > 0) {
+				/* Check if we match a beginning of a new quit_str.
+				 * We either match the first character, or in the edge case of
+				 * quit_str starting with multiple same characters, e.g. "aaabbb",
+				 * we match all but the current character (with input aaaa).
+				 */
+				for (int i = 0; i < quit_str_match_count; i++) {
+					if (buf[processed] != quit_str[i]) {
+						quit_str_match_count = i;
+						break;
+					}
+				}
+				if (quit_str_match_count == 0) {
+					/* No match.
+					 * Previous partial quit_str is data.
+					 */
+					prev_quit_str_match_count = 0;
+				} else if (prev_quit_str_match_count > 0) {
+					/* Partial match.
+					 * Part of the previous partial quit_str is data.
+					 */
+					prev_quit_str_match_count--;
 				}
 			}
-			if (quit_str_match_count == 0) {
-				/* No match.
-				 * Previous partial quit_str is data.
-				 */
-				prev_quit_str_match_count = 0;
-			} else if (prev_quit_str_match_count > 0) {
-				/* Partial match.
-				 * Part of the previous partial quit_str is data.
-				 */
-				prev_quit_str_match_count--;
-			}
+		}
+
+		/* Write data which was previously interpreted as a possible partial quit_str. */
+		write_data_buf(quit_str,
+			       prev_quit_str_match_count_original - prev_quit_str_match_count);
+
+		/* Write data from buf until the start of the possible (partial) quit_str. */
+		write_data_buf(buf, processed - (quit_str_match_count - prev_quit_str_match_count));
+
+		if (quit_str_match) {
+			raw_send(SM_DATAMODE_FLAGS_NONE);
+			(void)exit_datamode();
+			quit_str_partial_match = 0;
+		} else {
+			quit_str_partial_match = quit_str_match_count;
 		}
 	}
-
-	/* Write data which was previously interpreted as a possible partial quit_str. */
-	write_data_buf(quit_str, prev_quit_str_match_count_original - prev_quit_str_match_count);
-
-	/* Write data from buf until the start of the possible (partial) quit_str. */
-	write_data_buf(buf, processed - (quit_str_match_count - prev_quit_str_match_count));
-
-	if (quit_str_match) {
-		raw_send(SM_DATAMODE_FLAGS_NONE);
-		(void)exit_datamode();
-		quit_str_partial_match = 0;
-	} else {
-		quit_str_partial_match = quit_str_match_count;
-	}
-
 	k_mutex_unlock(&mutex_data);
 
 	return processed;
@@ -786,7 +803,7 @@ void data_send(const uint8_t *data, size_t len)
 	sm_at_send_internal(data, len, false, SM_DEBUG_PRINT_SHORT);
 }
 
-int enter_datamode(sm_datamode_handler_t handler)
+int enter_datamode(sm_datamode_handler_t handler, size_t data_len)
 {
 	k_mutex_lock(&mutex_mode, K_FOREVER);
 
@@ -801,6 +818,7 @@ int enter_datamode(sm_datamode_handler_t handler)
 	k_mutex_unlock(&mutex_data);
 
 	datamode_handler = handler;
+	datamode_data_len = data_len;
 	if (sm_datamode_time_limit == 0) {
 		if (sm_uart_baudrate > 0) {
 			sm_datamode_time_limit = CONFIG_SM_UART_RX_BUF_SIZE * (8 + 1 + 1) * 1000 /
@@ -835,6 +853,7 @@ bool exit_datamode_handler(int result)
 		}
 		datamode_handler = NULL;
 		datamode_handler_result = result;
+		datamode_data_len = 0;
 		ret = true;
 	}
 

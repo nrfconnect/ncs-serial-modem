@@ -1717,6 +1717,7 @@ static int handle_at_send(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 	int size;
 	struct sm_socket *sock = NULL;
 	const char *str_ptr;
+	int data_len = 0;
 
 	switch (cmd_type) {
 	case AT_PARSER_CMD_TYPE_SET:
@@ -1764,8 +1765,14 @@ static int handle_at_send(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 				err = err < 0 ? err : -EAGAIN;
 			}
 		} else if (mode == AT_SOCKET_SEND_MODE_DATA) {
+			if (param_count > 4) {
+				err = at_parser_num_get(parser, 4, &data_len);
+				if (err) {
+					return err;
+				}
+			}
 			datamode_sock = sock;
-			err = enter_datamode(socket_datamode_callback);
+			err = enter_datamode(socket_datamode_callback, data_len);
 		} else {
 			return -EINVAL;
 		}
@@ -1846,6 +1853,7 @@ static int handle_at_sendto(enum at_parser_cmd_type cmd_type, struct at_parser *
 	int size;
 	struct sm_socket *sock = NULL;
 	const char *str_ptr;
+	int data_len = 0;
 
 	switch (cmd_type) {
 	case AT_PARSER_CMD_TYPE_SET:
@@ -1903,8 +1911,14 @@ static int handle_at_sendto(enum at_parser_cmd_type cmd_type, struct at_parser *
 			}
 			memset(udp_url, 0, sizeof(udp_url));
 		} else if (mode == AT_SOCKET_SEND_MODE_DATA) {
+			if (param_count > 6) {
+				err = at_parser_num_get(parser, 6, &data_len);
+				if (err) {
+					return err;
+				}
+			}
 			datamode_sock = sock;
-			err = enter_datamode(socket_datamode_callback);
+			err = enter_datamode(socket_datamode_callback, data_len);
 		} else {
 			return -EINVAL;
 		}
