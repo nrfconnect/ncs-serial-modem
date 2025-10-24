@@ -60,7 +60,7 @@ The application supports the following development kits:
      - `nrf9131ek`_
      - ``nrf9131ek/nrf9131/ns``
 
-For more security, it is recommended to use the ``*/ns`` `variant <app_boards_names_>`_ of the board target.
+For more security, the application must use the ``*/ns`` `variant <app_boards_names_>`_ of the board target, which is required when using the nRF91 Series `Modem library`_.
 When built for this variant, the sample is configured to compile and run as a non-secure application using `security by separation <ug_tfm_security_by_separation_>`_.
 Therefore, it automatically includes `Trusted Firmware-M <ug_tfm_>`_ that prepares the required peripherals and secure services to be available for the application.
 
