@@ -489,12 +489,13 @@ static int tx_write_nonblock(const uint8_t *data, size_t len)
 	return ret;
 }
 
-static int sm_uart_tx_write(const uint8_t *data, size_t len, bool flush, k_timeout_t urc_delay)
+static int sm_uart_tx_write(const uint8_t *data, size_t len, bool flush, bool urc,
+			    k_timeout_t urc_delay)
 {
 	int ret;
 
 	/* Send only from Serial Modem work queue to guarantee URC ordering. */
-	if (k_current_get() == &sm_work_q.thread) {
+	if (k_current_get() == &sm_work_q.thread && !urc) {
 		ret = tx_write_block(data, &len, flush);
 		if (!ret) {
 			/* Possible waiting URC is delayed for urc_delay. */
@@ -512,14 +513,14 @@ static int sm_uart_tx_write(const uint8_t *data, size_t len, bool flush, k_timeo
 	return ret;
 }
 
-int sm_tx_write(const uint8_t *data, size_t len, bool flush, k_timeout_t urc_delay)
+int sm_tx_write(const uint8_t *data, size_t len, bool flush, bool urc, k_timeout_t urc_delay)
 {
 #if SM_PIPE
 	if (atomic_test_bit(&sm_pipe.state, SM_PIPE_STATE_INIT_BIT) && sm_pipe.tx_cb != NULL) {
-		return sm_pipe.tx_cb(data, len, urc_delay);
+		return sm_pipe.tx_cb(data, len, urc, urc_delay);
 	}
 #endif
-	return sm_uart_tx_write(data, len, flush, urc_delay);
+	return sm_uart_tx_write(data, len, flush, urc, urc_delay);
 }
 
 int sm_uart_handler_enable(void)

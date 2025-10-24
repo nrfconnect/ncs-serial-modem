@@ -125,8 +125,6 @@ static bool exit_datamode(void)
 		rsp_send("\r\n#XDATAMODE: %d\r\n", datamode_handler_result);
 		datamode_handler_result = 0;
 
-		sm_at_socket_notify_datamode_exit();
-
 		LOG_INF("Exit datamode");
 		ret = true;
 	}
@@ -134,7 +132,7 @@ static bool exit_datamode(void)
 	k_mutex_unlock(&mutex_mode);
 
 	/* Flush the TX buffer. */
-	sm_tx_write(NULL, 0, true, K_NO_WAIT);
+	sm_tx_write(NULL, 0, true, false, K_NO_WAIT);
 
 	return ret;
 }
@@ -465,7 +463,8 @@ static void format_final_result(char *buf, size_t buf_len, size_t buf_max_len)
 	}
 }
 
-static int sm_at_send_internal(const uint8_t *data, size_t len, enum sm_debug_print print_debug)
+static int sm_at_send_internal(const uint8_t *data, size_t len, bool urc,
+			       enum sm_debug_print print_debug)
 {
 	int ret;
 
@@ -474,7 +473,7 @@ static int sm_at_send_internal(const uint8_t *data, size_t len, enum sm_debug_pr
 		return -EINTR;
 	}
 
-	ret = sm_tx_write(data, len, true, incomplete_echo ?
+	ret = sm_tx_write(data, len, true, urc, incomplete_echo ?
 			  K_MSEC(CONFIG_SM_URC_DELAY_WITH_INCOMPLETE_ECHO_MS) : K_NO_WAIT);
 	if (!ret) {
 		if (print_debug == SM_DEBUG_PRINT_FULL) {
@@ -488,7 +487,7 @@ static int sm_at_send_internal(const uint8_t *data, size_t len, enum sm_debug_pr
 
 int sm_at_send(const uint8_t *data, size_t len)
 {
-	return sm_at_send_internal(data, len, SM_DEBUG_PRINT_FULL);
+	return sm_at_send_internal(data, len, false, SM_DEBUG_PRINT_FULL);
 }
 
 int sm_at_send_str(const char *str)
@@ -630,7 +629,7 @@ static size_t cmd_rx_handler(const uint8_t *buf, const size_t len, bool *stop_at
 		 * UART RX buffer (keystroke, when typing).
 		 */
 		incomplete_echo = !send;
-		(void)sm_at_send_internal(buf, processed, SM_DEBUG_PRINT_NONE);
+		(void)sm_at_send_internal(buf, processed, false, SM_DEBUG_PRINT_NONE);
 	}
 
 	if (send) {
@@ -734,8 +733,8 @@ static void notification_handler(const char *notification)
 		return;
 	}
 #endif
-	sm_at_send_internal(CRLF_STR, strlen(CRLF_STR), SM_DEBUG_PRINT_FULL);
-	sm_at_send_str(notification);
+	sm_at_send_internal(CRLF_STR, strlen(CRLF_STR), true, SM_DEBUG_PRINT_FULL);
+	sm_at_send_internal(notification, strlen(notification), true, SM_DEBUG_PRINT_FULL);
 }
 
 void rsp_send_ok(void)
@@ -748,28 +747,43 @@ void rsp_send_error(void)
 	sm_at_send_str(ERROR_STR);
 }
 
-void rsp_send(const char *fmt, ...)
+static void rsp_send_internal(bool urc, const char *fmt, va_list arg_ptr)
 {
 	static K_MUTEX_DEFINE(mutex_rsp_buf);
 	static char rsp_buf[SM_AT_MAX_RSP_LEN];
-	va_list arg_ptr;
 	int rsp_len;
 
 	k_mutex_lock(&mutex_rsp_buf, K_FOREVER);
 
-	va_start(arg_ptr, fmt);
 	rsp_len = vsnprintf(rsp_buf, sizeof(rsp_buf), fmt, arg_ptr);
 	rsp_len = MIN(rsp_len, sizeof(rsp_buf) - 1);
-	va_end(arg_ptr);
 
-	sm_at_send_internal(rsp_buf, rsp_len, SM_DEBUG_PRINT_FULL);
+	sm_at_send_internal(rsp_buf, rsp_len, urc, SM_DEBUG_PRINT_FULL);
 
 	k_mutex_unlock(&mutex_rsp_buf);
 }
 
+void rsp_send(const char *fmt, ...)
+{
+	va_list arg_ptr;
+
+	va_start(arg_ptr, fmt);
+	rsp_send_internal(false, fmt, arg_ptr);
+	va_end(arg_ptr);
+}
+
+void urc_send(const char *fmt, ...)
+{
+	va_list arg_ptr;
+
+	va_start(arg_ptr, fmt);
+	rsp_send_internal(true, fmt, arg_ptr);
+	va_end(arg_ptr);
+}
+
 void data_send(const uint8_t *data, size_t len)
 {
-	sm_at_send_internal(data, len, SM_DEBUG_PRINT_SHORT);
+	sm_at_send_internal(data, len, false, SM_DEBUG_PRINT_SHORT);
 }
 
 int enter_datamode(sm_datamode_handler_t handler)
@@ -987,7 +1001,7 @@ int sm_at_host_power_off(void)
 
 	/* Write sync str to buffer so it is sent first when resuming, do not flush. */
 	if (!IS_ENABLED(CONFIG_SM_SKIP_READY_MSG)) {
-		sm_tx_write(SM_SYNC_STR, strlen(SM_SYNC_STR), false, K_NO_WAIT);
+		sm_tx_write(SM_SYNC_STR, strlen(SM_SYNC_STR), false, false, K_NO_WAIT);
 	}
 
 	return err;
@@ -1003,7 +1017,7 @@ int sm_at_host_power_on(void)
 	}
 
 	/* Flush the TX buffer. */
-	sm_tx_write(NULL, 0, true, K_NO_WAIT);
+	sm_tx_write(NULL, 0, true, false, K_NO_WAIT);
 
 	return 0;
 }

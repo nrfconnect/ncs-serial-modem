@@ -64,44 +64,34 @@ static char udp_url[SM_MAX_URL];
 static uint16_t udp_port;
 
 struct sm_async_poll {
-	atomic_t update_events; /* Update events to poll for this socket. */
-	bool specific: 1;	/* Specific socket to poll. */
-	bool disable: 1;	/* Poll needs to stay disabled for this socket. */
+	int events;        /* Events to poll for this socket. */
+	atomic_t revents;  /* Events received for this socket. */
+	int update_events; /* Events to update for this socket. */
+	bool specific: 1;  /* Specific socket to poll. */
+	bool disable: 1;   /* Poll needs to stay disabled for this socket. */
 };
 
 static struct sm_socket {
-	int type;          /* SOCK_STREAM or SOCK_DGRAM */
-	uint16_t role;     /* Client or Server */
-	sec_tag_t sec_tag; /* Security tag of the credential */
-	int family;        /* Socket address family */
-	int fd;            /* Socket descriptor. */
-	int fd_peer;       /* Socket descriptor for peer. */
-	uint16_t cid;      /* PDP Context ID, 0: primary; 1~10: secondary */
-	int send_flags;    /* Send flags */
-	struct sm_async_poll async_poll; /* Async poll info */
+	int type;           /* SOCK_STREAM or SOCK_DGRAM */
+	uint16_t role;      /* Client or Server */
+	sec_tag_t sec_tag;  /* Security tag of the credential */
+	int family;         /* Socket address family */
+	int fd;             /* Socket descriptor. */
+	int fd_peer;        /* Socket descriptor for peer. */
+	uint16_t cid;       /* PDP Context ID, 0: primary; 1~10: secondary */
+	int send_flags;     /* Send flags */
+	struct sm_async_poll async_poll; /* Async poll info. */
 } socks[SM_MAX_SOCKET_COUNT];
 
 static struct sm_socket *datamode_sock; /* Socket for data mode */
 static char hex_data[1400 + 1]; /* Buffer for hex data conversion */
 
-enum EFD_COMMAND {
-	EFD_POLL = 0x1,
-	EFD_CLOSE = 0x8000
-};
-
-struct async_poll_ctx {
-	struct k_work update_work; /* Work to update async poll */
-	int efd;		   /* Event file descriptor for async poll */
-	int poll_events;	   /* Events to poll for async poll. */
-	bool poll_all: 1;	   /* Poll all the sockets. */
-	bool poll_running: 1;	   /* Async poll is running. */
-};
-static struct async_poll_ctx poll_ctx = {
-	.efd = -1,
-};
-
-static struct k_thread apoll_thread_id;
-static K_THREAD_STACK_DEFINE(apoll_thread_stack, KB(2));
+static struct async_poll_ctx {
+	struct k_work poll_work; /* Work to send poll URCs. */
+	int poll_events;         /* Events to poll for async poll. */
+	bool poll_all: 1;        /* Poll all the sockets. */
+	bool poll_running: 1;    /* Async poll is running. */
+} poll_ctx;
 
 /* forward declarations */
 #define SOCKET_SEND_TMO_SEC 30
@@ -121,7 +111,8 @@ static void init_socket(struct sm_socket *socket)
 	socket->fd = INVALID_SOCKET;
 	socket->fd_peer = INVALID_SOCKET;
 	socket->cid = 0;
-	socket->async_poll = (struct sm_async_poll){0};
+	socket->send_flags = 0;
+	socket->async_poll = (struct sm_async_poll) {0};
 }
 
 static struct sm_socket *find_socket(int fd)
@@ -164,13 +155,95 @@ static int bind_to_pdn(struct sm_socket *sock)
 	return ret;
 }
 
-static void update_work_fn(struct k_work *work)
+/* Called in IRQ context */
+static void poll_cb(struct nrf_pollfd *pollfd)
 {
-	/* Update async poll events after AT-operation has completed. */
-	if (poll_ctx.poll_running) {
-		LOG_DBG("Update poll events");
-		if (eventfd_write(poll_ctx.efd, EFD_POLL)) {
-			LOG_ERR("eventfd_write() failed: %d", -errno);
+	LOG_DBG("Poll event fd %d, revents 0x%x", pollfd->fd, pollfd->revents);
+
+	struct sm_socket *sock = find_socket(pollfd->fd);
+
+	if (sock == NULL) {
+		LOG_DBG("Poll callback for unknown socket fd %d", pollfd->fd);
+		return;
+	}
+	atomic_or(&sock->async_poll.revents, pollfd->revents);
+
+	k_work_submit_to_queue(&sm_work_q, &poll_ctx.poll_work);
+}
+
+
+static int set_so_poll_cb(struct sm_socket *socket, short events)
+{
+	int err;
+
+	if (socket == NULL) {
+		return -EINVAL;
+	}
+
+	LOG_DBG("Set poll cb for socket %d, events %d", socket->fd, events);
+
+	struct nrf_modem_pollcb pcb = {
+		.callback = poll_cb,
+		.events = events,
+		.oneshot = true,
+	};
+
+	err = nrf_setsockopt(socket->fd, NRF_SOL_SOCKET, NRF_SO_POLLCB, &pcb, sizeof(pcb));
+	if (err < 0) {
+		LOG_ERR("nrf_setsockopt(%d,%d,%d) error: %d", socket->fd, NRF_SOL_SOCKET,
+			NRF_SO_POLLCB, -errno);
+		return -errno;
+	}
+	return 0;
+}
+
+static int clear_so_poll_cb(struct sm_socket *socket)
+{
+	int err;
+
+	if (socket == NULL) {
+		return -EINVAL;
+	}
+
+	err = nrf_setsockopt(socket->fd, NRF_SOL_SOCKET, NRF_SO_POLLCB, NULL, 0);
+	if (err < 0) {
+		LOG_ERR("nrf_setsockopt(%d,%d,%d) error: %d", socket->fd, NRF_SOL_SOCKET,
+			NRF_SO_POLLCB, -errno);
+		return -errno;
+	}
+	return 0;
+}
+
+static void poll_work_fn(struct k_work *work)
+{
+	if (poll_ctx.poll_running == false) {
+		return;
+	}
+
+	for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
+		if (socks[i].fd == INVALID_SOCKET) {
+			continue;
+		}
+
+		short revents = atomic_clear(&socks[i].async_poll.revents);
+
+		if (revents) {
+			urc_send("\r\n#XAPOLL: %d,%d\r\n", socks[i].fd, revents);
+			if (revents & (NRF_POLLERR | NRF_POLLNVAL | NRF_POLLHUP)) {
+				/* Remove socket from poll until closed. */
+				socks[i].async_poll.disable = true;
+			} else {
+				/* Remove POLLIN/POLLOUT from poll, until AT-operation. */
+				socks[i].async_poll.events &= ~revents;
+			}
+		}
+
+		if (socks[i].async_poll.disable == false &&
+		    (revents != 0 || socks[i].async_poll.update_events != 0)) {
+			/* Re-register for remaining events */
+			socks[i].async_poll.events |= socks[i].async_poll.update_events;
+			socks[i].async_poll.update_events = 0;
+			set_so_poll_cb(&socks[i], socks[i].async_poll.events);
 		}
 	}
 }
@@ -179,25 +252,9 @@ static void delegate_poll_event(struct sm_socket *s, int events)
 {
 	if (poll_ctx.poll_running && (poll_ctx.poll_all || s->async_poll.specific)) {
 		LOG_DBG("Delegate poll events %d for socket %d", events, s->fd);
-		atomic_or(&s->async_poll.update_events, (poll_ctx.poll_events & events));
+		s->async_poll.update_events |= (poll_ctx.poll_events & events);
 
-		k_work_submit(&poll_ctx.update_work);
-	}
-}
-
-void sm_at_socket_notify_datamode_exit(void)
-{
-	if (poll_ctx.poll_running) {
-		for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
-			if (socks[i].fd == INVALID_SOCKET) {
-				continue;
-			}
-			/* When we exit data mode, we will refresh
-			 * POLLIN, POLLERR, POLLHUP, and POLLNVAL for all monitored sockets.
-			 */
-			socks[i].async_poll.disable = false;
-			delegate_poll_event(&socks[i], NRF_POLLIN);
-		}
+		k_work_submit_to_queue(&sm_work_q, &poll_ctx.poll_work);
 	}
 }
 
@@ -871,7 +928,6 @@ static int do_sendto(struct sm_socket *sock, const char *url, uint16_t port, con
 		rsp_send("\r\n#XSENDTO: %d,%d\r\n", sock->fd, sent);
 		delegate_poll_event(sock, NRF_POLLOUT);
 	}
-
 
 	return sent > 0 ? sent : ret;
 }
@@ -1819,148 +1875,18 @@ static int handle_at_getaddrinfo(enum at_parser_cmd_type cmd_type, struct at_par
 	return err;
 }
 
-static void update_apoll_fds(struct nrf_pollfd *afds, size_t count)
-{
-	for (size_t i = 0; i < count && i < ARRAY_SIZE(socks); ++i) {
-		/* Skip sockets that are not opened or are disabled for async poll. */
-		if (socks[i].fd == INVALID_SOCKET || socks[i].async_poll.disable) {
-			afds[i].fd = INVALID_SOCKET;
-			afds[i].events = 0;
-			continue;
-		}
-		/* Skip sockets that are not in async poll mode. */
-		if (!poll_ctx.poll_all && !socks[i].async_poll.specific) {
-			afds[i].fd = INVALID_SOCKET;
-			continue;
-		}
-		afds[i].fd = socks[i].fd;
-
-		/* atomic_clear returns the value before clear. */
-		afds[i].events |= atomic_clear(&socks[i].async_poll.update_events);
-		LOG_DBG("fd: %d, events: 0x%04x", afds[i].fd, afds[i].events);
-	}
-}
-
-static eventfd_t get_efd_event(struct nrf_pollfd *efd)
-{
-	eventfd_t value = 0;
-
-	if (efd->revents & NRF_POLLIN) {
-		efd->revents &= ~NRF_POLLIN;
-		eventfd_read(efd->fd, &value);
-	}
-	if (efd->revents) {
-		LOG_ERR("efd revents: 0x%04x", efd->revents);
-	}
-
-	return value;
-}
-
-static inline void handle_apoll_socket_event(struct sm_socket *s, struct nrf_pollfd *fd)
-{
-	if (fd->revents) {
-		if (fd->revents & (NRF_POLLERR | NRF_POLLNVAL | NRF_POLLHUP)) {
-			/* Remove socket from poll until closed. */
-			s->async_poll.disable = true;
-		} else {
-			/* Remove POLLIN/POLLOUT from poll, until AT-operation. */
-			fd->events &= ~fd->revents;
-		}
-		if (!in_datamode()) {
-			rsp_send("\r\n#XAPOLL: %d,%d\r\n", fd->fd, fd->revents);
-		}
-	}
-}
-
-static void apoll_thread(void*, void*, void*)
-{
-	int ret;
-	struct nrf_pollfd afds[SM_FDS_COUNT] = {
-		[0 ... SM_FDS_COUNT - 1] = {
-			.fd = INVALID_SOCKET
-		}
-	};
-
-	LOG_DBG("Asynchronous polling thread started");
-
-	/* Always poll the EFD socket. */
-	afds[ARRAY_SIZE(afds) - 1].fd = poll_ctx.efd;
-	afds[ARRAY_SIZE(afds) - 1].events = NRF_POLLIN;
-
-	while (poll_ctx.poll_running) {
-		update_apoll_fds(afds, ARRAY_SIZE(afds) - 1);
-
-		ret = nrf_poll(afds, ARRAY_SIZE(afds), -1);
-		if (ret < 0) {
-			LOG_ERR("nrf_poll() failed: %d, exit thread...", -errno);
-			poll_ctx.poll_running = false;
-			break;
-		}
-		for (int i = 0; i < ARRAY_SIZE(afds); ++i) {
-			if (afds[i].fd == INVALID_SOCKET) {
-				continue;
-			}
-
-			if (afds[i].fd == poll_ctx.efd) {
-				if (get_efd_event(&afds[i]) & EFD_CLOSE) {
-					/* Exit thread. */
-					poll_ctx.poll_running = false;
-				}
-			} else {
-				handle_apoll_socket_event(&socks[i], &afds[i]);
-			}
-		}
-	}
-	LOG_DBG("Asynchronous polling thread stopped");
-}
-
-static int apoll_start(void)
-{
-	if (poll_ctx.poll_running) {
-		LOG_DBG("Restart asynchronous polling");
-		return eventfd_write(poll_ctx.efd, EFD_POLL);
-	}
-
-	LOG_DBG("Start asynchronous polling");
-	if (poll_ctx.efd != INVALID_SOCKET) {
-		zsock_close(poll_ctx.efd);
-	}
-	poll_ctx.efd = eventfd(0, 0);
-	if (poll_ctx.efd < 0) {
-		LOG_ERR("eventfd() failed: %d", -errno);
-		return -errno;
-	}
-	poll_ctx.poll_running = true;
-	k_thread_create(&apoll_thread_id, apoll_thread_stack,
-			K_THREAD_STACK_SIZEOF(apoll_thread_stack),
-			apoll_thread, NULL, NULL, NULL,
-			K_LOWEST_APPLICATION_THREAD_PRIO, 0, K_NO_WAIT);
-	k_thread_name_set(&apoll_thread_id, "Asynchronous polling");
-
-	return 0;
-}
-
 static int apoll_stop(void)
 {
-	int err = 0;
-
-	if (poll_ctx.poll_running) {
-		LOG_DBG("Stop asynchronous polling");
-		err = eventfd_write(poll_ctx.efd, EFD_CLOSE);
-		if (err < 0) {
-			LOG_ERR("eventfd_write() failed: %d", -errno);
-		}
-		err = k_thread_join(&apoll_thread_id, K_SECONDS(1));
-		if (err) {
-			LOG_WRN("k_thread_join() failed: %d", err);
-		}
-	}
-
-	if (poll_ctx.efd != INVALID_SOCKET) {
-		zsock_close(poll_ctx.efd);
-		poll_ctx.efd = INVALID_SOCKET;
-	}
+	poll_ctx.poll_all = false;
 	poll_ctx.poll_events = 0;
+	poll_ctx.poll_running = false;
+
+	for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
+		if (socks[i].fd != INVALID_SOCKET) {
+			clear_so_poll_cb(&socks[i]);
+		}
+		socks[i].async_poll = (struct sm_async_poll){0};
+	}
 
 	return 0;
 }
@@ -1987,10 +1913,11 @@ static void format_apoll_read_response(char *response, size_t size)
 
 static void set_apoll_all_sockets(void)
 {
+	poll_ctx.poll_running = true;
 	poll_ctx.poll_all = true;
 	for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
 		if (socks[i].fd != INVALID_SOCKET) {
-			atomic_set(&socks[i].async_poll.update_events, poll_ctx.poll_events);
+			socks[i].async_poll.update_events = poll_ctx.poll_events;
 		}
 	}
 }
@@ -2001,10 +1928,15 @@ static int set_apoll_specific_sockets(struct at_parser *parser, uint32_t param_c
 	int err;
 	bool socket_found;
 
-	/* Clear previously set values. */
+	poll_ctx.poll_running = true;
 	poll_ctx.poll_all = false;
+
+	/* Clear previously set values. */
 	for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
-		socks[i].async_poll.specific = false;
+		if (socks[i].fd != INVALID_SOCKET) {
+			clear_so_poll_cb(&socks[i]);
+		}
+		socks[i].async_poll = (struct sm_async_poll){0};
 	}
 
 	/* Go through all the given handles. */
@@ -2019,8 +1951,7 @@ static int set_apoll_specific_sockets(struct at_parser *parser, uint32_t param_c
 		for (int j = 0; j < SM_MAX_SOCKET_COUNT; j++) {
 			if (socks[j].fd == handle) {
 				socks[j].async_poll.specific = true;
-				atomic_set(&socks[j].async_poll.update_events,
-					   poll_ctx.poll_events);
+				socks[j].async_poll.update_events = poll_ctx.poll_events;
 				socket_found = true;
 				break;
 			}
@@ -2073,7 +2004,7 @@ static int handle_at_apoll(enum at_parser_cmd_type cmd_type, struct at_parser *p
 				return err;
 			}
 		}
-		err = apoll_start();
+		poll_work_fn(NULL);
 		break;
 
 	case AT_PARSER_CMD_TYPE_READ:
@@ -2105,7 +2036,7 @@ int sm_at_socket_init(void)
 		init_socket(&socks[i]);
 	}
 
-	k_work_init(&poll_ctx.update_work, update_work_fn);
+	k_work_init(&poll_ctx.poll_work, poll_work_fn);
 
 	return 0;
 }

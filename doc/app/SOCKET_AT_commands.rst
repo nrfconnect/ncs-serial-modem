@@ -1261,6 +1261,9 @@ When the asynchronous socket events are enabled, |SM| sends events as URC notifi
 * For ``POLLERR``, ``POLLHUP``, and ``POLLNVAL`` events, the URC notification is sent only once for each socket.
   No further URC notifications will be sent for the same socket.
 
+.. note::
+   When closing the socket with ``#XCLOSE``, no closure event will be sent.
+
 ::
 
    #XAPOLL: <handle>,<revents>

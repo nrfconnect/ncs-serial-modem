@@ -26,11 +26,6 @@
 int sm_bind_to_local_addr(int socket, int family, uint16_t port);
 
 /**
- * @brief Notify socket AT command parser that the data mode has been exited.
- */
-void sm_at_socket_notify_datamode_exit(void);
-
-/**
  * @brief Initialize socket AT command parser.
  *
  * @retval 0 If the operation was successful.

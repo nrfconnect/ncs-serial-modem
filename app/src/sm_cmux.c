@@ -245,14 +245,14 @@ static int cmux_write_at_channel_nonblock(const uint8_t *data, size_t len)
 	return ret;
 }
 
-static int cmux_write_at_channel(const uint8_t *data, size_t len, k_timeout_t urc_delay)
+static int cmux_write_at_channel(const uint8_t *data, size_t len, bool urc, k_timeout_t urc_delay)
 {
 	int ret;
 
 	/* To process, CMUX needs system work queue to be able to run.
 	 * Send only from Serial Modem work queue to guarantee URC ordering.
 	 */
-	if (k_current_get() == &sm_work_q.thread) {
+	if (k_current_get() == &sm_work_q.thread && !urc) {
 		ret = cmux_write_at_channel_block(data, &len);
 		if (!ret) {
 			/* Possible waiting URC is delayed for urc_delay. */
