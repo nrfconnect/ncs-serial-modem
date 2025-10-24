@@ -118,17 +118,17 @@ This provides more flexibility and clearer socket management by directly referen
 
    * **AT#XRECV parameter changes:**
 
-    Added ``<handle>`` and ``<mode>`` parameters to the ``AT#XRECV`` command. Changed parameter order.
+    Added ``<handle>``, ``<mode>`` parameters and optional ``<data_len>`` parameter to the ``AT#XRECV`` command. Changed parameter order.
 
     * Old syntax: ``AT#XRECV=<timeout>[,<flags>]``
-    * New syntax: ``AT#XRECV=<handle>,<mode>,<flags>,<timeout>``
+    * New syntax: ``AT#XRECV=<handle>,<mode>,<flags>,<timeout>[,<data_len>]``
 
    * **AT#XRECVFROM parameter changes:**
 
-    Added ``<handle>`` and ``<mode>`` parameters to the ``AT#XRECVFROM`` command. Changed parameter order.
+    Added ``<handle>``, ``<mode>`` parameters and optional ``<data_len>`` parameter to the ``AT#XRECVFROM`` command. Changed parameter order.
 
     * Old syntax: ``AT#XRECVFROM=<timeout>[,<flags>]``
-    * New syntax: ``AT#XRECVFROM=<handle>,<mode>,<flags>,<timeout>``
+    * New syntax: ``AT#XRECVFROM=<handle>,<mode>,<flags>,<timeout>[,<data_len>]``
 
    * **New mode parameter for send/receive commands:**
 
@@ -152,9 +152,9 @@ This provides more flexibility and clearer socket management by directly referen
      * ``AT#XLISTEN=<handle>`` (handle parameter added)
      * ``AT#XACCEPT=<handle>,<timeout>`` (handle parameter added)
      * ``AT#XSEND=<handle>,<mode>,<flags>[,<data>]`` (handle parameter added, mode parameter added, parameter order changed)
-     * ``AT#XRECV=<handle>,<mode>,<flags>,<timeout>`` (handle parameter added, mode parameter added, parameter order changed)
+     * ``AT#XRECV=<handle>,<mode>,<flags>,<timeout>[,<data_len>]`` (handle parameter added, mode parameter added, optional data_len parameter added, parameter order changed)
      * ``AT#XSENDTO=<handle>,<mode>,<flags>,<url>,<port>[,<data>]`` (handle parameter added, mode parameter added, parameter order changed)
-     * ``AT#XRECVFROM=<handle>,<mode>,<flags>,<timeout>`` (handle parameter added, mode parameter added, parameter order changed)
+     * ``AT#XRECVFROM=<handle>,<mode>,<flags>,<timeout>[,<data_len>]`` (handle parameter added, mode parameter added, optional data_len parameter added, parameter order changed)
 
    * **Response format changes:**
 

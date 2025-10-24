@@ -978,7 +978,7 @@ Syntax
 
 ::
 
-   #XRECV=<handle>,<mode>,<flags>,<timeout>
+   #XRECV=<handle>,<mode>,<flags>,<timeout>[,<data_len>]
 
 * The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
 
@@ -997,6 +997,9 @@ Syntax
 
 * The ``<timeout>`` parameter sets the timeout value in seconds.
   When ``0``, it means no timeout, and it makes this request block indefinitely.
+
+* The ``<data_len>`` parameter is optional and sets the maximum number of bytes to receive.
+  The maximum value is 2048 bytes, which is also the default value when the parameter is omitted.
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -1140,7 +1143,7 @@ Syntax
 
 ::
 
-   #XRECVFROM=<handle>,<mode>,<flags>,<timeout>
+   #XRECVFROM=<handle>,<mode>,<flags>,<timeout>[,<data_len>]
 
 * The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
 
@@ -1158,6 +1161,9 @@ Syntax
 
 * The ``<timeout>`` parameter sets the timeout value in seconds.
   When ``0``, it means no timeout, and it makes this request block indefinitely.
+
+* The ``<data_len>`` parameter is optional and sets the maximum number of bytes to receive.
+  The maximum value is 2048 bytes, which is also the default value when the parameter is omitted.
 
 Response syntax
 ~~~~~~~~~~~~~~~

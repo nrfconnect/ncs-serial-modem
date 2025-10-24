@@ -777,7 +777,8 @@ static int data_send_hex(struct sm_socket *sock, const uint8_t *buf, int recv_le
 	return 0;
 }
 
-static int do_recv(struct sm_socket *sock, int timeout, int flags, enum sm_socket_recv_mode mode)
+static int do_recv(struct sm_socket *sock, int timeout, int flags, enum sm_socket_recv_mode mode,
+		   size_t data_len)
 {
 	int ret;
 	int sockfd = sock->fd;
@@ -798,7 +799,7 @@ static int do_recv(struct sm_socket *sock, int timeout, int flags, enum sm_socke
 		LOG_ERR("nrf_setsockopt(%d) error: %d", SO_RCVTIMEO, -errno);
 		return -errno;
 	}
-	ret = nrf_recv(sockfd, (void *)sm_data_buf, sizeof(sm_data_buf), flags);
+	ret = nrf_recv(sockfd, (void *)sm_data_buf, data_len, flags);
 	if (ret < 0) {
 		LOG_WRN("nrf_recv() error: %d", -errno);
 		return -errno;
@@ -877,7 +878,7 @@ static int do_sendto(struct sm_socket *sock, const char *url, uint16_t port, con
 }
 
 static int do_recvfrom(struct sm_socket *sock, int timeout, int flags,
-		       enum sm_socket_recv_mode mode)
+		       enum sm_socket_recv_mode mode, size_t data_len)
 {
 	int ret;
 	struct sockaddr remote;
@@ -889,7 +890,7 @@ static int do_recvfrom(struct sm_socket *sock, int timeout, int flags,
 		LOG_ERR("nrf_setsockopt(%d) error: %d", SO_RCVTIMEO, -errno);
 		return -errno;
 	}
-	ret = nrf_recvfrom(sock->fd, (void *)sm_data_buf, sizeof(sm_data_buf), flags,
+	ret = nrf_recvfrom(sock->fd, (void *)sm_data_buf, data_len, flags,
 			   (struct nrf_sockaddr *)&remote, &addrlen);
 	if (ret < 0) {
 		LOG_ERR("nrf_recvfrom() error: %d", -errno);
@@ -1574,6 +1575,7 @@ static int handle_at_recv(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 	uint16_t mode;
 	int timeout;
 	int flags = 0;
+	int data_len = sizeof(sm_data_buf);
 	struct sm_socket *sock = NULL;
 
 	switch (cmd_type) {
@@ -1601,7 +1603,17 @@ static int handle_at_recv(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 		if (err) {
 			return err;
 		}
-		err = do_recv(sock, timeout, flags, mode);
+		if (param_count > 5) {
+			err = at_parser_num_get(parser, 5, &data_len);
+			if (err) {
+				return err;
+			}
+			if (data_len > sizeof(sm_data_buf)) {
+				LOG_ERR("data_len is too large for receive buffer");
+				return -ENOBUFS;
+			}
+		}
+		err = do_recv(sock, timeout, flags, mode, data_len);
 		break;
 
 	default:
@@ -1702,6 +1714,7 @@ static int handle_at_recvfrom(enum at_parser_cmd_type cmd_type, struct at_parser
 	uint16_t mode;
 	int timeout;
 	int flags = 0;
+	int data_len = sizeof(sm_data_buf);
 	struct sm_socket *sock = NULL;
 
 	switch (cmd_type) {
@@ -1729,7 +1742,17 @@ static int handle_at_recvfrom(enum at_parser_cmd_type cmd_type, struct at_parser
 		if (err) {
 			return err;
 		}
-		err = do_recvfrom(sock, timeout, flags, mode);
+		if (param_count > 5) {
+			err = at_parser_num_get(parser, 5, &data_len);
+			if (err) {
+				return err;
+			}
+			if (data_len > sizeof(sm_data_buf)) {
+				LOG_ERR("data_len is too large for receive buffer");
+				return -ENOBUFS;
+			}
+		}
+		err = do_recvfrom(sock, timeout, flags, mode, data_len);
 		break;
 
 	default:
