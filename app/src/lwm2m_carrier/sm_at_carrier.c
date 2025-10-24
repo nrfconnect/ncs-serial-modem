@@ -322,7 +322,7 @@ static int do_carrier_appdata_set(enum at_parser_cmd_type, struct at_parser *par
 {
 	if (param_count == 2) {
 		/* enter data mode */
-		return enter_datamode(carrier_datamode_callback);
+		return enter_datamode(carrier_datamode_callback, 0);
 	} else if ((param_count < 2) || (param_count > 5)) {
 		return -EINVAL;
 	}

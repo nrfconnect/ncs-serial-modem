@@ -106,17 +106,19 @@ This provides more flexibility and clearer socket management by directly referen
 
    * **AT#XSEND command parameter changes:**
 
-    Added ``<handle>`` and ``<mode>`` parameters to the ``AT#XSEND`` command. Changed parameter order.
+    Added ``<handle>``, ``<mode>`` parameters and optional ``<data_len>`` parameter (for data mode) to the ``AT#XSEND`` command. Changed parameter order.
 
      * Old syntax: ``AT#XSEND[=<data>][,<flags>]``
-     * New syntax: ``AT#XSEND=<handle>,<mode>,<flags>[,<data>]``
+     * New syntax: ``AT#XSEND=<handle>,<mode>,<flags>,<url>,<port>,<data>`` for string and hex string modes, and
+                   ``AT#XSEND=<handle>,<mode>,<flags>,<url>,<port>[,<data_len>]`` for data mode.
 
    * **AT#XSENDTO parameter changes:**
 
-    Added ``<handle>`` and ``<mode>`` parameters to the ``AT#XSENDTO`` command. Changed parameter order.
+    Added ``<handle>``, ``<mode>`` parameters and optional ``<data_len>`` parameter (for data mode) to the ``AT#XSENDTO`` command. Changed parameter order.
 
     * Old syntax: ``AT#XSENDTO=<url>,<port>[,<data>][,<flags>]``
-    * New syntax: ``AT#XSENDTO=<handle>,<mode>,<flags>,<url>,<port>[,<data>]``
+    * New syntax: ``AT#XSENDTO=<handle>,<mode>,<flags>,<url>,<port>,<data>`` for string and hex string modes, and
+                  ``AT#XSENDTO=<handle>,<mode>,<flags>,<url>,<port>[,<data_len>]`` for data mode.
 
    * **AT#XRECV parameter changes:**
 
@@ -145,7 +147,7 @@ This provides more flexibility and clearer socket management by directly referen
      * ``0`` - Binary mode. Data received as binary data.
      * ``1`` - Hex string mode. Data received as hexadecimal string representation.
 
-   * **All socket operations now require handle parameter:**
+   * **Other socket operations now require handle parameter:**
 
      * ``AT#XSOCKETOPT=<handle>,<op>,<name>[,<value>]`` (handle parameter added)
      * ``AT#XSSOCKETOPT=<handle>,<op>,<name>[,<value>]`` (handle parameter added)
@@ -153,10 +155,6 @@ This provides more flexibility and clearer socket management by directly referen
      * ``AT#XCONNECT=<handle>,<url>,<port>`` (handle parameter added)
      * ``AT#XLISTEN=<handle>`` (handle parameter added)
      * ``AT#XACCEPT=<handle>,<timeout>`` (handle parameter added)
-     * ``AT#XSEND=<handle>,<mode>,<flags>[,<data>]`` (handle parameter added, mode parameter added, parameter order changed)
-     * ``AT#XRECV=<handle>,<mode>,<flags>,<timeout>[,<data_len>]`` (handle parameter added, mode parameter added, optional data_len parameter added, parameter order changed)
-     * ``AT#XSENDTO=<handle>,<mode>,<flags>,<url>,<port>[,<data>]`` (handle parameter added, mode parameter added, parameter order changed)
-     * ``AT#XRECVFROM=<handle>,<mode>,<flags>,<timeout>[,<data_len>]`` (handle parameter added, mode parameter added, optional data_len parameter added, parameter order changed)
 
    * **Response format changes:**
 

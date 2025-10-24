@@ -587,7 +587,7 @@ static int handle_at_nrf_cloud(enum at_parser_cmd_type cmd_type, struct at_parse
 			}
 		} else if (op == SM_NRF_CLOUD_SEND && sm_nrf_cloud_ready) {
 			/* enter data mode */
-			err = enter_datamode(nrf_cloud_datamode_callback);
+			err = enter_datamode(nrf_cloud_datamode_callback, 0);
 		} else if (op == SM_NRF_CLOUD_DISCONNECT) {
 			err = nrf_cloud_disconnect();
 			if (err) {

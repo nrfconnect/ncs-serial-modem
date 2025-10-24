@@ -898,7 +898,9 @@ Syntax
 
 ::
 
-   #XSEND=<handle>,<mode>,<flags>[,<data>]
+   #XSEND=<handle>,<mode>,<flags>,<data> when ``<mode>``is ``0`` or ``1``
+
+   #XSEND=<handle>,<mode>,<flags>[,<data_len>] when ``<mode>`` is ``2``
 
 * The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
 
@@ -922,6 +924,11 @@ Syntax
   The maximum payload size in hexadecimal string mode is up to 2800 characters (1400 bytes).
   For large packets, it is recommended to use data mode (``2``) since AT parser's memory limits the maximum size of data that can be sent in string or hex string modes.
   This parameter is not used when ``<mode>`` is ``2`` (data mode).
+
+* The ``<data_len>`` parameter is optional and only used when ``<mode>`` is ``2`` (data mode).
+  It sets the number of bytes to send in data mode.
+  When required number of bytes are sent, the data mode is exited.
+  The termination command :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` is not used in this case.
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -1058,7 +1065,9 @@ Syntax
 
 ::
 
-   #XSENDTO=<handle>,<mode>,<flags>,<url>,<port>[,<data>]
+   #XSENDTO=<handle>,<mode>,<flags>,<url>,<port>,<data> when ``<mode>`` is ``0`` or ``1``
+
+   #XSENDTO=<handle>,<mode>,<flags>,<url>,<port>[,<data_len>] when ``<mode>`` is ``2``
 
 * The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
 
@@ -1090,6 +1099,11 @@ Syntax
   The maximum payload size in hexadecimal string mode is up to 2800 characters (1400 bytes).
   For large packets, it is recommended to use data mode (``2``) since AT parser's memory limits the maximum size of data that can be sent in string or hex string modes.
   This parameter is not used when ``<mode>`` is ``2`` (data mode).
+
+* The ``<data_len>`` parameter is optional and only used when ``<mode>`` is ``2`` (data mode).
+  It sets the number of bytes to send in data mode.
+  When required number of bytes are sent, the data mode is exited.
+  The termination command :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` is not used in this case.
 
 * UDP packets that exceed 1500 bytes, including headers, may be dropped by the network due to MTU (Maximum Transmission Unit) restrictions.
 

@@ -414,7 +414,7 @@ static int do_ftp_put(enum at_parser_cmd_type, struct at_parser *parser,
 
 	if (param_count == 3) {
 		/* enter data mode */
-		ret = enter_datamode(ftp_datamode_callback);
+		ret = enter_datamode(ftp_datamode_callback, 0);
 		if (ret) {
 			return ret;
 		}
@@ -461,7 +461,7 @@ static int do_ftp_uput(enum at_parser_cmd_type, struct at_parser *parser,
 
 	if (param_count == 2) {
 		/* enter data mode */
-		ret = enter_datamode(ftp_datamode_callback);
+		ret = enter_datamode(ftp_datamode_callback, 0);
 		if (ret) {
 			return ret;
 		}
@@ -510,7 +510,7 @@ static int do_ftp_mput(enum at_parser_cmd_type, struct at_parser *parser,
 
 	if (param_count == 3) {
 		/* enter data mode */
-		ret = enter_datamode(ftp_datamode_callback);
+		ret = enter_datamode(ftp_datamode_callback, 0);
 		if (ret) {
 			return ret;
 		}

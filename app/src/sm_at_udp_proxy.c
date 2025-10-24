@@ -657,7 +657,7 @@ static int handle_at_udp_send(enum at_parser_cmd_type cmd_type, struct at_parser
 			datamode = true;
 		}
 		if (datamode) {
-			err = enter_datamode(udp_datamode_callback);
+			err = enter_datamode(udp_datamode_callback, 0);
 		} else {
 			err = do_udp_send(data, size);
 		}

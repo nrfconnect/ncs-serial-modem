@@ -192,7 +192,7 @@ static int payload_cb(int sock, struct http_request *req, void *user_data)
 	ARG_UNUSED(user_data);
 
 	if (httpc.content_length > 0 || httpc.chunked_transfer) {
-		enter_datamode(httpc_datamode_callback);
+		enter_datamode(httpc_datamode_callback, 0);
 		rsp_send("\r\n#XHTTPCREQ: 1\r\n");
 		/* Wait until all payload is sent */
 		LOG_DBG("wait until payload is ready");

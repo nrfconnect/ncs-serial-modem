@@ -149,11 +149,13 @@ void data_send(const uint8_t *data, size_t len);
  * No AT unsolicited message or command response allowed in data mode.
  *
  * @param handler Data mode handler provided by requesting module
+ * @param data_len Expected data length to be sent in data mode. 0 means unknown length and
+ *        that the termination command is required to exit the data mode.
  *
  * @retval 0 If the operation was successful.
  *         Otherwise, a (negative) error code is returned.
  */
-int enter_datamode(sm_datamode_handler_t handler);
+int enter_datamode(sm_datamode_handler_t handler, size_t data_len);
 
 /**
  * @brief Check whether Serial Modem AT host is in data mode
