@@ -170,7 +170,7 @@ For the process described here, |SM|'s UARTs must be connected to the Linux host
       $ sudo pppd -detach <PPP_UART_dev> <baud_rate> noauth crtscts novj nodeflate nobsdcomp debug +ipv6 usepeerdns noipdefault defaultroute defaultroute6 ipv6cp-restart 5 ipcp-restart 5
 
    Replace ``<PPP_UART_dev>`` by the device file assigned to the PPP UART and ``<baud_rate>`` by the baud rate of the UART that PPP is using (which is set in the :file:`overlay-ppp-without-cmux.overlay` file).
-   Typically, when ``uart1`` is assigned to be the PPP UART (in the devicetree overlay), the device file assigned to it is :file:`/dev/ttyACM2` for an nRF9160 DK, and :file:`/dev/ttyACM1` for the other nRF91 Series DKs.
+   Typically, when ``uart1`` is assigned to be the PPP UART (in the devicetree overlay), the device file assigned to it is :file:`/dev/ttyACM1` for an nRF9151 DK.
 
 #. After the PPP link negotiation has completed successfully, |SM| will send ``#XPPP: 1,1,0`` notification over UART, and a new network interface will be available, typically ``ppp0``.
    This network interface will allow sending and receiving IP traffic through the modem of the nRF91 Series SiP running |SM|.

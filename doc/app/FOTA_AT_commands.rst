@@ -35,8 +35,7 @@ Syntax
   * ``3`` - Start FOTA for full modem update.
     Can only be used when the :file:`overlay-full_fota.conf` configuration file is used.
 
-    Not supported on the Thingy:91 X, `Thingy:91 <thingy91_>`_, or nRF9160 DK board revisions older than 0.14.0 as they lack an external flash to store the firmware image.
-    See `nRF9160 DK board revisions <nrf9160_board_revisions_>`_ for more details.
+    Not supported on the Thingy:91 X.
 
   * ``7`` - Read modem DFU area size and firmware image offset (for modem delta update).
   * ``9`` - Erase modem DFU area (for modem delta update).
@@ -99,7 +98,7 @@ Example
    OK
 
    modem firmware download and update
-   AT#XFOTA=2,"http://remote.host/fota/mfw_nrf9160_update_from_1.3.4_to_1.3.5.bin"
+   AT#XFOTA=2,"http://remote.host/fota/mfw_nrf9151_update_from_2.0.2_to_2.0.3.bin"
    OK
    #XFOTA: 1,0,0
    ...

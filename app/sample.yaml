@@ -5,14 +5,9 @@ tests:
     sysbuild: true
     build_only: true
     platform_allow:
-      - nrf9160dk/nrf9160/ns
-      - nrf9161dk/nrf9161/ns
       - nrf9151dk/nrf9151/ns
-      - nrf9131ek/nrf9131/ns
-      - thingy91/nrf9160/ns
       - thingy91x/nrf9151/ns
     integration_platforms:
-      - nrf9160dk/nrf9160/ns
       - nrf9151dk/nrf9151/ns
       - thingy91x/nrf9151/ns
   serial_modem.extmcu:
@@ -21,8 +16,6 @@ tests:
     extra_args:
       - EXTRA_DTC_OVERLAY_FILE="overlay-external-mcu.overlay"
     platform_allow:
-      - nrf9160dk/nrf9160/ns
-      - nrf9161dk/nrf9161/ns
       - nrf9151dk/nrf9151/ns
     integration_platforms:
       - nrf9151dk/nrf9151/ns
@@ -32,11 +25,7 @@ tests:
     extra_args:
       - EXTRA_DTC_OVERLAY_FILE="overlay-disable-dtr.overlay"
     platform_allow:
-      - nrf9161dk/nrf9161/ns
       - nrf9151dk/nrf9151/ns
-      - nrf9160dk/nrf9160/ns
-      - nrf9131ek/nrf9131/ns
-      - thingy91/nrf9160/ns
       - thingy91x/nrf9151/ns
     integration_platforms:
       - nrf9151dk/nrf9151/ns
@@ -48,11 +37,7 @@ tests:
       - EXTRA_CONF_FILE="overlay-ppp-without-cmux.conf"
       - EXTRA_DTC_OVERLAY_FILE="overlay-ppp-without-cmux.overlay"
     platform_allow:
-      - nrf9160dk/nrf9160/ns
-      - nrf9161dk/nrf9161/ns
       - nrf9151dk/nrf9151/ns
-      - nrf9131ek/nrf9131/ns
-      - thingy91/nrf9160/ns
       - thingy91x/nrf9151/ns
     integration_platforms:
       - nrf9151dk/nrf9151/ns
@@ -62,11 +47,7 @@ tests:
     extra_args:
       - EXTRA_CONF_FILE="overlay-ppp-cmux-linux.conf"
     platform_allow:
-      - nrf9160dk/nrf9160/ns
-      - nrf9161dk/nrf9161/ns
       - nrf9151dk/nrf9151/ns
-      - nrf9131ek/nrf9131/ns
-      - thingy91/nrf9160/ns
       - thingy91x/nrf9151/ns
     integration_platforms:
       - nrf9151dk/nrf9151/ns
@@ -77,21 +58,9 @@ tests:
       - EXTRA_CONF_FILE="overlay-cmux.conf;overlay-ppp.conf;overlay-zephyr-modem.conf"
       - EXTRA_DTC_OVERLAY_FILE="overlay-external-mcu.overlay;overlay-zephyr-modem-external-mcu.overlay"
     platform_allow:
-      - nrf9160dk/nrf9160/ns
-      - nrf9161dk/nrf9161/ns
       - nrf9151dk/nrf9151/ns
     integration_platforms:
       - nrf9151dk/nrf9151/ns
-  serial_modem.ppp_cmux_zephyr_with_nrf52840_on_nrf9160dk:
-    sysbuild: true
-    build_only: true
-    extra_args:
-      - EXTRA_CONF_FILE="overlay-cmux.conf;overlay-ppp.conf;overlay-zephyr-modem.conf;"
-      - EXTRA_DTC_OVERLAY_FILE="overlay-zephyr-modem-nrf9160dk-nrf52840.overlay"
-    platform_allow:
-      - nrf9160dk/nrf9160/ns
-    integration_platforms:
-      - nrf9160dk/nrf9160/ns
   serial_modem.memfault:
     sysbuild: true
     build_only: true
@@ -100,10 +69,7 @@ tests:
     extra_configs:
       - CONFIG_MEMFAULT_NCS_PROJECT_KEY="dummy-key"
     platform_allow:
-      - nrf9160dk/nrf9160/ns
-      - nrf9161dk/nrf9161/ns
       - nrf9151dk/nrf9151/ns
-      - nrf9131ek/nrf9131/ns
       - thingy91x/nrf9151/ns
     integration_platforms:
       - nrf9151dk/nrf9151/ns
@@ -112,10 +78,7 @@ tests:
     build_only: true
     extra_args: EXTRA_CONF_FILE=overlay-native_tls.conf
     platform_allow:
-      - nrf9160dk/nrf9160/ns
-      - nrf9161dk/nrf9161/ns
       - nrf9151dk/nrf9151/ns
-      - nrf9131ek/nrf9131/ns
       - thingy91x/nrf9151/ns
     integration_platforms:
       - nrf9151dk/nrf9151/ns
@@ -124,10 +87,7 @@ tests:
     build_only: true
     extra_args: EXTRA_CONF_FILE=overlay-carrier.conf
     platform_allow:
-      - nrf9160dk/nrf9160/ns
-      - nrf9161dk/nrf9161/ns
       - nrf9151dk/nrf9151/ns
-      - nrf9131ek/nrf9131/ns
       - thingy91x/nrf9151/ns
     integration_platforms:
       - nrf9151dk/nrf9151/ns
@@ -138,10 +98,9 @@ tests:
       - EXTRA_CONF_FILE="overlay-carrier.conf;overlay-carrier-softbank.conf"
       - SB_EXTRA_CONF_FILE=sysbuild-softbank.conf
     platform_allow:
-      - nrf9160dk/nrf9160/ns
       - nrf9151dk/nrf9151/ns
     integration_platforms:
-      - nrf9160dk/nrf9160/ns
+      - nrf9151dk/nrf9151/ns
   serial_modem.lwm2m_carrier.lgu:
     sysbuild: true
     build_only: true
@@ -155,9 +114,6 @@ tests:
     build_only: true
     platform_allow:
       - nrf9151dk/nrf9151/ns
-      - nrf9160dk/nrf9160/ns
-      - nrf9161dk/nrf9161/ns
-      - thingy91/nrf9160/ns
       - thingy91x/nrf9151/ns
     integration_platforms:
       - nrf9151dk/nrf9151/ns
