@@ -21,7 +21,7 @@ This causes the DTR UART driver to stop the RX and TX operations and disable the
 When the DCE has data to be read by the DTE, it asserts the RI signal for a short period of time.
 The DTE can then assert the DTR signal to resume the UART peripheral and read the data.
 
-Application Integration
+Application integration
 ***********************
 
 When the DTR signal is deasserted:
@@ -40,7 +40,7 @@ When the DTR signal is asserted:
   The application must provide a new RX buffer by calling the :c:func:`uart_rx_buf_rsp` function.
 * The application will be able to send and receive UART data as normal.
 
-Power Management
+Power management
 ----------------
 
 With Device Power Management enabled with the ``CONFIG_PM_DEVICE`` Kconfig option, the DTR UART driver can be suspended and resumed from the application using the :c:func:`pm_device_action_run` function.
