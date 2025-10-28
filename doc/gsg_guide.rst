@@ -1,6 +1,6 @@
 .. _serial_modem_gsg:
 
-Getting Started
+Getting started
 ###############
 
 .. contents::
