@@ -164,8 +164,6 @@ This provides more flexibility and clearer socket management by directly referen
      * ``AT#XSSOCKETOPT=<handle>,<op>,<name>[,<value>]`` (handle parameter added)
      * ``AT#XBIND=<handle>,<port>`` (handle parameter added)
      * ``AT#XCONNECT=<handle>,<url>,<port>`` (handle parameter added)
-     * ``AT#XLISTEN=<handle>`` (handle parameter added)
-     * ``AT#XACCEPT=<handle>,<timeout>`` (handle parameter added)
 
    * **Response format changes:**
 
@@ -220,5 +218,7 @@ Removed features:
      * ``AT#XTCPSVR``
      * ``AT#XTCPHANGUP``
      * ``AT#XUDPSVR``
+     * ``AT#XLISTEN``
+     * ``AT#XACCEPT``
 
      There is no direct replacement for these commands.

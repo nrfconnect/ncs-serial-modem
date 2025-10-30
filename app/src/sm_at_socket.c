@@ -104,7 +104,6 @@ static struct async_poll_ctx {
 
 /* forward declarations */
 #define SOCKET_SEND_TMO_SEC 30
-static int socket_poll(int sock_fd, int event, int timeout);
 
 static void init_socket(struct sm_socket *socket)
 {
@@ -824,62 +823,6 @@ static int do_connect(struct sm_socket *sock, const char *url, uint16_t port)
 	return ret;
 }
 
-static int do_listen(struct sm_socket *sock)
-{
-	int ret;
-
-	/* hardcode backlog to be 1 for now */
-	ret = nrf_listen(sock->fd, 1);
-	if (ret < 0) {
-		LOG_ERR("nrf_listen() error: %d", -errno);
-		return -errno;
-	}
-
-	return 0;
-}
-
-static int do_accept(struct sm_socket *sock, int timeout)
-{
-	int ret;
-	char peer_addr[NRF_INET6_ADDRSTRLEN] = {0};
-
-	ret = socket_poll(sock->fd, NRF_POLLIN, timeout);
-	if (ret) {
-		return ret;
-	}
-
-	if (sock->family == AF_INET) {
-		struct nrf_sockaddr_in client;
-		socklen_t len = sizeof(struct nrf_sockaddr_in);
-
-		ret = nrf_accept(sock->fd, (struct nrf_sockaddr *)&client, &len);
-		if (ret == -1) {
-			LOG_ERR("nrf_accept() error: %d", -errno);
-			sock->fd_peer = INVALID_SOCKET;
-			return -errno;
-		}
-		sock->fd_peer = ret;
-		nrf_inet_ntop(NRF_AF_INET, &client.sin_addr, peer_addr, sizeof(peer_addr));
-	} else if (sock->family == AF_INET6) {
-		struct nrf_sockaddr_in6 client;
-		socklen_t len = sizeof(struct nrf_sockaddr_in6);
-
-		ret = nrf_accept(sock->fd, (struct nrf_sockaddr *)&client, &len);
-		if (ret == -1) {
-			LOG_ERR("nrf_accept() error: %d", -errno);
-			sock->fd_peer = INVALID_SOCKET;
-			return -errno;
-		}
-		sock->fd_peer = ret;
-		(void)nrf_inet_ntop(NRF_AF_INET6, &client.sin6_addr, peer_addr, sizeof(peer_addr));
-	} else {
-		return -EINVAL;
-	}
-	rsp_send("\r\n#XACCEPT: %d,\"%s\"\r\n", sock->fd_peer, peer_addr);
-
-	return 0;
-}
-
 static int do_send(struct sm_socket *sock, const uint8_t *data, int len, int flags)
 {
 	int ret = 0;
@@ -1125,35 +1068,6 @@ static int do_recvfrom(struct sm_socket *sock, int timeout, int flags,
 		}
 
 		delegate_poll_event(sock, ZSOCK_POLLIN);
-	}
-
-	return 0;
-}
-
-static int socket_poll(int sock_fd, int event, int timeout)
-{
-	int ret;
-	struct nrf_pollfd fd = {
-		.fd = sock_fd,
-		.events = event
-	};
-
-	if (timeout <= 0) {
-		return 0;
-	}
-
-	ret = nrf_poll(&fd, 1, MSEC_PER_SEC * timeout);
-	if (ret < 0) {
-		LOG_WRN("nrf_poll() error: %d", -errno);
-		return -errno;
-	} else if (ret == 0) {
-		LOG_WRN("nrf_poll() timeout");
-		return -EAGAIN;
-	}
-
-	LOG_DBG("nrf_poll() events 0x%08x", fd.revents);
-	if ((fd.revents & event) != event) {
-		return -EAGAIN;
 	}
 
 	return 0;
@@ -1620,78 +1534,6 @@ static int handle_at_connect(enum at_parser_cmd_type cmd_type, struct at_parser 
 			return err;
 		}
 		err = do_connect(sock, url, port);
-		break;
-
-	default:
-		break;
-	}
-
-	return err;
-}
-
-SM_AT_CMD_CUSTOM(xlisten, "AT#XLISTEN", handle_at_listen);
-static int handle_at_listen(enum at_parser_cmd_type cmd_type, struct at_parser *parser, uint32_t)
-{
-	int err = -EINVAL;
-	int fd;
-	struct sm_socket *sock = NULL;
-
-	switch (cmd_type) {
-	case AT_PARSER_CMD_TYPE_SET:
-		err = at_parser_num_get(parser, 1, &fd);
-		if (err) {
-			return err;
-		}
-		sock = find_socket(fd);
-		if (sock == NULL) {
-			return -EINVAL;
-		}
-		if (sock->role != AT_SOCKET_ROLE_SERVER) {
-			LOG_ERR("Invalid role");
-			return -EOPNOTSUPP;
-		}
-		err = do_listen(sock);
-		break;
-
-	default:
-		break;
-	}
-
-	return err;
-}
-
-SM_AT_CMD_CUSTOM(xaccept, "AT#XACCEPT", handle_at_accept);
-static int handle_at_accept(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
-			    uint32_t)
-{
-	int err = -EINVAL;
-	int fd;
-	int timeout;
-	struct sm_socket *sock = NULL;
-
-	switch (cmd_type) {
-	case AT_PARSER_CMD_TYPE_SET:
-		if (poll_ctx.poll_running) {
-			LOG_ERR("%s cannot be used with AT#XAPOLL", "AT#XACCEPT");
-			return -EBUSY;
-		}
-		err = at_parser_num_get(parser, 1, &fd);
-		if (err) {
-			return err;
-		}
-		sock = find_socket(fd);
-		if (sock == NULL) {
-			return -EINVAL;
-		}
-		if (sock->role != AT_SOCKET_ROLE_SERVER) {
-			LOG_ERR("Invalid role");
-			return -EOPNOTSUPP;
-		}
-		err = at_parser_num_get(parser, 2, &timeout);
-		if (err) {
-			return err;
-		}
-		err = do_accept(sock, timeout);
 		break;
 
 	default:
