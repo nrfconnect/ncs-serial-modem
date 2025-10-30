@@ -37,6 +37,7 @@ The |SM| application enters data mode when an AT command to send data out does n
 See the following examples:
 
 * ``AT#XSEND=0,2,0`` makes |SM| enter data mode to receive arbitrary data to transmit for socket 0.
+* ``AT#XSEND=0,2,0,<data_len>`` makes |SM| enter data mode to receive arbitrary data of the specified length to transmit for socket 0.
 * ``AT#XSEND=0,0,0,"data"`` makes |SM| transmit data in normal AT Command mode for socket 0.
 
 .. note::
@@ -71,10 +72,12 @@ This Unsolicited Result Code (URC) can also be used to impose flow control on up
 Exiting data mode
 =================
 
-To exit the data mode, the MCU sends the termination command set by the :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` configuration option over UART.
+To exit the data mode without the specification of ``<data_len>``, the MCU sends the termination command set by the :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` configuration option over UART.
 
 The pattern string could be sent alone or as an affix to the data.
 The pattern string must be sent in full.
+
+If ``<data_len>`` is specified in the AT command and the specified data length is reached, the |SM| application exits data mode. Termination command is not used in this case.
 
 When exiting the data mode, the |SM| application sends the ``#XDATAMODE`` unsolicited notification.
 
@@ -234,7 +237,8 @@ Example
 
 ::
 
-   AT#XSEND
+   AT#XSEND=0,2,0
+
    OK
    Test TCP datamode
    +++

@@ -82,7 +82,7 @@ You can connect to public HTTP servers (port 80), but you cannot send and receiv
 
          **AT#XSOCKET=?**
 
-         #XSOCKET: (0,1,2),(1,2,3),(0,1),<cid>
+         #XSOCKET: <handle>,(1,2),(1,2,3),(0,1),<cid>
 
          OK
 
@@ -93,7 +93,7 @@ You can connect to public HTTP servers (port 80), but you cannot send and receiv
 
          **AT#XSOCKET=1,1,0**
 
-         #XSOCKET: 1,1,6
+         #XSOCKET: 0,1,6
 
          OK
 
@@ -103,7 +103,7 @@ You can connect to public HTTP servers (port 80), but you cannot send and receiv
 
          OK
 
-         **AT#XSOCKETOPT=1,20,30**
+         **AT#XSOCKETOPT=0,1,20,30**
 
          OK
 
@@ -113,9 +113,9 @@ You can connect to public HTTP servers (port 80), but you cannot send and receiv
       .. parsed-literal::
         :class: highlight
 
-         **AT#XCONNECT="**\ *example.com*\ **",**\ *1234*
+         **AT#XCONNECT=0,"**\ *example.com*\ **",**\ *1234*
 
-         #XCONNECT: 1
+         #XCONNECT: 0,1
 
          OK
 
@@ -124,15 +124,15 @@ You can connect to public HTTP servers (port 80), but you cannot send and receiv
       .. parsed-literal::
          :class: highlight
 
-         **AT#XSEND="Test TCP"**
+         **AT#XSEND=0,0,0,"Test TCP"**
 
-         #XSEND: 8
+         #XSEND: 0,0,8
 
          OK
 
-         **AT#XRECV=0**
+         **AT#XRECV=0,0,0,0**
 
-         #XRECV: 8
+         #XRECV: 0,0,8
          Test TCP
          OK
 
@@ -141,9 +141,9 @@ You can connect to public HTTP servers (port 80), but you cannot send and receiv
       .. parsed-literal::
          :class: highlight
 
-         **AT#XSOCKET=0**
+         **AT#XCLOSE=0**
 
-         #XSOCKET: 0,"closed"
+         #XCLOSE: 0,0
 
          OK
 
@@ -244,15 +244,15 @@ The following steps assume that you have a UDP echo server available.
       .. parsed-literal::
          :class: highlight
 
-         **AT#XSENDTO="**\ *example.com*\ **",**\ *1234*\ **,"Test UDP"**
+         **AT#XSENDTO=0,0,0,"**\ *example.com*\ **",**\ *1234*\ **,"Test UDP"**
 
-         #XSENDTO: 8
+         #XSENDTO: 0,0,8
 
          OK
 
-         **AT#XRECVFROM=0**
+         **AT#XRECVFROM=0,0,0,0**
 
-         #XRECVFROM: 8,"<*IP address*>",<*port*>
+         #XRECVFROM: 0,0,8,"<*IP address*>",<*port*>
          Test UDP
          OK
 
@@ -261,9 +261,9 @@ The following steps assume that you have a UDP echo server available.
       .. parsed-literal::
          :class: highlight
 
-         **AT#XSOCKET=0**
+         **AT#XCLOSE=0**
 
-         #XSOCKET: 0,"closed"
+         #XCLOSE: 0,0
 
          OK
 
@@ -281,9 +281,9 @@ The following steps assume that you have a UDP echo server available.
 
          OK
 
-         **AT#XCONNECT="**\ *example.com*\ **",**\ *1234*
+         **AT#XCONNECT=0,"**\ *example.com*\ **",**\ *1234*
 
-         #XCONNECT: 1
+         #XCONNECT: 0,1
 
          OK
 
@@ -292,15 +292,15 @@ The following steps assume that you have a UDP echo server available.
       .. parsed-literal::
          :class: highlight
 
-         **AT#XSEND="Test UDP"**
+         **AT#XSEND=0,0,0,"Test UDP"**
 
-         #XSEND: 8
+         #XSEND: 0,0,8
 
          OK
 
-         **AT#XRECV=0**
+         **AT#XRECV=0,0,0,0**
 
-         #XRECV: 8
+         #XRECV: 0,0,8
          Test UDP
          OK
 
@@ -309,9 +309,9 @@ The following steps assume that you have a UDP echo server available.
       .. parsed-literal::
          :class: highlight
 
-         **AT#XSOCKET=0**
+         **AT#XCLOSE=0**
 
-         #XSOCKET: 0,"closed"
+         #XCLOSE: 0,0
 
          OK
 
@@ -376,7 +376,7 @@ A TLS client connection requires a valid certificate for the TLS server.
 Update your TLS (root) certificate in PEM format with your selected security tag (in this example, 1000), and start the modem:
 
    .. note::
-      Sending multi-line text to |SM| requires the terminal to be configured to use `<CR><LF>` as the line ending.
+      Sending multi-line text to |SM| requires the terminal to be configured to use ``<CR><LF>`` as the line ending.
 
    .. parsed-literal::
       :class: highlight
@@ -433,13 +433,13 @@ Update your TLS (root) certificate in PEM format with your selected security tag
 
          **AT#XSSOCKET=1,1,0,1000**
 
-         #XSOCKET: 0,1,258
+         #XSSOCKET: 0,1,258
 
          OK
 
-         **AT#XCONNECT="**\ *example.com*\ **",**\ *1234*
+         **AT#XCONNECT=0,"**\ *example.com*\ **",**\ *1234*
 
-         #XCONNECT: 1
+         #XCONNECT: 0,1
 
          OK
 
@@ -448,15 +448,15 @@ Update your TLS (root) certificate in PEM format with your selected security tag
       .. parsed-literal::
          :class: highlight
 
-         **AT#XSEND="Test TLS client"**
+         **AT#XSEND=0,0,0,"Test TLS client"**
 
-         #XSEND: 15
+         #XSEND: 0,0,15
 
          OK
 
-         **AT#XRECV=0**
+         **AT#XRECV=0,0,0,0**
 
-         #XRECV: 15
+         #XRECV: 0,0,15
          Test TLS client
          OK
 
@@ -465,9 +465,9 @@ Update your TLS (root) certificate in PEM format with your selected security tag
       .. parsed-literal::
          :class: highlight
 
-         **AT#XSSOCKET=0**
+         **AT#XCLOSE=0**
 
-         #XSOCKET: 0,"closed"
+         #XCLOSE: 0,0
 
          OK
 
@@ -557,9 +557,9 @@ Update your hex-encoded PSK and the PSK identity to be used for the DTLS connect
 
          OK
 
-         **AT#XCONNECT="**\ *example.com*\ **",**\ *1234*
+         **AT#XCONNECT=0,"**\ *example.com*\ **",**\ *1234*
 
-         #XCONNECT: 1
+         #XCONNECT: 0,1
 
          OK
 
@@ -568,15 +568,15 @@ Update your hex-encoded PSK and the PSK identity to be used for the DTLS connect
       .. parsed-literal::
          :class: highlight
 
-         **AT#XSEND="Test DTLS client"**
+         **AT#XSEND=0,0,0,"Test DTLS client"**
 
-         #XSEND: 16
+         #XSEND: 0,0,16
 
          OK
 
-         **AT#XRECV=0**
+         **AT#XRECV=0,0,0,0**
 
-         #XRECV: 16
+         #XRECV: 0,0,16
          Test DTLS client
          OK
 
@@ -585,9 +585,9 @@ Update your hex-encoded PSK and the PSK identity to be used for the DTLS connect
       .. parsed-literal::
          :class: highlight
 
-         **AT#XSSOCKET=0**
+         **AT#XCLOSE=0**
 
-         #XSOCKET: 0,"closed"
+         #XCLOSE: 0,0
 
          OK
 
@@ -674,10 +674,10 @@ To test the TCP server functionality, complete the following steps:
          #XSOCKET: 0,1,6
          OK
 
-         **AT#XBIND=**\ *1234*
+         **AT#XBIND=0,**\ *1234*
          OK
 
-         **AT#XLISTEN**
+         **AT#XLISTEN=0**
          OK
 
    #. Run the :file:`client_tcp.py` script to start sending data to the server.
@@ -687,27 +687,27 @@ To test the TCP server functionality, complete the following steps:
       .. parsed-literal::
          :class: highlight
 
-         **AT#XACCEPT=60**
+         **AT#XACCEPT=0,60**
 
          #XACCEPT: 1,"*IP address*"
 
          OK
-         **AT#XRECV=0**
+         **AT#XRECV=1,0,0,0**
 
-         #XRECV: 26
+         #XRECV: 1,0,26
          Hello, TCP#1!Hello, TCP#2!
          OK
-         **AT#XSEND="TCP1/2 received"**
-         #XSEND: 15
+         **AT#XSEND=1,0,0,"TCP1/2 received"**
+         #XSEND: 1,0,15
          OK
 
-         **AT#XRECV=0**
-         #XRECV: 39
+         **AT#XRECV=1,0,0,0**
+         #XRECV: 1,0,39
          Hello, TCP#3!Hello, TCP#4!Hello, TCP#5!
          OK
 
-         **AT#XSEND="TCP3/4/5 received"**
-         #XSEND: 17
+         **AT#XSEND=1,0,0,"TCP3/4/5 received"**
+         #XSEND: 1,0,17
          OK
 
    #. Observe the output of the Python script::
@@ -728,8 +728,8 @@ To test the TCP server functionality, complete the following steps:
       .. parsed-literal::
          :class: highlight
 
-         **AT#XSOCKET=0**
-         #XSOCKET: 0,"closed"
+         **AT#XCLOSE=0**
+         #XCLOSE: 0,0
          OK
 
 
@@ -904,7 +904,7 @@ To test the UDP server functionality, complete the following steps:
          #XSOCKET: 0,2,17
          OK
 
-         **AT#XBIND=**\ *1234*
+         **AT#XBIND=0,**\ *1234*
          OK
 
    #. Run the :file:`client_udp.py` script to start sending data to the server.
@@ -915,37 +915,37 @@ To test the UDP server functionality, complete the following steps:
       .. parsed-literal::
          :class: highlight
 
-         **AT#XRECVFROM=0**
-         #XRECVFROM: 13,"<*IP address*>",<*port*>
+         **AT#XRECVFROM=0,0,0,0**
+         #XRECVFROM: 0,0,13,"<*IP address*>",<*port*>
          Hello, UDP#1!
          OK
 
-         **AT#XRECVFROM=0**
-         #XRECVFROM: 13,"<*IP address*>",<*port*>
+         **AT#XRECVFROM=0,0,0,0**
+         #XRECVFROM: 0,0,13,"<*IP address*>",<*port*>
          Hello, UDP#2!
          OK
 
-         **AT#XSENDTO="**\ *example.com*\ **",**\ *1234*\ **,"UDP1/2 received"**
-         #XSENDTO: 15
+         **AT#XSENDTO=0,0,0,"**\ *example.com*\ **",**\ *1234*\ **,"UDP1/2 received"**
+         #XSENDTO: 0,0,15
          OK
 
-         **AT#XRECVFROM=0**
-         #XRECVFROM: 13,"<*IP address*>",<*port*>
+         **AT#XRECVFROM=0,0,0,0**
+         #XRECVFROM: 0,0,13,"<*IP address*>",<*port*>
          Hello, UDP#3!
          OK
 
-         **AT#XRECVFROM=0**
-         #XRECVFROM: 13,"<*IP address*>",<*port*>
+         **AT#XRECVFROM=0,0,0,0**
+         #XRECVFROM: 0,0,13,"<*IP address*>",<*port*>
          Hello, UDP#4!
          OK
 
-         **AT#XRECVFROM=0**
-         #XRECVFROM: 13,"<*IP address*>",<*port*>
+         **AT#XRECVFROM=0,0,0,0**
+         #XRECVFROM: 0,0,13,"<*IP address*>",<*port*>
          Hello, UDP#5!
          OK
 
-         **AT#XSENDTO="**\ *example.com*\ **",**\ *1234*\ **,"UDP3/4/5 received"**
-         #XSENDTO: 17
+         **AT#XSENDTO=0,0,0,"**\ *example.com*\ **",**\ *1234*\ **,"UDP3/4/5 received"**
+         #XSENDTO: 0,0,17
          OK
 
    #. Observe the output of the Python script::
@@ -968,8 +968,8 @@ To test the UDP server functionality, complete the following steps:
       .. parsed-literal::
          :class: highlight
 
-         **AT#XSOCKET=0**
-         #XSOCKET: 0,"closed"
+         **AT#XCLOSE=0**
+         #XCLOSE: 0,0
          OK
 
 #. Test the UDP server with UDP proxy service:
@@ -1074,7 +1074,7 @@ After opening a client-role socket, you can configure various options.
       :class: highlight
 
       **AT#XSOCKETOPT=?**
-      #XSOCKETOPT: (0,1),<name>,<value>
+      #XSOCKETOPT: <handle>,(0,1),<name>,<value>
       OK
 
 #. Open a client socket.
@@ -1083,7 +1083,7 @@ After opening a client-role socket, you can configure various options.
       :class: highlight
 
       **AT#XSOCKET=1,1,0**
-      #XSOCKET: 2,1,6
+      #XSOCKET: 0,1,6
       OK
 
 #. Test to set and get socket options.
@@ -1092,7 +1092,7 @@ After opening a client-role socket, you can configure various options.
    .. parsed-literal::
       :class: highlight
 
-      **AT#XSOCKETOPT=1,20,30**
+      **AT#XSOCKETOPT=0,1,20,30**
       OK
 
 ICMP AT commands
