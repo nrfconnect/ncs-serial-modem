@@ -19,6 +19,8 @@ if [[ ! -c $AT_CMUX ]]; then
 	exit 1
 fi
 
+test -f /var/run/ppp-nrf91.pid && kill -SIGTERM $(head -1 </var/run/ppp-nrf91.pid)
+
 chat $CHATOPT -t30 "" "AT+CFUN=0" "#XPPP: 0,0" >$AT_CMUX <$AT_CMUX
 
 sleep 1
