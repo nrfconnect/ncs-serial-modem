@@ -111,6 +111,9 @@ static void dlci_pipe_event_handler(struct modem_pipe *pipe,
 
 	case MODEM_PIPE_EVENT_CLOSED:
 		LOG_INF("DLCI %u%s closed.", dlci->address, is_at ? " (AT)" : "");
+		if (is_at) {
+			k_sem_give(&cmux.tx_sem);
+		}
 		break;
 
 	case MODEM_PIPE_EVENT_RECEIVE_READY:
@@ -120,8 +123,7 @@ static void dlci_pipe_event_handler(struct modem_pipe *pipe,
 		break;
 
 	case MODEM_PIPE_EVENT_TRANSMIT_IDLE:
-		if (is_at &&
-		    cmux.dlcis[cmux.at_channel].instance.state == MODEM_CMUX_DLCI_STATE_OPEN) {
+		if (is_at) {
 			k_sem_give(&cmux.tx_sem);
 		}
 		break;
@@ -162,14 +164,15 @@ static int cmux_write_at_channel_block(const uint8_t *data, size_t *len)
 		ret = modem_pipe_transmit(cmux.dlcis[cmux.at_channel].pipe, data + sent,
 					  *len - sent);
 		if (ret < 0) {
-			if (ret != -EPERM) {
-				/* Pipe is open, but failed. */
-				LOG_ERR("DLCI %u (AT) transmit failed (%d).",
-					INDEX_TO_DLCI(cmux.at_channel), ret);
-			}
-			*len = sent;
+			LOG_ERR("DLCI %u (AT) transmit failed (%d).",
+				INDEX_TO_DLCI(cmux.at_channel), ret);
 			return ret;
 		} else if (ret == 0) {
+			if (cmux.dlcis[cmux.at_channel].instance.state !=
+			    MODEM_CMUX_DLCI_STATE_OPEN) {
+				/* Drop URC when pipe is closed */
+				return 0;
+			}
 			/* Pipe TX buffer full. Wait for transmit idle event. */
 			k_sem_take(&cmux.tx_sem, K_FOREVER);
 		} else {
