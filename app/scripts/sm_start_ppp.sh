@@ -44,10 +44,17 @@ fi
 stty -F $MODEM $BAUD pass8 raw crtscts clocal
 
 echo "Wait modem to boot"
-chat -t5 "" "AT" "OK" <$MODEM >$MODEM || true
-
-echo "Attach CMUX channel to modem..."
-ldattach -c $'AT#XCMUX=1\r' GSM0710 $MODEM
+if chat -t5 "" "AT" "OK" <$MODEM >$MODEM; then
+	echo "Modem is in AT mode"
+	echo "Attach CMUX channel to modem..."
+	ldattach -c $'AT#XCMUX=1\r' GSM0710 $MODEM
+else
+	echo "Modem not responding, try CMUX resync..."
+	printf "\xF9\xF9\xF9\xF9\xF9\xF9\xF9\xF9" > $MODEM
+	printf "\xF9\x03\xEF\x05\xC3\x01\xF2\xF9" > $MODEM
+	echo "Attach CMUX channel to modem..."
+	ldattach GSM0710 $MODEM
+fi
 
 sleep 1
 stty -F $AT_CMUX clocal
