@@ -237,6 +237,5 @@ rsource "src/twi/Kconfig"
 rsource "src/gpio/Kconfig"
 rsource "src/lwm2m_carrier/Kconfig"
 rsource "src/gnss/Kconfig"
-rsource "src/nativetls/Kconfig"
 
 endmenu

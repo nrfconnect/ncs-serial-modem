@@ -198,6 +198,9 @@ Removed features
 
 This section lists features that have been removed from the |addon| compared to the |NCS| v3.1.x `Serial LTE modem (SLM) <Serial LTE modem_>`_.
 If you need any of those features with this |addon|, please contact customer support and describe your use case.
+Removed features:
 
-   * Remove board support for the following chipsets: ``nrf9161dk/nrf9161/ns``, ``nrf9160dk/nrf9160/ns``, ``thingy91/nrf9160/ns`` and ``nrf9131ek/nrf9131/ns``.
+   * Board support for the following chipsets: ``nrf9161dk/nrf9161/ns``, ``nrf9160dk/nrf9160/ns``, ``thingy91/nrf9160/ns`` and ``nrf9131ek/nrf9131/ns``.
      * Use ``nrf9151dk/nrf9151/ns`` instead.
+   * Native TLS support including ``overlay-native_tls.conf``.
+     ``<sec_tag>`` parameter has been removed from ``XTCPSVR`` and ``#XUDPSVR`` commands.

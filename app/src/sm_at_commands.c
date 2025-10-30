@@ -32,9 +32,6 @@
 #include "sm_at_icmp.h"
 #include "sm_at_sms.h"
 #include "sm_at_fota.h"
-#if defined(CONFIG_SM_NATIVE_TLS)
-#include "sm_at_cmng.h"
-#endif
 #if defined(CONFIG_SM_NRF_CLOUD)
 #include "sm_at_nrfcloud.h"
 #endif

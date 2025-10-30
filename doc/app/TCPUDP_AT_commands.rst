@@ -7,8 +7,7 @@ TCP and UDP AT commands
    :local:
    :depth: 2
 
-This page describes TCP- and UDP-related AT commands.
-When native TLS is used, you must store the credentials using the ``AT#XCMNG`` AT command.
+This page describes TCP and UDP related AT commands.
 
 For more information on the networking services, see the `Zephyr Network APIs`_.
 
@@ -27,7 +26,7 @@ Syntax
 
 ::
 
-   #XTCPSVR=<op>[<port>[,<sec_tag>]]
+   #XTCPSVR=<op>[,<port>]
 
 
 * The ``<op>`` parameter can accept one of the following values:
@@ -39,10 +38,6 @@ Syntax
 * The ``<port>`` parameter is an unsigned 16-bit integer (0 - 65535).
   It represents the TCP service port.
   It is mandatory to set it when starting the server.
-* The ``<sec_tag>`` parameter is an integer.
-  If it is given, a TLS server will be started.
-  It indicates to the modem which credentials are used for establishing a secure connection.
-  Can only be used when the :file:`overlay-native_tls.conf` configuration file is used.
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -148,7 +143,7 @@ Response syntax
 
 ::
 
-   #XTCPSVR: <list of ops>,<port>,<sec_tag>
+   #XTCPSVR: <list of ops>,<port>
 
 Examples
 ~~~~~~~~
@@ -156,7 +151,7 @@ Examples
 ::
 
    AT#XTCPSVR=?
-   #XTCPSVR: (0,1,2),<port>,<sec_tag>
+   #XTCPSVR: (0,1,2),<port>
    OK
 
 TCP/TLS client #XTCPCLI
@@ -452,7 +447,7 @@ Syntax
 
 ::
 
-   #XUDPSVR=<op>[,<port>[,<sec_tag>]]
+   #XUDPSVR=<op>[,<port>]
 
 * The ``<op>`` parameter can accept one of the following values:
 
@@ -463,11 +458,6 @@ Syntax
 * The ``<port>`` parameter is an unsigned 16-bit integer (0 - 65535).
   It represents the UDP service port.
   It is mandatory for starting the server.
-* The ``<sec_tag>`` parameter is an integer.
-  If it is given, a DTLS server will be started.
-  It indicates to the modem which credentials are used for establishing a secure connection.
-  Can only be used when the :file:`overlay-native_tls.conf` configuration file is used.
-
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -533,7 +523,7 @@ Response syntax
 
 ::
 
-   #XUDPSVR: <list of ops>,<port>,<sec_tag>
+   #XUDPSVR: <list of ops>,<port>
 
 Examples
 ~~~~~~~~
@@ -541,7 +531,7 @@ Examples
 ::
 
    AT#XUDPSVR=?
-   #XUDPSVR: (0,1,2),<port>,<sec_tag>
+   #XUDPSVR: (0,1,2),<port>
    OK
 
 UDP/DTLS client #XUDPCLI

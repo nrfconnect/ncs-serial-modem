@@ -741,7 +741,7 @@ To test the TCP server functionality, complete the following steps:
          :class: highlight
 
          **AT#XTCPSVR=?**
-         #XTCPSVR: (0,1,2),<port>,<sec_tag>
+         #XTCPSVR: (0,1,2),<port>
          OK
 
          **AT#XTCPSVR?**
@@ -981,7 +981,7 @@ To test the UDP server functionality, complete the following steps:
          :class: highlight
 
          **AT#XUDPSVR=?**
-         #XUDPSVR: (0,1,2),<port>,<sec_tag>
+         #XUDPSVR: (0,1,2),<port>
          OK
 
          **AT#XUDPSVR=1,**\ *1234*
@@ -1038,17 +1038,6 @@ To test the UDP server functionality, complete the following steps:
          **AT#XUDPSVR=0**
          #XUDPSVR: 0,"stopped"
          OK
-
-TLS server
-==========
-
-The TLS server role is currently only supported when using the :file:`overlay-native_tls.conf` configuration file.
-
-
-DTLS server
-===========
-
-The DTLS server role is currently only supported when using the :file:`overlay-native_tls.conf` configuration file.
 
 DNS lookup
 ==========
