@@ -23,12 +23,6 @@ LOG_MODULE_REGISTER(sm_sock, CONFIG_SM_LOG_LEVEL);
 #define SM_FDS_COUNT CONFIG_POSIX_OPEN_MAX
 #define SM_MAX_SOCKET_COUNT (SM_FDS_COUNT - 1)
 
-/*
- * Known limitation in this version
- * - Multiple concurrent sockets
- * - TCP server accept one connection only
- */
-
 /**@brief Socket operations. */
 enum sm_socket_operation {
 	AT_SOCKET_OPEN = 0x1,

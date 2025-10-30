@@ -732,117 +732,6 @@ To test the TCP server functionality, complete the following steps:
          #XCLOSE: 0,0
          OK
 
-
-#. Test the TCP server with TCP proxy service:
-
-   a. Check the available values for the XTCPSVR command and read the information about the current state.
-
-      .. parsed-literal::
-         :class: highlight
-
-         **AT#XTCPSVR=?**
-         #XTCPSVR: (0,1,2),<port>
-         OK
-
-         **AT#XTCPSVR?**
-         #XTCPSVR: -1,-1,0
-         OK
-
-   #. Create a TCP server and read the information about the current state.
-      Replace *1234* with the correct port number.
-
-      .. parsed-literal::
-         :class: highlight
-
-         **AT#XTCPSVR=1,**\ *1234*
-         #XTCPSVR: 0,"started"
-         OK
-
-         **AT#XTCPSVR?**
-         #XTCPSVR: 0,-1,1
-         OK
-
-   #. Run the :file:`client_tcp.py` script to start sending data to the server.
-
-   #. Observe that the server accepts the connection from the client and receives the first packets.
-      Read the information about the current state again.
-
-      .. parsed-literal::
-         :class: highlight
-
-         #XTCPSVR: "*IP address*","connected"
-
-         #XTCPDATA: 13
-         Hello, TCP#1!
-         #XTCPDATA: 13
-         Hello, TCP#2!
-
-         **AT#XTCPSVR?**
-         #XTCPSVR: 0,1,1
-         OK
-
-   #. Send responses and receive the rest of the data.
-      Client disconnects after receiving the last response.
-
-      .. parsed-literal::
-         :class: highlight
-
-         **AT#XTCPSEND="TCP1/2 received"**
-
-         #XTCPSEND: 15
-
-         OK
-
-         #XTCPDATA: 13
-         Hello, TCP#3!
-         #XTCPDATA: 13
-         Hello, TCP#4!
-         #XTCPDATA: 13
-         Hello, TCP#5!
-
-         **AT#XTCPSEND="TCP3/4/5 received"**
-
-         #XTCPSEND: 17
-
-         OK
-
-         #XTCPSVR: 0,"disconnected"
-
-   #. Observe the output of the Python script::
-
-         $ python client_tcp.py
-
-         Sending: 'Hello, TCP#1!
-         Sending: 'Hello, TCP#2!
-         TCP1/2 received
-         Sending: 'Hello, TCP#3!
-         Sending: 'Hello, TCP#4!
-         Sending: 'Hello, TCP#5!
-         TCP3/4/5 received
-         Closing connection
-
-   #. Read the information about the current state.
-
-      .. parsed-literal::
-         :class: highlight
-
-         **AT#XTCPSVR?**
-         #XTCPSVR: 0,-1,1
-         OK
-
-   #. Stop the server.
-
-      .. parsed-literal::
-         :class: highlight
-
-         **AT#XTCPSVR=0**
-         #XTCPSVR:0,"stopped"
-         OK
-
-         **AT#XTCPSVR?**
-         #XTCPSVR: -1,-1,0
-         OK
-
 UDP server
 ==========
 
@@ -911,6 +800,7 @@ To test the UDP server functionality, complete the following steps:
 
    #. Start receiving and acknowledging the data.
       Replace *example.com* with the hostname or IPv4 address of the UDP client and *1234* with the corresponding port.
+      A more complete example would use ``AT#XAPOLL`` to see when data has arrived and then read it with ``AT#XRECVFROM``.
 
       .. parsed-literal::
          :class: highlight
@@ -970,73 +860,6 @@ To test the UDP server functionality, complete the following steps:
 
          **AT#XCLOSE=0**
          #XCLOSE: 0,0
-         OK
-
-#. Test the UDP server with UDP proxy service:
-
-   a. Check the available values for the XUDPSVR command and create a UDP server.
-      Replace *1234* with the correct port number.
-
-      .. parsed-literal::
-         :class: highlight
-
-         **AT#XUDPSVR=?**
-         #XUDPSVR: (0,1,2),<port>
-         OK
-
-         **AT#XUDPSVR=1,**\ *1234*
-         #XUDPSVR: 0,"started"
-         OK
-
-   #. Run the :file:`client_udp.py` script to start sending data to the server.
-
-   #. Observe that the server starts receiving data and acknowledge the data.
-
-      .. parsed-literal::
-         :class: highlight
-
-         #XUDPDATA: 13
-         Hello, UDP#1!
-         #XUDPDATA: 13
-         Hello, UDP#2!
-
-         **AT#XUDPSEND="UDP1/2 received"**
-         #XUDPSEND: 15
-         OK
-
-         #XUDPDATA: 13
-         Hello, UDP#3!
-         #XUDPDATA: 13
-         Hello, UDP#4!
-         #XUDPDATA: 13
-         Hello, UDP#5!
-
-         **AT#XUDPSEND="UDP3/4/5 received"**
-         #XUDPSEND: 17
-         OK
-
-   #. Observe the output of the Python script::
-
-         $ python client_udp.py
-
-         Sending: 'Hello, UDP#1!
-         Sending: 'Hello, UDP#2!
-         b'UDP1/2 received'
-         ('000.000.000.00', 1234, 0, 0)
-         Sending: 'Hello, UDP#3!
-         Sending: 'Hello, UDP#4!
-         Sending: 'Hello, UDP#5!
-         b'UDP3/4/5 received'
-         ('000.000.000.00', 1234, 0, 0)
-         Closing connection
-
-   #. Close the socket.
-
-      .. parsed-literal::
-         :class: highlight
-
-         **AT#XUDPSVR=0**
-         #XUDPSVR: 0,"stopped"
          OK
 
 DNS lookup

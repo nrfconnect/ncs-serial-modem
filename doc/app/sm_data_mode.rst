@@ -86,7 +86,6 @@ After exiting the data mode, the |SM| application returns to the AT command mode
 .. note::
    The |SM| application sends the termination string :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` and moves to a state where the data received on the UART is dropped in the following scenarios:
 
-   * The TCP server is stopped due to an error.
    * The remote server disconnects the TCP client.
    * The TCP client disconnects from the remote server due to an error.
    * The UDP client disconnects from the remote server due to an error.

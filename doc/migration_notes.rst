@@ -214,4 +214,11 @@ Removed features:
    * Board support for the following chipsets: ``nrf9161dk/nrf9161/ns``, ``nrf9160dk/nrf9160/ns``, ``thingy91/nrf9160/ns`` and ``nrf9131ek/nrf9131/ns``.
      * Use ``nrf9151dk/nrf9151/ns`` instead.
    * Native TLS support including ``overlay-native_tls.conf``.
-     ``<sec_tag>`` parameter has been removed from ``XTCPSVR`` and ``#XUDPSVR`` commands.
+   * TCP and UDP servers.
+     This includes the removal of the following AT commands:
+
+     * ``AT#XTCPSVR``
+     * ``AT#XTCPHANGUP``
+     * ``AT#XUDPSVR``
+
+     There is no direct replacement for these commands.
