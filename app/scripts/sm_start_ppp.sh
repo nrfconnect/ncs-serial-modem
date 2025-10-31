@@ -65,4 +65,4 @@ chat $CHATOPT -t$TIMEOUT "" "AT#XPPP=1" "OK" >$AT_CMUX <$AT_CMUX
 chat $CHATOPT -t$TIMEOUT "" "AT+CFUN=1" "OK" "\c" "#XPPP: 1,0" >$AT_CMUX <$AT_CMUX
 
 pppd $PPP_CMUX noauth novj nodeflate nobsdcomp debug noipdefault passive +ipv6 noremoteip \
-	local linkname nrf91 defaultroute defaultroute-metric -1 persist lcp-echo-interval 0
+	local linkname nrf91 defaultroute defaultroute-metric -1 lcp-echo-interval 0
