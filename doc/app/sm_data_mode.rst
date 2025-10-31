@@ -36,8 +36,8 @@ Entering data mode
 The |SM| application enters data mode when an AT command to send data out does not carry the payload.
 See the following examples:
 
-* ``AT#XSEND`` makes |SM| enter data mode to receive arbitrary data to transmit.
-* ``AT#XSEND="data"`` makes |SM| transmit data in normal AT Command mode.
+* ``AT#XSEND=0,2,0`` makes |SM| enter data mode to receive arbitrary data to transmit for socket 0.
+* ``AT#XSEND=0,0,0,"data"`` makes |SM| transmit data in normal AT Command mode for socket 0.
 
 .. note::
    If the data contains either  ``,`` or ``"`` as characters, it can only be sent in data mode.

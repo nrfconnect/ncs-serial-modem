@@ -111,6 +111,12 @@ This provides more flexibility and clearer socket management by directly referen
      * Old syntax: ``AT#XSEND[=<data>][,<flags>]``
      * New syntax: ``AT#XSEND=<handle>,<mode>,<flags>[,<data>]``
 
+    Added result type to the ``#XSEND`` response.
+
+     * Old response: ``#XSEND: <size>``
+     * New response: ``#XSEND: <handle>,<result_type>,<size>``
+       Result type indicates whether an unsolicited notification (``#XSENDNTF``) will be sent when the network acknowledges the send operation.
+
    * **AT#XSENDTO parameter changes:**
 
     Added ``<handle>`` and ``<mode>`` parameters to the ``AT#XSENDTO`` command. Changed parameter order.

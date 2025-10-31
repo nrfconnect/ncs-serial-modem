@@ -54,6 +54,12 @@ enum sm_socket_send_mode {
 	AT_SOCKET_SEND_MODE_DATA = 2	/* Enter data mode */
 };
 
+/**@brief Socket send result modes. */
+enum sm_socket_send_result_mode {
+	AT_SOCKET_SEND_RESULT_DEFAULT = 0, /* Data pushed to modem. */
+	AT_SOCKET_SEND_RESULT_NW_ACK_URC = 1 /* URC from network acknowledgment will follow. */
+};
+
 /**@brief Socket receive modes. */
 enum sm_socket_recv_mode {
 	AT_SOCKET_RECV_MODE_BINARY = 0,	/* Receive binary data */
@@ -71,6 +77,13 @@ struct sm_async_poll {
 	bool disable: 1;   /* Poll needs to stay disabled for this socket. */
 };
 
+#define SM_MSG_SEND_ACK 0x2000
+struct sm_send_ntf {
+	atomic_t ready;    /* Notification received. */
+	int status;        /* Send status. */
+	size_t bytes_sent; /* Bytes sent. */
+};
+
 static struct sm_socket {
 	int type;           /* SOCK_STREAM or SOCK_DGRAM */
 	uint16_t role;      /* Client or Server */
@@ -80,7 +93,9 @@ static struct sm_socket {
 	int fd_peer;        /* Socket descriptor for peer. */
 	uint16_t cid;       /* PDP Context ID, 0: primary; 1~10: secondary */
 	int send_flags;     /* Send flags */
+	bool send_cb_set;   /* Send callback set */
 	struct sm_async_poll async_poll; /* Async poll info. */
+	struct sm_send_ntf send_ntf; /* Send notification info. */
 } socks[SM_MAX_SOCKET_COUNT];
 
 static struct sm_socket *datamode_sock; /* Socket for data mode */
@@ -96,8 +111,6 @@ static struct async_poll_ctx {
 /* forward declarations */
 #define SOCKET_SEND_TMO_SEC 30
 static int socket_poll(int sock_fd, int event, int timeout);
-static int handle_at_sendto(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
-			    uint32_t param_count);
 
 static void init_socket(struct sm_socket *socket)
 {
@@ -112,7 +125,9 @@ static void init_socket(struct sm_socket *socket)
 	socket->fd_peer = INVALID_SOCKET;
 	socket->cid = 0;
 	socket->send_flags = 0;
-	socket->async_poll = (struct sm_async_poll) {0};
+	socket->send_cb_set = false;
+	socket->send_ntf = (struct sm_send_ntf){0};
+	socket->async_poll = (struct sm_async_poll){0};
 }
 
 static struct sm_socket *find_socket(int fd)
@@ -256,6 +271,103 @@ static void delegate_poll_event(struct sm_socket *s, int events)
 
 		k_work_submit_to_queue(&sm_work_q, &poll_ctx.poll_work);
 	}
+}
+
+static void send_cb_fn(struct k_work *work)
+{
+	for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
+		if (socks[i].fd == INVALID_SOCKET) {
+			continue;
+		}
+		if (atomic_get(&socks[i].send_ntf.ready) != 0) {
+			int status = socks[i].send_ntf.status;
+			int bytes_sent = socks[i].send_ntf.bytes_sent;
+
+			atomic_clear(&socks[i].send_ntf.ready);
+			urc_send("\r\n#XSENDNTF: %d,%d,%d\r\n", socks[i].fd, -status, bytes_sent);
+			delegate_poll_event(&socks[i], NRF_POLLOUT);
+		}
+	}
+}
+
+/* Called in IRQ context */
+static void send_cb(const struct nrf_modem_sendcb_params *params)
+{
+	static K_WORK_DEFINE(work, send_cb_fn);
+
+	LOG_DBG("Send cb fd %d, status %d, bytes_sent %d",
+		params->fd, params->status, params->bytes_sent);
+
+	struct sm_socket *sock = find_socket(params->fd);
+
+	if (sock == NULL) {
+		LOG_DBG("Send callback for unknown socket fd %d", params->fd);
+		return;
+	}
+	if (atomic_get(&sock->send_ntf.ready)) {
+		LOG_ERR("Send notification pending for socket fd %d", params->fd);
+		return;
+	}
+	sock->send_ntf.status = params->status;
+	sock->send_ntf.bytes_sent = params->bytes_sent;
+	atomic_set(&sock->send_ntf.ready, 1);
+
+	k_work_submit_to_queue(&sm_work_q, &work);
+}
+
+static int set_so_send_cb(struct sm_socket *socket)
+{
+	int err;
+
+	if (socket == NULL) {
+		return -EINVAL;
+	}
+	if (socket->send_cb_set) {
+		return 0;
+	}
+
+	LOG_DBG("Set send cb for socket %d", socket->fd);
+
+	struct nrf_modem_sendcb pcb = {
+		.callback = send_cb,
+	};
+
+	err = nrf_setsockopt(socket->fd, NRF_SOL_SOCKET, NRF_SO_SENDCB, &pcb, sizeof(pcb));
+	if (err < 0) {
+		LOG_ERR("nrf_setsockopt(%d,%d,%d) error: %d", socket->fd, NRF_SOL_SOCKET,
+			NRF_SO_SENDCB, -errno);
+
+		return -errno;
+	}
+
+	socket->send_cb_set = true;
+
+	return 0;
+}
+
+static int clear_so_send_cb(struct sm_socket *socket)
+{
+	int err;
+
+	if (socket == NULL) {
+		return -EINVAL;
+	}
+	if (!socket->send_cb_set) {
+		return 0;
+	}
+
+	LOG_DBG("Clear send cb for socket %d", socket->fd);
+
+	err = nrf_setsockopt(socket->fd, NRF_SOL_SOCKET, NRF_SO_SENDCB, NULL, 0);
+	if (err < 0) {
+		LOG_ERR("nrf_setsockopt(%d,%d,%d) error: %d", socket->fd, NRF_SOL_SOCKET,
+			NRF_SO_SENDCB, -errno);
+		err = -errno;
+	}
+
+	socket->send_cb_set = false;
+
+	return err;
 }
 
 static int do_socket_open(struct sm_socket *sock)
@@ -778,6 +890,7 @@ static int do_send(struct sm_socket *sock, const uint8_t *data, int len, int fla
 {
 	int ret = 0;
 	int sockfd = sock->fd;
+	bool send_ntf = (flags & SM_MSG_SEND_ACK) != 0;
 
 	LOG_DBG("send flags=%d", flags);
 
@@ -788,6 +901,21 @@ static int do_send(struct sm_socket *sock, const uint8_t *data, int len, int fla
 		} else {
 			LOG_ERR("No connection");
 			return -EINVAL;
+		}
+	}
+
+	if (send_ntf) {
+		/* Set send callback. */
+		flags &= ~SM_MSG_SEND_ACK;
+		ret = set_so_send_cb(sock);
+		if (ret < 0) {
+			return ret;
+		}
+	} else {
+		/* Clear previously set send callback. */
+		ret = clear_so_send_cb(sock);
+		if (ret < 0) {
+			return ret;
 		}
 	}
 
@@ -804,8 +932,13 @@ static int do_send(struct sm_socket *sock, const uint8_t *data, int len, int fla
 	}
 
 	if (!in_datamode()) {
-		rsp_send("\r\n#XSEND: %d,%d\r\n", sock->fd, sent);
-		delegate_poll_event(sock, NRF_POLLOUT);
+		rsp_send("\r\n#XSEND: %d,%d,%d\r\n", sock->fd,
+			 send_ntf ? AT_SOCKET_SEND_RESULT_NW_ACK_URC
+				  : AT_SOCKET_SEND_RESULT_DEFAULT,
+			 sent);
+		if (!send_ntf) {
+			delegate_poll_event(sock, NRF_POLLOUT);
+		}
 	}
 
 	return sent > 0 ? sent : ret;
@@ -895,11 +1028,27 @@ static int do_sendto(struct sm_socket *sock, const char *url, uint16_t port, con
 	int ret = 0;
 	uint32_t sent = 0;
 	struct sockaddr sa = {.sa_family = AF_UNSPEC};
+	bool send_ntf = (flags & SM_MSG_SEND_ACK) != 0;
 
 	LOG_DBG("sendto %s:%d, flags=%d", url, port, flags);
 	ret = util_resolve_host(sock->cid, url, port, sock->family, &sa);
 	if (ret) {
 		return -EAGAIN;
+	}
+
+	if (send_ntf) {
+		/* Set send callback. */
+		flags &= ~SM_MSG_SEND_ACK;
+		ret = set_so_send_cb(sock);
+		if (ret < 0) {
+			return ret;
+		}
+	} else {
+		/* Clear previously set send callback. */
+		ret = clear_so_send_cb(sock);
+		if (ret < 0) {
+			return ret;
+		}
 	}
 
 	do {
@@ -926,8 +1075,13 @@ static int do_sendto(struct sm_socket *sock, const char *url, uint16_t port, con
 	}
 
 	if (!in_datamode()) {
-		rsp_send("\r\n#XSENDTO: %d,%d\r\n", sock->fd, sent);
-		delegate_poll_event(sock, NRF_POLLOUT);
+		rsp_send("\r\n#XSENDTO: %d,%d,%d\r\n", sock->fd,
+			 send_ntf ? AT_SOCKET_SEND_RESULT_NW_ACK_URC
+				  : AT_SOCKET_SEND_RESULT_DEFAULT,
+			 sent);
+		if (!send_ntf) {
+			delegate_poll_event(sock, NRF_POLLOUT);
+		}
 	}
 
 	return sent > 0 ? sent : ret;
@@ -1033,7 +1187,9 @@ static int socket_datamode_callback(uint8_t op, const uint8_t *data, int len, ui
 	} else if (op == DATAMODE_EXIT) {
 		LOG_DBG("datamode exit");
 		memset(udp_url, 0, sizeof(udp_url));
-		delegate_poll_event(datamode_sock, NRF_POLLOUT);
+		if ((datamode_sock->send_flags & SM_MSG_SEND_ACK) == 0) {
+			delegate_poll_event(datamode_sock, NRF_POLLOUT);
+		}
 		datamode_sock = NULL;
 	}
 
