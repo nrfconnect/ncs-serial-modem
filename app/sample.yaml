@@ -73,15 +73,6 @@ tests:
       - thingy91x/nrf9151/ns
     integration_platforms:
       - nrf9151dk/nrf9151/ns
-  serial_modem.native_tls:
-    sysbuild: true
-    build_only: true
-    extra_args: EXTRA_CONF_FILE=overlay-native_tls.conf
-    platform_allow:
-      - nrf9151dk/nrf9151/ns
-      - thingy91x/nrf9151/ns
-    integration_platforms:
-      - nrf9151dk/nrf9151/ns
   serial_modem.lwm2m_carrier:
     sysbuild: true
     build_only: true

@@ -85,26 +85,6 @@ CONFIG_SM_PPP - Enable PPP functionality
    When CMUX is also enabled, PPP is usable only through a CMUX channel.
    See :ref:`SM_AT_PPP` for more information.
 
-.. _CONFIG_SM_NATIVE_TLS:
-
-CONFIG_SM_NATIVE_TLS - Use Zephyr's Mbed TLS for TLS connections
-   This option is enabled by the native TLS overlay.
-   See :ref:`sm_native_tls` for more information.
-
-.. _CONFIG_SM_NATIVE_TLS_CREDENTIAL_BUFFER_SIZE:
-
-CONFIG_SM_NATIVE_TLS_CREDENTIAL_BUFFER_SIZE - Buffer space reserved for loading credentials
-   Specifies the credential buffer size available for a single ``sec_tag`` when loading credentials for Mbed TLS.
-   The default value is ``4096``.
-
-.. _CONFIG_SM_NATIVE_TLS_CREDENTIAL_BUFFER_COUNT:
-
-CONFIG_SM_NATIVE_TLS_CREDENTIAL_BUFFER_COUNT - Number of buffers for loading credentials
-   The number of buffers available for loading ``sec_tag`` credentials for Mbed TLS.
-   TLS client only needs the buffer when connecting, while TLS server needs the buffer as long as it is running.
-   Increase the value if you need both TLS client and server running simultaneously with different ``sec_tags``.
-   The default value is ``1``.
-
 .. _CONFIG_SM_EXTERNAL_XTAL:
 
 CONFIG_SM_EXTERNAL_XTAL - Use external XTAL for UARTE
@@ -292,8 +272,6 @@ The following configuration files are provided:
   The overlay is pin compatible with nRF9151DK.
   For other setups, you can customize the overlay to fit your configuration.
 
-* :file:`overlay-native_tls.conf` - This configuration file contains additional configuration options that are required to use :ref:`sm_native_tls`.
-
 * :file:`overlay-carrier.conf` - Configuration file that adds |NCS| `LwM2M carrier`_ support.
   See :ref:`sm_carrier_library_support` for more information on how to connect to an operator's device management platform.
 
@@ -334,33 +312,6 @@ The following configuration files are provided:
 
 The board-specific devicetree overlays (:file:`boards/*.overlay`) set up configurations that are specific to each supported development kit.
 All of them configure the DTR to be deasserted from a button and RI to blink an LED.
-
-.. _sm_native_tls:
-
-Native TLS
-----------
-
-By default, the secure socket (TLS/DTLS) is offloaded to the modem.
-If you need customized TLS/DTLS features that are not supported by the modem firmware, you can use native TLS instead.
-Native TLS uses the Mbed TLS library in Zephyr to establish secure connectivity.
-Currently, the |SM| application can be built to use native TLS for the following services:
-
-* Secure socket
-* TLS Proxy client
-* TLS Proxy server
-* DTLS Proxy client
-* DTLS Proxy server
-* HTTPS client
-
-With native TLS, the credentials are stored in the Zephyr settings storage with the ``AT#XCMNG`` command.
-
-The configuration options that are required to enable native TLS are defined in the :file:`overlay-native_tls.conf` file.
-
-.. note::
-
-   Native TLS services have the following limitations:
-
-   * TLS session resumption is currently not supported.
 
 Sending traces over UART on an nRF91 Series DK
 ==============================================

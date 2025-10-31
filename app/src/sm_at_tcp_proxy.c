@@ -14,9 +14,6 @@
 #include "sm_at_host.h"
 #include "sm_at_socket.h"
 #include "sm_at_tcp_proxy.h"
-#if defined(CONFIG_SM_NATIVE_TLS)
-#include "sm_native_tls.h"
-#endif
 
 LOG_MODULE_REGISTER(sm_tcp, CONFIG_SM_LOG_LEVEL);
 
@@ -72,48 +69,13 @@ static int do_tcp_server_start(uint16_t port)
 	int reuseaddr = 1;
 
 	/* Open socket */
-	if (proxy.sec_tag == SEC_TAG_TLS_INVALID) {
-		ret = zsock_socket(proxy.family, SOCK_STREAM, IPPROTO_TCP);
-	} else {
-		ret = zsock_socket(proxy.family, SOCK_STREAM, IPPROTO_TLS_1_2);
-	}
+	ret = zsock_socket(proxy.family, SOCK_STREAM, IPPROTO_TCP);
 	if (ret < 0) {
 		LOG_ERR("zsock_socket() failed: %d", -errno);
 		ret = -errno;
 		goto exit_svr;
 	}
 	proxy.sock = ret;
-
-	if (proxy.sec_tag != SEC_TAG_TLS_INVALID) {
-#ifndef CONFIG_SM_NATIVE_TLS
-		LOG_ERR("Not supported");
-		return -ENOTSUP;
-#else
-		ret = sm_native_tls_load_credentials(proxy.sec_tag);
-		if (ret < 0) {
-			LOG_ERR("Failed to load sec tag: %d (%d)", proxy.sec_tag, ret);
-			return ret;
-		}
-		int tls_native = 1;
-
-		/* Must be the first socket option to set. */
-		ret = zsock_setsockopt(proxy.sock, SOL_TLS, TLS_NATIVE, &tls_native,
-					sizeof(tls_native));
-		if (ret) {
-			ret = errno;
-			goto exit_svr;
-		}
-#endif
-		sec_tag_t sec_tag_list[1] = { proxy.sec_tag };
-
-		ret = zsock_setsockopt(proxy.sock, SOL_TLS, TLS_SEC_TAG_LIST, sec_tag_list,
-				 sizeof(sec_tag_t));
-		if (ret) {
-			LOG_ERR("zsock_setsockopt(TLS_SEC_TAG_LIST) error: %d", -errno);
-			ret = -errno;
-			goto exit_svr;
-		}
-	}
 
 	ret = zsock_setsockopt(proxy.sock, SOL_SOCKET, SO_REUSEADDR, &reuseaddr, sizeof(int));
 	if (ret < 0) {
@@ -211,22 +173,6 @@ static int do_tcp_client_connect(const char *url, uint16_t port, uint16_t cid)
 	proxy.sock = ret;
 
 	if (proxy.sec_tag != SEC_TAG_TLS_INVALID) {
-#if defined(CONFIG_SM_NATIVE_TLS)
-		ret = sm_native_tls_load_credentials(proxy.sec_tag);
-		if (ret < 0) {
-			LOG_ERR("Failed to load sec tag: %d (%d)", proxy.sec_tag, ret);
-			goto exit_cli;
-		}
-		int tls_native = 1;
-
-		/* Must be the first socket option to set. */
-		ret = zsock_setsockopt(proxy.sock, SOL_TLS, TLS_NATIVE, &tls_native,
-				       sizeof(tls_native));
-		if (ret) {
-			ret = errno;
-			goto exit_cli;
-		}
-#endif
 		sec_tag_t sec_tag_list[1] = { proxy.sec_tag };
 
 		ret = zsock_setsockopt(proxy.sock, SOL_TLS, TLS_SEC_TAG_LIST, sec_tag_list,
@@ -690,13 +636,6 @@ static int handle_at_tcp_server(enum at_parser_cmd_type cmd_type, struct at_pars
 			if (err) {
 				return err;
 			}
-			proxy.sec_tag = SEC_TAG_TLS_INVALID;
-			if (param_count > 3) {
-				err = at_parser_num_get(parser, 3, &proxy.sec_tag);
-				if (err) {
-					return err;
-				}
-			}
 			proxy.family = (op == SERVER_START) ? AF_INET : AF_INET6;
 			err = do_tcp_server_start(port);
 		} else if (op == SERVER_STOP) {
@@ -710,7 +649,7 @@ static int handle_at_tcp_server(enum at_parser_cmd_type cmd_type, struct at_pars
 		break;
 
 	case AT_PARSER_CMD_TYPE_TEST:
-		rsp_send("\r\n#XTCPSVR: (%d,%d,%d),<port>,<sec_tag>\r\n",
+		rsp_send("\r\n#XTCPSVR: (%d,%d,%d),<port>\r\n",
 			SERVER_STOP, SERVER_START, SERVER_START6);
 		err = 0;
 		break;
