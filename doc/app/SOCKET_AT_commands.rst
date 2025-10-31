@@ -909,12 +909,16 @@ Syntax
   * ``2`` - Data mode. |SM| enters ``sm_data_mode`` for data input.
 
 * The ``<flags>`` parameter sets the sending behavior.
-  It can be set to the following value:
+  It can be set to one of the following values:
 
-  * ``0`` - No flags set.
-  * ``512`` - Blocks send operation until the request is acknowledged.
-    The request will not return until the send operation is completed by lower layers, or until the timeout given by the AT_SO_SNDTIMEO socket option, is reached.
+  * ``0`` - No flags set. The request is complete when the data is pushed to the modem buffer.
+  * ``512`` - Blocks send operation until the request is acknowledged by network.
+    The request will not return until the data is pushed to the network, or acknowledged by network (for TCP), or the timeout given by the AT_SO_SNDTIMEO socket option, is reached.
     Valid timeout values are 1 to 600 seconds.
+  * ``8192`` - Send unsolicited ``#XSENDNTF`` notification when the request is acknowledged by network.
+    Unsolicited notification will be sent when the data is pushed to the network, or acknowledged by network (for TCP), or the timeout given by the AT_SO_SNDTIMEO socket option, is reached.
+    Valid timeout values are 1 to 600 seconds.
+    Further sends for the socket are blocked until the unsolicited notification is received.
 
 * The ``<data>`` parameter is required when ``<mode>`` is ``0`` (string mode) or ``1`` (hex string mode).
   For string mode (``0``), it is a string that contains the data to be sent.
@@ -928,12 +932,35 @@ Response syntax
 
 ::
 
-   #XSEND: <handle>,<size>
+   #XSEND: <handle>,<result_type>,<size>
 
 * The ``<handle>`` value is an integer indicating the socket handle.
 
+* The ``<result_type>`` value is an integer indicating the type of result:
+
+  * ``0`` - Indicates that there are no further notifications.
+  * ``1`` - Indicates that an unsolicited notification will be sent when the network acknowledged send is completed.
+
 * The ``<size>`` value is an integer.
   It represents the actual number of bytes that has been sent.
+
+
+Unsolicited notification
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+For network acknowledged sends (when the ``8192`` flag is used), an unsolicited notification is sent when the send operation is completed.
+
+::
+
+   #XSENDNTF: <handle>,<status>,<size>
+
+* The ``<handle>`` value is an integer indicating the socket handle.
+
+* The ``<status>`` value is an integer indicating the status of the network acknowledged send.
+  It is ``0`` for success or a negative error code for failure.
+
+* The ``<size>`` value is an integer indicating the size of the data sent.
+
 
 Example
 ~~~~~~~~
@@ -941,17 +968,23 @@ Example
 ::
 
    AT#XSEND=0,0,0,"Test TCP"
-   #XSEND: 0,8
+   #XSEND: 0,0,8
    OK
 
    AT#XSEND=0,1,0,"48656C6C6F"
-   #XSEND: 0,5
+   #XSEND: 0,0,5
    OK
 
-   AT#XSEND=1,2,512
+   AT#XSEND=1,0,8192,"Test notification"
+   #XSEND: 1,1,17
    OK
-   Test datamode with flags
-   +++
+   #XSENDNTF: 1,0,17
+
+   AT#XSEND=1,2,8192
+   OK
+   Test datamode with flags+++
+   #XDATAMODE: 0
+   #XSENDNTF: 1,0,24
 
 Read command
 ------------
@@ -1069,12 +1102,16 @@ Syntax
   * ``2`` - Data mode. |SM| enters ``sm_data_mode`` for data input.
 
 * The ``<flags>`` parameter sets the sending behavior.
-  It can be set to the following value:
+  It can be set to one of the following values:
 
-  * ``0`` - No flags set.
-  * ``512`` - Blocks send operation until the request is acknowledged.
-    The request will not return until the send operation is completed by lower layers, or until the timeout given by the AT_SO_SNDTIMEO socket option, is reached.
+  * ``0`` - No flags set. The request is complete when the data is pushed to the modem buffer.
+  * ``512`` - Blocks send operation until the request is acknowledged by network.
+    The request will not return until the data is pushed to the network, or acknowledged by network (for TCP), or the timeout given by the AT_SO_SNDTIMEO socket option, is reached.
     Valid timeout values are 1 to 600 seconds.
+  * ``8192`` - Send unsolicited ``#XSENDNTF`` notification when the request is acknowledged by network.
+    Unsolicited notification will be sent when the data is pushed to the network, or acknowledged by network (for TCP), or the timeout given by the AT_SO_SNDTIMEO socket option, is reached.
+    Valid timeout values are 1 to 600 seconds.
+    Further sends for the socket are blocked until the unsolicited notification is received.
 
 * The ``<url>`` parameter is a string.
   It indicates the hostname or the IP address of the remote peer.
@@ -1098,12 +1135,33 @@ Response syntax
 
 ::
 
-   #XSENDTO: <handle>,<size>
+   #XSENDTO: <handle>,<result_type>,<size>
 
 * The ``<handle>`` value is an integer indicating the socket handle.
 
+* The ``<result_type>`` value is an integer indicating the type of result:
+
+  * ``0`` - Indicates that there are no further notifications.
+  * ``1`` - Indicates that an unsolicited notification will be sent when the network acknowledged send is completed.
+
 * The ``<size>`` value is an integer.
   It represents the actual number of bytes that has been sent.
+
+Unsolicited notification
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+For network acknowledged sends (when the ``8192`` flag is used), an unsolicited notification is sent when the send operation is completed.
+
+::
+
+   #XSENDNTF: <handle>,<status>,<size>
+
+* The ``<handle>`` value is an integer indicating the socket handle.
+
+* The ``<status>`` value is an integer indicating the status of the network acknowledged send.
+  It is ``0`` for success or a negative error code for failure.
+
+* The ``<size>`` value is an integer indicating the size of the data sent.
 
 Example
 ~~~~~~~~
@@ -1111,12 +1169,18 @@ Example
 ::
 
    AT#XSENDTO=0,0,0,"test.server.com",1234,"Test UDP"
-   #XSENDTO: 0,8
+   #XSENDTO: 0,0,8
    OK
 
    AT#XSENDTO=0,1,0,"test.server.com",1234,"48656C6C6F"
-   #XSENDTO: 0,5
+   #XSENDTO: 0,0,5
    OK
+
+   AT#XSENDTO=0,0,8192,"test.server.com",1234,"Test notification"
+   #XSENDTO: 0,1,17
+   OK
+   #XSENDNTF: 0,0,17
+
 
 Read command
 ------------
@@ -1290,6 +1354,7 @@ Example
 
    OK
 
+   // Create a TCP socket and connect to the test server.
    AT#XSOCKET=1,1,0
 
    #XSOCKET: 1,1,6
@@ -1305,9 +1370,9 @@ Example
    #XAPOLL: 1,4
 
    // Send data to the test server, which will echo it back.
-   AT#XSEND=1,"echo"
+   AT#XSEND=1,0,0,"echo"
 
-   #XSEND: 1,4
+   #XSEND: 1,0,4
 
    OK
 
@@ -1316,20 +1381,53 @@ Example
    // Test server sends the data back and closes the connection. POLLIN and POLLHUP events are received.
    #XAPOLL: 1,17
 
-   AT#XRECV=1,1
+   AT#XRECV=1,0,0,1
 
-   #XRECV: 1,4
+   #XRECV: 1,0,4
    echo
    OK
 
+   // Close the TCP socket.
    AT#XCLOSE=1
 
    #XCLOSE: 1,0
 
    OK
 
-   // #XAPOLL: 1,32 (POLLNVAL) is not received here as a closure event POLLHUP was already received.
+   // Create a UDP socket and send network acknowledge data to another test server, which does not echo.
+   AT#XSOCKET=2,2,0
 
+   #XSOCKET: 2,2,17
+
+   OK
+
+   #XAPOLL: 2,4
+
+   AT#XCONNECT=2,"no_echo.test.server.com",1234
+
+   #XCONNECT: 2,1
+
+   OK
+
+   // Send data to the test server with network acknowledged send flag.
+   AT#XSEND=2,0,8192,"no echo"
+
+   #XSEND: 2,1,7
+
+   OK
+
+   #XSENDNTF: 2,0,7  // Unsolicited notification for network acknowledged send.
+
+   #XAPOLL: 2,4
+
+   // Close the UDP socket.
+   AT#XCLOSE=2
+
+   #XCLOSE: 2,0
+
+   OK
+
+   // Stop asynchronous polling.
    AT#XAPOLL=0
 
    OK
