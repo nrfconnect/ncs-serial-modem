@@ -204,10 +204,8 @@ static void rx_process(struct k_work *work)
 {
 #if SM_PIPE
 	/* With pipe, CMUX layer is notified and it requests the data. */
-	if (atomic_test_bit(&sm_pipe.state, SM_PIPE_STATE_INIT_BIT)) {
-		if (atomic_test_bit(&sm_pipe.state, SM_PIPE_STATE_OPEN_BIT)) {
-			modem_pipe_notify_receive_ready(&sm_pipe.pipe);
-		}
+	if (atomic_test_bit(&sm_pipe.state, SM_PIPE_STATE_OPEN_BIT)) {
+		modem_pipe_notify_receive_ready(&sm_pipe.pipe);
 		return;
 	}
 #endif
@@ -522,7 +520,7 @@ static int sm_uart_tx_write(const uint8_t *data, size_t len, bool flush, bool ur
 int sm_tx_write(const uint8_t *data, size_t len, bool flush, bool urc, k_timeout_t urc_delay)
 {
 #if SM_PIPE
-	if (atomic_test_bit(&sm_pipe.state, SM_PIPE_STATE_INIT_BIT) && sm_pipe.tx_cb != NULL) {
+	if (atomic_test_bit(&sm_pipe.state, SM_PIPE_STATE_OPEN_BIT) && sm_pipe.tx_cb != NULL) {
 		return sm_pipe.tx_cb(data, len, urc, urc_delay);
 	}
 #endif

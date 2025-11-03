@@ -30,6 +30,9 @@ LOG_MODULE_REGISTER(sm_cmux, CONFIG_SM_LOG_LEVEL);
 
 #define DLCI_TO_INDEX(dlci) ((dlci) - 1)
 #define INDEX_TO_DLCI(index) ((index) + 1)
+#define STOP_DELAY K_MSEC(10)
+
+static void stop_work_fn(struct k_work *work);
 
 static struct {
 	/* UART backend */
@@ -59,6 +62,7 @@ static struct {
 	/* Outgoing data for AT DLCI. */
 	struct sm_urc_ctx *urc_ctx;
 	struct k_work_delayable nonblock_tx_work;
+	struct k_work_delayable stop_work;
 	struct k_sem tx_sem;
 } cmux;
 
@@ -134,6 +138,14 @@ static void cmux_event_handler(struct modem_cmux *, enum modem_cmux_event event,
 {
 	if (event == MODEM_CMUX_EVENT_CONNECTED || event == MODEM_CMUX_EVENT_DISCONNECTED) {
 		LOG_INF("CMUX %sconnected.", (event == MODEM_CMUX_EVENT_CONNECTED) ? "" : "dis");
+	}
+	switch (event) {
+	case MODEM_CMUX_EVENT_CONNECTED:
+		break;
+	case MODEM_CMUX_EVENT_DISCONNECTED:
+		/* Return to AT command mode */
+		k_work_reschedule_for_queue(&sm_work_q, &cmux.stop_work, STOP_DELAY);
+		break;
 	}
 }
 
@@ -305,7 +317,9 @@ void sm_cmux_init(void)
 
 	k_sem_init(&cmux.tx_sem, 1, 1);
 	k_work_init_delayable(&cmux.nonblock_tx_work, nonblock_tx_work_fn);
+	k_work_init_delayable(&cmux.stop_work, stop_work_fn);
 
+	cmux.at_channel = 0;
 	cmux.requested_at_channel = UINT_MAX;
 }
 
@@ -322,6 +336,24 @@ void sm_cmux_uninit(void)
 		}
 		sm_at_host_urc_ctx_release(cmux.urc_ctx, SM_URC_OWNER_CMUX);
 	}
+}
+
+static void stop_work_fn(struct k_work *work)
+{
+	int err;
+
+	ARG_UNUSED(work);
+
+	/* Will stop the UART when calling the close_pipe() function. */
+	sm_cmux_uninit();
+
+	err = sm_uart_handler_enable();
+	if (err) {
+		LOG_ERR("Failed to enable UART handler (%d).", err);
+	}
+
+	sm_cmux_init();
+	LOG_INF("Returned to AT command mode.");
 }
 
 static struct cmux_dlci *cmux_get_dlci(enum cmux_channel channel)
