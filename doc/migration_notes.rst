@@ -61,8 +61,10 @@ The following changes are mandatory to make your application work in the same wa
    * PPP connection must be requested using the ``AT#XPPP=1`` command to get it started when the modem is put into online mode using the ``AT+CFUN=1`` command.
      The ``AT#XPPP=1`` command can be run before or after the ``AT+CFUN=1`` command.
      So PPP connection is not started automatically anymore when the ``AT+CFUN=1`` command is run.
-     After the ``AT#XPPP=1`` command is run, the PPP connection is started when the ``AT+CFUN=1`` command is run and stopped when network is lost (for example, with ``AT+CFUN=4`` or ``AT+CFUN=0``).
-     When the ``AT#XPPP=0`` command is run, the PPP connection is stopped permanently.
+     After the ``AT#XPPP=1`` command is run, the PPP connection is started when the ``AT+CFUN=1`` command is run and stopped when network is lost (for example, with ``AT+CFUN=4``, ``AT+CFUN=0`` or bad reception).
+     When the network is regained (for example, with ``AT+CFUN=1``), the PPP connection is started again automatically.
+     To permanently stop the PPP connection, either the remote peer should disconnect the PPP using LCP termination or the ``AT#XPPP=0`` command should be run.
+     If PPP is terminated using LCP termination or the ``AT#XPPP=0`` command, the PPP connection can be started again with the ``AT#XPPP=1`` command.
 
 DTR and RI GPIOs replace Power and Indicate pins
 ------------------------------------------------
