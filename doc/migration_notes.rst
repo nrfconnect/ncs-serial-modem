@@ -66,6 +66,11 @@ The following changes are mandatory to make your application work in the same wa
      To permanently stop the PPP connection, either the remote peer should disconnect the PPP using LCP termination or the ``AT#XPPP=0`` command should be run.
      If PPP is terminated using LCP termination or the ``AT#XPPP=0`` command, the PPP connection can be started again with the ``AT#XPPP=1`` command.
 
+   * Removed the :file:`overlay-zephyr-modem.conf` as the default behavior of the |SM| application is compatible with Zephyr modem driver.
+
+   * Default behavior of CMUX channels have changed if DLCI 1 is used for PPP. Now when PPP is shutdown, the CMUX channel 1 switches to AT command mode and channel 2 is not used for AT commands anymore.
+
+
 DTR and RI GPIOs replace Power and Indicate pins
 ------------------------------------------------
 

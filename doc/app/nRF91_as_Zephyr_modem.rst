@@ -36,15 +36,11 @@ The following configuration files must be included:
 
 * :file:`overlay-cmux.conf` - To enable CMUX.
 * :file:`overlay-ppp.conf` - To enable PPP.
-* :file:`overlay-zephyr-modem.conf` - To tailor |SM| to how Zephyr's cellular modem driver works.
 
 In addition, if the controlling chip is an external MCU, the following configurations must also be included:
 
 * :file:`overlay-external-mcu.overlay` - To configure UART (pins, baud rate), DTR and RI pins that |SM| will use.
   Make sure to update the UART configuration (pins, baud rate) so that it matches your setup.
-* :file:`overlay-zephyr-modem-external-mcu.overlay` - To define the power GPIO with ``sm-power-key``. If ``sm-power-key`` is configured, the nRF91 Series SIP will start only when the pin in ``sm-power-key`` is toggled by the controlling chip.
-  On the controlling chip, running Zephyr, the power GPIO is configured with the ``mdm-power-gpios``.
-  This overlay also sets the DTR pin to be always asserted, as the Zephyr's cellular modem driver does not currently manage it.
 
 Finally, if you want more verbose logging that includes the AT commands and responses, you can enable debug logging by uncommenting ``CONFIG_SM_LOG_LEVEL_DBG=y`` in the :file:`prj.conf` configuration file.
 

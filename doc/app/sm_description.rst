@@ -307,9 +307,6 @@ The following configuration files are provided:
   This overlay can be used if your setup does not have the need or means for managing the power externally.
   Modify the overlay to fit your configuration.
 
-* :file:`overlay-zephyr-modem.conf` and :file:`overlay-zephyr-modem-external-mcu.overlay` - These configuration files are used when compiling |SM| to turn an nRF91 Series SiP into a Zephyr-compatible standalone modem.
-  See :ref:`sm_as_zephyr_modem` for more information.
-
 The board-specific devicetree overlays (:file:`boards/*.overlay`) set up configurations that are specific to each supported development kit.
 All of them configure the DTR to be deasserted from a button and RI to blink an LED.
 

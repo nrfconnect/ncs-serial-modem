@@ -386,11 +386,9 @@ void sm_cmux_release(enum cmux_channel channel, bool fallback)
 {
 	struct cmux_dlci *dlci = cmux_get_dlci(channel);
 
-#if defined(CONFIG_SM_CMUX_AUTOMATIC_FALLBACK_ON_PPP_STOPPAGE)
 	if (channel == CMUX_PPP_CHANNEL && fallback) {
 		cmux.at_channel = 0;
 	}
-#endif
 	modem_pipe_attach(dlci->pipe, dlci_pipe_event_handler, dlci);
 }
 
