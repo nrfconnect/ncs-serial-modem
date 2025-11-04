@@ -475,7 +475,6 @@ static int api_rx_disable(const struct device *dev)
 
 	LOG_DBG("api_rx_disable");
 
-	data->app_rx_enabled = false;
 	return deactivate_rx(data);
 }
 
