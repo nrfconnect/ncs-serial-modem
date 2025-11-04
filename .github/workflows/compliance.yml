@@ -47,23 +47,25 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
         working-directory: serial_modem
         run: |
+          # Debug command
+          ls -la
+          git log --oneline -n 5
+
           export ZEPHYR_BASE="../zephyr"
           $ZEPHYR_BASE/scripts/ci/check_compliance.py \
             --annotate \
-            -m Codeowners \
-            -m Devicetree \
-            -m Gitlint \
-            -m Identity \
-            -m Nits \
-            -m pylint \
-            -m checkpatch \
-            -c origin/${BASE_REF}.. || \
-          echo "COMPLIANCE_FAILED=true" >> $GITHUB_ENV
+            -e Kconfig \
+            -e KconfigBasicNoModules \
+            -e ClangFormat \
+            -e Ruff \
+            -e SysbuildKconfigBasicNoModules
 
       - name: Process Compliance Results
         working-directory: serial_modem
         shell: bash
         run: |
+          # Debug command
+          ls -la
           # Check for compliance.xml existence
           if [[ ! -s "compliance.xml" ]]; then
             echo "::error::compliance.xml file is missing or empty"
@@ -73,27 +75,16 @@ jobs:
           # Initialize exit code
           exit_code=0
 
-          # Define error files to check
-          error_files=(
-            "Nits.txt"
-            "checkpatch.txt"
-            "Identity.txt"
-            "Gitlint.txt"
-            "pylint.txt"
-            "Devicetree.txt"
-            "Kconfig.txt"
-            "KconfigBasic.txt"
-            "Codeowners.txt"
-          )
-
-          # Process each error file
-          for file in "${error_files[@]}"; do
-            if [[ -s $file ]]; then
-              errors=$(cat $file)
+          export ZEPHYR_BASE="../zephyr"
+          files=($($ZEPHYR_BASE/scripts/ci/check_compliance.py -l))
+          for file in "${files[@]}"; do
+            f="${file}.txt"
+            if [[ -s $f ]]; then
+              errors=$(cat $f)
               errors="${errors//'%'/'%25'}"
               errors="${errors//$'\n'/'%0A'}"
               errors="${errors//$'\r'/'%0D'}"
-              echo "::error file=${file}::$errors"
+              echo "::error f=${f}::$errors"
               exit_code=1
             fi
           done
