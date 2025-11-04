@@ -313,6 +313,7 @@ static int ppp_start(void)
 {
 	if (ppp_state == PPP_STATE_RUNNING) {
 		LOG_INF("PPP already running");
+		send_status_notification();
 		return 0;
 	}
 	ppp_state = PPP_STATE_STARTING;
