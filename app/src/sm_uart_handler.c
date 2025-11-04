@@ -135,7 +135,8 @@ static int rx_enable(void)
 	struct rx_buf_t *buf;
 	int ret;
 
-	if (atomic_test_bit(&uart_state, SM_UART_STATE_RX_ENABLED_BIT)) {
+	if (atomic_test_bit(&uart_state, SM_UART_STATE_RX_ENABLED_BIT) ||
+	    atomic_test_bit(&uart_state, SM_UART_STATE_RX_RECOVERY_DISABLED_BIT)) {
 		return 0;
 	}
 
@@ -171,6 +172,11 @@ static int rx_disable(void)
 	if (err) {
 		LOG_ERR("UART RX disable failed: %d", err);
 		return err;
+	}
+
+	while (atomic_test_bit(&uart_state, SM_UART_STATE_RX_ENABLED_BIT)) {
+		/* Wait until RX stopped */
+		k_sleep(K_MSEC(10));
 	}
 
 	return 0;
