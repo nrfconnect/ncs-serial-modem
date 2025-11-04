@@ -56,8 +56,10 @@ enum ppp_action {
 };
 
 enum ppp_reason {
-	PPP_REASON_DEFAULT,
-	PPP_REASON_PEER_DISCONNECTED,
+	PPP_REASON_CMD,			/**< Request is originated from user command */
+	PPP_REASON_NETWORK,		/**< Request is originated from network event */
+	PPP_REASON_ERROR,		/**< Request is originated from error condition */
+	PPP_REASON_PEER_DISCONNECTED,	/**< Request is originated from peer disconnection */
 };
 
 struct ppp_event {
@@ -84,7 +86,7 @@ static enum ppp_states ppp_state;
 
 MODEM_PPP_DEFINE(ppp_module, NULL, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT,
 		 sizeof(ppp_data_buf), sizeof(ppp_data_buf));
-
+AT_MONITOR(sm_ppp_on_cgev, "CGEV", at_notif_on_cgev, PAUSED);
 static struct modem_pipe *ppp_pipe;
 
 /* Default PPP PDN is the default PDP context (CID 0). */
@@ -323,6 +325,7 @@ static int ppp_start(void)
 		goto error;
 	}
 
+	at_monitor_resume(&sm_ppp_on_cgev);
 	ppp_retrieve_pdn_info(ctx);
 
 	ret = net_if_up(ppp_iface);
@@ -384,6 +387,15 @@ static int ppp_stop(enum ppp_reason reason)
 		return 0;
 	}
 	ppp_state = PPP_STATE_STOPPING;
+
+	switch (reason) {
+	case PPP_REASON_PEER_DISCONNECTED:
+	case PPP_REASON_CMD:
+		at_monitor_pause(&sm_ppp_on_cgev);
+		break;
+	default:
+		break;
+	}
 
 	/* Bring the interface down before releasing pipes and carrier.
 	 * This is needed for LCP to notify the remote endpoint that the link is going down.
@@ -476,8 +488,6 @@ static void subscribe_cgev_notifications(void)
 	}
 }
 
-AT_MONITOR(sm_ppp_on_cgev, "CGEV", at_notif_on_cgev, PAUSED);
-
 static void at_notif_on_cgev(const char *notify)
 {
 	char *str;
@@ -503,7 +513,7 @@ static void at_notif_on_cgev(const char *notify)
 			cid = (uint8_t)strtoul(str, &endptr, 10);
 			if (endptr != str && cid == ppp_pdn_cid) {
 				LOG_INF("PPP PDN (%d) activated.", ppp_pdn_cid);
-				delegate_ppp_event(PPP_START, PPP_REASON_DEFAULT);
+				delegate_ppp_event(PPP_START, PPP_REASON_NETWORK);
 			}
 		}
 	}
@@ -693,11 +703,9 @@ static int handle_at_ppp(enum at_parser_cmd_type cmd_type, struct at_parser *par
 		ppp_pdn_cid = 0;
 		/* Store PPP PDN if given */
 		at_parser_num_get(parser, 2, &ppp_pdn_cid);
-		delegate_ppp_event(PPP_START, PPP_REASON_DEFAULT);
-		at_monitor_resume(&sm_ppp_on_cgev);
+		delegate_ppp_event(PPP_START, PPP_REASON_CMD);
 	} else {
-		delegate_ppp_event(PPP_STOP, PPP_REASON_DEFAULT);
-		at_monitor_pause(&sm_ppp_on_cgev);
+		delegate_ppp_event(PPP_STOP, PPP_REASON_CMD);
 	}
 	return -SILENT_AT_COMMAND_RET;
 }
@@ -717,7 +725,7 @@ static void ppp_data_passing_thread(void*, void*, void*)
 
 		if (poll_ret <= 0) {
 			LOG_ERR("Sockets polling failed (%d, %d). Restart.", poll_ret, -errno);
-			delegate_ppp_event(PPP_RESTART, PPP_REASON_DEFAULT);
+			delegate_ppp_event(PPP_RESTART, PPP_REASON_ERROR);
 			return;
 		}
 
@@ -741,7 +749,7 @@ static void ppp_data_passing_thread(void*, void*, void*)
 				} else {
 					LOG_DBG("Connection down. Stop.");
 				}
-				delegate_ppp_event(PPP_STOP, PPP_REASON_DEFAULT);
+				delegate_ppp_event(PPP_STOP, PPP_REASON_NETWORK);
 				return;
 			}
 
