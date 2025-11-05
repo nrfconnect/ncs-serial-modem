@@ -84,7 +84,7 @@ static void dtr_pin_callback(const struct device *dev, struct gpio_callback *gpi
 
 	if (asserted) {
 		gpio_remove_callback(dev, gpio_callback);
-		k_work_submit(&work);
+		k_work_submit_to_queue(&sm_work_q, &work);
 	}
 }
 #endif
