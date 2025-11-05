@@ -11,8 +11,6 @@
 
 MODEM=/dev/ttyACM0
 BAUD=115200
-PPP_CMUX=/dev/gsmtty2
-AT_CMUX=/dev/gsmtty1
 CHATOPT="-vs"
 TIMEOUT=60
 
@@ -41,6 +39,11 @@ if [[ ! -c $MODEM ]]; then
 	exit 1
 fi
 
+if find /dev -type c -name 'gsmtty*' | grep -q . ; then
+	echo "Error: existing CMUX devices found (/dev/gsmtty*)"
+	exit 1
+fi
+
 stty -F $MODEM $BAUD pass8 raw crtscts clocal
 
 echo "Wait modem to boot"
@@ -55,6 +58,11 @@ fi
 
 echo "Attach CMUX channel to modem..."
 ldattach -c $'\rAT#XCMUX=1\r' GSM0710 $MODEM
+
+AT_CMUX=$(ls /dev/gsmtty* | sort -V | head -n 1)
+PPP_CMUX=$(ls /dev/gsmtty* | sort -V | head -n 2 | tail -n 1)
+echo "AT CMUX:  $AT_CMUX"
+echo "PPP CMUX: $PPP_CMUX"
 
 sleep 1
 stty -F $AT_CMUX clocal
