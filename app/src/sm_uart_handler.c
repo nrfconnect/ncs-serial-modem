@@ -438,7 +438,7 @@ static void tx_write_nonblock_fn(struct k_work *)
 	struct sm_urc_ctx *uc = urc_ctx; /* Take a local copy. */
 	uint8_t *data;
 	size_t len;
-	int err;
+	int err = 0;
 
 	if (uc == NULL) {
 		LOG_DBG("No URC context");
@@ -458,6 +458,9 @@ static void tx_write_nonblock_fn(struct k_work *)
 	 */
 	do {
 		len = ring_buf_get_claim(&uc->rb, &data, ring_buf_capacity_get(&uc->rb));
+		if (!len) {
+			break;
+		}
 		err = tx_write_block(data, &len, true);
 		ring_buf_get_finish(&uc->rb, len);
 
