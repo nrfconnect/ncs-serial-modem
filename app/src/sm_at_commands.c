@@ -152,7 +152,8 @@ static int handle_at_sleep(enum at_parser_cmd_type cmd_type, struct at_parser *p
 		}
 		if (sleep_control.mode == SLEEP_MODE_DEEP ||
 		    sleep_control.mode == SLEEP_MODE_IDLE) {
-			k_work_reschedule(&sleep_control.work, SM_UART_RESPONSE_DELAY);
+			k_work_reschedule_for_queue(&sm_work_q, &sleep_control.work,
+						    SM_UART_RESPONSE_DELAY);
 		} else {
 			ret = -EINVAL;
 		}

@@ -229,7 +229,7 @@ static void inactivity_timer_handler(struct k_timer *timer)
 
 	LOG_INF("time limit reached");
 	if (!ring_buf_is_empty(&data_rb)) {
-		k_work_submit(&raw_send_scheduled_work);
+		k_work_submit_to_queue(&sm_work_q, &raw_send_scheduled_work);
 	} else {
 		LOG_DBG("data buffer empty");
 	}
