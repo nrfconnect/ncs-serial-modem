@@ -11,6 +11,8 @@ This page describes CMUX-related AT commands.
 
 The GSM 0710 multiplexer protocol (CMUX) enables multiplexing multiple data streams through a single serial link, setting up one channel per data stream.
 For example, it can be used to exchange AT data and have a :ref:`Point-to-Point Protocol (PPP) <CONFIG_SM_PPP>` link up at the same time on a single UART.
+Serial Modem implements the basic option of CMUX protocol with only UIH frames as described in the :ref:`3GPP TS 27.010 <https://www.etsi.org/deliver/etsi_ts/127000_127099/127010/18.00.00_60/ts_127010v180000p.pdf>` specification.
+The maximum length of the information field in UIH frames is configurable using the :kconfig:option:`CONFIG_MODEM_CMUX_MTU` Kconfig option which defaults to 127 bytes.
 
 .. note::
 
@@ -38,6 +40,9 @@ Set command
 -----------
 
 The set command allows you to start CMUX and assign the CMUX channels.
+
+The CMUX link is closed down automatically when the remote end sends the CMUX Multiplexer Close Down (CLD) sequence.
+The CMUX link can be closed manually with the ``AT#XCMUXCLD`` command.
 
 Syntax
 ~~~~~~
@@ -131,3 +136,30 @@ With PPP:
    #XCMUX: 2,2
 
    OK
+
+CMUX close down #XCMUXCLD
+=========================
+
+The ``#XCMUXCLD`` command closes down the CMUX service.
+
+This command can be used on host devices which do not support sending the CMUX Multiplexer close down sequence.
+Once CMUX is closed down, the serial link returns to AT command mode.
+
+Set command
+-----------
+
+The set command allows you to close down the CMUX link.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XCMUXCLD
+
+An ``OK`` response is sent in the CMUX channel if the command is accepted, after which CMUX is closed down.
+
+Read command
+------------
+
+The read command is not supported.

@@ -483,3 +483,23 @@ static int handle_at_cmux(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 	}
 	return ret;
 }
+
+SM_AT_CMD_CUSTOM(xcmuxcld, "AT#XCMUXCLD", handle_at_cmuxcld);
+static int handle_at_cmuxcld(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+			      uint32_t param_count)
+{
+	if (cmd_type != AT_PARSER_CMD_TYPE_SET || param_count != 1) {
+		return -EINVAL;
+	}
+
+	if (!cmux_is_started() || !cmux.uart_pipe_open) {
+		return -EALREADY;
+	}
+
+	/* Respond before stopping CMUX. */
+	rsp_send_ok();
+	/* Return to AT command mode */
+	k_work_reschedule_for_queue(&sm_work_q, &cmux.stop_work, STOP_DELAY);
+
+	return -SILENT_AT_COMMAND_RET;
+}
