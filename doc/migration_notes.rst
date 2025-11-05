@@ -7,16 +7,15 @@ Migration notes
    :local:
    :depth: 3
 
-This migration note helps you to move from |NCS| v3.1.x `Serial LTE modem (SLM) <Serial LTE modem_>`_ to the |addon|.
+This migration note helps you to move from |NCS| v3.1.x `Serial LTE modem (SLM) <Serial LTE modem_>`_ to the |SM|.
 
-There are several breaking changes between |addon| and |NCS| SLM, such as renaming, file movement, AT command changes, overlay file changes, and so on.
+There are several breaking changes between |SM| and |NCS| SLM, such as renaming, file movement, AT command changes, overlay file changes, and so on.
 The following sections cover all the changes that must be taken into account.
 
 Background
 **********
 
-The base of the |addon| repository is a copy of |NCS| SLM and related components from the |NCS| commit ``437f372b37849fe215243f8de48847d578976c13``.
-Most of the |SM| application APIs remain the same as in the |NCS| SLM, but with significant breaking changes from the host implementation's perspective in the future versions of the |addon|.
+The base of the |SM| repository is a copy of |NCS| SLM and related components from the |NCS| main branch commit ``437f372b37849fe215243f8de48847d578976c13``, which is in practice a bit after the |NCS| release v3.1.0.
 
 The following |NCS| files were copied into this repository:
 
@@ -26,16 +25,12 @@ The following |NCS| files were copied into this repository:
 * :file:`include/modem/modm_slm.h` to :file:`include/sm_host.h`
 * :file:`doc/nrf/libraries/modem/modem_slm.rst` to :file:`doc/lib/sm_host.rst`
 
-.. _migration_3.1.x_SM_required:
-
 Required changes
 ****************
 
 The following changes are mandatory to make your application work in the same way as in previous releases.
 
-.. toggle::
-
-   This section gives instructions on how to migrate from the NCS v3.1.x Serial LTE Modem to the |SM| Add-On:
+This section gives instructions on how to migrate from the NCS v3.1.x Serial LTE Modem to the |SM|:
 
    * Rename the use of the following Kconfig options:
 
@@ -45,7 +40,7 @@ The following changes are mandatory to make your application work in the same wa
 
    * Code patches:
 
-     * Renamed the file name from ``slm_`` to ``sm_`` and ``modem_slm`` to ``sm_host``.
+     * Renamed the file names from ``slm_`` to ``sm_`` and ``modem_slm`` to ``sm_host``.
      * Functions and other symbols in the code have been renamed accordingly making automatic patching to likely fail.
 
    * Default AT command terminator changed from ``\r\n`` (``CONFIG_SM_CR_LF_TERMINATION`` and ``CONFIG_SM_HOST_CR_LF_TERMINATION``) to ``\r`` (``CONFIG_SM_CR_TERMINATION`` and ``CONFIG_SM_HOST_CR_TERMINATION``).
@@ -53,7 +48,7 @@ The following changes are mandatory to make your application work in the same wa
    * Rename the following AT commands:
 
      * ``AT#GPS`` to ``AT#GNSS``
-     * ``AT#XGPSDEL`` command has been renamed to ``AT#XGNSSDEL``
+     * ``AT#XGPSDEL`` to ``AT#XGNSSDEL``
 
    * Removed the ``AT#XPOLL`` command.
      Use ``AT#XAPOLL`` instead.
@@ -89,83 +84,95 @@ The |SM| application uses DTR (Data Terminal Ready) and RI (Ring Indicator) pins
 See :ref:`sm_dtr_ri` for more information on how DTR and RI pins work in the |SM| application.
 See :ref:`sm_as_zephyr_modem` for information on how to configure DTR and RI pins when using the |SM| application as a Zephyr modem.
 
-Socket AT commands updated to handle-based API
-----------------------------------------------
+Socket AT command changes
+-------------------------
 
-The socket AT commands have been updated to use a handle-based approach instead of socket selection.
+The socket AT commands have been updated to use a handle-based approach instead of socket selection ``AT#XSOCKETSELECT``.
 This provides more flexibility and clearer socket management by directly referencing socket handles in all operations.
+There are also other changes to the socket AT commands to improve functionality and usability.
+Especially, ``#XSEND``/``#XSENDTO`` and ``#XRECV``/``#XRECV`` commands have been updated significantly.
 
-   * **Removed commands:**
+Here is the list of changes:
+
+   * Removed commands:
 
      * ``AT#XSOCKETSELECT`` - Socket selection is no longer needed. Each command now directly specifies the socket handle.
 
-   * **Updated socket creation:**
+   * Updated socket creation:
 
      * ``AT#XSOCKET`` - No longer supports closing sockets (``op=0`` removed). Only creates sockets and returns a handle.
      * ``AT#XSSOCKET`` - No longer supports closing sockets (``op=0`` removed). Only creates secure sockets and returns a handle.
 
-   * **New socket closing:**
+   * New socket closing:
 
      * ``AT#XCLOSE`` - New command to close individual sockets or all sockets at once.
      * Syntax: ``AT#XCLOSE[=<handle>]`` (handle is optional - omit to close all sockets)
 
-   * **AT#XSEND command parameter changes:**
+   * ``AT#XSEND`` command parameter changes:
 
-    Added ``<handle>``, ``<mode>`` parameters and optional ``<data_len>`` parameter (for data mode) to the ``AT#XSEND`` command. Changed parameter order.
+     Added ``<handle>``, ``<mode>`` parameters and optional ``<data_len>`` parameter (for data mode) to the ``AT#XSEND`` command.
+     Changed parameter order.
 
      * Old syntax: ``AT#XSEND[=<data>][,<flags>]``
-     * New syntax: ``AT#XSEND=<handle>,<mode>,<flags>,<url>,<port>,<data>`` for string and hex string modes, and
-                   ``AT#XSEND=<handle>,<mode>,<flags>,<url>,<port>[,<data_len>]`` for data mode.
+     * New syntax for string and hex string modes: ``AT#XSEND=<handle>,<mode>,<flags>,<url>,<port>,<data>``
+     * New syntax for data mode: ``AT#XSEND=<handle>,<mode>,<flags>,<url>,<port>[,<data_len>]``
 
-    Added result type to the ``#XSEND`` response.
+     Added result type to the ``#XSEND`` response.
 
      * Old response: ``#XSEND: <size>``
      * New response: ``#XSEND: <handle>,<result_type>,<size>``
-       Result type indicates whether an unsolicited notification (``#XSENDNTF``) will be sent when the network acknowledges the send operation.
 
-   * **AT#XSENDTO parameter changes:**
+   * New ``#XSENDNTF`` notification will be sent when the network acknowledges the send operation.
+     This notification is requested with ``<flags>`` parameter in the ``#XSEND``/``#XSENDTO`` commands.
 
-    Added ``<handle>``, ``<mode>`` parameters and optional ``<data_len>`` parameter (for data mode) to the ``AT#XSENDTO`` command. Changed parameter order.
+     * Syntax: ``#XSENDNTF: <handle>,<status>,<size>``
 
-    * Old syntax: ``AT#XSENDTO=<url>,<port>[,<data>][,<flags>]``
-    * New syntax: ``AT#XSENDTO=<handle>,<mode>,<flags>,<url>,<port>,<data>`` for string and hex string modes, and
-                  ``AT#XSENDTO=<handle>,<mode>,<flags>,<url>,<port>[,<data_len>]`` for data mode.
+   * ``AT#XSENDTO`` parameter changes:
 
-   * **AT#XRECV parameter changes:**
+     Added ``<handle>``, ``<mode>`` parameters and optional ``<data_len>`` parameter (for data mode) to the ``AT#XSENDTO`` command.
+     Changed parameter order.
 
-    Added ``<handle>``, ``<mode>`` parameters and optional ``<data_len>`` parameter to the ``AT#XRECV`` command. Changed parameter order.
+     * Old syntax: ``AT#XSENDTO=<url>,<port>[,<data>][,<flags>]``
+     * New syntax for string and hex string modes: ``AT#XSENDTO=<handle>,<mode>,<flags>,<url>,<port>,<data>``
+     * New syntax for data mode: ``AT#XSENDTO=<handle>,<mode>,<flags>,<url>,<port>[,<data_len>]``
 
-    * Old syntax: ``AT#XRECV=<timeout>[,<flags>]``
-    * New syntax: ``AT#XRECV=<handle>,<mode>,<flags>,<timeout>[,<data_len>]``
+   * ``AT#XRECV`` parameter changes:
 
-   * **AT#XRECVFROM parameter changes:**
+     Added ``<handle>``, ``<mode>`` parameters and optional ``<data_len>`` parameter to the ``AT#XRECV`` command.
+     Changed parameter order.
 
-    Added ``<handle>``, ``<mode>`` parameters and optional ``<data_len>`` parameter to the ``AT#XRECVFROM`` command. Changed parameter order.
+     * Old syntax: ``AT#XRECV=<timeout>[,<flags>]``
+     * New syntax: ``AT#XRECV=<handle>,<mode>,<flags>,<timeout>[,<data_len>]``
 
-    * Old syntax: ``AT#XRECVFROM=<timeout>[,<flags>]``
-    * New syntax: ``AT#XRECVFROM=<handle>,<mode>,<flags>,<timeout>[,<data_len>]``
+   * ``AT#XRECVFROM`` parameter changes:
 
-   * **New mode parameter for send/receive commands:**
+     Added ``<handle>``, ``<mode>`` parameters and optional ``<data_len>`` parameter to the ``AT#XRECVFROM`` command.
+     Changed parameter order.
 
-    The ``<mode>`` parameter provides different data handling modes:
+     * Old syntax: ``AT#XRECVFROM=<timeout>[,<flags>]``
+     * New syntax: ``AT#XRECVFROM=<handle>,<mode>,<flags>,<timeout>[,<data_len>]``
 
-    **For send commands (AT#XSEND, AT#XSENDTO):**
-     * ``0`` - String mode. Data provided directly as string parameter.
-     * ``1`` - Hex string mode. Data provided as hexadecimal string representation.
-     * ``2`` - Data mode. Enter data input mode for binary data.
+   * New ``<mode>`` parameter for send/receive commands:
 
-    **For receive commands (AT#XRECV, AT#XRECVFROM):**
-     * ``0`` - Binary mode. Data received as binary data.
-     * ``1`` - Hex string mode. Data received as hexadecimal string representation.
+     * For send commands (AT#XSEND, AT#XSENDTO):
 
-   * **Other socket operations now require handle parameter:**
+       * ``0`` - String mode. Data provided directly as string parameter.
+       * ``1`` - Hex string mode. Data provided as hexadecimal string representation.
+       * ``2`` - Data mode. Enter data input mode for binary data.
+
+     * For receive commands (AT#XRECV, AT#XRECVFROM):
+
+       * ``0`` - Binary mode. Data received as binary data.
+       * ``1`` - Hex string mode. Data received as hexadecimal string representation.
+
+   * Other socket operations now require handle parameter:
 
      * ``AT#XSOCKETOPT=<handle>,<op>,<name>[,<value>]`` (handle parameter added)
      * ``AT#XSSOCKETOPT=<handle>,<op>,<name>[,<value>]`` (handle parameter added)
      * ``AT#XBIND=<handle>,<port>`` (handle parameter added)
      * ``AT#XCONNECT=<handle>,<url>,<port>`` (handle parameter added)
 
-   * **Response format changes:**
+   * Response format changes:
 
      * ``AT#XSOCKETOPT`` - Response to get options now includes socket handle: ``#XSOCKETOPT: <handle>,<value>`` (previously just ``#XSOCKETOPT: <value>``)
      * ``AT#XSSOCKETOPT`` - Response to get options now includes socket handle: ``#XSSOCKETOPT: <handle>,<value>`` (previously just ``#XSSOCKETOPT: <value>``)
@@ -175,9 +182,9 @@ This provides more flexibility and clearer socket management by directly referen
      * ``AT#XSENDTO`` - Response now includes socket handle: ``#XSENDTO: <handle>,<size>`` (previously just ``#XSENDTO: <size>``)
      * ``AT#XRECVFROM`` - Response now includes socket handle and mode: ``#XRECVFROM: <handle>,<mode>,<size>,"<ip_addr>",<port>`` (previously just ``#XRECVFROM: <size>,"<ip_addr>",<port>``)
 
-   * **Migration example:**
+Migration example:
 
-     **Old approach (NCS SLM):**
+     Old approach (NCS SLM):
 
      .. code-block::
 
@@ -190,7 +197,7 @@ This provides more flexibility and clearer socket management by directly referen
         AT#XSOCKETSELECT=1        // Select socket handle 1
         AT#XSOCKET=0              // Close selected socket handle 1
 
-     **New approach (Serial Modem add-on):**
+     New approach (|SM|):
 
      .. code-block::
 
@@ -205,8 +212,8 @@ This provides more flexibility and clearer socket management by directly referen
 Removed features
 ****************
 
-This section lists features that have been removed from the |addon| compared to the |NCS| v3.1.x `Serial LTE modem (SLM) <Serial LTE modem_>`_.
-If you need any of those features with this |addon|, please contact customer support and describe your use case.
+This section lists features that have been removed from the |SM| compared to the |NCS| v3.1.x `Serial LTE modem (SLM) <Serial LTE modem_>`_.
+If you need any of those features with this |SM|, please contact customer support and describe your use case.
 Removed features:
 
    * Board support for the following chipsets: ``nrf9161dk/nrf9161/ns``, ``nrf9160dk/nrf9160/ns``, ``thingy91/nrf9160/ns`` and ``nrf9131ek/nrf9131/ns``.
