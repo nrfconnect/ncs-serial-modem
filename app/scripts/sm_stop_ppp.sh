@@ -10,7 +10,7 @@
 #
 
 MODEM=/dev/ttyACM0
-AT_CMUX=/dev/gsmtty1
+AT_CMUX=$(ls /dev/gsmtty* | sort -V | head -n 1)
 CHATOPT="-vs"
 TIMEOUT=30
 
