@@ -1,9 +1,9 @@
 .. _ncs_serial_modem:
 
-|addon|
-#######
+|SM|
+####
 
-The |addon| contains the |SM| application for nRF91-based devices, and is built on `nRF Connect SDK`_.
+The |SM| contains the |SM| application for nRF91-based devices, and is built on `nRF Connect SDK`_.
 It includes host examples in the form of the |SM| Host library and the |SM| Host Shell sample.
 
 .. toctree::

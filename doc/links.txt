@@ -1,4 +1,4 @@
-.. ### This page lists links used in Serial modem Add-on docs.
+.. ### This page lists links used in Serial Modem docs.
        Links are grouped by source URL if three or more have the same source URL.
        Links not separated by blank line are related to one another.
 
@@ -6,6 +6,7 @@
 
 .. _`nRF Connect SDK`: https://www.nordicsemi.com/Products/Development-software/nRF-Connect-SDK
 .. _`Getting started guide`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/installation.html
+.. _`Serial Modem`: https://docs.nordicsemi.com/bundle/addon-serial_modem-latest/page/index.html
 
 .. _`nRF91x1 AT Commands Reference Guide`: https://docs.nordicsemi.com/bundle/ref_at_commands_nrf91x1/page/REF/at_commands/intro_nrf91x1.html
 
@@ -83,7 +84,7 @@
 
 .. ### github.com
 
-.. _`github_release`: https://github.com/divipillai/ncs-serial-modem/releases
+.. _`github_release`: https://github.com/nrfconnect/ncs-serial-modem/releases
 .. _`sdk-nrfxlib`: https://github.com/nrfconnect/sdk-nrfxlib
 
 .. ### others

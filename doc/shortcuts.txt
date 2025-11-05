@@ -1,7 +1,6 @@
 .. ### Versions
 
 .. |NCS| replace:: nRF Connect SDK
-.. |addon| replace:: Serial Modem Add-on
 .. |SM| replace:: Serial Modem
 
 .. |VSC| replace:: Visual Studio Code

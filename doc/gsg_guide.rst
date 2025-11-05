@@ -7,7 +7,7 @@ Getting started
    :local:
    :depth: 2
 
-Before getting started, make sure you have a proper nRF Connect SDK development environment.
+Before getting started, make sure you have a proper |NCS| development environment.
 Follow the official `Getting started guide`_.
 
 Initialization
