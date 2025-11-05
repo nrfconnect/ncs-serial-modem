@@ -26,6 +26,10 @@ The sample supports the following development kits:
      - PCA
      - Board name
      - Board target
+   * - `nRF54L15 DK <nRF54L15 DK_>`_
+     - PCA10156
+     - `nrf54l15dk`_
+     - ``nrf54l15dk/nrf54l15/cpuapp``
    * - `nRF7002 DK <nRF7002dk_>`_
      - PCA10143
      - `nRF7002dk <nRF7002dk_>`_
@@ -44,6 +48,38 @@ Connect the DK pins that are defined in the board-specific overlay files :file:`
 The following table shows how to connect UART, DTR and RI pins of the DK to the corresponding pins in the nRF91 Series DKs:
 
 .. tabs::
+
+   .. group-tab:: nRF54L15 DK
+
+      .. list-table::
+         :header-rows: 1
+
+         * - nRF54L15 DK
+           - nRF91 Series DK
+         * - UART TX P0.00
+           - UART RX P0.11
+         * - UART RX P0.01
+           - UART TX P0.10
+         * - UART CTS P0.03
+           - UART RTS P0.12
+         * - UART RTS P0.02
+           - UART CTS P0.13
+         * - DTR OUT P1.11
+           - DTR IN P0.31
+         * - RI IN P1.12
+           - RI OUT P0.30
+         * - GPIO GND
+           - GPIO GND
+
+      .. note::
+         The VCOM0 must be disabled on the nRF54L15 DK, to release the UART GPIO pins to be used with |SM| Host Shell sample.
+
+         * For nRF54L15 DK, you can use the `Board Configurator app`_ to disable the `Connect port VCOM0` setting.
+
+      .. note::
+         The GPIO output levels on the nRF91 Series device and nRF54L15 DK must be the same.
+
+         * You can set the VDD voltages for both devices with the `Board Configurator app`_.
 
    .. group-tab:: nRF52840 DK
 

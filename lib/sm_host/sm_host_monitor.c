@@ -38,7 +38,7 @@ void sm_monitor_dispatch(const char *notif, size_t len)
 {
 	struct at_notif_fifo *at_notif;
 	size_t sz_needed;
-	size_t notif_len;
+	size_t notif_len = 0;
 	char *match = NULL;
 
 	/* TODO:
