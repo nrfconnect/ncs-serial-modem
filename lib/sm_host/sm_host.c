@@ -792,7 +792,11 @@ static int gpio_init(void)
 			LOG_DBG("Wakeup sense %s", "low");
 			sense = NRF_GPIO_PIN_SENSE_LOW;
 		}
-		nrf_gpio_cfg_sense_set(dtr_config.ri_gpio.pin, sense);
+
+		int port = DT_PROP(DT_PHANDLE(DT_NODELABEL(dte_dtr), ri_gpios), port);
+		uint32_t abs_pin = NRF_PIN_PORT_TO_PIN_NUMBER(dtr_config.ri_gpio.pin, port);
+
+		nrf_gpio_cfg_sense_set(abs_pin, sense);
 
 		gpio_init_callback(&gpio_cb, gpio_cb_func, BIT(dtr_config.ri_gpio.pin));
 		err = gpio_add_callback_dt(&dtr_config.ri_gpio, &gpio_cb);
