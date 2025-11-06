@@ -316,6 +316,7 @@ static int ppp_start(void)
 		send_status_notification();
 		return 0;
 	}
+	at_monitor_resume(&sm_ppp_on_cgev);
 	ppp_state = PPP_STATE_STARTING;
 
 	int ret;
@@ -326,7 +327,6 @@ static int ppp_start(void)
 		goto error;
 	}
 
-	at_monitor_resume(&sm_ppp_on_cgev);
 	ppp_retrieve_pdn_info(ctx);
 
 	ret = net_if_up(ppp_iface);
