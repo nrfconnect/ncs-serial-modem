@@ -91,3 +91,6 @@
 .. _`Private addresses`: https://en.wikipedia.org/wiki/IP_address#Private_addresses
 .. _`DLPTest.com`: https://dlptest.com/ftp-test/
 .. _`Zephyr Network APIs`: https://docs.zephyrproject.org/latest/connectivity/networking/api/apis.html#network-apis
+
+.. _`3GPP TS 27.010`: https://www.etsi.org/deliver/etsi_ts/127000_127099/127010/18.00.00_60/ts_127010v180000p.pdf
+.. _`3GPP TS 27.007`: https://www.etsi.org/deliver/etsi_ts/127000_127099/127007/18.06.00_60/ts_127007v180600p.pdf
