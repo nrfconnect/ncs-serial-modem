@@ -29,10 +29,10 @@ cleanup() {
 	set +eu
 	pkill pppd
 	pkill ldattach
+	printf "\xF9\x03\xEF\x05\xC3\x01\xF2\xF9" > $MODEM
 	echo "Failed to start..."
 	exit 1
 }
-trap cleanup ERR
 
 if [[ ! -c $MODEM ]]; then
 	echo "Serial port not found: $MODEM"
@@ -43,6 +43,8 @@ if find /dev -type c -name 'gsmtty*' | grep -q . ; then
 	echo "Error: existing CMUX devices found (/dev/gsmtty*)"
 	exit 1
 fi
+
+trap cleanup ERR
 
 stty -F $MODEM $BAUD pass8 raw crtscts clocal
 
