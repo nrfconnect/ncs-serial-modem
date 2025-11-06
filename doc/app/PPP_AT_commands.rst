@@ -85,24 +85,21 @@ PPP with default PDN connection:
 
   OK
 
+  // PPP is started and waits for a peer to connect.
   #XPPP: 1,0,0
 
-  // Have the peer connect to |SM|'s PPP.
+  // Peer connects to |SM|'s PPP.
   #XPPP: 1,1,0
 
   // Peer disconnects.
   #XPPP: 1,0,0
 
-  // |SM| restarts PPP automatically when peer disconnects.
+  // |SM| stops PPP when a peer disconnects.
   #XPPP: 0,0,0
-
-  #XPPP: 1,0,0
 
   AT+CFUN=4
 
   OK
-
-  #XPPP: 0,0,0
 
 PPP with non-default PDN connection:
 
@@ -129,8 +126,32 @@ PPP with non-default PDN connection:
   // PPP is automatically started when the PDN connection set for PPP has been activated.
   #XPPP: 1,0,1
 
-  // Have the peer connect to |SM|'s PPP.
+  // Peer connects to |SM|'s PPP.
   #XPPP: 1,1,1
+
+Connection recovery for network loss.
+This requires the PPP on the peer side to keep retrying or waiting for LCP Config-Requests.
+
+::
+
+  // Simulate connection loss by activating the flight mode.
+  AT+CFUN=4
+
+  OK
+
+  // PPP is automatically stopped when the PDN connection has been deactivated.
+  #XPPP: 0,0,0
+
+  // Reactivate the connection.
+  AT+CFUN=1
+
+  OK
+
+  // PPP is automatically restarted when the PDN connection has been reactivated.
+  #XPPP: 1,0,0
+
+  // Peer connects to |SM|'s PPP.
+  #XPPP: 1,1,0
 
 Read command
 ------------
