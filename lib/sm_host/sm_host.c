@@ -467,6 +467,7 @@ static void uart_callback(const struct device*, struct uart_event *evt, void*)
 		}
 		if (ring_buf_is_empty(&tx_buf)) {
 			k_sem_give(&tx_done_sem);
+			reschedule_disable();
 			break;
 		}
 		err = tx_start();
@@ -474,7 +475,6 @@ static void uart_callback(const struct device*, struct uart_event *evt, void*)
 			LOG_ERR("tx_start failed: %d", err);
 			k_sem_give(&tx_done_sem);
 		}
-		reschedule_disable();
 		break;
 	case UART_TX_ABORTED:
 		err = ring_buf_get_finish(&tx_buf, evt->data.tx.len);
@@ -484,6 +484,7 @@ static void uart_callback(const struct device*, struct uart_event *evt, void*)
 		LOG_WRN("UART_TX_ABORTED, dropped: %d bytes", ring_buf_size_get(&tx_buf));
 		ring_buf_reset(&tx_buf);
 		k_sem_give(&tx_done_sem);
+		reschedule_disable();
 		break;
 	case UART_RX_RDY:
 		buf_ref(evt->data.rx.buf);
@@ -496,7 +497,9 @@ static void uart_callback(const struct device*, struct uart_event *evt, void*)
 			break;
 		}
 		k_work_submit((struct k_work *)&rx_process_work);
-		reschedule_disable();
+		if (ring_buf_is_empty(&tx_buf)) {
+			reschedule_disable();
+		}
 		break;
 	case UART_RX_BUF_REQUEST:
 		buf = buf_alloc();
@@ -625,6 +628,8 @@ static int dtr_uart_disable(void)
 {
 	int err;
 
+	LOG_DBG("DTR UART disable: %s.", "Start");
+
 	/* Set DTR state at beginning so that we have correct state when RI comes. */
 	dtr_config.active = false;
 
@@ -659,7 +664,7 @@ static int dtr_uart_disable(void)
 		return err;
 	}
 
-	LOG_DBG("DTR UART disabled");
+	LOG_DBG("DTR UART disable: %s.", "Done");
 	return 0;
 }
 
@@ -678,6 +683,8 @@ static void dtr_uart_disable_work_fn(struct k_work *work)
 static int dtr_uart_enable(void)
 {
 	int err;
+
+	LOG_DBG("DTR UART enable: %s.", "Start");
 
 	/* Set DTR state at beginning so that we have correct state when RI comes. */
 	dtr_config.active = true;
@@ -721,7 +728,7 @@ static int dtr_uart_enable(void)
 		return err;
 	}
 
-	LOG_DBG("DTR UART enabled");
+	LOG_DBG("DTR UART enable: %s.", "Done");
 	return 0;
 }
 
