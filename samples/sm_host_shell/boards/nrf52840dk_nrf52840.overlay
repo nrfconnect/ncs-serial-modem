@@ -33,7 +33,7 @@
 	dte_dtr: dte_dtr {
 		compatible = "nordic,dte-dtr";
 		dtr-gpios = <&gpio0 11 GPIO_ACTIVE_LOW>;
-		ri-gpios = <&gpio0 13 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>;
+		ri-gpios = <&gpio0 13 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
 	};
 };
 

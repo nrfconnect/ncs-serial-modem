@@ -65,7 +65,7 @@ See the configuration example from :file:`app/overlay-external-mcu.overlay`::
       dtr_uart2: dtr-uart {
          compatible = "nordic,dtr-uart";
          dtr-gpios = <&gpio0 31 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
-         ri-gpios = <&gpio0 30 GPIO_ACTIVE_HIGH>;
+         ri-gpios = <&gpio0 30 GPIO_ACTIVE_LOW>;
          status = "okay";
       };
       pinctrl-0 = <&uart2_default_alt>;
