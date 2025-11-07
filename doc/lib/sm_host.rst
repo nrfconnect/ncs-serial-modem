@@ -106,7 +106,7 @@ Below is an example overlay for configuring UART and DTR/RI GPIOs:
     dte_dtr: dte_dtr {
       compatible = "nordic,dte-dtr";
       dtr-gpios = <&gpio0 26 GPIO_ACTIVE_LOW>;
-      ri-gpios = <&gpio0 25 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>;
+      ri-gpios = <&gpio0 25 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
     };
   };
 
