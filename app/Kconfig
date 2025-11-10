@@ -11,7 +11,7 @@ menu "Nordic Serial Modem"
 config SM_CUSTOMER_VERSION
 	string "Customer version string"
 	help
-	   This version is reported together with baseline versions by AT command "#XSLMVER".
+	   This version is reported together with baseline versions by AT command "#XSMVER".
 
 config SM_AT_MAX_PARAM
 	int "Maximum number of parameters in AT command"

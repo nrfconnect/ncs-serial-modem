@@ -47,8 +47,9 @@ This section gives instructions on how to migrate from the NCS v3.1.x Serial LTE
 
    * Rename the following AT commands:
 
-     * ``AT#GPS`` to ``AT#GNSS``
+     * ``AT#XGPS`` to ``AT#XGNSS``
      * ``AT#XGPSDEL`` to ``AT#XGNSSDEL``
+     * ``AT#XSLMVER`` to ``AT#XSMVER``
 
    * Removed the ``AT#XPOLL`` command.
      Use ``AT#XAPOLL`` instead.
