@@ -484,6 +484,7 @@ static void uart_callback(const struct device*, struct uart_event *evt, void*)
 		LOG_WRN("UART_TX_ABORTED, dropped: %d bytes", ring_buf_size_get(&tx_buf));
 		ring_buf_reset(&tx_buf);
 		k_sem_give(&tx_done_sem);
+		k_sem_reset(&at_rsp);
 		reschedule_disable();
 		break;
 	case UART_RX_RDY:
@@ -722,10 +723,12 @@ static int dtr_uart_enable(void)
 	}
 
 	/* Start TX in case there is pending data. */
-	err = tx_start();
-	if (err) {
-		LOG_ERR("Failed to start TX (%d).", err);
-		return err;
+	if (!ring_buf_is_empty(&tx_buf)) {
+		err = tx_start();
+		if (err) {
+			LOG_ERR("Failed to start TX (%d).", err);
+			return err;
+		}
 	}
 
 	LOG_DBG("DTR UART enable: %s.", "Done");
@@ -930,6 +933,7 @@ int sm_host_send_cmd(const char *const command, uint32_t timeout)
 	}
 	if (ret) {
 		LOG_ERR("timeout");
+		sm_at_state = AT_CMD_ERROR;
 		return ret;
 	}
 
