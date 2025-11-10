@@ -62,7 +62,7 @@ Configuration options
 
 CONFIG_SM_CUSTOMER_VERSION - Customer version string
    Version string defined by the customer after customizing the application.
-   When defined, this version is reported with the baseline versions by the ``#XSLMVER`` AT command.
+   When defined, this version is reported with the baseline versions by the ``#XSMVER`` AT command.
 
 .. _CONFIG_SM_AT_MAX_PARAM:
 
