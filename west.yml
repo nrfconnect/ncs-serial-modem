@@ -14,4 +14,18 @@ manifest:
       remote: ncs
       repo-path: sdk-nrf
       revision: v3.3.0-preview2
-      import: true
+      import:
+        name-allowlist:
+          - cjson
+          - cmsis_6
+          - cmock
+          - hal_nordic
+          - mbedtls
+          - mcuboot
+          - memfault-firmware-sdk
+          - nrfxlib
+          - oberon-psa-crypto
+          - segger
+          - trusted-firmware-m
+          - zcbor
+          - zephyr
