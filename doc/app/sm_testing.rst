@@ -25,8 +25,8 @@ Complete the following steps to test the functionality provided by the :ref:`SM_
    .. parsed-literal::
       :class: highlight
 
-      **AT#XSLMVER**
-      #XSLMVER: "2.3.0","2.3.0"
+      **AT#XSMVER**
+      #XSMVER: "v0.1.0","3.1.99"
       OK
 
 #. Retrieve a list of all supported proprietary AT commands.
@@ -35,7 +35,7 @@ Complete the following steps to test the functionality provided by the :ref:`SM_
       :class: highlight
 
       **AT#XCLAC**
-      AT#XSLMVER
+      AT#XSMVER
       AT#XSLEEP
       AT#XCLAC
       AT#XSOCKET

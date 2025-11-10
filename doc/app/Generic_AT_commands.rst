@@ -63,34 +63,33 @@ Test command
 
 The test command is not supported.
 
-|SM| version #XSLMVER
+|SM| version #XSMVER
 =====================
 
-The ``#XSLMVER`` command return the versions of the |NCS| in which the |SM| application is built.
-It also returns the version of the modem library that |SM| uses to communicate with the modem.
+The ``#XSMVER`` command return the versions of the |SM| and |NCS| in which the |SM| application is built.
 
 Set command
 -----------
 
-The set command returns the versions of the |NCS| and the modem library.
+The set command returns the versions of the |SM| and |NCS|.
 
 Syntax
 ~~~~~~
 
 ::
 
-   #XSLMVER
+   #XSMVER
 
 Response syntax
 ~~~~~~~~~~~~~~~
 
 ::
 
-   #XSLMVER: <ncs_version>,<libmodem_version>[,<customer_version>]
+   #XSMVER: <sm_version>,<ncs_version>[,<customer_version>]
+
+The ``<sm_version>`` value is the version of the |SM| application.
 
 The ``<ncs_version>`` value is a string containing the version of the |NCS|.
-
-The ``<libmodem_version>`` value is a string containing the version of the modem library.
 
 The ``<customer_version>`` value is the :ref:`CONFIG_SM_CUSTOMER_VERSION <CONFIG_SM_CUSTOMER_VERSION>` string, if defined.
 
@@ -101,12 +100,19 @@ The following command example reads the versions:
 
 ::
 
-   AT#XSLMVER
-   #XSLMVER: "2.5.0","2.5.0-lte-5ccd2d4dd54c"
+   // Released build
+   AT#XSMVER
+   #XSMVER: "v0.1.0","3.1.99"
    OK
 
-   AT#XSLMVER
-   #XSLMVER: "2.5.99","2.5.0-lte-5ccd2d4dd54c","Onomondo 2.1.0"
+   // Development build
+   AT#XSMVER
+   #XSMVER: "v0.1.0-73-g0c2af8c-dirty","3.1.99"
+   OK
+
+   // Released build with customer version
+   AT#XSMVER
+   #XSMVER: "v0.1.0","3.1.99","Onomondo 2.1.0"
    OK
 
 Read command
@@ -152,7 +158,7 @@ Example
 ::
 
    AT#XCLAC
-   AT#XSLMVER
+   AT#XSMVER
    AT#XSLEEP
    AT#XCLAC
    AT#XSOCKET
