@@ -94,6 +94,15 @@ config SM_URC_BUFFER_SIZE
 	  Note: %NCELLMEAS notifications can be nearly 4kB in size,
 	  which explains the default value.
 
+config SM_AT_ECHO_MAX_LEN
+	int "Maximum length of AT command echo"
+	range 2 4096
+	default 4096
+	help
+	  Maximum length of AT command echo that will be sent back to the host when AT command echo is enabled.
+	  AT commands longer than this value will be truncated in the echo.
+	  The AT command terminator is included in this length and it is always echoed.
+
 config SM_URC_DELAY_WITH_INCOMPLETE_ECHO_MS
 	int "Delay for URC transmission when incomplete AT command echo is in progress (ms)"
 	default 1000

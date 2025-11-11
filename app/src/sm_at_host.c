@@ -576,6 +576,7 @@ static size_t cmd_rx_handler(const uint8_t *buf, const size_t len, bool *stop_at
 	size_t processed;
 	static bool inside_quotes;
 	static size_t at_cmd_len;
+	static size_t echo_len;
 	static uint8_t prev_character;
 	bool send = false;
 
@@ -641,12 +642,38 @@ static size_t cmd_rx_handler(const uint8_t *buf, const size_t len, bool *stop_at
 	}
 
 	if (echo) {
+		const uint8_t terminator_len = IS_ENABLED(CONFIG_SM_CR_LF_TERMINATION) ? 2 : 1;
+		bool truncate = false;
+		size_t echo_fragment_len = processed;
+
+		/* Check if echo should be truncated. */
+		if (echo_len + echo_fragment_len + (send ? 0 : terminator_len) >
+		    CONFIG_SM_AT_ECHO_MAX_LEN) {
+			truncate = true;
+			echo_fragment_len = CONFIG_SM_AT_ECHO_MAX_LEN - echo_len - terminator_len;
+		}
+
 		/* Echoing incomplete AT-command will cause
 		 * CONFIG_SM_URC_DELAY_WITH_INCOMPLETE_ECHO_MS delay in URCs after every
 		 * UART RX buffer (keystroke, when typing).
 		 */
 		incomplete_echo = !send;
-		(void)sm_at_send_internal(buf, processed, false, SM_DEBUG_PRINT_NONE);
+		(void)sm_at_send_internal(buf, echo_fragment_len, false, SM_DEBUG_PRINT_NONE);
+		echo_len += echo_fragment_len;
+
+		/* Send truncated termination characters.*/
+		if (send && truncate) {
+			if (IS_ENABLED(CONFIG_SM_CR_TERMINATION)) {
+				(void)sm_at_send_internal((uint8_t *)"\r", 1, false,
+							  SM_DEBUG_PRINT_NONE);
+			} else if (IS_ENABLED(CONFIG_SM_LF_TERMINATION)) {
+				(void)sm_at_send_internal((uint8_t *)"\n", 1, false,
+							  SM_DEBUG_PRINT_NONE);
+			} else {
+				(void)sm_at_send_internal((uint8_t *)"\r\n", 2, false,
+							  SM_DEBUG_PRINT_NONE);
+			}
+		}
 	}
 
 	if (send) {
@@ -662,6 +689,7 @@ static size_t cmd_rx_handler(const uint8_t *buf, const size_t len, bool *stop_at
 
 		inside_quotes = false;
 		at_cmd_len = 0;
+		echo_len = 0;
 	}
 
 	return processed;
