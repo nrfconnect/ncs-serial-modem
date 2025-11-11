@@ -15,4 +15,12 @@ manifest:
       remote: ncs
       repo-path: sdk-nrf
       revision: 6f12beea656373fd7b7db76db76ecd7c7b9d5811
-      import: true
+      import:
+        name-allowlist:
+          - zephyr
+          - mcuboot
+          - mbedtls
+          - nrfxlib
+          - trusted-firmware-m
+          - cjson
+          - memfault-firmware-sdk
