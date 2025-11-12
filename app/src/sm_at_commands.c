@@ -171,7 +171,7 @@ static void final_call(void (*func)(void))
 	static struct k_work_delayable worker;
 
 	k_work_init_delayable(&worker, (k_work_handler_t)func);
-	k_work_schedule(&worker, SM_UART_RESPONSE_DELAY);
+	k_work_schedule_for_queue(&sm_work_q, &worker, SM_UART_RESPONSE_DELAY);
 }
 
 static void sm_shutdown(void)

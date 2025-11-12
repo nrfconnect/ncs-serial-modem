@@ -204,7 +204,7 @@ static void pwr_pin_callback(const struct device *dev, struct gpio_callback *gpi
 {
 	static K_WORK_DELAYABLE_DEFINE(work, pwr_pin_fn);
 
-	k_work_reschedule(&work, K_MSEC(10));
+	k_work_reschedule_for_queue(&sm_work_q, &work, K_MSEC(10));
 }
 #endif
 
