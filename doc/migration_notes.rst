@@ -223,3 +223,4 @@ Removed features:
 
      There is no direct replacement for these commands.
    * FTP and TFTP clients including ``AT#XFTP`` and ``AT#XTFTP`` commands.
+   * ``#XGPIO`` AT command.
