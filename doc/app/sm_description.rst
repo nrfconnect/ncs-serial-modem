@@ -154,16 +154,6 @@ CONFIG_SM_GNSS - GNSS support in |SM|
 CONFIG_SM_NRF_CLOUD - nRF Cloud support in |SM|
    This option enables additional AT commands for using the nRF Cloud service.
 
-.. _CONFIG_SM_FTPC:
-
-CONFIG_SM_FTPC - FTP client support in |SM|
-   This option enables additional AT commands for using the FTP client service.
-
-.. _CONFIG_SM_TFTPC:
-
-CONFIG_SM_TFTPC - TFTP client support in |SM|
-   This option enables additional AT commands for using the TFTP client service.
-
 .. _CONFIG_SM_MQTTC:
 
 CONFIG_SM_MQTTC - MQTT client support in |SM|
@@ -289,7 +279,7 @@ The following configuration files are provided:
   See :ref:`SM_AT_CMUX` for more information.
 
 * :file:`overlay-ppp.conf` - Configuration file that adds support for the Point-to-Point Protocol (PPP).
-  This disables most of the IP-based protocols available through AT commands (such as FTP and MQTT) as it is expected that the controlling chip's own IP stack is used instead.
+  This disables most of the IP-based protocols available through AT commands (such as MQTT) as it is expected that the controlling chip's own IP stack is used instead.
   See :ref:`CONFIG_SM_PPP <CONFIG_SM_PPP>` and :ref:`SM_AT_PPP` for more information.
 
 * :file:`overlay-ppp-without-cmux.conf` - Configuration file that enables support for the second UART to be used by PPP.
@@ -588,7 +578,6 @@ This application uses the following |NCS| libraries:
 * `AT monitor`_
 * `Modem library integration layer`_
 * `Modem JWT`_
-* `FTP client`_
 * `SMS`_
 * `FOTA download`_
 * `Downloader`_

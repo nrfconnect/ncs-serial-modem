@@ -24,7 +24,6 @@ However, the |SM| data mode is applied automatically while using the following m
 * Socket ``send()`` and ``sendto()``
 * TCP/TLS proxy send
 * UDP/DTLS proxy send
-* FTP put, uput and mput
 * MQTT publish
 * HTTP request
 * GNSS nRF Cloud send message
@@ -48,9 +47,6 @@ Other examples:
 
 * ``AT#XTCPSEND``
 * ``AT#XUDPSEND``
-* ``AT#XFTP="put",<file>``
-* ``AT#XFTP="uput"``
-* ``AT#XFTP="mput",<file>``
 * ``AT#XMQTTPUB=<topic>,"",<qos>,<retain>``
 * ``AT#XNRFCLOUD=2``
 * ``AT#XCARRIER="app_data_set"``

@@ -38,9 +38,6 @@
 #if defined(CONFIG_SM_GNSS)
 #include "sm_at_gnss.h"
 #endif
-#if defined(CONFIG_SM_FTPC)
-#include "sm_at_ftp.h"
-#endif
 #if defined(CONFIG_SM_MQTTC)
 #include "sm_at_mqtt.h"
 #endif
@@ -348,7 +345,7 @@ static int handle_at_clac(enum at_parser_cmd_type cmd_type, struct at_parser *, 
 
 		for (size_t j = 0; j < i; j++) {
 			/* Compare length and command as we have AT commands such as
-			 * AT#XSEND/AT#XSENDTO, AT#XFTP="whatever"
+			 * AT#XSEND/AT#XSENDTO, AT#XBIND="whatever"
 			 * and AT#XNRFCLOUD[=?]/AT#XNRFCLOUDPOS.
 			 */
 			if ((base_cmd_len[i] == base_cmd_len[j]) &&
@@ -437,13 +434,6 @@ int sm_at_init(void)
 	err = sm_at_gnss_init();
 	if (err) {
 		LOG_ERR("%s initialization failed (%d).", "GNSS", err);
-		return -EFAULT;
-	}
-#endif
-#if defined(CONFIG_SM_FTPC)
-	err = sm_at_ftp_init();
-	if (err) {
-		LOG_ERR("%s initialization failed (%d).", "FTP", err);
 		return -EFAULT;
 	}
 #endif
@@ -542,12 +532,6 @@ void sm_at_uninit(void)
 	err = sm_at_gnss_uninit();
 	if (err) {
 		LOG_WRN("%s uninitialization failed (%d).", "GNSS", err);
-	}
-#endif
-#if defined(CONFIG_SM_FTPC)
-	err = sm_at_ftp_uninit();
-	if (err) {
-		LOG_WRN("%s uninitialization failed (%d).", "FTP", err);
 	}
 #endif
 #if defined(CONFIG_SM_MQTTC)
