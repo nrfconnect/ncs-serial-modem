@@ -31,7 +31,6 @@ add_subdirectory_ifdef(CONFIG_SM_GNSS src/gnss)
 add_subdirectory_ifdef(CONFIG_SM_NRF_CLOUD src/nrfcloud)
 add_subdirectory_ifdef(CONFIG_SM_MQTTC src/mqtt_c)
 add_subdirectory_ifdef(CONFIG_SM_HTTPC src/http_c)
-add_subdirectory_ifdef(CONFIG_SM_TWI src/twi)
 add_subdirectory_ifdef(CONFIG_SM_CARRIER src/lwm2m_carrier)
 
 zephyr_include_directories(src)

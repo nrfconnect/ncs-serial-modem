@@ -44,9 +44,6 @@
 #if defined(CONFIG_SM_HTTPC)
 #include "sm_at_httpc.h"
 #endif
-#if defined(CONFIG_SM_TWI)
-#include "sm_at_twi.h"
-#endif
 #if defined(CONFIG_SM_CARRIER)
 #include "sm_at_carrier.h"
 #endif
@@ -448,13 +445,6 @@ int sm_at_init(void)
 		return -EFAULT;
 	}
 #endif
-#if defined(CONFIG_SM_TWI)
-	err = sm_at_twi_init();
-	if (err) {
-		LOG_ERR("%s initialization failed (%d).", "TWI", err);
-		return -EFAULT;
-	}
-#endif
 #if defined(CONFIG_SM_CARRIER)
 	err = sm_at_carrier_init();
 	if (err) {
@@ -534,12 +524,6 @@ void sm_at_uninit(void)
 	err = sm_at_httpc_uninit();
 	if (err) {
 		LOG_WRN("%s uninitialization failed (%d).", "HTTP", err);
-	}
-#endif
-#if defined(CONFIG_SM_TWI)
-	err = sm_at_twi_uninit();
-	if (err) {
-		LOG_WRN("%s uninitialization failed (%d).", "TWI", err);
 	}
 #endif
 #if defined(CONFIG_SM_CARRIER)

@@ -47,4 +47,3 @@ The modem specific AT commands are documented in the `nRF91x1 AT Commands Refere
    SMS_AT_commands
    SOCKET_AT_commands
    TCPUDP_AT_commands
-   TWI_AT_commands
