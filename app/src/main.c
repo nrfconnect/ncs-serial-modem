@@ -61,7 +61,7 @@ void nrf_modem_fault_handler(struct nrf_modem_fault_info *fault_info)
 {
 	modem_fault_info = *fault_info;
 
-	k_work_submit(&modem_failure_work);
+	k_work_submit_to_queue(&sm_work_q, &modem_failure_work);
 }
 #endif /* CONFIG_NRF_MODEM_LIB_ON_FAULT_APPLICATION_SPECIFIC */
 
