@@ -649,8 +649,8 @@ static int handle_at_mqtt_publish(enum at_parser_cmd_type cmd_type, struct at_pa
 	uint16_t qos = MQTT_QOS_0_AT_MOST_ONCE;
 	uint16_t retain = 0;
 	size_t topic_sz = MQTT_MAX_TOPIC_LEN;
-	uint8_t pub_msg[SM_MAX_PAYLOAD_SIZE];
-	size_t msg_sz = sizeof(pub_msg);
+	const char *pub_msg_ptr = NULL;
+	size_t msg_sz = 0;
 
 	if (!ctx.connected) {
 		return -ENOTCONN;
@@ -662,9 +662,8 @@ static int handle_at_mqtt_publish(enum at_parser_cmd_type cmd_type, struct at_pa
 		if (err) {
 			return err;
 		}
-		pub_msg[0] = '\0';
 		if (param_count > 2) {
-			err = util_string_get(parser, 2, pub_msg, &msg_sz);
+			err = at_parser_string_ptr_get(parser, 2, &pub_msg_ptr, &msg_sz);
 			if (err) {
 				return err;
 			}
@@ -700,11 +699,11 @@ static int handle_at_mqtt_publish(enum at_parser_cmd_type cmd_type, struct at_pa
 		if (pub_param.message_id == UINT16_MAX) {
 			pub_param.message_id = 1;
 		}
-		if (strlen(pub_msg) == 0) {
+		if (pub_msg_ptr == NULL || msg_sz == 0) {
 			/* Publish payload in data mode */
 			err = enter_datamode(mqtt_datamode_callback, 0);
 		} else {
-			err = do_mqtt_publish(pub_msg, msg_sz);
+			err = do_mqtt_publish((uint8_t *)pub_msg_ptr, msg_sz);
 		}
 		break;
 

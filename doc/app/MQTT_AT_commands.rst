@@ -498,7 +498,6 @@ Syntax
 * The ``<msg>`` parameter is a string.
   It contains the payload on the topic being published.
 
-  The maximum size of the payload is 1024 bytes when not empty.
   If the payload is empty (for example, ``""``), |SM| enters ``sm_data_mode``.
 * The ``<qos>`` parameter is an integer.
   It indicates the MQTT Quality of Service type to use.
