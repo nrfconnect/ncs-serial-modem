@@ -170,11 +170,6 @@ CONFIG_SM_MQTTC_MESSAGE_BUFFER_LEN - Size of the buffer for the MQTT library
 CONFIG_SM_HTTPC - HTTP client support in |SM|
    This option enables additional AT commands for using the HTTP client service.
 
-.. _CONFIG_SM_TWI:
-
-CONFIG_SM_TWI - TWI support in |SM|
-   This option enables additional AT commands for using the TWI service.
-
 .. _CONFIG_SM_UART_RX_BUF_COUNT:
 
 CONFIG_SM_UART_RX_BUF_COUNT - Receive buffers for UART.
@@ -510,9 +505,6 @@ To connect to a Thingy:91 X with a PC:
 .. include:: sm_description.rst
    :start-after: .. sm_connecting_91dk_pc_instr_start
    :end-before: .. sm_connecting_91dk_pc_instr_end
-
-You can also test the i2c sensor on Thingy:91 X using :ref:`SM_AT_TWI`.
-See :ref:`sm_testing_twi` for more details.
 
 .. _sm_testing_section:
 

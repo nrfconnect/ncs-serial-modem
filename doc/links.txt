@@ -70,7 +70,6 @@
 .. _`nrfxlib_nrf_sockets`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrfxlib/nrf_modem/doc/sockets.html#nrf-sockets
 .. _`nrfxlib_dtls_cid_settings`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrfxlib/nrf_modem/doc/sockets/socket_options_func.html#dtls-cid-setting
 .. _`nrfxlib_dtls_cid_status`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrfxlib/nrf_modem/doc/sockets/socket_options_func.html#dtls-cid-status
-.. _`nordic-nrf-twi`: https://docs.nordicsemi.com/bundle/ncs-latest/page/zephyr/build/dts/api/bindings/i2c/nordic_nrf-twi.html#std-dtcompatible-nordic-nrf-twi
 
 .. _`nRF Cloud Preconnect Provisioning`: https://docs.nordicsemi.com/bundle/nrf-cloud/page/Devices/Associations/Onboarding.html#preconnect-onboarding
 
