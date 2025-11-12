@@ -425,6 +425,38 @@ The following table shows how to connect selected development kit to an nRF91 Se
 
 .. tabs::
 
+   .. group-tab:: nRF54L15 DK
+
+      .. list-table::
+         :header-rows: 1
+
+         * - nRF54L15 DK
+           - nRF91 Series DK
+         * - UART TX P0.00
+           - UART RX P0.11
+         * - UART RX P0.01
+           - UART TX P0.10
+         * - UART CTS P0.03
+           - UART RTS P0.12
+         * - UART RTS P0.02
+           - UART CTS P0.13
+         * - DTR OUT P1.11
+           - DTR IN P0.31
+         * - RI IN P1.12
+           - RI OUT P0.30
+         * - GPIO GND
+           - GPIO GND
+
+      .. note::
+         You must disable the VCOM0 on the nRF54L15 DK to release the UART GPIO pins to use it with the :ref:`sm_shell_sample`.
+
+         * For nRF54L15 DK, you can use the `Board Configurator app`_ to disable the `Connect port VCOM0` setting.
+
+      .. note::
+         The GPIO output levels on the nRF91 Series device and nRF54L15 DK must be the same.
+
+         * You can set the VDD voltages for both devices with the `Board Configurator app`_.
+
    .. group-tab:: nRF52 DK
 
       .. list-table::
@@ -446,6 +478,11 @@ The following table shows how to connect selected development kit to an nRF91 Se
            - RI OUT P0.30
          * - GPIO GND
            - GPIO GND
+
+      .. note::
+         The GPIO output level on the nRF91 Series device side must be 3 V.
+
+         * For nRF9151 DK, you can set the VDD voltage with the `Board Configurator app`_.
 
    .. group-tab:: nRF53 DK
 
@@ -469,9 +506,14 @@ The following table shows how to connect selected development kit to an nRF91 Se
          * - GPIO GND
            - GPIO GND
 
+      .. note::
+         The GPIO output level on the nRF91 Series device side must be 3 V.
+
+         * For nRF9151 DK, you can set the VDD voltage with the `Board Configurator app`_.
+
 Use the following UART devices:
 
-* nRF52 or nRF53 Series DK - UART0
+* nRF54, nRF52 or nRF53 Series DK - UART0
 * nRF91 Series DK - UART2
 
 The UART configuration must match on both sides.
@@ -480,11 +522,6 @@ By default the |SM| application and :ref:`sm_shell_sample` use the following set
 * Hardware flow control: enabled
 * Baud rate: 115200
 * Parity bit: no
-
-.. note::
-   The GPIO output level on the nRF91 Series device side must be 3 V.
-
-   * For nRF9151 DK, you can set the VDD voltage with the `Board Configurator app`_.
 
 Communicating with the modem on Thingy:91 X
 ===========================================

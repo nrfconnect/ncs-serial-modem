@@ -72,7 +72,7 @@ The following table shows how to connect UART, DTR and RI pins of the DK to the 
            - GPIO GND
 
       .. note::
-         The VCOM0 must be disabled on the nRF54L15 DK, to release the UART GPIO pins to be used with |SM| Host Shell sample.
+         You must disable the VCOM0 on the nRF54L15 DK to release the UART GPIO pins to use it with the :ref:`sm_shell_sample`.
 
          * For nRF54L15 DK, you can use the `Board Configurator app`_ to disable the `Connect port VCOM0` setting.
 
