@@ -69,6 +69,11 @@ CONFIG_SM_CUSTOMER_VERSION - Customer version string
 CONFIG_SM_AT_MAX_PARAM - AT command parameter count limit
    This defines the maximum number of parameters allowed in an AT command, including the command name.
 
+.. _CONFIG_SM_AT_BUF_SIZE:
+
+CONFIG_SM_AT_BUF_SIZE - AT command buffer size
+   This option defines the size of the buffer for incoming AT commands and modem responses.
+
 .. _CONFIG_SM_CMUX:
 
 CONFIG_SM_CMUX - Enable CMUX functionality

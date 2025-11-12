@@ -29,7 +29,7 @@
 #define SM_DATAMODE_FLAGS_EXIT_HANDLER (1 << 1)
 
 extern uint8_t sm_data_buf[SM_MAX_MESSAGE_SIZE];  /* For socket data. */
-extern uint8_t sm_at_buf[SM_AT_MAX_CMD_LEN + 1]; /* AT command buffer. */
+extern uint8_t sm_at_buf[CONFIG_SM_AT_BUF_SIZE + 1]; /* AT command buffer. */
 
 extern uint16_t sm_datamode_time_limit; /* Send trigger by time in data mode. */
 
