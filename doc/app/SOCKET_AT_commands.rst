@@ -827,7 +827,7 @@ Syntax
   For string mode (``0``), it is a string that contains the data to be sent.
   For hex string mode (``1``), it is a hexadecimal string representation of the data to be sent.
   The maximum payload size in hexadecimal string mode is up to 2800 characters (1400 bytes).
-  For large packets, it is recommended to use data mode (``2``) since :ref:`CONFIG_SM_AT_BUF_SIZE <CONFIG_SM_AT_BUF_SIZE>` limit the maximum size of data that can be sent in string or hex string modes.
+  For large packets, it is recommended to use data mode (``2``) since :ref:`CONFIG_SM_AT_BUF_SIZE <CONFIG_SM_AT_BUF_SIZE>` limits the maximum size of data that can be sent in string or hex string modes.
   This parameter is not used when ``<mode>`` is ``2`` (data mode).
 
 * The ``<data_len>`` parameter is optional and only used when ``<mode>`` is ``2`` (data mode).
