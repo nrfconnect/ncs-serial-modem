@@ -47,9 +47,6 @@
 #if defined(CONFIG_SM_TWI)
 #include "sm_at_twi.h"
 #endif
-#if defined(CONFIG_SM_GPIO)
-#include "sm_at_gpio.h"
-#endif
 #if defined(CONFIG_SM_CARRIER)
 #include "sm_at_carrier.h"
 #endif
@@ -451,13 +448,6 @@ int sm_at_init(void)
 		return -EFAULT;
 	}
 #endif
-#if defined(CONFIG_SM_GPIO)
-	err = sm_at_gpio_init();
-	if (err) {
-		LOG_ERR("%s initialization failed (%d).", "GPIO", err);
-		return -EFAULT;
-	}
-#endif
 #if defined(CONFIG_SM_TWI)
 	err = sm_at_twi_init();
 	if (err) {
@@ -550,12 +540,6 @@ void sm_at_uninit(void)
 	err = sm_at_twi_uninit();
 	if (err) {
 		LOG_WRN("%s uninitialization failed (%d).", "TWI", err);
-	}
-#endif
-#if defined(CONFIG_SM_GPIO)
-	err = sm_at_gpio_uninit();
-	if (err) {
-		LOG_WRN("%s uninitialization failed (%d).", "GPIO", err);
 	}
 #endif
 #if defined(CONFIG_SM_CARRIER)
