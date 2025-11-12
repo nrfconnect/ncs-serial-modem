@@ -17,6 +17,12 @@ config SM_AT_MAX_PARAM
 	int "Maximum number of parameters in AT command"
 	default 42
 
+config SM_AT_BUF_SIZE
+	int "AT command buffer size"
+	range 128 8192
+	default 4096
+	help
+	  Size of the buffer for incoming AT commands and modem responses.
 #
 # external XTAL for UART
 #

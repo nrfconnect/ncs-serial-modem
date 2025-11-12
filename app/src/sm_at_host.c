@@ -45,7 +45,7 @@ uint16_t sm_datamode_time_limit; /* Send trigger by time in data mode */
 K_MUTEX_DEFINE(mutex_mode); /* Protects the operation mode variables. */
 static size_t datamode_data_len; /* Expected data length in data mode. */
 
-uint8_t sm_at_buf[SM_AT_MAX_CMD_LEN + 1];
+uint8_t sm_at_buf[CONFIG_SM_AT_BUF_SIZE + 1];
 uint8_t sm_data_buf[SM_MAX_MESSAGE_SIZE];
 
 RING_BUF_DECLARE(data_rb, CONFIG_SM_DATAMODE_BUF_SIZE);
