@@ -33,7 +33,4 @@ enum {
 #define SM_MAX_USERNAME     32   /** max size of username in login */
 #define SM_MAX_PASSWORD     32   /** max size of password in login */
 
-#define SM_NRF52_BLK_SIZE   4096 /** nRF52 flash block size for write operation */
-#define SM_NRF52_BLK_TIME   2000 /** nRF52 flash block write time in millisecond (1.x second) */
-
 #endif
