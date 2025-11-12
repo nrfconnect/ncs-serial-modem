@@ -220,8 +220,14 @@ This section lists features that have been removed from the |SM| compared to the
 If you need any of those features with this |SM|, please contact customer support and describe your use case.
 Removed features:
 
-   * Board support for the following chipsets: ``nrf9161dk/nrf9161/ns``, ``nrf9160dk/nrf9160/ns``, ``thingy91/nrf9160/ns`` and ``nrf9131ek/nrf9131/ns``.
-     * Use ``nrf9151dk/nrf9151/ns`` instead.
+   * Support for the ``nrf9161dk``, ``nrf9160dk``, ``thingy91``, and ``nrf9131ek`` boards.
+
+     * Use ``nrf9151dk`` instead.
+
+   * Support for the ``nrf5340dk``, ``nrf52840dk``, and ``nrf7002dk`` boards from the :ref:`sm_at_client_shell_sample`.
+
+     * Use ``nrf54l15dk`` instead.
+
    * Native TLS support including ``overlay-native_tls.conf``.
    * TCP and UDP servers.
      This includes the removal of the following AT commands:
@@ -235,6 +241,7 @@ Removed features:
      There is no direct replacement for these commands.
 
      In addition, the ``AT_SO_TCP_SRV_SESSTIMEO`` socket option has been removed.
+
    * HTTP client functionality including ``AT#XHTTPCCON`` and ``AT#XHTTPCREQ`` commands, and ``#XHTTPCRSP`` notification.
    * FTP and TFTP clients including ``AT#XFTP`` and ``AT#XTFTP`` commands.
    * ``#XGPIO`` AT command.

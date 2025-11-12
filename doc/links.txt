@@ -15,11 +15,6 @@
 .. _`Thingy91X`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/device_guides/thingy91x/index.html#ug-thingy91x
 .. _`nRF91 DK`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/device_guides/nrf91/index.html#ug-nrf91
 .. _`nrf9151dk`: https://docs.nordicsemi.com/bundle/ncs-latest/page/zephyr/boards/nordic/nrf9151dk/doc/index.html#nrf9151dk
-.. _`nRF7002dk`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/device_guides/nrf70/index.html#ug-nrf70-developing
-.. _`nRF5340 DK`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/device_guides/nrf53/index.html#ug-nrf5340
-.. _`nrf5340dk`: https://docs.nordicsemi.com/bundle/ncs-latest/page/zephyr/boards/nordic/nrf5340dk/doc/index.html#nrf5340dk
-.. _`nRF52840_DK`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/device_guides/nrf52/index.html#ug-nrf52
-.. _`nrf52840dk`: https://docs.nordicsemi.com/bundle/ncs-latest/page/zephyr/boards/nordic/nrf52840dk/doc/index.html#nrf52840dk
 .. _`nRF9151 Product Specification`: https://docs.nordicsemi.com/bundle/ps_nrf9151/page/nRF9151_html5_keyfeatures.html
 .. _`Thingy91x_firmware_update`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/device_guides/thingy91x/thingy91x_updating_fw_programmer.html#updating_the_firmware_on_the_nrf5340_soc
 .. _`shared TF-M logging`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/device_guides/nrf91/nrf91_snippet.html#tfm-enable-share-uart

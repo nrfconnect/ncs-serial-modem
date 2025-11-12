@@ -373,8 +373,8 @@ Connecting with an external MCU
 
    This section does not apply to Thingy:91 X.
 
-If you run your user application on an external MCU (for example, an nRF52 Series development kit), you can control the |SM| application on an nRF91 Series device directly from the application.
-See the :ref:`sm_shell_sample` for a sample implementation of such an application.
+If you run your user application on an external MCU (for example, an nRF54 Series development kit), you can control the |SM| application on an nRF91 Series device directly from the application.
+See the :ref:`sm_at_client_shell_sample` for a sample implementation of such an application.
 
 To connect with an external MCU using UART_2, include the :file:`overlay-external-mcu.overlay` devicetree overlay in your build.
 This overlay configures the UART_2 pins, DTR pin, and RI pin for the nRF9151 DK.
@@ -428,101 +428,43 @@ If you use a different setup, you can customize the :file:`overlay-external-mcu.
 
 The following table shows how to connect selected development kit to an nRF91 Series development kit to be able to communicate through UART:
 
-.. tabs::
+.. list-table::
+   :header-rows: 1
 
-   .. group-tab:: nRF54L15 DK
+   * - nRF54L15 DK
+     - nRF91 Series DK
+   * - UART TX P0.00
+     - UART RX P0.11
+   * - UART RX P0.01
+     - UART TX P0.10
+   * - UART CTS P0.03
+     - UART RTS P0.12
+   * - UART RTS P0.02
+     - UART CTS P0.13
+   * - DTR OUT P1.11
+     - DTR IN P0.31
+   * - RI IN P1.12
+     - RI OUT P0.30
+   * - GPIO GND
+     - GPIO GND
 
-      .. list-table::
-         :header-rows: 1
+.. note::
+   You must disable the VCOM0 on the nRF54L15 DK to release the UART GPIO pins to use it with the :ref:`sm_at_client_shell_sample`.
 
-         * - nRF54L15 DK
-           - nRF91 Series DK
-         * - UART TX P0.00
-           - UART RX P0.11
-         * - UART RX P0.01
-           - UART TX P0.10
-         * - UART CTS P0.03
-           - UART RTS P0.12
-         * - UART RTS P0.02
-           - UART CTS P0.13
-         * - DTR OUT P1.11
-           - DTR IN P0.31
-         * - RI IN P1.12
-           - RI OUT P0.30
-         * - GPIO GND
-           - GPIO GND
+   * For nRF54L15 DK, you can use the `Board Configurator app`_ to disable the ``Connect port VCOM0`` setting.
 
-      .. note::
-         You must disable the VCOM0 on the nRF54L15 DK to release the UART GPIO pins to use it with the :ref:`sm_shell_sample`.
+.. note::
+   The GPIO output levels on the nRF91 Series device and nRF54L15 DK must be the same.
 
-         * For nRF54L15 DK, you can use the `Board Configurator app`_ to disable the `Connect port VCOM0` setting.
-
-      .. note::
-         The GPIO output levels on the nRF91 Series device and nRF54L15 DK must be the same.
-
-         * You can set the VDD voltages for both devices with the `Board Configurator app`_.
-
-   .. group-tab:: nRF52 DK
-
-      .. list-table::
-         :header-rows: 1
-
-         * - nRF52 Series DK
-           - nRF91 Series DK
-         * - UART TX P1.02
-           - UART RX P0.11
-         * - UART RX P1.01
-           - UART TX P0.10
-         * - UART CTS P1.07
-           - UART RTS P0.12
-         * - UART RTS P1.06
-           - UART CTS P0.13
-         * - DTR OUT P0.11
-           - DTR IN P0.31
-         * - RI IN P0.13
-           - RI OUT P0.30
-         * - GPIO GND
-           - GPIO GND
-
-      .. note::
-         The GPIO output level on the nRF91 Series device side must be 3 V.
-
-         * For nRF9151 DK, you can set the VDD voltage with the `Board Configurator app`_.
-
-   .. group-tab:: nRF53 DK
-
-      .. list-table::
-         :header-rows: 1
-
-         * - nRF53 Series DK
-           - nRF91 Series DK
-         * - UART TX P1.04
-           - UART RX P0.11
-         * - UART RX P1.05
-           - UART TX P0.10
-         * - UART CTS P1.07
-           - UART RTS P0.12
-         * - UART RTS P1.06
-           - UART CTS P0.13
-         * - DTR OUT P0.23
-           - DTR IN P0.31
-         * - RI IN P0.28
-           - RI OUT P0.30
-         * - GPIO GND
-           - GPIO GND
-
-      .. note::
-         The GPIO output level on the nRF91 Series device side must be 3 V.
-
-         * For nRF9151 DK, you can set the VDD voltage with the `Board Configurator app`_.
+   * You can set the VDD voltages for both devices with the `Board Configurator app`_.
 
 Use the following UART devices:
 
-* nRF54, nRF52 or nRF53 Series DK - UART0
+* nRF54 Series DK - UART30
 * nRF91 Series DK - UART2
 
 The UART configuration must match on both sides.
-By default the |SM| application and :ref:`sm_shell_sample` use the following settings:
+By default the |SM| application and :ref:`sm_at_client_shell_sample` use the following settings:
 
 * Hardware flow control: enabled
 * Baud rate: 115200
@@ -554,7 +496,6 @@ Testing
 =======
 
 The following testing instructions focus on testing the application with a PC client.
-If you have an nRF52 Series DK running a client application, you can also use this DK for testing the different scenarios.
 
 |test_sample|
 
