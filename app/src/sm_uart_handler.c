@@ -27,8 +27,10 @@ LOG_MODULE_REGISTER(sm_uart_handler, CONFIG_SM_LOG_LEVEL);
 const struct device *const sm_uart_dev = DEVICE_DT_GET(DT_CHOSEN(ncs_sm_uart));
 uint32_t sm_uart_baudrate;
 
-static struct k_work_delayable rx_process_work;
-static struct k_work_delayable tx_write_nonblock_work;
+static void rx_process(struct k_work *work);
+static void tx_write_nonblock_fn(struct k_work *);
+static K_WORK_DELAYABLE_DEFINE(rx_process_work, rx_process);
+static K_WORK_DELAYABLE_DEFINE(tx_write_nonblock_work, tx_write_nonblock_fn);
 struct rx_buf_t {
 	atomic_t ref_counter;
 	size_t len;
@@ -374,7 +376,7 @@ static void uart_callback(const struct device *dev, struct uart_event *evt, void
 		break;
 	case UART_RX_DISABLED:
 		atomic_clear_bit(&uart_state, SM_UART_STATE_RX_ENABLED_BIT);
-		k_work_schedule_for_queue(&sm_work_q, &rx_process_work, K_NO_WAIT);
+		k_work_reschedule_for_queue(&sm_work_q, &rx_process_work, K_NO_WAIT);
 		break;
 	default:
 		break;
@@ -547,6 +549,8 @@ int sm_uart_handler_enable(void)
 		return err;
 	}
 
+	atomic_clear(&uart_state);
+
 	sm_uart_baudrate = cfg.baudrate;
 	LOG_INF("UART baud: %d d/p/s-bits: %d/%d/%d HWFC: %d",
 		cfg.baudrate, cfg.data_bits, cfg.parity,
@@ -578,15 +582,11 @@ int sm_uart_handler_enable(void)
 		return -EFAULT;
 	}
 
-	atomic_clear(&uart_state);
 	tx_enable();
 	err = rx_enable();
 	if (err) {
 		return -EFAULT;
 	}
-
-	k_work_init_delayable(&rx_process_work, rx_process);
-	k_work_init_delayable(&tx_write_nonblock_work, tx_write_nonblock_fn);
 
 	/* Flush possibly pending data in case Serial Modem was idle. */
 	tx_start();
@@ -609,6 +609,8 @@ int sm_uart_handler_disable(void)
 		LOG_ERR("RX disable failed (%d).", err);
 		return err;
 	}
+
+	(void)k_work_cancel_delayable(&rx_process_work);
 
 	return 0;
 }
@@ -729,8 +731,6 @@ static int pipe_receive(void *data, uint8_t *buf, size_t size)
 
 static int pipe_close(void *data)
 {
-	int err;
-
 	ARG_UNUSED(data);
 
 	if (!atomic_test_bit(&sm_pipe.state, SM_PIPE_STATE_OPEN_BIT)) {
@@ -739,17 +739,7 @@ static int pipe_close(void *data)
 
 	atomic_clear_bit(&sm_pipe.state, SM_PIPE_STATE_OPEN_BIT);
 
-	err = tx_disable(K_MSEC(50));
-	if (err) {
-		LOG_WRN("%s disable failed (%d).", "TX", err);
-	}
-
-	err = rx_disable();
-	if (err) {
-		LOG_ERR("%s disable failed (%d).", "RX", err);
-	}
-
-	return 0;
+	return sm_uart_handler_disable();
 }
 
 static const struct modem_pipe_api modem_pipe_api = {
