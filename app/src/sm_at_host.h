@@ -165,6 +165,13 @@ int enter_datamode(sm_datamode_handler_t handler, size_t data_len);
 bool in_datamode(void);
 
 /**
+ * @brief Check whether Serial Modem AT host is in AT command mode
+ *
+ * @retval true if yes, false if no.
+ */
+bool in_at_mode(void);
+
+/**
  * @brief Exit the data mode handler
  *
  * Remove the callback to the data mode handler and start dropping the incoming data, until
