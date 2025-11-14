@@ -1,0 +1,11 @@
+# Copyright (c) 2025 Nordic Semiconductor
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+
+# This file is used to override west manifest settings for CI purposes.
+
+manifest:
+  projects:
+    - name: nrf
+      url: https://github.com/nrfconnect/sdk-nrf.git
+      revision: main
+      import: true
