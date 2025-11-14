@@ -5,6 +5,7 @@
  */
 #include <zephyr/logging/log.h>
 #include <zephyr/kernel.h>
+#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
@@ -41,11 +42,18 @@ enum sm_socket_role {
 	AT_SOCKET_ROLE_SERVER
 };
 
-/**@brief Socket send modes. */
-enum sm_socket_send_mode {
-	AT_SOCKET_SEND_MODE_STRING = 0,	/* String data in command */
-	AT_SOCKET_SEND_MODE_HEXSTRING = 1,	/* Hexadecimal string data */
-	AT_SOCKET_SEND_MODE_DATA = 2	/* Enter data mode */
+/**@brief Socket modes for send and receive. */
+enum sm_socket_mode {
+	AT_SOCKET_MODE_UNFORMATTED = 0, /* Text/binary string data */
+	AT_SOCKET_MODE_HEX = 1,         /* Hexadecimal string data */
+	AT_SOCKET_MODE_DATA = 2,        /* Enter data mode */
+};
+
+/**@brief Socket automatic reception flags. */
+enum sm_socket_adr_flags {
+	SM_ADR_DISABLE = 0,  /* Disable automatic data reception */
+	SM_ADR_AT_MODE = 1,  /* Enable automatic data reception in AT mode */
+	SM_ADR_DATA_MODE = 2 /* Enable automatic data reception in data mode */
 };
 
 /**@brief Socket send result modes. */
@@ -54,21 +62,18 @@ enum sm_socket_send_result_mode {
 	AT_SOCKET_SEND_RESULT_NW_ACK_URC = 1 /* URC from network acknowledgment will follow. */
 };
 
-/**@brief Socket receive modes. */
-enum sm_socket_recv_mode {
-	AT_SOCKET_RECV_MODE_BINARY = 0,	/* Receive binary data */
-	AT_SOCKET_RECV_MODE_HEXSTRING = 1	/* Receive hexadecimal string data */
-};
-
 static char udp_url[SM_MAX_URL];
 static uint16_t udp_port;
 
 struct sm_async_poll {
-	int events;        /* Events to poll for this socket. */
-	atomic_t revents;  /* Events received for this socket. */
-	int update_events; /* Events to update for this socket. */
-	bool specific: 1;  /* Specific socket to poll. */
-	bool disable: 1;   /* Poll needs to stay disabled for this socket. */
+	uint16_t events;          /* Events to poll for this socket. */
+	atomic_t revents;         /* Events received for this socket. */
+	uint16_t delayed_revents; /* Events received for this socket during datamode. */
+	uint16_t xapoll_events;   /* Events to update for xapoll. */
+	uint8_t adr_flags;        /* Flags for automatic data reception. */
+	bool disable: 1;          /* Poll needs to stay disabled for this socket. */
+	bool xapoll_specific: 1;  /* xapoll specific socket to poll. */
+	bool adr_hex: 1;          /* Automatic data reception in hex mode. */
 };
 
 #define SM_MSG_SEND_ACK 0x2000
@@ -79,16 +84,17 @@ struct sm_send_ntf {
 };
 
 static struct sm_socket {
-	int type;           /* SOCK_STREAM or SOCK_DGRAM */
-	uint16_t role;      /* Client or Server */
-	sec_tag_t sec_tag;  /* Security tag of the credential */
-	int family;         /* Socket address family */
-	int fd;             /* Socket descriptor. */
-	uint16_t cid;       /* PDP Context ID, 0: primary; 1~10: secondary */
-	int send_flags;     /* Send flags */
-	bool send_cb_set;   /* Send callback set */
+	int type;                        /* SOCK_STREAM or SOCK_DGRAM */
+	uint16_t role;                   /* Client or Server */
+	sec_tag_t sec_tag;               /* Security tag of the credential */
+	int family;                      /* Socket address family */
+	int fd;                          /* Socket descriptor. */
+	uint16_t cid;                    /* PDP Context ID, 0: primary; 1~10: secondary */
+	int send_flags;                  /* Send flags */
+	bool send_cb_set: 1;             /* Send callback set */
+	bool connected: 1;               /* Connected flag. */
 	struct sm_async_poll async_poll; /* Async poll info. */
-	struct sm_send_ntf send_ntf; /* Send notification info. */
+	struct sm_send_ntf send_ntf;     /* Send notification info. */
 } socks[SM_MAX_SOCKET_COUNT];
 
 static struct sm_socket *datamode_sock; /* Socket for data mode */
@@ -96,27 +102,36 @@ static char hex_data[1400 + 1]; /* Buffer for hex data conversion */
 
 static struct async_poll_ctx {
 	struct k_work poll_work; /* Work to send poll URCs. */
-	int poll_events;         /* Events to poll for async poll. */
-	bool poll_all: 1;        /* Poll all the sockets. */
-	bool poll_running: 1;    /* Async poll is running. */
+	uint16_t xapoll_events;  /* Events to poll for async poll. */
+	uint8_t adr_flags;       /* Auto reception flags for all sockets. */
+	bool xapoll_all: 1;      /* Poll all the sockets. */
+	bool xapoll_running: 1;  /* Async poll is running. */
+	bool adr_hex: 1;         /* Auto reception hex mode for all sockets. */
 } poll_ctx;
 
 /* forward declarations */
 #define SOCKET_SEND_TMO_SEC 30
+
+static int do_recv(struct sm_socket *sock, int timeout, int flags,
+		   enum sm_socket_mode mode, size_t data_len);
+
+static int do_recvfrom(struct sm_socket *sock, int timeout, int flags,
+		       enum sm_socket_mode mode, size_t data_len);
 
 static void init_socket(struct sm_socket *socket)
 {
 	if (socket == NULL) {
 		return;
 	}
-
-	socket->family = AF_UNSPEC;
-	socket->sec_tag = SEC_TAG_TLS_INVALID;
+	socket->type = 0;
 	socket->role = AT_SOCKET_ROLE_CLIENT;
+	socket->sec_tag = SEC_TAG_TLS_INVALID;
+	socket->family = AF_UNSPEC;
 	socket->fd = INVALID_SOCKET;
 	socket->cid = 0;
 	socket->send_flags = 0;
 	socket->send_cb_set = false;
+	socket->connected = false;
 	socket->send_ntf = (struct sm_send_ntf){0};
 	socket->async_poll = (struct sm_async_poll){0};
 }
@@ -182,7 +197,7 @@ static void poll_cb(struct nrf_pollfd *pollfd)
 }
 
 
-static int set_so_poll_cb(struct sm_socket *socket, short events)
+static int set_so_poll_cb(struct sm_socket *socket, uint16_t events)
 {
 	int err;
 
@@ -207,65 +222,168 @@ static int set_so_poll_cb(struct sm_socket *socket, short events)
 	return 0;
 }
 
-static int clear_so_poll_cb(struct sm_socket *socket)
+static void auto_reception(struct sm_socket *sock)
 {
-	int err;
+	int err = 0;
 
-	if (socket == NULL) {
+	if (sock == NULL) {
+		return;
+	}
+	if (sock->connected || sock->type == NRF_SOCK_RAW) {
+		err = do_recv(sock, 0, NRF_MSG_DONTWAIT,
+			      sock->async_poll.adr_hex ? AT_SOCKET_MODE_HEX
+						      : AT_SOCKET_MODE_UNFORMATTED,
+			      sizeof(sm_data_buf));
+	} else {
+		err = do_recvfrom(sock, 0, NRF_MSG_DONTWAIT,
+				  sock->async_poll.adr_hex ? AT_SOCKET_MODE_HEX
+							  : AT_SOCKET_MODE_UNFORMATTED,
+				  sizeof(sm_data_buf));
+	}
+	if (err) {
+		LOG_ERR("auto_reception() error: %d", err);
+		return;
+	}
+	if (!in_datamode()) {
+		/* <CR><LF> after the data. */
+		sm_at_send_str("\r\n");
+	}
+}
+
+static int update_poll_events(struct sm_socket *sock, uint16_t events, bool update_xapoll)
+{
+	int ret;
+
+	if (sock == NULL) {
 		return -EINVAL;
 	}
-
-	err = nrf_setsockopt(socket->fd, NRF_SOL_SOCKET, NRF_SO_POLLCB, NULL, 0);
-	if (err < 0) {
-		LOG_ERR("nrf_setsockopt(%d,%d,%d) error: %d", socket->fd, NRF_SOL_SOCKET,
-			NRF_SO_POLLCB, -errno);
-		return -errno;
+	if (sock->async_poll.disable) {
+		return 0;
 	}
+
+	if (update_xapoll && poll_ctx.xapoll_running &&
+	    (poll_ctx.xapoll_all || sock->async_poll.xapoll_specific)) {
+		/* Update expected xapoll events. */
+		sock->async_poll.xapoll_events |= (poll_ctx.xapoll_events & events);
+	}
+
+	sock->async_poll.events |= events;
+	ret = set_so_poll_cb(sock, sock->async_poll.events);
+	if (ret) {
+		LOG_ERR("Failed to update poll events %d for socket %d: %d",
+			sock->async_poll.events, sock->fd, ret);
+		return ret;
+	}
+
+	LOG_DBG("Updated poll events %d for socket %d", sock->async_poll.events, sock->fd);
 	return 0;
 }
 
 static void poll_work_fn(struct k_work *work)
 {
-	if (poll_ctx.poll_running == false) {
-		return;
-	}
+	bool at_mode = in_at_mode();
+	bool data_mode = in_datamode();
 
 	for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
-		if (socks[i].fd == INVALID_SOCKET) {
+		struct sm_socket *sock = &socks[i];
+
+		if (sock->fd == INVALID_SOCKET) {
 			continue;
 		}
 
-		short revents = atomic_clear(&socks[i].async_poll.revents);
+		uint16_t revents = atomic_clear(&sock->async_poll.revents);
 
-		if (revents) {
-			urc_send("\r\n#XAPOLL: %d,%d\r\n", socks[i].fd, revents);
-			if (revents & (NRF_POLLERR | NRF_POLLNVAL | NRF_POLLHUP)) {
-				/* Remove socket from poll until closed. */
-				socks[i].async_poll.disable = true;
-			} else {
-				/* Remove POLLIN/POLLOUT from poll, until AT-operation. */
-				socks[i].async_poll.events &= ~revents;
+		LOG_DBG("Socket %d poll revents 0x%x", sock->fd, revents);
+
+		/* Store events for later processing when not in AT mode. */
+		if (!at_mode) {
+			sock->async_poll.delayed_revents |= revents;
+			LOG_DBG("Socket %d delayed revents 0x%x", sock->fd,
+				sock->async_poll.delayed_revents);
+		}
+
+		/* Do not process any socket events if not in correct mode. */
+		if (!at_mode && !data_mode) {
+			continue;
+		}
+		/* In data mode, skip non-datamode sockets. */
+		if (data_mode && sock != datamode_sock) {
+			continue;
+		}
+		/* Transitioning back to AT mode: re-enable delayed events */
+		if (at_mode && sock->async_poll.delayed_revents) {
+			/* We have received events when not in AT-command mode.
+			 * Re-enable all the events to see which ones are still valid.
+			 */
+			sock->async_poll.disable = false;
+			update_poll_events(sock, sock->async_poll.delayed_revents | revents, true);
+			sock->async_poll.delayed_revents = 0;
+			continue;
+		}
+
+		assert(at_mode || (data_mode && sock == datamode_sock));
+
+		/* Send #XAPOLL URC for poll events. */
+		if (!data_mode && poll_ctx.xapoll_running) {
+			uint16_t xapoll_events = revents & (sock->async_poll.xapoll_events);
+
+			/* Do not send URC for the same events twice, unless send/recv is done. */
+			sock->async_poll.xapoll_events &= ~xapoll_events;
+			if (xapoll_events) {
+				rsp_send("\r\n#XAPOLL: %d,%d\r\n", sock->fd, xapoll_events);
 			}
 		}
 
-		if (socks[i].async_poll.disable == false &&
-		    (revents != 0 || socks[i].async_poll.update_events != 0)) {
-			/* Re-register for remaining events */
-			socks[i].async_poll.events |= socks[i].async_poll.update_events;
-			socks[i].async_poll.update_events = 0;
-			set_so_poll_cb(&socks[i], socks[i].async_poll.events);
+		/* Remove POLLOUT from poll, until send is done. */
+		if (revents & NRF_POLLOUT) {
+			sock->async_poll.events &= ~NRF_POLLOUT;
+		}
+
+		/* Prevent further poll activations for socket. */
+		if (revents & (NRF_POLLERR | NRF_POLLNVAL | NRF_POLLHUP)) {
+			sock->async_poll.disable = true;
+		}
+
+		/* Remove POLLIN from poll, until recv is done. */
+		if (revents & NRF_POLLIN) {
+			sock->async_poll.events &= ~NRF_POLLIN;
+
+			/* Automatic data reception may reactivate POLLIN. */
+			if (((at_mode && (sock->async_poll.adr_flags & SM_ADR_AT_MODE)) ||
+			     (data_mode && (sock->async_poll.adr_flags & SM_ADR_DATA_MODE)))) {
+				auto_reception(sock);
+			}
+		}
+
+		LOG_DBG("Socket %d, revents %d, disable %d, events %d, xapoll_events %d",
+			sock->fd, revents, sock->async_poll.disable,
+			sock->async_poll.events, sock->async_poll.xapoll_events);
+
+		/* Re-register for remaining events */
+		update_poll_events(sock, 0, false);
+
+		/* Exit data mode handler on socket error */
+		if (data_mode) {
+			int err = 0;
+
+			if (revents & NRF_POLLERR) {
+				err = -EIO;
+			} else if (revents & NRF_POLLNVAL) {
+				err = -ENETDOWN;
+			} else if (revents & NRF_POLLHUP) {
+				err = -ECONNRESET;
+			}
+			if (err) {
+				exit_datamode_handler(err);
+			}
 		}
 	}
 }
 
-static void delegate_poll_event(struct sm_socket *s, int events)
+void sm_at_socket_notify_datamode_exit(void)
 {
-	if (poll_ctx.poll_running && (poll_ctx.poll_all || s->async_poll.specific)) {
-		LOG_DBG("Delegate poll events %d for socket %d", events, s->fd);
-		s->async_poll.update_events |= (poll_ctx.poll_events & events);
-
-		k_work_submit_to_queue(&sm_work_q, &poll_ctx.poll_work);
-	}
+	/* Update events that were received during data mode. */
+	k_work_submit_to_queue(&sm_work_q, &poll_ctx.poll_work);
 }
 
 static void send_cb_fn(struct k_work *work)
@@ -285,7 +403,7 @@ static void send_cb_fn(struct k_work *work)
 				status = -1;
 			}
 			urc_send("\r\n#XSENDNTF: %d,%d,%d\r\n", socks[i].fd, status, bytes_sent);
-			delegate_poll_event(&socks[i], NRF_POLLOUT);
+			update_poll_events(&socks[i], NRF_POLLOUT, true);
 		}
 	}
 }
@@ -412,7 +530,11 @@ static int do_socket_open(struct sm_socket *sock)
 
 	rsp_send("\r\n#XSOCKET: %d,%d,%d\r\n", sock->fd, sock->type, proto);
 
-	delegate_poll_event(sock, NRF_POLLIN | NRF_POLLOUT);
+	/* Update poll events for xapoll and automatic data reception */
+	sock->async_poll.adr_flags = poll_ctx.adr_flags;
+	sock->async_poll.adr_hex = poll_ctx.adr_hex;
+	update_poll_events(
+		sock, NRF_POLLIN | NRF_POLLOUT | NRF_POLLERR | NRF_POLLHUP | NRF_POLLNVAL, true);
 
 	return 0;
 
@@ -486,7 +608,11 @@ static int do_secure_socket_open(struct sm_socket *sock, int peer_verify)
 
 	rsp_send("\r\n#XSSOCKET: %d,%d,%d\r\n", sock->fd, sock->type, proto);
 
-	delegate_poll_event(sock, NRF_POLLIN | NRF_POLLOUT);
+	/* Update poll events for xapoll and automatic data reception */
+	sock->async_poll.adr_flags = poll_ctx.adr_flags;
+	sock->async_poll.adr_hex = poll_ctx.adr_hex;
+	update_poll_events(
+		sock, NRF_POLLIN | NRF_POLLOUT | NRF_POLLERR | NRF_POLLHUP | NRF_POLLNVAL, true);
 
 	return 0;
 
@@ -814,6 +940,7 @@ static int do_connect(struct sm_socket *sock, const char *url, uint16_t port)
 		return -errno;
 	}
 
+	sock->connected = true;
 	rsp_send("\r\n#XCONNECT: %d,1\r\n", sock->fd);
 
 	return ret;
@@ -859,9 +986,9 @@ static int do_send(struct sm_socket *sock, const uint8_t *data, int len, int fla
 			 send_ntf ? AT_SOCKET_SEND_RESULT_NW_ACK_URC
 				  : AT_SOCKET_SEND_RESULT_DEFAULT,
 			 sent);
-		if (!send_ntf) {
-			delegate_poll_event(sock, NRF_POLLOUT);
-		}
+	}
+	if (!send_ntf) {
+		update_poll_events(sock, NRF_POLLOUT, true);
 	}
 
 	return sent > 0 ? sent : ret;
@@ -890,8 +1017,8 @@ static int data_send_hex(struct sm_socket *sock, const uint8_t *buf, int recv_le
 	return 0;
 }
 
-static int do_recv(struct sm_socket *sock, int timeout, int flags, enum sm_socket_recv_mode mode,
-		   size_t data_len)
+static int do_recv(struct sm_socket *sock, int timeout, int flags,
+		   enum sm_socket_mode mode, size_t data_len)
 {
 	int ret;
 	int sockfd = sock->fd;
@@ -917,9 +1044,11 @@ static int do_recv(struct sm_socket *sock, int timeout, int flags, enum sm_socke
 	if (ret == 0) {
 		LOG_WRN("nrf_recv() return 0");
 	} else {
-		rsp_send("\r\n#XRECV: %d,%d,%d\r\n", sock->fd, mode, ret);
+		if (!in_datamode()) {
+			rsp_send("\r\n#XRECV: %d,%d,%d\r\n", sock->fd, mode, ret);
+		}
 
-		if (mode == AT_SOCKET_RECV_MODE_HEXSTRING) {
+		if (mode == AT_SOCKET_MODE_HEX) {
 			ret = data_send_hex(sock, sm_data_buf, ret);
 			if (ret) {
 				return ret;
@@ -929,7 +1058,7 @@ static int do_recv(struct sm_socket *sock, int timeout, int flags, enum sm_socke
 		}
 		ret = 0;
 
-		delegate_poll_event(sock, NRF_POLLIN);
+		update_poll_events(sock, NRF_POLLIN, true);
 	}
 
 	return ret;
@@ -992,16 +1121,16 @@ static int do_sendto(struct sm_socket *sock, const char *url, uint16_t port, con
 			 send_ntf ? AT_SOCKET_SEND_RESULT_NW_ACK_URC
 				  : AT_SOCKET_SEND_RESULT_DEFAULT,
 			 sent);
-		if (!send_ntf) {
-			delegate_poll_event(sock, NRF_POLLOUT);
-		}
+	}
+	if (!send_ntf) {
+		update_poll_events(sock, NRF_POLLOUT, true);
 	}
 
 	return sent > 0 ? sent : ret;
 }
 
 static int do_recvfrom(struct sm_socket *sock, int timeout, int flags,
-		       enum sm_socket_recv_mode mode, size_t data_len)
+		       enum sm_socket_mode mode, size_t data_len)
 {
 	int ret;
 	struct sockaddr remote;
@@ -1027,14 +1156,16 @@ static int do_recvfrom(struct sm_socket *sock, int timeout, int flags,
 	if (ret == 0) {
 		LOG_WRN("nrf_recvfrom() return 0");
 	} else {
-		char peer_addr[NRF_INET6_ADDRSTRLEN] = {0};
-		uint16_t peer_port = 0;
+		if (!in_datamode()) {
+			char peer_addr[NRF_INET6_ADDRSTRLEN] = {0};
+			uint16_t peer_port = 0;
 
-		util_get_peer_addr(&remote, peer_addr, &peer_port);
-		rsp_send("\r\n#XRECVFROM: %d,%d,%d,\"%s\",%d\r\n", sock->fd, mode, ret, peer_addr,
-			 peer_port);
+			util_get_peer_addr(&remote, peer_addr, &peer_port);
+			rsp_send("\r\n#XRECVFROM: %d,%d,%d,\"%s\",%d\r\n", sock->fd, mode,
+				 ret, peer_addr, peer_port);
+		}
 
-		if (mode == AT_SOCKET_RECV_MODE_HEXSTRING) {
+		if (mode == AT_SOCKET_MODE_HEX) {
 			ret = data_send_hex(sock, sm_data_buf, ret);
 			if (ret) {
 				return ret;
@@ -1043,7 +1174,7 @@ static int do_recvfrom(struct sm_socket *sock, int timeout, int flags,
 			data_send(sm_data_buf, ret);
 		}
 
-		delegate_poll_event(sock, ZSOCK_POLLIN);
+		update_poll_events(sock, NRF_POLLIN, true);
 	}
 
 	return 0;
@@ -1066,13 +1197,21 @@ static int socket_datamode_callback(uint8_t op, const uint8_t *data, int len, ui
 			} else {
 				ret = do_send(datamode_sock, data, len, datamode_sock->send_flags);
 			}
-			LOG_INF("datamode send: %d", ret);
+			if (ret == -EAGAIN || ret == -ETIMEDOUT) {
+				LOG_WRN("Send failed: %d", ret);
+				return ret;
+			} else if (ret < 0) {
+				LOG_ERR("Send failed: %d", ret);
+				exit_datamode_handler(ret);
+				return ret;
+			}
 		}
 	} else if (op == DATAMODE_EXIT) {
 		LOG_DBG("datamode exit");
 		memset(udp_url, 0, sizeof(udp_url));
-		if ((datamode_sock->send_flags & SM_MSG_SEND_ACK) == 0) {
-			delegate_poll_event(datamode_sock, NRF_POLLOUT);
+		if ((flags & SM_DATAMODE_FLAGS_EXIT_HANDLER) != 0) {
+			/* Datamode exited unexpectedly. */
+			rsp_send(CONFIG_SM_DATAMODE_TERMINATOR);
 		}
 		datamode_sock = NULL;
 	}
@@ -1549,7 +1688,7 @@ static int handle_at_send(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 		if (err) {
 			return err;
 		}
-		if (mode == AT_SOCKET_SEND_MODE_STRING || mode == AT_SOCKET_SEND_MODE_HEXSTRING) {
+		if (mode == AT_SOCKET_MODE_UNFORMATTED || mode == AT_SOCKET_MODE_HEX) {
 			if (param_count > 4) {
 				err = at_parser_string_ptr_get(parser, 4, &str_ptr, &size);
 				if (err) {
@@ -1560,7 +1699,7 @@ static int handle_at_send(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 			}
 
 			/* Convert hex string to binary data */
-			if (mode == AT_SOCKET_SEND_MODE_HEXSTRING) {
+			if (mode == AT_SOCKET_MODE_HEX) {
 				err = sm_util_atoh(str_ptr, size, hex_data, sizeof(hex_data));
 				if (err < 0) {
 					LOG_ERR("Failed to convert hex string to binary data");
@@ -1576,7 +1715,7 @@ static int handle_at_send(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 			} else {
 				err = err < 0 ? err : -EAGAIN;
 			}
-		} else if (mode == AT_SOCKET_SEND_MODE_DATA) {
+		} else if (mode == AT_SOCKET_MODE_DATA) {
 			if (param_count > 4) {
 				err = at_parser_num_get(parser, 4, &data_len);
 				if (err) {
@@ -1585,6 +1724,9 @@ static int handle_at_send(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 			}
 			datamode_sock = sock;
 			err = enter_datamode(socket_datamode_callback, data_len);
+			if (!err && sock->async_poll.adr_flags & SM_ADR_DATA_MODE) {
+				update_poll_events(sock, NRF_POLLIN, false);
+			}
 		} else {
 			return -EINVAL;
 		}
@@ -1623,7 +1765,7 @@ static int handle_at_recv(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 		if (err) {
 			return err;
 		}
-		if (mode != AT_SOCKET_RECV_MODE_BINARY && mode != AT_SOCKET_RECV_MODE_HEXSTRING) {
+		if (mode != AT_SOCKET_MODE_UNFORMATTED && mode != AT_SOCKET_MODE_HEX) {
 			return -EINVAL;
 		}
 		err = at_parser_num_get(parser, 3, &flags);
@@ -1694,7 +1836,7 @@ static int handle_at_sendto(enum at_parser_cmd_type cmd_type, struct at_parser *
 		if (err) {
 			return err;
 		}
-		if (mode == AT_SOCKET_SEND_MODE_STRING || mode == AT_SOCKET_SEND_MODE_HEXSTRING) {
+		if (mode == AT_SOCKET_MODE_UNFORMATTED || mode == AT_SOCKET_MODE_HEX) {
 			if (param_count > 6) {
 				err = at_parser_string_ptr_get(parser, 6, &str_ptr, &size);
 				if (err) {
@@ -1705,7 +1847,7 @@ static int handle_at_sendto(enum at_parser_cmd_type cmd_type, struct at_parser *
 			}
 
 			/* Convert hex string to binary data */
-			if (mode == AT_SOCKET_SEND_MODE_HEXSTRING) {
+			if (mode == AT_SOCKET_MODE_HEX) {
 				err = sm_util_atoh(str_ptr, size, hex_data, sizeof(hex_data));
 				if (err < 0) {
 					LOG_ERR("Failed to convert hex string to binary data");
@@ -1722,7 +1864,7 @@ static int handle_at_sendto(enum at_parser_cmd_type cmd_type, struct at_parser *
 				err = err < 0 ? err : -EAGAIN;
 			}
 			memset(udp_url, 0, sizeof(udp_url));
-		} else if (mode == AT_SOCKET_SEND_MODE_DATA) {
+		} else if (mode == AT_SOCKET_MODE_DATA) {
 			if (param_count > 6) {
 				err = at_parser_num_get(parser, 6, &data_len);
 				if (err) {
@@ -1731,6 +1873,9 @@ static int handle_at_sendto(enum at_parser_cmd_type cmd_type, struct at_parser *
 			}
 			datamode_sock = sock;
 			err = enter_datamode(socket_datamode_callback, data_len);
+			if (!err && sock->async_poll.adr_flags & SM_ADR_DATA_MODE) {
+				update_poll_events(sock, NRF_POLLIN, false);
+			}
 		} else {
 			return -EINVAL;
 		}
@@ -1769,7 +1914,7 @@ static int handle_at_recvfrom(enum at_parser_cmd_type cmd_type, struct at_parser
 		if (err) {
 			return err;
 		}
-		if (mode != AT_SOCKET_RECV_MODE_BINARY && mode != AT_SOCKET_RECV_MODE_HEXSTRING) {
+		if (mode != AT_SOCKET_MODE_UNFORMATTED && mode != AT_SOCKET_MODE_HEX) {
 			return -EINVAL;
 		}
 		err = at_parser_num_get(parser, 3, &flags);
@@ -1882,15 +2027,15 @@ static int handle_at_getaddrinfo(enum at_parser_cmd_type cmd_type, struct at_par
 
 static int apoll_stop(void)
 {
-	poll_ctx.poll_all = false;
-	poll_ctx.poll_events = 0;
-	poll_ctx.poll_running = false;
+	poll_ctx.xapoll_running = false;
+	poll_ctx.xapoll_all = false;
+	poll_ctx.xapoll_events = 0;
 
 	for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
 		if (socks[i].fd != INVALID_SOCKET) {
-			clear_so_poll_cb(&socks[i]);
+			socks[i].async_poll.xapoll_events = 0;
+			socks[i].async_poll.xapoll_specific = false;
 		}
-		socks[i].async_poll = (struct sm_async_poll){0};
 	}
 
 	return 0;
@@ -1900,12 +2045,12 @@ static void format_apoll_read_response(char *response, size_t size)
 {
 	int offset = 0;
 
-	offset = snprintf(response, size, "\r\n#XAPOLL: %d,%d", poll_ctx.poll_running,
-			  poll_ctx.poll_events);
+	offset = snprintf(response, size, "\r\n#XAPOLL: %d,%d", poll_ctx.xapoll_running,
+			  (poll_ctx.xapoll_events & ~(NRF_POLLERR | NRF_POLLHUP | NRF_POLLNVAL)));
 
 	for (int i = 0; i < SM_MAX_SOCKET_COUNT && offset < size; i++) {
 		if (socks[i].fd != INVALID_SOCKET &&
-		    (poll_ctx.poll_all || socks[i].async_poll.specific)) {
+		    (poll_ctx.xapoll_all || socks[i].async_poll.xapoll_specific)) {
 			offset += snprintf(&response[offset], size - offset, ",%d", socks[i].fd);
 		}
 	}
@@ -1916,15 +2061,21 @@ static void format_apoll_read_response(char *response, size_t size)
 	snprintf(&response[offset], size - offset, "\r\n");
 }
 
-static void set_apoll_all_sockets(void)
+static int set_apoll_all_sockets(void)
 {
-	poll_ctx.poll_running = true;
-	poll_ctx.poll_all = true;
+	int ret;
+
+	poll_ctx.xapoll_running = true;
+	poll_ctx.xapoll_all = true;
 	for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
 		if (socks[i].fd != INVALID_SOCKET) {
-			socks[i].async_poll.update_events = poll_ctx.poll_events;
+			ret = update_poll_events(&socks[i], poll_ctx.xapoll_events, true);
+			if (ret) {
+				return ret;
+			}
 		}
 	}
+	return 0;
 }
 
 static int set_apoll_specific_sockets(struct at_parser *parser, uint32_t param_count)
@@ -1933,15 +2084,15 @@ static int set_apoll_specific_sockets(struct at_parser *parser, uint32_t param_c
 	int err;
 	bool socket_found;
 
-	poll_ctx.poll_running = true;
-	poll_ctx.poll_all = false;
+	poll_ctx.xapoll_running = true;
+	poll_ctx.xapoll_all = false;
 
 	/* Clear previously set values. */
 	for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
 		if (socks[i].fd != INVALID_SOCKET) {
-			clear_so_poll_cb(&socks[i]);
+			socks[i].async_poll.xapoll_specific = false;
+			socks[i].async_poll.xapoll_events = 0;
 		}
-		socks[i].async_poll = (struct sm_async_poll){0};
 	}
 
 	/* Go through all the given handles. */
@@ -1955,8 +2106,11 @@ static int set_apoll_specific_sockets(struct at_parser *parser, uint32_t param_c
 		/* Match given handles to socket handles. */
 		for (int j = 0; j < SM_MAX_SOCKET_COUNT; j++) {
 			if (socks[j].fd == handle) {
-				socks[j].async_poll.specific = true;
-				socks[j].async_poll.update_events = poll_ctx.poll_events;
+				socks[j].async_poll.xapoll_specific = true;
+				err = update_poll_events(&socks[j], poll_ctx.xapoll_events, true);
+				if (err) {
+					return err;
+				}
 				socket_found = true;
 				break;
 			}
@@ -1992,24 +2146,28 @@ static int handle_at_apoll(enum at_parser_cmd_type cmd_type, struct at_parser *p
 			return apoll_stop();
 		}
 
-		/* APOLL START */
-		err = at_parser_num_get(parser, 2, &poll_ctx.poll_events);
+		/* op == AT_ASYNCPOLL_START */
+		err = at_parser_num_get(parser, 2, &poll_ctx.xapoll_events);
 		if (err) {
 			return err;
 		}
-		if (poll_ctx.poll_events & ~(NRF_POLLIN | NRF_POLLOUT)) {
-			LOG_ERR("Invalid poll events: 0x%02x", poll_ctx.poll_events);
+		if (poll_ctx.xapoll_events & ~(NRF_POLLIN | NRF_POLLOUT)) {
+			LOG_ERR("Invalid poll events: 0x%02x", poll_ctx.xapoll_events);
 			return -EINVAL;
 		}
+		/* Libmodem always returns these. */
+		poll_ctx.xapoll_events |= NRF_POLLERR | NRF_POLLHUP | NRF_POLLNVAL;
 		if (param_count == 3) {
-			set_apoll_all_sockets();
+			err = set_apoll_all_sockets();
+			if (err) {
+				return err;
+			}
 		} else {
 			err = set_apoll_specific_sockets(parser, param_count);
 			if (err) {
 				return err;
 			}
 		}
-		poll_work_fn(NULL);
 		break;
 
 	case AT_PARSER_CMD_TYPE_READ:
@@ -2023,6 +2181,88 @@ static int handle_at_apoll(enum at_parser_cmd_type cmd_type, struct at_parser *p
 		rsp_send("\r\n#XAPOLL: (%d,%d),<0,%d,%d,%d>,<handle1>,<handle2>,...\r\n",
 			 AT_ASYNCPOLL_STOP, AT_ASYNCPOLL_START, ZSOCK_POLLIN, ZSOCK_POLLOUT,
 			 ZSOCK_POLLIN | ZSOCK_POLLOUT);
+		err = 0;
+		break;
+
+	default:
+		break;
+	}
+
+	return err;
+}
+
+SM_AT_CMD_CUSTOM(xrecvcfg, "AT#XRECVCFG", handle_at_recvcfg);
+static int handle_at_recvcfg(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+				 uint32_t param_count)
+{
+	int err = -EINVAL;
+	int fd = -1;
+	uint16_t flags;
+	uint16_t hex_mode = 0;
+	struct sm_socket *sock = NULL;
+
+	switch (cmd_type) {
+	case AT_PARSER_CMD_TYPE_SET:
+		err = at_parser_num_get(parser, 1, &fd);
+		if (err && err != -ENODATA) {
+			return err;
+		}
+		if (fd != -1) {
+			sock = find_socket(fd);
+			if (sock == NULL) {
+				return -EINVAL;
+			}
+		}
+		err = at_parser_num_get(parser, 2, &flags);
+		if (err) {
+			return err;
+		}
+		if (param_count > 3) {
+			err = at_parser_num_get(parser, 3, &hex_mode);
+			if (err) {
+				return err;
+			}
+		}
+		if ((flags & SM_ADR_DATA_MODE) && hex_mode) {
+			LOG_ERR("Hex mode with data mode is not supported.");
+			return -EINVAL;
+		}
+		if (sock) {
+			sock->async_poll.adr_flags = flags;
+			sock->async_poll.adr_hex = hex_mode != 0;
+			err = update_poll_events(sock, NRF_POLLIN, false);
+		} else {
+			/* Apply to all sockets */
+			poll_ctx.adr_flags = flags;
+			poll_ctx.adr_hex = hex_mode != 0;
+			for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
+				if (socks[i].fd != INVALID_SOCKET) {
+					socks[i].async_poll.adr_flags = poll_ctx.adr_flags;
+					socks[i].async_poll.adr_hex = poll_ctx.adr_hex;
+					err = update_poll_events(&socks[i], NRF_POLLIN, false);
+					if (err) {
+						return err;
+					}
+				}
+			}
+		}
+		break;
+
+	case AT_PARSER_CMD_TYPE_READ:
+		for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
+			if (socks[i].fd != INVALID_SOCKET && socks[i].async_poll.adr_flags) {
+				rsp_send("\r\n#XRECVCFG: %d,%d,%d\r\n", socks[i].fd,
+					 socks[i].async_poll.adr_flags,
+					 socks[i].async_poll.adr_hex);
+			}
+		}
+		err = 0;
+		break;
+
+	case AT_PARSER_CMD_TYPE_TEST:
+		rsp_send("\r\n#XRECVCFG: <handle>,(%d,%d,%d,%d),(%d,%d)\r\n", SM_ADR_DISABLE,
+			 SM_ADR_AT_MODE, SM_ADR_DATA_MODE, SM_ADR_AT_MODE | SM_ADR_DATA_MODE,
+			 AT_SOCKET_MODE_UNFORMATTED, AT_SOCKET_MODE_HEX);
 		err = 0;
 		break;
 
