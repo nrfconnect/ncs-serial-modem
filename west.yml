@@ -3,8 +3,7 @@
 
 manifest:
   self:
-    west-commands: scripts/west-commands.yml
-    path: project
+    import: submanifests
 
   remotes:
     - name: ncs
