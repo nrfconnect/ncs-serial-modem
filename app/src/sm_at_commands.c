@@ -32,6 +32,7 @@
 #include "sm_at_icmp.h"
 #include "sm_at_sms.h"
 #include "sm_at_fota.h"
+#include "sm_version.h"
 #if defined(CONFIG_SM_NRF_CLOUD)
 #include "sm_at_nrfcloud.h"
 #endif
@@ -91,21 +92,19 @@ int sm_power_off_modem(void)
 	return sm_util_at_printf("AT+CFUN=0");
 }
 
-SM_AT_CMD_CUSTOM(xslmver, "AT#XSLMVER", handle_at_slmver);
-static int handle_at_slmver(enum at_parser_cmd_type cmd_type, struct at_parser *, uint32_t)
+SM_AT_CMD_CUSTOM(xsmver, "AT#XSMVER", handle_at_smver);
+static int handle_at_smver(enum at_parser_cmd_type cmd_type, struct at_parser *, uint32_t)
 {
 	int ret = -EINVAL;
 
 	if (cmd_type == AT_PARSER_CMD_TYPE_SET) {
-		char *libmodem = nrf_modem_build_version();
-
 		if (strlen(CONFIG_SM_CUSTOMER_VERSION) > 0) {
-			rsp_send("\r\n#XSLMVER: %s,\"%s\",\"%s\"\r\n",
-				 STRINGIFY(NCS_VERSION_STRING), libmodem,
+			rsp_send("\r\n#XSMVER: %s,%s,\"%s\"\r\n",
+				 STRINGIFY(SM_VERSION), STRINGIFY(NCS_VERSION_STRING),
 				 CONFIG_SM_CUSTOMER_VERSION);
 		} else {
-			rsp_send("\r\n#XSLMVER: %s,\"%s\"\r\n",
-				 STRINGIFY(NCS_VERSION_STRING), libmodem);
+			rsp_send("\r\n#XSMVER: %s,%s\r\n",
+				 STRINGIFY(SM_VERSION), STRINGIFY(NCS_VERSION_STRING));
 		}
 		ret = 0;
 	}

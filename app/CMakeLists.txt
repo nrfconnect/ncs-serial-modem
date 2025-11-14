@@ -34,3 +34,5 @@ add_subdirectory_ifdef(CONFIG_SM_HTTPC src/http_c)
 add_subdirectory_ifdef(CONFIG_SM_CARRIER src/lwm2m_carrier)
 
 zephyr_include_directories(src)
+
+include(cmake/sm_version.cmake)
