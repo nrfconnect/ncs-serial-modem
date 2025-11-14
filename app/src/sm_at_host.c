@@ -132,6 +132,8 @@ static bool exit_datamode(void)
 		rsp_send("\r\n#XDATAMODE: %d\r\n", datamode_handler_result);
 		datamode_handler_result = 0;
 
+		sm_at_socket_notify_datamode_exit();
+
 		LOG_INF("Exit datamode");
 		ret = true;
 	}
@@ -871,6 +873,11 @@ int enter_datamode(sm_datamode_handler_t handler, size_t data_len)
 bool in_datamode(void)
 {
 	return (get_sm_mode() == SM_DATA_MODE);
+}
+
+bool in_at_mode(void)
+{
+	return (get_sm_mode() == SM_AT_COMMAND_MODE);
 }
 
 bool exit_datamode_handler(int result)

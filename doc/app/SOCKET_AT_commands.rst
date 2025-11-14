@@ -138,7 +138,7 @@ Response syntax
   It represents ``cid`` in the ``+CGDCONT`` command.
 
 Example
-~~~~~~~~
+~~~~~~~
 
 ::
 
@@ -166,7 +166,7 @@ Response syntax
    #XSOCKET: <handle>,<list of ops>,<list of types>,<list of roles>,<cid>
 
 Example
-~~~~~~~~
+~~~~~~~
 
 ::
 
@@ -302,7 +302,7 @@ Response syntax
   It represents ``cid`` in the ``+CGDCONT`` command.
 
 Example
-~~~~~~~~
+~~~~~~~
 
 ::
 
@@ -330,7 +330,7 @@ Response syntax
    #XSSOCKET: <handle>,<list of ops>,<list of types>,<list of roles>,<sec_tag>,<peer_verify>,<cid>
 
 Example
-~~~~~~~~
+~~~~~~~
 
 ::
 
@@ -534,7 +534,7 @@ Response syntax
    #XSOCKETOPT: <handle>,<list of ops>,<name>,<value>
 
 Example
-~~~~~~~~
+~~~~~~~
 
 ::
 
@@ -621,7 +621,7 @@ See `nRF socket options <nrfxlib_nrf_sockets_>`_ for explanation of the supporte
 
 
 Example
-~~~~~~~~
+~~~~~~~
 
 ::
 
@@ -653,7 +653,7 @@ Response syntax
    #XSSOCKETOPT: <handle>,<list of ops>,<name>,<value>
 
 Example
-~~~~~~~~
+~~~~~~~
 
 ::
 
@@ -687,7 +687,7 @@ Syntax
   It represents the specific port to use for binding the socket.
 
 Example
-~~~~~~~~
+~~~~~~~
 
 ::
 
@@ -878,7 +878,7 @@ For network acknowledged sends (when the ``8192`` flag is used), an unsolicited 
 
 
 Example
-~~~~~~~~
+~~~~~~~
 
 ::
 
@@ -952,6 +952,8 @@ Syntax
 Response syntax
 ~~~~~~~~~~~~~~~
 
+.. sm_recv_response_start
+
 ::
 
    #XRECV: <handle>,<mode>,<size>
@@ -961,13 +963,15 @@ Response syntax
 
 * The ``<mode>`` value is an integer indicating the receive mode used.
 
-* The ``<data>`` value is a string that contains the data being received.
-
 * The ``<size>`` value is an integer that represents the actual number of bytes received.
   In case of hex string mode, it represents the number of bytes before conversion to hexadecimal format.
 
+* The ``<data>`` value is a string that contains the data being received.
+
+.. sm_recv_response_end
+
 Example
-~~~~~~~~
+~~~~~~~
 
 ::
 
@@ -1096,7 +1100,7 @@ For network acknowledged sends (when the ``8192`` flag is used), an unsolicited 
 * The ``<size>`` value is an integer indicating the size of the data sent.
 
 Example
-~~~~~~~~
+~~~~~~~
 
 ::
 
@@ -1164,6 +1168,8 @@ Syntax
 Response syntax
 ~~~~~~~~~~~~~~~
 
+.. sm_recvfrom_response_start
+
 ::
 
    #XRECVFROM: <handle>,<mode>,<size>,"<ip_addr>",<port>
@@ -1173,8 +1179,6 @@ Response syntax
 
 * The ``<mode>`` value is an integer indicating the receive mode used.
 
-* The ``<data>`` value is a string that contains the data being received.
-
 * The ``<size>`` value is an integer that represents the actual number of bytes received.
   In case of hex string mode, it represents the number of bytes before conversion to hexadecimal format.
 
@@ -1182,8 +1186,12 @@ Response syntax
 
 * The ``<port>`` value is an integer that represents the UDP port of the remote peer.
 
+* The ``<data>`` value is a string that contains the data being received.
+
+.. sm_recvfrom_response_end
+
 Example
-~~~~~~~~
+~~~~~~~
 
 ::
 
@@ -1401,7 +1409,7 @@ Response syntax
 * The ``<handleN>`` values return the socket handles that are being polled.
 
 Example
-~~~~~~~~
+~~~~~~~
 
 ::
 
@@ -1442,7 +1450,7 @@ Response syntax
    #XAPOLL: <stop/start>,<events>,<handle1>,<handle2>,...
 
 Example
-~~~~~~~~
+~~~~~~~
 
 ::
 
@@ -1450,6 +1458,251 @@ Example
 
 
    #XAPOLL: (0,1),<0,1,4,5>,<handle1>,<handle2>,...
+
+   OK
+
+Configure socket receive #XRECVCFG
+==================================
+
+The socket receive configuration command allows you to configure the following aspects of a socket:
+
+* Automatic data reception
+* Automatic data reception in hex format
+
+Set command
+-----------
+
+The set command allows you to configure the socket receive configuration of all sockets or a specific socket.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XRECVCFG=[<handle>],<auto_reception_flags>[,<hex_format>]
+
+* The ``<handle>`` parameter is an integer that identifies the socket handle.
+  If omitted, the command applies to all opened sockets, whether already open or opened in the future.
+* The ``<auto_reception_flags>`` parameter is an integer that specifies the automatic reception flags.
+  It can be a combination of the following values summed up:
+
+  * ``0`` - No automatic data reception.
+  * ``1`` - Automatic data reception in AT-command mode.
+  * ``2`` - Automatic data reception in data mode.
+* The ``<hex_format>`` parameter is an integer that specifies the hex format for automatically received data.
+  It applies only when automatic data reception is enabled.
+  It can be one of the following values:
+
+  * ``0`` - Data is received in binary format (default).
+  * ``1`` - Data is received in hex string format (supported only in AT-command mode).
+
+Response syntax
+~~~~~~~~~~~~~~~
+
+When in the AT-command mode and the automatic data reception is enabled, |SM| sends ``#XRECV`` and ``#XRECVFROM`` responses as URC notifications when data is received.
+``#XRECV`` is used for TCP, raw, and connected UDP sockets, while ``#XRECVFROM`` is used for unconnected UDP sockets.
+
+.. include:: SOCKET_AT_commands.rst
+   :start-after: sm_recv_response_start
+   :end-before: sm_recv_response_end
+
+.. include:: SOCKET_AT_commands.rst
+   :start-after: sm_recvfrom_response_start
+   :end-before: sm_recvfrom_response_end
+
+.. note::
+   ``<CR><LF>`` is sent after ``<data>``.
+   This differs from the standard ``#XRECV`` and ``#XRECVFROM`` responses where ``<CR><LF>`` is sent before ``OK``.
+
+When in data mode and the automatic data reception is enabled, |SM| sends the received data as is, without any additional headers or formatting.
+
+Example
+~~~~~~~
+
+::
+
+   // Enable automatic data reception in AT-command mode in binary format for all sockets.
+   AT#XRECVCFG=,1,0
+
+   OK
+   AT#XSOCKET=1,1,0
+
+   #XSOCKET: 0,1,6
+
+   OK
+   AT#XCONNECT=0,"test.server.com",1234
+
+   #XCONNECT: 0,1
+
+   OK
+   // Send data to the test server, which will echo it back.
+   AT#XSEND=0,0,0,"Test"
+
+   #XSEND: 0,0,4
+
+   OK
+   // Data is automatically received.
+   #XRECV: 0,0,4
+   Test
+   // Enable automatic data reception in AT-command mode in hex string format for socket 0.
+   AT#XRECVCFG=0,1,1
+
+   OK
+   // Send data to the test server, which will echo it back.
+   AT#XSEND=0,0,0,"Test hex"
+
+   #XSEND: 0,0,8
+
+   OK
+   // Data is automatically received in hex string format.
+   #XRECV: 0,1,8
+   5465737420686578
+   // Enable automatic reception of data in data mode.
+   AT#XRECVCFG=0,2,0
+
+   OK
+   // Enter data mode and send data to the test server, which will echo it back.
+   AT#XSEND=0,2,0
+
+   OK
+   DATA TEST
+   DATA TEST
+   +++
+   #XDATAMODE: 0
+
+   // Create a new UDP socket. Data reception in AT-command mode in binary format is enabled for it.
+   AT#XSOCKET=1,2,0
+
+   #XSOCKET: 1,2,17
+
+   OK
+   // Send data with unconnected UDP socket to the test server, which will echo it back with a delay.
+   AT#XSENDTO=1,0,0,"test.server.com",1235,"Delayed UDP data"
+
+   #XSENDTO: 1,0,16
+
+   OK
+   // Enter data mode with socket 0.
+   AT#XSEND=0,2,0
+
+   OK
+
+   // Long operations during data mode.
+
+   // Exiting the data mode allows the delayed UDP data to be received.
+   +++
+   #XDATAMODE: 0
+   // Unconnected UDP socket automatically receives the delayed data with RECVFROM.
+   #XRECVFROM: 1,0,16,"111.112.113.114",1235
+   Delayed UDP data
+   // Disable automatic data reception for all sockets.
+   AT#XRECVCFG=,0
+
+   OK
+   AT#XCLOSE
+
+   #XCLOSE: 0,0
+
+   #XCLOSE: 1,0
+
+   OK
+
+Read command
+------------
+
+The read command allows you to check the receive configuration settings of sockets.
+
+Syntax
+~~~~~~
+
+::
+
+   #XRECVCFG?
+
+Response syntax
+~~~~~~~~~~~~~~~
+
+::
+
+   #XRECVCFG: <handle>,<auto_reception_flags>,<hex_format>
+
+* The ``<handle>`` parameter is an integer that identifies the socket handle.
+* The ``<auto_reception_flags>`` parameter is an integer that specifies the automatic reception flags.
+  It is a combination of the following values summed up:
+
+  * ``0`` - No automatic data reception.
+  * ``1`` - Automatic data reception in AT-command mode.
+  * ``2`` - Automatic data reception in data mode.
+* The ``<hex_format>`` parameter is an integer that specifies the hex format for automatically received data.
+  It can be one of the following values:
+
+  * ``0`` - Data is received in binary format.
+  * ``1`` - Data is received in hex string format (supported only in AT-command mode).
+
+Example
+~~~~~~~
+
+::
+
+   AT#XRECVCFG=,1,0
+
+   OK
+   AT#XSOCKET=1,1,0
+
+   #XSOCKET: 0,1,6
+
+   OK
+   AT#XSOCKET=1,1,0
+
+   #XSOCKET: 1,1,6
+
+   OK
+   // Enable automatic data reception in data mode for socket 1.
+   AT#XRECVCFG=1,2
+
+   OK
+   AT#XRECVCFG?
+
+   #XRECVCFG: 0,1,0
+
+   #XRECVCFG: 1,2,0
+
+   OK
+   // Disable automatic reception for all sockets.
+   AT#XRECVCFG=,0
+
+   OK
+   AT#XRECVCFG?
+
+   OK
+
+Test command
+------------
+
+The test command provides information about the command and its parameters.
+
+Syntax
+~~~~~~
+
+::
+
+   #XRECVCFG=?
+
+Response syntax
+~~~~~~~~~~~~~~~
+
+::
+
+   #XRECVCFG: <handle>,(0,1,2,3),(0,1)
+
+Example
+~~~~~~~
+
+::
+
+   AT#XRECVCFG=?
+
+   #XRECVCFG: <handle>,(0,1,2,3),(0,1)
 
    OK
 
@@ -1490,7 +1743,7 @@ Response syntax
   It indicates the IPv4 or IPv6 address of the resolved hostname.
 
 Example
-~~~~~~~~
+~~~~~~~
 
 ::
 
