@@ -1,0 +1,53 @@
+name: Documentation Build for PRs
+
+on:
+  pull_request:
+    paths-include:
+      - "doc/**"
+      - "include/**"
+      - ".github/workflows/doc-build-pr.yml"
+
+env:
+  DOXYGEN_VERSION: 1.12.0
+
+jobs:
+  build-and-test-in-toolchain-bundle:
+    runs-on: ubuntu-24.04
+    steps:
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3 python3-pip
+
+      - name: Install Python dependencies
+        working-directory: doc
+        run: |
+          python3 -m pip install -r requirements.txt
+
+      - name: Install Doxygen
+        run: |
+          wget --no-verbose "https://github.com/doxygen/doxygen/releases/download/Release_${DOXYGEN_VERSION//./_}/doxygen-${DOXYGEN_VERSION}.linux.bin.tar.gz"
+          tar xf doxygen-${DOXYGEN_VERSION}.linux.bin.tar.gz
+          echo "${PWD}/doxygen-${DOXYGEN_VERSION}/bin" >> $GITHUB_PATH
+
+      - name: Build documentation
+        working-directory: doc
+        run: |
+          # Run Doxygen
+          doxygen |& tee doc_build_doxygen.log
+          # Run Sphinx
+          make html |& tee doc_build_sphinx.log
+          # Check Doxygen build log for errors/warnings
+          if grep -E "error|warning" doc_build_doxygen.log; then
+            echo "Documentation build failed due to Doxygen errors/warnings"
+            exit 1
+          fi
+          # Check Sphinx build log for errors/warnings
+          if grep -E "error|warning" doc_build_sphinx.log; then
+            echo "Documentation build failed due to Sphinx errors/warnings"
+            exit 1
+          fi
