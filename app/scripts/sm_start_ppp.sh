@@ -32,6 +32,8 @@ PDN=0
 VERBOSE=0
 CHATOPT=""
 PPP_DEBUG=""
+PIDFILE="/var/run/nrf91-modem.pid"
+PPP_PIDFILE="/var/run/ppp-nrf91.pid"
 
 usage() {
     echo "Usage: $0 [-s serial_port] [-b baud_rate] [-t timeout] [-a APN] [-f IP|IPV6|IPV4V6]"
@@ -58,7 +60,7 @@ do
 	a) APN=${OPTARG};;
 	p) PDN=${OPTARG};;
 	f) TYPE=${OPTARG};;
-	v) VERBOSE=1; CHATOPT="-vs"; PPP_DEBUG="debug";;
+	v) VERBOSE=1; CHATOPT="-v"; PPP_DEBUG="debug";;
 	h|?) usage;;
     esac
 done
@@ -192,13 +194,13 @@ chat $CHATOPT -t$TIMEOUT "${CHAT_SCRIPT[@]}" >$AT_CMUX <$AT_CMUX
 
 shutdown_modem() {
 	set +eu
-	chat -t5 '' $SHUTDOWN_SCRIPT >$AT_CMUX <$AT_CMUX
+	chat $CHATOPT -t5 '' $SHUTDOWN_SCRIPT >$AT_CMUX <$AT_CMUX
 	CHAT_ERR=$?
 	pkill ldattach
 	sleep 1
 	if [ "$CHAT_ERR" -ne 0 ]; then
 		cmux_close
-		chat -t5 '' $SHUTDOWN_SCRIPT >$MODEM <$MODEM
+		chat $CHATOPT -t5 '' $SHUTDOWN_SCRIPT >$MODEM <$MODEM
 	fi
 }
 
@@ -209,6 +211,7 @@ ppp_start() {
 	if [ "$?" -eq 5 ]; then
 		echo "pppd terminated with signal, shutting down modem..."
 		shutdown_modem
+		test -O $PIDFILE && rm -f $PIDFILE
 		exit 0
 	fi
 	sleep 1
@@ -221,11 +224,28 @@ export AT_CMUX
 export MODEM
 export SHUTDOWN_SCRIPT
 export PPP_OPTIONS
+export PIDFILE
+export CHATOPT
 export -f ppp_start
 export -f shutdown_modem
 export -f cmux_close
 
 # Start PPPD in a subshell
-nohup bash -c ppp_start &
-echo "PPP link starting"
-exit 0
+# Logs go to syslog so redirect output to /dev/null
+setsid bash -c ppp_start  </dev/null >/dev/null 2>&1 &
+echo $! > $PIDFILE
+
+# Wait for PPPD to start
+for i in {1..5}; do
+	if [ -f $PPP_PIDFILE ]; then
+		if grep "ppp[0-9]" $PPP_PIDFILE >/dev/null; then
+			echo "PPP link started"
+			log_dbg "Interface $(cat $PPP_PIDFILE| tail -1)"
+			exit 0
+		fi
+	fi
+	sleep 1
+done
+
+echo "Failed to start PPP link"
+exit 1
