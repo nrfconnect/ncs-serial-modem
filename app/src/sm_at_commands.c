@@ -328,9 +328,12 @@ static int handle_at_clac(enum at_parser_cmd_type cmd_type, struct at_parser *, 
 	memset(base_cmd_len, 0, cmd_custom_count * sizeof(size_t));
 	rsp_send("\r\n");
 	for (size_t i = 0; i < cmd_custom_count; i++) {
-		/* Serial Modem at commands start with AT#X. */
-		if (strncasecmp(_nrf_modem_at_cmd_custom_list_start[i].cmd, "AT#X",
-				strlen("AT#X"))) {
+		const char *cmd = _nrf_modem_at_cmd_custom_list_start[i].cmd;
+		/* Modem AT comamands start with 'AT+' or AT%. Other commands are
+		 * Serial Modem specific'. Skip modem AT commands.
+		 */
+		if (strncasecmp(cmd, "AT+", strlen("AT+")) == 0 ||
+		    strncasecmp(cmd, "AT%%", strlen("AT%%")) == 0) {
 			continue;
 		}
 		/* List commands without operations and list each command only once. */
