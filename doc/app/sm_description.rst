@@ -170,11 +170,6 @@ CONFIG_SM_MQTTC_MESSAGE_BUFFER_LEN - Size of the buffer for the MQTT library
    This option specifies the maximum message size which can be transmitted or received through MQTT (excluding PUBLISH payload).
    The default value is 512, meaning 512 bytes for TX and RX, respectively.
 
-.. _CONFIG_SM_HTTPC:
-
-CONFIG_SM_HTTPC - HTTP client support in |SM|
-   This option enables additional AT commands for using the HTTP client service.
-
 .. _CONFIG_SM_UART_RX_BUF_COUNT:
 
 CONFIG_SM_UART_RX_BUF_COUNT - Receive buffers for UART.

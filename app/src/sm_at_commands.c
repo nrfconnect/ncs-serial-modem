@@ -42,9 +42,6 @@
 #if defined(CONFIG_SM_MQTTC)
 #include "sm_at_mqtt.h"
 #endif
-#if defined(CONFIG_SM_HTTPC)
-#include "sm_at_httpc.h"
-#endif
 #if defined(CONFIG_SM_CARRIER)
 #include "sm_at_carrier.h"
 #endif
@@ -440,13 +437,6 @@ int sm_at_init(void)
 		return -EFAULT;
 	}
 #endif
-#if defined(CONFIG_SM_HTTPC)
-	err = sm_at_httpc_init();
-	if (err) {
-		LOG_ERR("%s initialization failed (%d).", "HTTP", err);
-		return -EFAULT;
-	}
-#endif
 #if defined(CONFIG_SM_CARRIER)
 	err = sm_at_carrier_init();
 	if (err) {
@@ -520,12 +510,6 @@ void sm_at_uninit(void)
 	err = sm_at_mqtt_uninit();
 	if (err) {
 		LOG_WRN("%s uninitialization failed (%d).", "MQTT", err);
-	}
-#endif
-#if defined(CONFIG_SM_HTTPC)
-	err = sm_at_httpc_uninit();
-	if (err) {
-		LOG_WRN("%s uninitialization failed (%d).", "HTTP", err);
 	}
 #endif
 #if defined(CONFIG_SM_CARRIER)

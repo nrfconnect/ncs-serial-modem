@@ -38,7 +38,6 @@ The modem specific AT commands are documented in the `nRF91x1 AT Commands Refere
    CMUX_AT_commands
    FOTA_AT_commands
    GNSS_AT_commands
-   HTTPC_AT_commands
    ICMP_AT_commands
    CARRIER_AT_commands
    MQTT_AT_commands

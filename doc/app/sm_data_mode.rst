@@ -25,7 +25,6 @@ However, the |SM| data mode is applied automatically while using the following m
 * TCP/TLS proxy send
 * UDP/DTLS proxy send
 * MQTT publish
-* HTTP request
 * GNSS nRF Cloud send message
 * LwM2M carrier library app data send
 
