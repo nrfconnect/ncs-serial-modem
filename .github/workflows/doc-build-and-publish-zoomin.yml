@@ -28,6 +28,9 @@ on:
         type: boolean
         default: true
 
+env:
+  DOXYGEN_VERSION: 1.12.0
+
 jobs:
   doc-build-and-publish:
     env:
@@ -56,9 +59,16 @@ jobs:
         run: |
           python3 -m pip install -r requirements.txt
 
+      - name: Install Doxygen
+        run: |
+          wget --no-verbose "https://github.com/doxygen/doxygen/releases/download/Release_${DOXYGEN_VERSION//./_}/doxygen-${DOXYGEN_VERSION}.linux.bin.tar.gz"
+          tar xf doxygen-${DOXYGEN_VERSION}.linux.bin.tar.gz
+          echo "${PWD}/doxygen-${DOXYGEN_VERSION}/bin" >> $GITHUB_PATH
+
       - name: Build documentation
         working-directory: doc
         run: |
+          doxygen
           sphinx-build -M html . build
 
           cp custom.properties build/html
