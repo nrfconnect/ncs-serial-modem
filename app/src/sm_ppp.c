@@ -149,14 +149,20 @@ static bool open_ppp_sockets(void)
 	}
 
 	/* Bind PPP to PDN */
+	int pdn_id = sm_util_pdn_id_get(ppp_pdn_cid);
+
+	if (pdn_id < 0) {
+		return false;
+	}
+
 	ret = zsock_setsockopt(
 		ppp_fds[MODEM_FD_IDX],
 		SOL_SOCKET, SO_BINDTOPDN,
-		&ppp_pdn_cid, sizeof(int));
+		&pdn_id, sizeof(int));
 	if (ret == 0) {
-		LOG_INF("PPP socket bound to PDN %d", ppp_pdn_cid);
+		LOG_INF("PPP socket bound to PDN ID %d", pdn_id);
 	} else {
-		LOG_ERR("Failed to bind PPP to PDN %d (%d)", ppp_pdn_cid, -errno);
+		LOG_ERR("Failed to bind PPP to PDN ID %d (%d)", pdn_id, -errno);
 		return false;
 	}
 

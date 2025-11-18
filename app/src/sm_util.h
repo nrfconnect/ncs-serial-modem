@@ -189,8 +189,17 @@ int util_resolve_host(int cid, const char *host, uint16_t port, int family, stru
  * @retval 0 If the operation was successful.
  *           Otherwise, a (negative) error code is returned.
  */
-
 int util_get_peer_addr(struct sockaddr *peer, char addr[static INET6_ADDRSTRLEN], uint16_t *port);
+
+/**
+ * @brief Get PDN ID from AT command response
+ *
+ * @param[in] cid PDP Context ID as defined in "+CGDCONT" command (0~10).
+ *
+ * @retval PDN ID If the operation was successful.
+ *           Otherwise, a (negative) error code is returned.
+ */
+int sm_util_pdn_id_get(uint8_t cid);
 /** @} */
 
 #endif /* SM_UTIL_ */

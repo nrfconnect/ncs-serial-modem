@@ -131,10 +131,15 @@ static int do_tcp_client_connect(const char *url, uint16_t port, uint16_t cid)
 
 	/* Explicitly bind to a PDP context if necessary */
 	if (cid > 0) {
-		int cid_int = cid;
+		int pdn_id = sm_util_pdn_id_get(cid);
+
+		if (pdn_id < 0) {
+			ret = pdn_id;
+			goto exit_cli;
+		}
 
 		ret = zsock_setsockopt(proxy.sock, SOL_SOCKET, SO_BINDTOPDN,
-				&cid_int, sizeof(int));
+				&pdn_id, sizeof(int));
 		if (ret < 0) {
 			LOG_ERR("zsock_setsockopt(SO_BINDTOPDN) error: %d", -errno);
 			goto exit_cli;

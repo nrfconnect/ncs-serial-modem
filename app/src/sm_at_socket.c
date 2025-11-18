@@ -150,9 +150,13 @@ static int bind_to_pdn(struct sm_socket *sock)
 	int ret = 0;
 
 	if (sock->cid > 0) {
-		int cid_int = sock->cid;
+		int pdn_id = sm_util_pdn_id_get(sock->cid);
 
-		ret = nrf_setsockopt(sock->fd, NRF_SOL_SOCKET, NRF_SO_BINDTOPDN, &cid_int,
+		if (pdn_id < 0) {
+			return pdn_id;
+		}
+
+		ret = nrf_setsockopt(sock->fd, NRF_SOL_SOCKET, NRF_SO_BINDTOPDN, &pdn_id,
 				     sizeof(int));
 		if (ret < 0) {
 			LOG_ERR("nrf_setsockopt(%d) error: %d", NRF_SO_BINDTOPDN, -errno);
