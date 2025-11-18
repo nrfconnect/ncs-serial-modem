@@ -1,0 +1,13 @@
+sample:
+  description: Serial Modem PPP example with shell interface
+  name: PPP shell
+tests:
+  sample.sm_ppp_shell:
+    sysbuild: true
+    build_only: true
+    platform_allow:
+      - nrf54l15dk/nrf54l15/cpuapp
+      - nrf54l15dk/nrf54l15/cpuapp/ns
+      - native_sim
+    integration_platforms:
+      - nrf54l15dk/nrf54l15/cpuapp
