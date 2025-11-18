@@ -140,10 +140,16 @@ static int do_udp_client_connect(const char *url, uint16_t port, uint16_t cid)
 
 	/* Explicitly bind to a PDP context if necessary */
 	if (cid > 0) {
-		int cid_int = cid;
+		int pdn_id = sm_util_pdn_id_get(cid);
+
+		if (pdn_id < 0) {
+			LOG_ERR("Failed to get PDN ID for CID %d", cid);
+			ret = pdn_id;
+			goto cli_exit;
+		}
 
 		ret = zsock_setsockopt(proxy.sock, SOL_SOCKET, SO_BINDTOPDN,
-				&cid_int, sizeof(int));
+				&pdn_id, sizeof(int));
 		if (ret < 0) {
 			LOG_ERR("zsock_setsockopt(SO_BINDTOPDN) error: %d", -errno);
 			goto cli_exit;
