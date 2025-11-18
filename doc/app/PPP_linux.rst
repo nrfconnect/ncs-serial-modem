@@ -29,8 +29,6 @@ These should be available on all standard Linux distributions.
 Configuration
 =============
 
-To build the |SM| application, use the :file:`overlay-ppp-cmux-linux.conf` configuration overlay.
-
 You can adjust the serial port baud rate using the devicetree overlay file.
 The `baud rate is set to 115200 <Testing and optimization_>`_ by default.
 If you change the baud rate, set the same rate in the :file:`scripts/sm_start_ppp.sh` and :file:`scripts/sm_stop_ppp.sh` scripts.
@@ -39,18 +37,18 @@ If you change the baud rate, set the same rate in the :file:`scripts/sm_start_pp
    The standard ``ldattach`` utility sets MRU and MTU to 127 bytes.
    This is hard-coded and cannot be changed.
    If you change the |SM| configuration, make sure that the ``CONFIG_MODEM_CMUX_MTU`` Kconfig option is set to 127 bytes.
-   This is already configured in the :file:`overlay-ppp-cmux-linux.conf` configuration overlay.
+   This is already configured in the :file:`overlay-cmux.conf` configuration overlay.
 
 Building and running
 ====================
 
-To build and program the |SM| application to the nRF91 Series device, use the :file:`overlay-ppp-cmux-linux.conf` overlay file.
+To build and program the |SM| application to the nRF91 Series device, use the :file:`overlay-ppp.conf` and the :file:`overlay-cmux.conf` configuration overlays.
 
 Managing the connection
 ***********************
 
 The start and stop scripts are provided in the :file:`scripts` directory of the |SM| application.
-The scripts assume that the nRF91 Series SiP is connected to the Linux device using the `/dev/ttyACM0` serial port.
+The scripts assume that the nRF91 Series SiP is connected to the Linux device using the ``/dev/ttyACM0`` serial port.
 
 If needed, adjust the serial port settings in the scripts as follows:
 
@@ -62,7 +60,7 @@ If needed, adjust the serial port settings in the scripts as follows:
 To start the PPP connection, run the :file:`scripts/sm_start_ppp.sh` script.
 To stop the PPP connection, run the :file:`scripts/sm_stop_ppp.sh` script.
 
-The scripts need superuser privileges to run, so use `sudo`.
+The scripts need superuser privileges to run, so use ``sudo``.
 The PPP link is set as a default route if there is no existing default route.
 The scripts do not manage the DNS settings from the Linux system.
 Read the distribution manuals to learn how to configure the DNS settings.

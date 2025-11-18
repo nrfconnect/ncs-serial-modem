@@ -63,6 +63,9 @@ This section gives instructions on how to migrate from the NCS v3.1.x Serial LTE
 
    * Removed the :file:`overlay-zephyr-modem.conf` as the default behavior of the |SM| application is compatible with Zephyr modem driver.
 
+   * Removed the :file:`overlay-ppp-cmux-linux.conf` overlay file.
+     Use :file:`overlay-ppp.conf` and :file:`overlay-cmux.conf` files instead.
+
    * Default behavior of CMUX channels have changed if DLCI 1 is used for PPP. Now when PPP is shutdown, the CMUX channel 1 switches to AT command mode and channel 2 is not used for AT commands anymore.
 
 
