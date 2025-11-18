@@ -1,0 +1,20 @@
+/ {
+	/*
+	 * Enable UART2 as the serial interface to the nRF91 Serial Modem application.
+	 * Assume that the UART which receives modem AT-commands is available at /dev/ttyACM0 on the host system.
+	 */
+	uart2: uart2 {
+		status = "okay";
+		compatible = "zephyr,native-tty-uart";
+		serial-port = "/dev/ttyACM0";
+		current-speed = <115200>;
+		hw-flow-control;
+
+		modem: modem {
+			compatible = "nordic,nrf91-slm";
+			status = "okay";
+			zephyr,pm-device-runtime-auto;
+		};
+	};
+
+};

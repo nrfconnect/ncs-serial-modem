@@ -1,0 +1,51 @@
+/*
+ * Copyright (c) 2025 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+ */
+
+
+/*
+ * See nRF54L15DK GPIO documentation from
+ * https://docs.nordicsemi.com/bundle/ug_nrf54l15_dk/page/UG/nRF54L15_DK/hw_desription/connector_if.html
+ *
+ * UART0 is used for Serial Modem communication and UART1 is used for console/shell.
+ *
+ * Note: Disable VCOM0 from Board Configurator to release UART0 for Serial Modem.
+ *
+ * UART0 located on the P0 connector is the "uart30" instance in the device tree.
+ * UART1 is "uart20" in the device tree and it is routed to the VCOM1 on the interface chip.
+ * RING and DTR signals are located on P1 connector.
+ */
+
+/ {
+	chosen {
+		/* Switch console to uart20 */
+		zephyr,console = &uart20;
+		zephyr,shell-uart = &uart20;
+	};
+};
+
+/* Zephyr modem UART <-> nRF91 Serial Modem UART */
+&uart30 {
+	status = "okay";
+	current-speed = <115200>;
+	hw-flow-control;
+	zephyr,pm-device-runtime-auto;
+
+	/* Nordic nRF91 Serial Modem configuration */
+	modem: modem {
+		compatible = "nordic,nrf91-slm";
+		status = "okay";
+		mdm-ring-gpios = <&gpio1 12 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+		mdm-dtr-gpios = <&gpio1 11 GPIO_ACTIVE_LOW>;
+		zephyr,pm-device-runtime-auto;
+		cmux-enable-runtime-power-save;
+		cmux-close-pipe-on-power-save;
+		cmux-idle-timeout-ms = <5000>;
+	};
+};
+
+&gpio1 {
+	status = "okay";
+};
