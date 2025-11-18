@@ -226,7 +226,6 @@ module-str = serial modem
 source "$(ZEPHYR_BASE)/subsys/logging/Kconfig.template.log_config"
 
 rsource "src/mqtt_c/Kconfig"
-rsource "src/http_c/Kconfig"
 rsource "src/lwm2m_carrier/Kconfig"
 rsource "src/gnss/Kconfig"
 

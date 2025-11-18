@@ -1,9 +1,0 @@
-#
-# Copyright (c) 2020 Nordic Semiconductor ASA
-#
-# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
-
-config SM_HTTPC
-	bool "HTTP client support"
-	default y
-	select HTTP_CLIENT
