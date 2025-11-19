@@ -42,6 +42,9 @@ In addition, if the controlling chip is an external MCU, the following configura
 * :file:`overlay-external-mcu.overlay` - To configure UART (pins, baud rate), DTR and RI pins that |SM| will use.
   Make sure to update the UART configuration (pins, baud rate) so that it matches your setup.
 
+* :file:`overlay-external-mcu.conf` - To enable hardware RX byte counting on UART2.
+  This configuration is required when UART2 is used without hardware flow control.
+
 Finally, if you want more verbose logging that includes the AT commands and responses, you can enable debug logging by uncommenting ``CONFIG_SM_LOG_LEVEL_DBG=y`` in the :file:`prj.conf` configuration file.
 
 Controlling chip running Zephyr

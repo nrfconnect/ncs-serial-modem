@@ -14,6 +14,7 @@ tests:
     sysbuild: true
     build_only: true
     extra_args:
+      - EXTRA_CONF_FILE="overlay-external-mcu.conf"
       - EXTRA_DTC_OVERLAY_FILE="overlay-external-mcu.overlay"
     platform_allow:
       - nrf9151dk/nrf9151/ns
@@ -56,6 +57,7 @@ tests:
     build_only: true
     extra_args:
       - EXTRA_CONF_FILE="overlay-cmux.conf;overlay-ppp.conf"
+      - EXTRA_CONF_FILE="overlay-external-mcu.conf"
       - EXTRA_DTC_OVERLAY_FILE="overlay-external-mcu.overlay"
     platform_allow:
       - nrf9151dk/nrf9151/ns
