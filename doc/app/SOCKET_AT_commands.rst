@@ -860,7 +860,7 @@ For network acknowledged sends (when the ``8192`` flag is used), an unsolicited 
 * The ``<handle>`` value is an integer indicating the socket handle.
 
 * The ``<status>`` value is an integer indicating the status of the network acknowledged send.
-  It is ``0`` for success or a negative error code for failure.
+  It is ``0`` for success or ``-1`` for failure.
 
 * The ``<size>`` value is an integer indicating the size of the data sent.
 
@@ -1069,7 +1069,7 @@ For network acknowledged sends (when the ``8192`` flag is used), an unsolicited 
 * The ``<handle>`` value is an integer indicating the socket handle.
 
 * The ``<status>`` value is an integer indicating the status of the network acknowledged send.
-  It is ``0`` for success or a negative error code for failure.
+  It is ``0`` for success or ``-1`` for failure.
 
 * The ``<size>`` value is an integer indicating the size of the data sent.
 

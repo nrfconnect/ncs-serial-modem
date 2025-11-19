@@ -125,6 +125,10 @@ static bool exit_datamode(void)
 		ring_buf_reset(&data_rb);
 		k_mutex_unlock(&mutex_data);
 
+		if (datamode_handler_result) {
+			LOG_ERR("Datamode handler error: %d", datamode_handler_result);
+			datamode_handler_result = -1;
+		}
 		rsp_send("\r\n#XDATAMODE: %d\r\n", datamode_handler_result);
 		datamode_handler_result = 0;
 
