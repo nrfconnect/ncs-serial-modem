@@ -277,7 +277,12 @@ static void send_cb_fn(struct k_work *work)
 			int bytes_sent = socks[i].send_ntf.bytes_sent;
 
 			atomic_clear(&socks[i].send_ntf.ready);
-			urc_send("\r\n#XSENDNTF: %d,%d,%d\r\n", socks[i].fd, -status, bytes_sent);
+			if (status) {
+				LOG_ERR("Send cb failed for socket %d: %d, %d", socks[i].fd,
+					-status, bytes_sent);
+				status = -1;
+			}
+			urc_send("\r\n#XSENDNTF: %d,%d,%d\r\n", socks[i].fd, status, bytes_sent);
 			delegate_poll_event(&socks[i], NRF_POLLOUT);
 		}
 	}

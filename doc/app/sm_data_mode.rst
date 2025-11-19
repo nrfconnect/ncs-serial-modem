@@ -223,8 +223,8 @@ Unsolicited notification
 
    #XDATAMODE: <status>
 
-The ``<status>`` value ``0`` indicates that the data mode operation was successful.
-A negative value indicates the error code of the failing operation.
+* The ``<status>`` value is an integer that indicates the status of the data mode operation.
+  It is ``0`` for success or ``-1`` for failure.
 
 Example
 ~~~~~~~

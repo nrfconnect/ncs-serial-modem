@@ -267,7 +267,7 @@ static void loc_req_wk(struct k_work *work)
 	}
 
 	if (err) {
-		rsp_send("\r\n#XNRFCLOUDPOS: %d\r\n", err);
+		rsp_send("\r\n#XNRFCLOUDPOS: %d\r\n", err < 0 ? -1 : err);
 	}
 	if (nrfcloud_wifi_pos) {
 		k_free(nrfcloud_wifi_data.ap_info);
@@ -330,7 +330,7 @@ static void on_cloud_evt_location_data_received(const struct nrf_cloud_data *con
 			err = result.err;
 		}
 		LOG_ERR("Failed to process the location request response (%d).", err);
-		rsp_send("\r\n#XNRFCLOUDPOS: %d\r\n", err);
+		rsp_send("\r\n#XNRFCLOUDPOS: %d\r\n", err < 0 ? -1 : err);
 	}
 
 #else

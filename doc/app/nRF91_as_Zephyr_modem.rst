@@ -88,7 +88,7 @@ To observe the operation sequence, you can view the application logs coming from
 By default, |SM| will output its logs through RTT, and the Zephyr application running on the controlling chip through its UART 0.
 The RTT logs can be seen with an RTT client such as ``JLinkRTTViewer``.
 However, for convenience you may want to redirect |SM|'s logs to the SiP's UART 0 so that you do not need to reconnect the RTT client every time the board is reset.
-See the :ref:`sm_additional_config` section for information on how to do this.
+See the :ref:`sm_logging` section for information on how to do this.
 
 The logs output through UART can be seen by connecting to the appropriate UART with a serial communication program.
 

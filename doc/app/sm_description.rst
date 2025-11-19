@@ -213,16 +213,21 @@ CONFIG_SM_PGPS_INJECT_FIX_DATA - Injects the data obtained when acquiring a fix.
    The default value is ``y``.
 
 
-.. _sm_additional_config:
+.. _sm_logging:
 
-Additional configuration
-========================
+Logging
+=======
 
-To save power, both the console and the output logs over ``UART_0`` are disabled in this application.
-This information is logged using RTT instead.
-See `Testing and optimization`_ for instructions on how to view this information.
+|SM| uses the SEGGER Real-Time Transfer (RTT) for application logging.
+You can view the RTT logs with an RTT client such as ``J-Link RTT Viewer``.
+See `Testing and optimization`_ for instructions on how to view the logs.
 
-To switch to UART output, change the following options in the :file:`prj.conf` file::
+.. note::
+   The negative error codes that are visible in logs are *errno* codes defined in `nrf_errno.h`_.
+
+By default, the |SM| uses the ``UART0`` for sending and receiving AT commands.
+If a different UART is used, the application log can be output through ``UART0`` while AT commands are sent and received through the other UART.
+To switch to ``UART0`` output for application logs, change the following options in the :file:`prj.conf` file::
 
    # Segger RTT
    CONFIG_USE_SEGGER_RTT=n

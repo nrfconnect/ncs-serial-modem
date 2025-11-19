@@ -253,7 +253,7 @@ This is emitted when the location request failed, either when sending it or rece
 No notification containing location data will be emitted.
 
 * The ``<error>`` value indicates the error that happened.
-  It is either a negative *errno* code or one of the :c:enum:`nrf_cloud_error` values.
+  It is one of the :c:enum:`nrf_cloud_error` values.
 
 ::
 
