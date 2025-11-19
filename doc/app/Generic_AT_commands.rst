@@ -9,8 +9,8 @@ Generic AT commands
 
 This page describes generic AT commands.
 
-|SM| echo E[0|1]
-================
+|SM| echo E0/E1
+===============
 
 The ``E`` command enables or disables the AT command echo feature of the |SM| application.
 

@@ -782,7 +782,7 @@ The test command is not supported.
 Send data #XSEND
 ================
 
-The ``#XSEND`` command allows you to send data over TCP and UDP connections.
+The ``#XSEND`` command allows you to send data over TCP, UDP, and raw sockets.
 
 Set command
 -----------
@@ -829,6 +829,18 @@ Syntax
   It sets the number of bytes to send in data mode.
   When required number of bytes are sent, the data mode is exited.
   The termination command :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` is not used in this case.
+
+.. note::
+
+   UDP packets that exceed the Maximum Transmission Unit (MTU) of any network segment along their path may be dropped or fragmented, increasing the risk of packet loss.
+   Ethernet networks have an MTU of 1500 bytes, which allows a maximum UDP payload of 1472 bytes for IPv4 and 1452 bytes for IPv6.
+   With DTLS sockets, the usable payload size is further reduced due to encryption overhead.
+
+   The cellular network MTU can be queried with the ``AT+CGCONTRDP`` command, but some networks may still drop packets smaller than the reported MTU.
+
+   A UDP payload size of 1200 bytes is commonly recommended, especially for IPv6, as it ensures the total packet size remains below the IPv6 minimum MTU of 1280 bytes, after accounting for headers and DTLS overhead.
+   Keeping UDP packet sizes well below the theoretical maximum increases the likelihood of successful transmission.
+   Even 1024 bytes could be used as a safe size for UDP packets.
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -902,7 +914,7 @@ The test command is not supported.
 Receive data #XRECV
 ===================
 
-The ``#XRECV`` command allows you to receive data over TCP or UDP connections.
+The ``#XRECV`` command allows you to receive data over TCP, UDP, and raw sockets.
 
 Set command
 -----------
@@ -1038,7 +1050,17 @@ Syntax
   When required number of bytes are sent, the data mode is exited.
   The termination command :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` is not used in this case.
 
-* UDP packets that exceed 1500 bytes, including headers, may be dropped by the network due to MTU (Maximum Transmission Unit) restrictions.
+.. note::
+
+   UDP packets that exceed the Maximum Transmission Unit (MTU) of any network segment along their path may be dropped or fragmented, increasing the risk of packet loss.
+   Ethernet networks have an MTU of 1500 bytes, which allows a maximum UDP payload of 1472 bytes for IPv4 and 1452 bytes for IPv6.
+   With DTLS sockets, the usable payload size is further reduced due to encryption overhead.
+
+   The cellular network MTU can be queried with the ``AT+CGCONTRDP`` command, but some networks may still drop packets smaller than the reported MTU.
+
+   A UDP payload size of 1200 bytes is commonly recommended, especially for IPv6, as it ensures the total packet size remains below the IPv6 minimum MTU of 1280 bytes, after accounting for headers and DTLS overhead.
+   Keeping UDP packet sizes well below the theoretical maximum increases the likelihood of successful transmission.
+   Even 1024 bytes could be used as a safe size for UDP packets.
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -1326,7 +1348,8 @@ Example
 
    OK
 
-   #XSENDNTF: 2,0,7  // Unsolicited notification for network acknowledged send.
+   // Unsolicited notification for network acknowledged send.
+   #XSENDNTF: 2,0,7
 
    #XAPOLL: 2,4
 
