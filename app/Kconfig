@@ -334,6 +334,30 @@ config SM_PGPS_INJECT_FIX_DATA
 
 endif # SM_GNSS
 
+#
+# Hardware RX byte counting for UART
+#
+# Either hardware flow control OR hardware RX byte counting is required to prevent RX data loss.
+# When hw-flow-control is enabled in devicetree, it handles flow management efficiently.
+# When hw-flow-control is disabled, hardware RX byte counting is enabled to prevent data loss,
+# but it consumes more power due to additional timer usage.
+#
+if UART_ASYNC_API
+
+config UART_0_NRF_HW_ASYNC
+	default y if HAS_HW_NRF_UARTE0 && !$(dt_nodelabel_bool_prop,uart0,hw-flow-control)
+
+config UART_0_NRF_HW_ASYNC_TIMER
+	default 0 if HAS_HW_NRF_UARTE0 && !$(dt_nodelabel_bool_prop,uart0,hw-flow-control)
+
+config UART_2_NRF_HW_ASYNC
+	default y if HAS_HW_NRF_UARTE2 && !$(dt_nodelabel_bool_prop,uart2,hw-flow-control)
+
+config UART_2_NRF_HW_ASYNC_TIMER
+	default 2 if HAS_HW_NRF_UARTE2 && !$(dt_nodelabel_bool_prop,uart2,hw-flow-control)
+
+endif # UART_ASYNC_API
+
 module = SM
 module-str = serial modem
 source "$(ZEPHYR_BASE)/subsys/logging/Kconfig.template.log_config"
