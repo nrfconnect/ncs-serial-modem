@@ -192,7 +192,7 @@ CONFIG_SM_UART_TX_BUF_SIZE - Send buffer size for UART.
 
 CONFIG_SM_PPP_FALLBACK_MTU - Control the MTU used by PPP.
    This option controls the MTU used by PPP.
-   PPP tries to retrieve the cellular link MTU from the modem (using ``AT+CGCONTRDP=0``).
+   PPP tries to retrieve the cellular link MTU from the modem (using ``AT+CGCONTRDP``).
    If MTU is not returned by the modem, this value will be used as a fallback.
    The MTU will be used for sending and receiving data on both the PPP and cellular links.
    The default value is 1280.

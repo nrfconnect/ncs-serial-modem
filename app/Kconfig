@@ -190,7 +190,7 @@ config SM_PPP_FALLBACK_MTU
 	int "Fallback MTU to be used by PPP"
 	default 1280
 	help
-	  PPP tries to retrieve the cellular link MTU from the modem (using `AT+CGCONTRDP=0`).
+	  PPP tries to retrieve the cellular link MTU from the modem (using `AT+CGCONTRDP`).
 	  If no MTU is returned by the modem, this value will be used as a fallback.
 	  The MTU will be used for sending and receiving of data on both the PPP and cellular links.
 
