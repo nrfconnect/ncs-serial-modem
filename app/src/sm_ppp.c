@@ -12,7 +12,6 @@
 #include "sm_cmux.h"
 #endif
 #include <modem/lte_lc.h>
-#include <modem/pdn.h>
 #include <zephyr/modem/ppp.h>
 #if !defined(CONFIG_SM_CMUX)
 #include <zephyr/modem/backend/uart.h>
@@ -263,10 +262,10 @@ static void ppp_start_failure(void)
 
 static void ppp_retrieve_pdn_info(struct ppp_context *const ctx)
 {
-	struct pdn_dynamic_info populated_info = {0};
+	struct sm_pdn_dynamic_info populated_info = {0};
 	unsigned int mtu = CONFIG_SM_PPP_FALLBACK_MTU;
 
-	if (!pdn_dynamic_info_get(ppp_pdn_cid, &populated_info)) {
+	if (!sm_util_pdn_dynamic_info_get(ppp_pdn_cid, &populated_info)) {
 		if (populated_info.ipv6_mtu) {
 			/* Set the PPP MTU to that of the LTE link. */
 			/* IPv6's MTU has more priority on dual-stack.

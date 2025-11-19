@@ -68,7 +68,7 @@ int sm_util_at_printf(const char *fmt, ...)
 
 int sm_util_at_scanf(const char *cmd, const char *fmt, ...)
 {
-	char buf[128];
+	char buf[256];
 	va_list args;
 	int ret;
 
@@ -426,4 +426,96 @@ int sm_util_pdn_id_get(uint8_t cid)
 	}
 
 	return pdn_id;
+}
+
+static int pdn_sa_family_from_ip_string(const char *src)
+{
+	char buf[INET6_ADDRSTRLEN];
+
+	if (zsock_inet_pton(AF_INET, src, buf)) {
+		return AF_INET;
+	} else if (zsock_inet_pton(AF_INET6, src, buf)) {
+		return AF_INET6;
+	}
+	return -1;
+}
+
+/** @brief Fill PDN dynamic info with DNS addresses adnd mtu. */
+static void pdn_dynamic_info_dns_addr_fill(struct sm_pdn_dynamic_info *pdn_info, uint32_t mtu,
+					   const char *dns_addr_str_primary,
+					   const char *dns_addr_str_secondary)
+{
+	const int family = pdn_sa_family_from_ip_string(dns_addr_str_primary);
+
+	if (family == AF_INET) {
+		(void)zsock_inet_pton(AF_INET, dns_addr_str_primary,
+				      &(pdn_info->dns_addr4_primary));
+		(void)zsock_inet_pton(AF_INET, dns_addr_str_secondary,
+				      &(pdn_info->dns_addr4_secondary));
+		pdn_info->ipv4_mtu = mtu;
+	} else if (family == AF_INET6) {
+		(void)zsock_inet_pton(AF_INET6, dns_addr_str_primary,
+				      &(pdn_info->dns_addr6_primary));
+		(void)zsock_inet_pton(AF_INET6, dns_addr_str_secondary,
+				      &(pdn_info->dns_addr6_secondary));
+		pdn_info->ipv6_mtu = mtu;
+	}
+}
+
+#define AT_CMD_PDN_CONTEXT_READ_INFO  "AT+CGCONTRDP=%u"
+#define AT_CMD_PDN_CONTEXT_READ_INFO_PARSE_LINE1 \
+	"+CGCONTRDP: %*u,,\"%*[^\"]\",\"\",\"\",\"%15[0-9.]\",\"%15[0-9.]\",,,,,%u"
+#define AT_CMD_PDN_CONTEXT_READ_INFO_PARSE_LINE2 \
+	"+%*[^+]"\
+	"+CGCONTRDP: %*u,,\"%*[^\"]\",\"\",\"\",\"%39[0-9A-Fa-f:]\",\"%39[0-9A-Fa-f:]\",,,,,%u"
+
+int sm_util_pdn_dynamic_info_get(uint8_t cid, struct sm_pdn_dynamic_info *pdn_info)
+{
+	int ret;
+	char at_cmd_buf[sizeof("AT+CGCONTRDP=###")];
+	char dns_addr_str_primary[INET6_ADDRSTRLEN];
+	char dns_addr_str_secondary[INET6_ADDRSTRLEN];
+	uint32_t mtu = 0;
+
+	if (!pdn_info) {
+		return -EINVAL;
+	}
+
+	/* Reset PDN dynamic info. */
+	memset(pdn_info, 0, sizeof(struct sm_pdn_dynamic_info));
+
+	/* Clear secondary DNS address buffer. */
+	memset(dns_addr_str_secondary, 0, sizeof(dns_addr_str_secondary));
+
+	(void)snprintf(at_cmd_buf, sizeof(at_cmd_buf), AT_CMD_PDN_CONTEXT_READ_INFO, cid);
+	ret = sm_util_at_scanf(at_cmd_buf, AT_CMD_PDN_CONTEXT_READ_INFO_PARSE_LINE1,
+				 dns_addr_str_primary, dns_addr_str_secondary, &mtu);
+	if (ret < 1) {
+		/* Don't log an error if no PDN connections are active, this may not be considered
+		 * an error by the caller.
+		 */
+		if (ret != -NRF_EBADMSG) {
+			LOG_ERR("nrf_modem_at_scanf failed, ret: %d", ret);
+		}
+
+		return ret;
+	}
+
+	pdn_dynamic_info_dns_addr_fill(pdn_info, mtu, dns_addr_str_primary, dns_addr_str_secondary);
+
+	/* Reset secondary DNS address buffer and mtu. */
+	memset(dns_addr_str_secondary, 0, sizeof(dns_addr_str_secondary));
+	mtu = 0;
+
+	/* Scan second line if PDN has dual stack capabilities. */
+	ret = sm_util_at_scanf(at_cmd_buf, AT_CMD_PDN_CONTEXT_READ_INFO_PARSE_LINE2,
+				 dns_addr_str_primary, dns_addr_str_secondary, &mtu);
+	if (ret < 1) {
+		/* We only got one entry, but that is ok. */
+		return 0;
+	}
+
+	pdn_dynamic_info_dns_addr_fill(pdn_info, mtu, dns_addr_str_primary, dns_addr_str_secondary);
+
+	return 0;
 }
