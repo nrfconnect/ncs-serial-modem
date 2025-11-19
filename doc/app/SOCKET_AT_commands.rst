@@ -462,11 +462,6 @@ Syntax
 
     * ``<value>`` is an integer that indicates the packet data network ID to bind to.
 
-  * ``55`` - :c:macro:`AT_SO_TCP_SRV_SESSTIMEO`.
-
-    * ``<value>`` is an integer that indicates the TCP server session inactivity timeout for a socket.
-      It accepts values from the range ``0`` to ``135``, where ``0`` is no timeout and ``135`` is 2 hours, 15 minutes.
-
   * ``61`` - :c:macro:`AT_SO_RAI` (set-only).
     Release Assistance Indication (RAI).
 
@@ -672,7 +667,7 @@ Socket binding #XBIND
 
 The ``#XBIND`` command allows you to bind a socket with a local port.
 
-This command can be used with TCP servers and both UDP clients and servers.
+This command can be used with TCP and UDP and is needed for incoming UDP data, where the remote end targets a particular port.
 
 Set command
 -----------

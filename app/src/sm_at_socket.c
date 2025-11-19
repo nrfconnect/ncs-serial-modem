@@ -556,10 +556,6 @@ static int at_sockopt_to_sockopt(enum at_sockopt at_option, int *level, int *opt
 		*level = NRF_SOL_SOCKET;
 		*option = NRF_SO_RAI;
 		break;
-	case AT_SO_TCP_SRV_SESSTIMEO:
-		*level = NRF_IPPROTO_TCP;
-		*option = NRF_SO_TCP_SRV_SESSTIMEO;
-		break;
 
 	default:
 		LOG_WRN("Unsupported option: %d", at_option);

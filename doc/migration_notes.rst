@@ -233,6 +233,8 @@ Removed features:
      * ``AT#XACCEPT``
 
      There is no direct replacement for these commands.
+
+     In addition, the ``AT_SO_TCP_SRV_SESSTIMEO`` socket option has been removed.
    * HTTP client functionality including ``AT#XHTTPCCON`` and ``AT#XHTTPCREQ`` commands, and ``#XHTTPCRSP`` notification.
    * FTP and TFTP clients including ``AT#XFTP`` and ``AT#XTFTP`` commands.
    * ``#XGPIO`` AT command.
