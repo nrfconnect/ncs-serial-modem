@@ -730,14 +730,14 @@ static int sec_sockopt_get(struct sm_socket *sock, enum at_sec_sockopt at_option
 	return ret;
 }
 
-int sm_bind_to_local_addr(int socket, int family, uint16_t port)
+int bind_to_local_addr(struct sm_socket *sock, uint16_t port)
 {
 	int ret;
 
-	if (family == AF_INET) {
+	if (sock->family == NRF_AF_INET) {
 		char ipv4_addr[NRF_INET_ADDRSTRLEN];
 
-		util_get_ip_addr(0, ipv4_addr, NULL);
+		util_get_ip_addr(sock->cid, ipv4_addr, NULL);
 		if (!*ipv4_addr) {
 			LOG_ERR("Get local IPv4 address failed");
 			return -ENETDOWN;
@@ -753,17 +753,17 @@ int sm_bind_to_local_addr(int socket, int family, uint16_t port)
 			return -EINVAL;
 		}
 
-		ret = nrf_bind(socket, (struct nrf_sockaddr *)&local,
+		ret = nrf_bind(sock->fd, (struct nrf_sockaddr *)&local,
 			       sizeof(struct nrf_sockaddr_in));
 		if (ret) {
-			LOG_ERR("nrf_bind() sock %d failed: %d", socket, -errno);
+			LOG_ERR("nrf_bind() sock %d failed: %d", sock->fd, -errno);
 			return -errno;
 		}
-		LOG_DBG("bind sock %d to %s", socket, ipv4_addr);
-	} else if (family == NRF_AF_INET6) {
+		LOG_DBG("bind sock %d to %s", sock->fd, ipv4_addr);
+	} else if (sock->family == NRF_AF_INET6) {
 		char ipv6_addr[NRF_INET6_ADDRSTRLEN];
 
-		util_get_ip_addr(0, NULL, ipv6_addr);
+		util_get_ip_addr(sock->cid, NULL, ipv6_addr);
 		if (!*ipv6_addr) {
 			LOG_ERR("Get local IPv6 address failed");
 			return -ENETDOWN;
@@ -778,13 +778,13 @@ int sm_bind_to_local_addr(int socket, int family, uint16_t port)
 			LOG_ERR("Parse local IPv6 address failed: %d", -errno);
 			return -EINVAL;
 		}
-		ret = nrf_bind(socket, (struct nrf_sockaddr *)&local,
+		ret = nrf_bind(sock->fd, (struct nrf_sockaddr *)&local,
 			       sizeof(struct nrf_sockaddr_in6));
 		if (ret) {
-			LOG_ERR("nrf_bind() sock %d failed: %d", socket, -errno);
+			LOG_ERR("nrf_bind() sock %d failed: %d", sock->fd, -errno);
 			return -errno;
 		}
-		LOG_DBG("bind sock %d to %s", socket, ipv6_addr);
+		LOG_DBG("bind sock %d to %s", sock->fd, ipv6_addr);
 	} else {
 		return -EINVAL;
 	}
@@ -1486,7 +1486,7 @@ static int handle_at_bind(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 		if (err < 0) {
 			return err;
 		}
-		err = sm_bind_to_local_addr(sock->fd, sock->family, port);
+		err = bind_to_local_addr(sock, port);
 		break;
 
 	default:
