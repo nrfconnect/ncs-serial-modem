@@ -2,7 +2,7 @@ sample:
   description: Serial Modem Shell sample
   name: SM shell
 tests:
-  sample.cellular.sm_host_shell:
+  sample.cellular.sm_at_client_shell:
     sysbuild: true
     build_only: true
     platform_allow:

@@ -16,7 +16,7 @@
 	status = "okay";
 };
 
-/* Serial Modem Host Shell <-> Serial Modem UART */
+/* Serial Modem AT Client Shell <-> Serial Modem UART */
 &uart2 {
 	compatible = "nordic,nrf-uarte";
 	current-speed = <115200>;

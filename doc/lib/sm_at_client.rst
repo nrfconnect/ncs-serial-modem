@@ -1,19 +1,19 @@
-.. _lib_sm_host:
+.. _lib_sm_at_client:
 
-|SM| Host library
-#################
+|SM| AT Client library
+######################
 
 .. contents::
    :local:
    :depth: 2
 
-The |SM| Host library exposes the AT command interface of the :ref:`Serial Modem <sm_description>` application for external devices over a serial interface.
+The |SM| AT Client library exposes the AT command interface of the :ref:`Serial Modem <sm_description>` application for external devices over a serial interface.
 This library is intended for applications running on an external MCU that are connected to an nRF91 Series SiP through UART.
 
 Overview
 ********
 
-The |SM| Host library allows you to perform the following functions:
+The |SM| AT Client library allows you to perform the following functions:
 
 * Send modem or |SM| proprietary AT commands, receive responses and notifications, similar to the `AT Host`_ library.
   Received AT responses or notifications can be parsed by the `AT parser`_ library.
@@ -30,25 +30,25 @@ Configuration
 
 Configure the following Kconfig option to enable the library:
 
-* ``CONFIG_SM_HOST`` - Enables the |SM| Host library.
+* ``CONFIG_SM_AT_CLIENT`` - Enables the |SM| AT Client library.
 
 Optionally configure the following Kconfig options based on need:
 
-* ``CONFIG_SM_HOST_SHELL`` - Enables the shell function in the |SM| Host library, which is disabled by default.
-* ``CONFIG_SM_HOST_AT_CMD_RESP_MAX_SIZE`` - Configures the size of the AT command response buffer.
+* ``CONFIG_SM_AT_CLIENT_SHELL`` - Enables the shell function in the |SM| AT Client library, which is disabled by default.
+* ``CONFIG_SM_AT_CLIENT_AT_CMD_RESP_MAX_SIZE`` - Configures the size of the AT command response buffer.
   The default size is 2100 bytes, which is aligned with |SM|.
-* ``CONFIG_SM_HOST_UART_RX_BUF_COUNT`` - Configures the number of RX buffers for the UART device.
+* ``CONFIG_SM_AT_CLIENT_UART_RX_BUF_COUNT`` - Configures the number of RX buffers for the UART device.
   The default value is ``3``.
-* ``CONFIG_SM_HOST_UART_RX_BUF_SIZE`` - Configures the size of the RX buffer for the UART device.
+* ``CONFIG_SM_AT_CLIENT_UART_RX_BUF_SIZE`` - Configures the size of the RX buffer for the UART device.
   The default value is 256 bytes.
-* ``CONFIG_SM_HOST_UART_TX_BUF_SIZE`` - Configures the size of the TX buffer for the UART device.
+* ``CONFIG_SM_AT_CLIENT_UART_TX_BUF_SIZE`` - Configures the size of the TX buffer for the UART device.
   The default value is 256 bytes.
 
 Use one of the following options to select the termination character:
 
-* ``CONFIG_SM_HOST_CR_TERMINATION`` - Enables ``<CR>`` as the termination character, which is selected by default.
-* ``CONFIG_SM_HOST_LF_TERMINATION`` - Enables ``<LF>`` as the termination character.
-* ``CONFIG_SM_HOST_CR_LF_TERMINATION`` - Enables ``<CR+LF>`` as the termination character.
+* ``CONFIG_SM_AT_CLIENT_CR_TERMINATION`` - Enables ``<CR>`` as the termination character, which is selected by default.
+* ``CONFIG_SM_AT_CLIENT_LF_TERMINATION`` - Enables ``<LF>`` as the termination character.
+* ``CONFIG_SM_AT_CLIENT_CR_LF_TERMINATION`` - Enables ``<CR+LF>`` as the termination character.
 
 You must configure the same termination character as that configured in |SM| on the nRF91 Series SiP.
 The library sends the termination character automatically after an AT command.
@@ -65,7 +65,7 @@ Below is an example overlay for configuring UART and DTR/RI GPIOs:
     };
   };
 
-  /* Serial Modem Host <-> Serial Modem UART */
+  /* Serial Modem AT Client <-> Serial Modem UART */
   &uart2 {
     compatible = "nordic,nrf-uarte";
     current-speed = <115200>;
@@ -140,12 +140,12 @@ Send AT commands for |SM| in shell:
 Host commands
 -------------
 
-Use ``smsh`` command to see commands for the |SM| Host library functions.
+Use ``smsh`` command to see commands for the |SM| AT Client library functions.
 
   .. code-block:: console
 
     uart:~$ smsh
-    smsh - Commands handled in Serial Modem Host shell device
+    smsh - Commands handled in Serial Modem AT Client shell device
     Subcommands:
       uart  : Enable/Disable DTR UART.
 
@@ -178,10 +178,10 @@ Set the automatic UART handling to 1000 ms inactivity period:
 When automatic UART and DTR handling is enabled, the UART's will be suspended after the inactivity period.
 UARTs are resumed when there is an RI signal from the |SM| or when the host sends data.
 
-|SM| Host Monitor usage
-***********************
+|SM| AT Client Monitor usage
+****************************
 
-The |SM| Host Monitor has similar functions to the `AT monitor`_ library, except "Direct dispatching".
+The |SM| AT Client Monitor has similar functions to the `AT monitor`_ library, except "Direct dispatching".
 
   .. code-block:: console
 
@@ -190,9 +190,9 @@ The |SM| Host Monitor has similar functions to the `AT monitor`_ library, except
 API documentation
 *****************
 
-| Header file: :file:`include/sm_host.h`
-| Source file: :file:`lib/sm_host/sm_host.c`
-| Source file: :file:`lib/sm_host/sm_host_monitor.c`
+| Header file: :file:`include/sm_at_client.h`
+| Source file: :file:`lib/sm_at_client/sm_at_client.c`
+| Source file: :file:`lib/sm_at_client/sm_at_client_monitor.c`
 
-.. doxygengroup:: sm_host
+.. doxygengroup:: sm_at_client
    :members:

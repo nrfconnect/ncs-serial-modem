@@ -4,8 +4,8 @@
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 #
 
-menuconfig SM_HOST
-	bool "Serial Modem Host Library"
+menuconfig SM_AT_CLIENT
+	bool "Serial Modem AT Client Library"
 	depends on SERIAL
 	select UART_ASYNC_API
 	select RING_BUFFER
@@ -13,12 +13,12 @@ menuconfig SM_HOST
 	select GPIO_GET_CONFIG
 	select PM_DEVICE
 
-if SM_HOST
+if SM_AT_CLIENT
 
 #
 # UART buffers
 #
-config SM_HOST_UART_RX_BUF_COUNT
+config SM_AT_CLIENT_UART_RX_BUF_COUNT
 	int "Receive buffers for UART"
 	range 2 4
 	default 3
@@ -26,14 +26,14 @@ config SM_HOST_UART_RX_BUF_COUNT
 	  Number of buffers for receiving (RX) UART traffic.
 	  If the buffers are full, UART RX will be disabled until the buffers are processed.
 
-config SM_HOST_UART_RX_BUF_SIZE
+config SM_AT_CLIENT_UART_RX_BUF_SIZE
 	int "Receive buffer size for UART"
 	range 16 4096
 	default 256
 	help
 	  Amount of received (RX), unprocessed, UART traffic that can be held by a single buffer.
 
-config SM_HOST_UART_TX_BUF_SIZE
+config SM_AT_CLIENT_UART_TX_BUF_SIZE
 	int "Send buffer size for UART"
 	range 16 4096
 	default 256
@@ -41,21 +41,21 @@ config SM_HOST_UART_TX_BUF_SIZE
 	  Amount of UART traffic waiting to be sent (TX), which can be held.
 	  If the buffers are full, all messages will be sent synchronously.
 
-config SM_HOST_AT_CMD_RESP_MAX_SIZE
+config SM_AT_CLIENT_AT_CMD_RESP_MAX_SIZE
 	int "Maximum size of AT command response from Serial Modem"
 	default 2100
 	help
 	  The maximum size of the AT command response.
 
-config SM_HOST_SHELL
-	bool "Serial Modem Host Shell"
+config SM_AT_CLIENT_SHELL
+	bool "Serial Modem AT Client Shell"
 	depends on SHELL
 	help
 	  Adds AT command capability to shell. The shell command is "sm".
 
 choice
 	prompt "AT command terminator"
-	default SM_HOST_CR_TERMINATION
+	default SM_AT_CLIENT_CR_TERMINATION
 	help
 	  Sets the termination ending from the serial terminal
 	  Levels are:
@@ -63,19 +63,19 @@ choice
 	  -  LF Termination
 	  -  CR+LF Termination
 
-config SM_HOST_CR_TERMINATION
+config SM_AT_CLIENT_CR_TERMINATION
 	bool "CR Termination"
 
-config SM_HOST_LF_TERMINATION
+config SM_AT_CLIENT_LF_TERMINATION
 	bool "LF Termination"
 
-config SM_HOST_CR_LF_TERMINATION
+config SM_AT_CLIENT_CR_LF_TERMINATION
 	bool "CR+LF Termination"
 
 endchoice
 
-module = SM_HOST
-module-str = SM Host
+module = SM_AT_CLIENT
+module-str = SM AT Client
 source "$(ZEPHYR_BASE)/subsys/logging/Kconfig.template.log_config"
 
-endif # SM_HOST
+endif # SM_AT_CLIENT

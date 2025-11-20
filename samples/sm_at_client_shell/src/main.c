@@ -5,7 +5,7 @@
  */
 
 #include <stdlib.h>
-#include <sm_host.h>
+#include <sm_at_client.h>
 #include <zephyr/logging/log.h>
 
 LOG_MODULE_REGISTER(app, CONFIG_LOG_DEFAULT_LEVEL);
@@ -21,7 +21,7 @@ static void cereg_mon(const char *notif)
 	}
 }
 
-void sm_host_shell_data_indication(const uint8_t *data, size_t datalen)
+void sm_at_client_shell_data_indication(const uint8_t *data, size_t datalen)
 {
 	ARG_UNUSED(data);
 	ARG_UNUSED(datalen);
@@ -29,7 +29,7 @@ void sm_host_shell_data_indication(const uint8_t *data, size_t datalen)
 	/* Add data handler implementation in here. */
 }
 
-void sm_host_shell_ri_handler(void)
+void sm_at_client_shell_ri_handler(void)
 {
 	LOG_INF("Ring Indicate (RI) triggered");
 }
@@ -38,14 +38,14 @@ int main(void)
 {
 	int err;
 
-	LOG_INF("Serial Modem Host Shell starts on %s", CONFIG_BOARD);
+	LOG_INF("Serial Modem AT Client Shell starts on %s", CONFIG_BOARD);
 
-	err = sm_host_init(sm_host_shell_data_indication, true, K_MSEC(100));
+	err = sm_at_client_init(sm_at_client_shell_data_indication, true, K_MSEC(100));
 	if (err) {
 		LOG_ERR("Failed to initialize Serial Modem: %d", err);
 	}
 
-	err = sm_host_register_ri_handler(sm_host_shell_ri_handler);
+	err = sm_at_client_register_ri_handler(sm_at_client_shell_ri_handler);
 	if (err) {
 		LOG_ERR("Failed to register RI handler (%d).", err);
 	}

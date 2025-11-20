@@ -10,13 +10,13 @@
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/shell/shell.h>
 #include <hal/nrf_gpio.h>
-#include <sm_host.h>
+#include <sm_at_client.h>
 #include <zephyr/shell/shell_uart.h>
 #include <zephyr/shell/shell_rtt.h>
 #include <zephyr/pm/device.h>
 #include <zephyr/logging/log.h>
 
-LOG_MODULE_REGISTER(sm_host, CONFIG_SM_HOST_LOG_LEVEL);
+LOG_MODULE_REGISTER(sm_at_client, CONFIG_SM_AT_CLIENT_LOG_LEVEL);
 
 #define UART_RX_MARGIN_MS	10
 #define UART_RX_TIMEOUT_US      2000
@@ -34,16 +34,16 @@ static const struct device *uart_dev = DEVICE_DT_GET(DT_CHOSEN(ncs_sm_uart));
 static struct k_work_delayable rx_process_work;
 struct rx_buf_t {
 	atomic_t ref_counter;
-	uint8_t buf[CONFIG_SM_HOST_UART_RX_BUF_SIZE];
+	uint8_t buf[CONFIG_SM_AT_CLIENT_UART_RX_BUF_SIZE];
 };
-BUILD_ASSERT(CONFIG_SM_HOST_AT_CMD_RESP_MAX_SIZE > CONFIG_SM_HOST_UART_RX_BUF_SIZE);
+BUILD_ASSERT(CONFIG_SM_AT_CLIENT_AT_CMD_RESP_MAX_SIZE > CONFIG_SM_AT_CLIENT_UART_RX_BUF_SIZE);
 
 /* Slabs for RX buffer. */
 #define UART_SLAB_BLOCK_SIZE sizeof(struct rx_buf_t)
 #define UART_SLAB_BLOCK_COUNT CONFIG_SM_UART_RX_BUF_COUNT
 #define UART_SLAB_ALIGNMENT sizeof(uint32_t)
 BUILD_ASSERT(UART_SLAB_BLOCK_SIZE % UART_SLAB_ALIGNMENT == 0);
-K_MEM_SLAB_DEFINE_STATIC(rx_slab, UART_SLAB_BLOCK_SIZE, CONFIG_SM_HOST_UART_RX_BUF_COUNT,
+K_MEM_SLAB_DEFINE_STATIC(rx_slab, UART_SLAB_BLOCK_SIZE, CONFIG_SM_AT_CLIENT_UART_RX_BUF_COUNT,
 			 UART_SLAB_ALIGNMENT);
 
 /* Event queue for RX buffer usage. */
@@ -51,19 +51,19 @@ struct rx_event_t {
 	uint8_t *buf;
 	size_t len;
 };
-#define UART_RX_EVENT_COUNT CONFIG_SM_HOST_UART_RX_BUF_COUNT
+#define UART_RX_EVENT_COUNT CONFIG_SM_AT_CLIENT_UART_RX_BUF_COUNT
 K_MSGQ_DEFINE(rx_event_queue, sizeof(struct rx_event_t), UART_RX_EVENT_COUNT, 1);
 
 /* Ring buffer for TX data. */
-RING_BUF_DECLARE(tx_buf, CONFIG_SM_HOST_UART_TX_BUF_SIZE);
+RING_BUF_DECLARE(tx_buf, CONFIG_SM_AT_CLIENT_UART_TX_BUF_SIZE);
 static K_SEM_DEFINE(tx_done_sem, 0, 1);
 static K_SEM_DEFINE(uart_disabled_sem, 0, 1);
 
-enum sm_host_uart_state {
-	SM_HOST_TX_ENABLED_BIT,
-	SM_HOST_RX_ENABLED_BIT,
-	SM_HOST_RX_RECOVERY_BIT,
-	SM_HOST_RX_RECOVERY_DISABLED_BIT
+enum sm_at_client_uart_state {
+	SM_AT_CLIENT_TX_ENABLED_BIT,
+	SM_AT_CLIENT_RX_ENABLED_BIT,
+	SM_AT_CLIENT_RX_RECOVERY_BIT,
+	SM_AT_CLIENT_RX_RECOVERY_DISABLED_BIT
 };
 static atomic_t uart_state;
 
@@ -74,7 +74,7 @@ static K_SEM_DEFINE(at_rsp, 0, 1);
 static sm_data_handler_t data_handler;
 static enum at_cmd_state sm_at_state;
 
-#if defined(CONFIG_SM_HOST_SHELL)
+#if defined(CONFIG_SM_AT_CLIENT_SHELL)
 static const struct shell *global_shell;
 static const char at_usage_str[] = "Usage: sm <at_command>";
 #endif
@@ -158,7 +158,7 @@ static int rx_enable(void)
 	struct rx_buf_t *buf;
 	int ret;
 
-	if (atomic_test_bit(&uart_state, SM_HOST_RX_ENABLED_BIT)) {
+	if (atomic_test_bit(&uart_state, SM_AT_CLIENT_RX_ENABLED_BIT)) {
 		return 0;
 	}
 
@@ -175,7 +175,7 @@ static int rx_enable(void)
 		return ret;
 	}
 
-	atomic_set_bit(&uart_state, SM_HOST_RX_ENABLED_BIT);
+	atomic_set_bit(&uart_state, SM_AT_CLIENT_RX_ENABLED_BIT);
 
 	return 0;
 }
@@ -184,14 +184,14 @@ static int rx_disable(void)
 {
 	int err;
 
-	atomic_set_bit(&uart_state, SM_HOST_RX_RECOVERY_DISABLED_BIT);
+	atomic_set_bit(&uart_state, SM_AT_CLIENT_RX_RECOVERY_DISABLED_BIT);
 
-	while (atomic_test_bit(&uart_state, SM_HOST_RX_RECOVERY_BIT)) {
+	while (atomic_test_bit(&uart_state, SM_AT_CLIENT_RX_RECOVERY_BIT)) {
 		/* Wait until possible recovery is complete. */
 		k_sleep(K_MSEC(10));
 	}
 
-	if (!atomic_test_bit(&uart_state, SM_HOST_RX_ENABLED_BIT)) {
+	if (!atomic_test_bit(&uart_state, SM_AT_CLIENT_RX_ENABLED_BIT)) {
 		return 0;
 	}
 
@@ -205,7 +205,7 @@ static int rx_disable(void)
 
 	/* Wait until RX is actually disabled. */
 	k_sem_take(&uart_disabled_sem, K_MSEC(100));
-	atomic_clear_bit(&uart_state, SM_HOST_RX_ENABLED_BIT);
+	atomic_clear_bit(&uart_state, SM_AT_CLIENT_RX_ENABLED_BIT);
 
 	return 0;
 }
@@ -214,18 +214,18 @@ static void rx_recovery(void)
 {
 	int err;
 
-	if (atomic_test_bit(&uart_state, SM_HOST_RX_RECOVERY_DISABLED_BIT)) {
+	if (atomic_test_bit(&uart_state, SM_AT_CLIENT_RX_RECOVERY_DISABLED_BIT)) {
 		return;
 	}
 
-	atomic_set_bit(&uart_state, SM_HOST_RX_RECOVERY_BIT);
+	atomic_set_bit(&uart_state, SM_AT_CLIENT_RX_RECOVERY_BIT);
 
 	err = rx_enable();
 	if (err) {
 		k_work_schedule(&rx_process_work, K_MSEC(UART_RX_MARGIN_MS));
 	}
 
-	atomic_clear_bit(&uart_state, SM_HOST_RX_RECOVERY_BIT);
+	atomic_clear_bit(&uart_state, SM_AT_CLIENT_RX_RECOVERY_BIT);
 }
 
 /* Attempts to find AT responses in the UART buffer. */
@@ -265,7 +265,7 @@ static size_t parse_at_response(const char *data, size_t datalen)
 
 static void response_handler(const uint8_t *data, const size_t len)
 {
-	static uint8_t at_cmd_resp[CONFIG_SM_HOST_AT_CMD_RESP_MAX_SIZE];
+	static uint8_t at_cmd_resp[CONFIG_SM_AT_CLIENT_AT_CMD_RESP_MAX_SIZE];
 	static size_t resp_len;
 	size_t copy_len;
 
@@ -280,11 +280,11 @@ static void response_handler(const uint8_t *data, const size_t len)
 
 		if (processed == 0 && resp_len == sizeof(at_cmd_resp)) {
 			LOG_ERR("AT-response overflow. Increase "
-				"CONFIG_SM_HOST_AT_CMD_RESP_MAX_SIZE");
+				"CONFIG_SM_AT_CLIENT_AT_CMD_RESP_MAX_SIZE");
 			processed = resp_len;
 		}
 		if (processed > 0) {
-#if defined(CONFIG_SM_HOST_SHELL)
+#if defined(CONFIG_SM_AT_CLIENT_SHELL)
 			shell_print(global_shell, "%.*s", processed, (char *)at_cmd_resp);
 #endif
 			if (processed < resp_len) {
@@ -311,7 +311,7 @@ static void response_handler(const uint8_t *data, const size_t len)
 	if (sm_at_state != AT_CMD_PENDING && resp_len > 0) {
 		sm_monitor_dispatch((const char *)at_cmd_resp, resp_len);
 
-#if defined(CONFIG_SM_HOST_SHELL)
+#if defined(CONFIG_SM_AT_CLIENT_SHELL)
 		shell_print(global_shell, "%.*s", resp_len, (char *)at_cmd_resp);
 #endif
 		resp_len = 0;
@@ -340,7 +340,7 @@ static int tx_start(void)
 	size_t len;
 	int err;
 
-	if (!atomic_test_bit(&uart_state, SM_HOST_TX_ENABLED_BIT)) {
+	if (!atomic_test_bit(&uart_state, SM_AT_CLIENT_TX_ENABLED_BIT)) {
 		return -EAGAIN;
 	}
 
@@ -377,7 +377,7 @@ static int tx_write(const uint8_t *data, size_t len, bool flush)
 			sent += ret;
 		} else {
 			/* Buffer full, block and start TX. */
-			if (atomic_test_bit(&uart_state, SM_HOST_TX_ENABLED_BIT) == 0) {
+			if (atomic_test_bit(&uart_state, SM_AT_CLIENT_TX_ENABLED_BIT) == 0) {
 				LOG_ERR("TX disabled, %zu bytes dropped", len - sent);
 				return -EIO;
 			}
@@ -394,7 +394,7 @@ static int tx_write(const uint8_t *data, size_t len, bool flush)
 	}
 
 	if (flush) {
-		if (atomic_test_bit(&uart_state, SM_HOST_TX_ENABLED_BIT) == 0) {
+		if (atomic_test_bit(&uart_state, SM_AT_CLIENT_TX_ENABLED_BIT) == 0) {
 			LOG_INF("TX disabled, data will be sent when enabled");
 			return -EAGAIN;
 		}
@@ -413,7 +413,7 @@ static int tx_write(const uint8_t *data, size_t len, bool flush)
 
 static int tx_enable(void)
 {
-	if (!atomic_test_and_set_bit(&uart_state, SM_HOST_TX_ENABLED_BIT)) {
+	if (!atomic_test_and_set_bit(&uart_state, SM_AT_CLIENT_TX_ENABLED_BIT)) {
 		k_sem_give(&tx_done_sem);
 	}
 	return 0;
@@ -423,7 +423,7 @@ static int tx_disable(k_timeout_t timeout)
 {
 	int err;
 
-	if (!atomic_test_and_clear_bit(&uart_state, SM_HOST_TX_ENABLED_BIT)) {
+	if (!atomic_test_and_clear_bit(&uart_state, SM_AT_CLIENT_TX_ENABLED_BIT)) {
 		return 0;
 	}
 
@@ -698,7 +698,7 @@ static int dtr_uart_enable(void)
 	}
 
 	/* Enable RX. */
-	atomic_clear_bit(&uart_state, SM_HOST_RX_RECOVERY_DISABLED_BIT);
+	atomic_clear_bit(&uart_state, SM_AT_CLIENT_RX_RECOVERY_DISABLED_BIT);
 	err = rx_enable();
 	if (err) {
 		LOG_ERR("Failed to enable RX (%d).", err);
@@ -826,7 +826,7 @@ static int gpio_init(void)
 	return 0;
 }
 
-int sm_host_init(sm_data_handler_t handler, bool automatic, k_timeout_t inactivity)
+int sm_at_client_init(sm_data_handler_t handler, bool automatic, k_timeout_t inactivity)
 {
 	int err;
 	static bool initialized;
@@ -873,7 +873,7 @@ int sm_host_init(sm_data_handler_t handler, bool automatic, k_timeout_t inactivi
 	return 0;
 }
 
-int sm_host_uninit(void)
+int sm_at_client_uninit(void)
 {
 	int err;
 
@@ -894,7 +894,7 @@ int sm_host_uninit(void)
 	return 0;
 }
 
-int sm_host_register_ri_handler(sm_ri_handler_t handler)
+int sm_at_client_register_ri_handler(sm_ri_handler_t handler)
 {
 	if (!gpio_is_ready_dt(&dtr_config.ri_gpio)) {
 		LOG_WRN("RI GPIO is not ready");
@@ -906,7 +906,7 @@ int sm_host_register_ri_handler(sm_ri_handler_t handler)
 	return 0;
 }
 
-int sm_host_send_cmd(const char *const command, uint32_t timeout)
+int sm_at_client_send_cmd(const char *const command, uint32_t timeout)
 {
 	int ret;
 
@@ -916,11 +916,11 @@ int sm_host_send_cmd(const char *const command, uint32_t timeout)
 		return ret;
 	}
 	/* send AT command terminator */
-#if defined(CONFIG_SM_HOST_CR_LF_TERMINATION)
+#if defined(CONFIG_SM_AT_CLIENT_CR_LF_TERMINATION)
 	ret = tx_write("\r\n", 2, true);
-#elif defined(CONFIG_SM_HOST_CR_TERMINATION)
+#elif defined(CONFIG_SM_AT_CLIENT_CR_TERMINATION)
 	ret = tx_write("\r", 1, true);
-#elif defined(CONFIG_SM_HOST_LF_TERMINATION)
+#elif defined(CONFIG_SM_AT_CLIENT_LF_TERMINATION)
 	ret = tx_write("\n", 1, true);
 #endif
 	if (ret < 0) {
@@ -940,12 +940,12 @@ int sm_host_send_cmd(const char *const command, uint32_t timeout)
 	return sm_at_state;
 }
 
-int sm_host_send_data(const uint8_t *const data, size_t datalen)
+int sm_at_client_send_data(const uint8_t *const data, size_t datalen)
 {
 	return tx_write(data, datalen, true);
 }
 
-void sm_host_configure_dtr_uart(bool automatic, k_timeout_t inactivity)
+void sm_at_client_configure_dtr_uart(bool automatic, k_timeout_t inactivity)
 {
 	dtr_config.automatic = automatic;
 	dtr_config.inactivity = inactivity;
@@ -958,47 +958,47 @@ void sm_host_configure_dtr_uart(bool automatic, k_timeout_t inactivity)
 	}
 }
 
-void sm_host_disable_dtr_uart(void)
+void sm_at_client_disable_dtr_uart(void)
 {
-	sm_host_configure_dtr_uart(false, K_NO_WAIT);
+	sm_at_client_configure_dtr_uart(false, K_NO_WAIT);
 	k_work_reschedule(&dtr_config.dtr_uart_disable_work, K_NO_WAIT);
 }
 
-void sm_host_enable_dtr_uart(void)
+void sm_at_client_enable_dtr_uart(void)
 {
-	sm_host_configure_dtr_uart(false, K_NO_WAIT);
+	sm_at_client_configure_dtr_uart(false, K_NO_WAIT);
 	k_work_submit(&dtr_config.dtr_uart_enable_work);
 }
 
-#if defined(CONFIG_SM_HOST_SHELL)
+#if defined(CONFIG_SM_AT_CLIENT_SHELL)
 
-int sm_host_shell(const struct shell *shell, size_t argc, char **argv)
+int sm_at_client_shell(const struct shell *shell, size_t argc, char **argv)
 {
 	if (argc < 2) {
 		shell_print(shell, "%s", at_usage_str);
 		return 0;
 	}
 
-	return sm_host_send_cmd(argv[1], 10);
+	return sm_at_client_send_cmd(argv[1], 10);
 }
 
-int sm_host_shell_smsh_dtr_uart_disable(const struct shell *shell, size_t argc, char **argv)
+int sm_at_client_shell_smsh_dtr_uart_disable(const struct shell *shell, size_t argc, char **argv)
 {
 	shell_print(shell, "Disable DTR UART.");
-	sm_host_disable_dtr_uart();
+	sm_at_client_disable_dtr_uart();
 
 	return 0;
 }
 
-int sm_host_shell_smsh_dtr_uart_enable(const struct shell *shell, size_t argc, char **argv)
+int sm_at_client_shell_smsh_dtr_uart_enable(const struct shell *shell, size_t argc, char **argv)
 {
 	shell_print(shell, "Enable DTR UART.");
-	sm_host_enable_dtr_uart();
+	sm_at_client_enable_dtr_uart();
 
 	return 0;
 }
 
-int sm_host_shell_smsh_dtr_uart_auto(const struct shell *shell, size_t argc, char **argv)
+int sm_at_client_shell_smsh_dtr_uart_auto(const struct shell *shell, size_t argc, char **argv)
 {
 	uint32_t timeout = 0;
 
@@ -1010,14 +1010,14 @@ int sm_host_shell_smsh_dtr_uart_auto(const struct shell *shell, size_t argc, cha
 		return -EINVAL;
 	}
 
-	sm_host_configure_dtr_uart(true, K_MSEC(timeout));
+	sm_at_client_configure_dtr_uart(true, K_MSEC(timeout));
 
 	shell_print(shell, "Automatic DTR UART. Inactivity timeout %u ms", timeout);
 
 	return 0;
 }
 
-SHELL_CMD_REGISTER(sm, NULL, "Send AT commands to Serial Modem device", sm_host_shell);
+SHELL_CMD_REGISTER(sm, NULL, "Send AT commands to Serial Modem device", sm_at_client_shell);
 
 SHELL_STATIC_SUBCMD_SET_CREATE(
 	sub_uart,
@@ -1025,11 +1025,11 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 		  "[<inactivity_period>]\n"
 		  "(Default) Automatically enable DTR UART from RI. Disable DTR UART after "
 		  "inactivity period (default value is 100ms).",
-		  sm_host_shell_smsh_dtr_uart_auto),
+		  sm_at_client_shell_smsh_dtr_uart_auto),
 	SHELL_CMD(enable, NULL, "Enable DTR UART. Disable automatic handling.",
-		  sm_host_shell_smsh_dtr_uart_enable),
+		  sm_at_client_shell_smsh_dtr_uart_enable),
 	SHELL_CMD(disable, NULL, "Disable DTR UART. Disable automatic handling.",
-		  sm_host_shell_smsh_dtr_uart_disable),
+		  sm_at_client_shell_smsh_dtr_uart_disable),
 	SHELL_SUBCMD_SET_END);
 
 SHELL_STATIC_SUBCMD_SET_CREATE(
@@ -1038,6 +1038,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 	SHELL_SUBCMD_SET_END
 );
 
-SHELL_CMD_REGISTER(smsh, &sub_smsh, "Commands handled in Serial Modem Host shell device", NULL);
+SHELL_CMD_REGISTER(smsh, &sub_smsh,
+		   "Commands handled in Serial Modem AT Client shell device", NULL);
 
-#endif /* CONFIG_SM_HOST_SHELL */
+#endif /* CONFIG_SM_AT_CLIENT_SHELL */

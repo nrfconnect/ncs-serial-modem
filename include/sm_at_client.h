@@ -4,17 +4,17 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
-#ifndef SM_HOST_H_
-#define SM_HOST_H_
+#ifndef SM_AT_CLIENT_H_
+#define SM_AT_CLIENT_H_
 
 /**
- * @file sm_host.h
+ * @file sm_at_client.h
  *
- * @defgroup sm_host Serial Modem Host library
+ * @defgroup sm_at_client Serial Modem AT Client library
  *
  * @{
  *
- * @brief Public APIs for the Serial Modem Host library.
+ * @brief Public APIs for the Serial Modem AT Client library.
  */
 
 #ifdef __cplusplus
@@ -51,7 +51,7 @@ enum at_cmd_state {
  * @param data    Data received from Serial Modem.
  * @param datalen Length of the data received.
  *
- * @note The handler runs from uart callback. It must not call @ref sm_host_send_cmd. The data
+ * @note The handler runs from uart callback. It must not call @ref sm_at_client_send_cmd. The data
  * should be copied out by the application as soon as called.
  */
 typedef void (*sm_data_handler_t)(const uint8_t *data, size_t datalen);
@@ -63,7 +63,7 @@ typedef void (*sm_data_handler_t)(const uint8_t *data, size_t datalen);
  */
 typedef void (*sm_ri_handler_t)(void);
 
-/**@brief Initialize Serial Modem Host library.
+/**@brief Initialize Serial Modem AT Client library.
  *
  * @param handler Pointer to a handler function of type @ref sm_data_handler_t.
  * @param automatic_uart If true, DTR and UART are automatically managed by the library.
@@ -72,11 +72,14 @@ typedef void (*sm_ri_handler_t)(void);
  *
  * @return Zero on success, non-zero otherwise.
  */
-int sm_host_init(sm_data_handler_t handler, bool automatic_uart, k_timeout_t inactivity_timeout);
+int sm_at_client_init(
+	sm_data_handler_t handler,
+	bool automatic_uart,
+	k_timeout_t inactivity_timeout);
 
-/**@brief Un-initialize Serial Modem Host
+/**@brief Un-initialize Serial Modem AT Client
  */
-int sm_host_uninit(void);
+int sm_at_client_uninit(void);
 
 /**
  * @brief Register callback for Ring Indicate (RI) pin.
@@ -85,7 +88,7 @@ int sm_host_uninit(void);
  *
  * @retval Zero on success. Otherwise, a (negative) error code is returned.
  */
-int sm_host_register_ri_handler(sm_ri_handler_t handler);
+int sm_at_client_register_ri_handler(sm_ri_handler_t handler);
 
 /**
  * @brief Configure automatic DTR UART handling
@@ -97,26 +100,26 @@ int sm_host_register_ri_handler(sm_ri_handler_t handler);
  * @param inactivity Inactivity timeout for DTR UART disablement. Only used if @p
  * automatic is true.
  */
-void sm_host_configure_dtr_uart(bool automatic, k_timeout_t inactivity);
+void sm_at_client_configure_dtr_uart(bool automatic, k_timeout_t inactivity);
 
 /**
  * @brief Disable DTR UART
  *
  * Disables DTR UART. Disables automatic DTR UART handling.
  */
-void sm_host_disable_dtr_uart(void);
+void sm_at_client_disable_dtr_uart(void);
 
 /** @brief Enable DTR UART
  *
  * Enables DTR UART. Disables automatic DTR UART handling.
  */
-void sm_host_enable_dtr_uart(void);
+void sm_at_client_enable_dtr_uart(void);
 
 /**
  * @brief Function to send an AT command in Serial Modem command mode
  *
  * This function wait until command result is received. The response of the AT command is received
- * through the sm_ind_handler_t registered in @ref sm_host_init.
+ * through the sm_ind_handler_t registered in @ref sm_at_client_init.
  *
  * @param command Pointer to null terminated AT command string without command terminator
  * @param timeout Response timeout for the command in seconds, Zero means infinite wait
@@ -125,7 +128,7 @@ void sm_host_enable_dtr_uart(void);
  * @retval -EAGAIN if command execution times out.
  * @retval other if command execution fails.
  */
-int sm_host_send_cmd(const char *const command, uint32_t timeout);
+int sm_at_client_send_cmd(const char *const command, uint32_t timeout);
 
 /**
  * @brief Function to send raw data in Serial Modem data mode
@@ -135,7 +138,7 @@ int sm_host_send_cmd(const char *const command, uint32_t timeout);
  *
  * @return Zero on success, non-zero otherwise.
  */
-int sm_host_send_data(const uint8_t *const data, size_t datalen);
+int sm_at_client_send_data(const uint8_t *const data, size_t datalen);
 
 /**
  * @brief Serial Modem monitor callback.
@@ -211,4 +214,4 @@ static inline void sm_monitor_resume(struct sm_monitor_entry *mon)
 
 /** @} */
 
-#endif /* SM_HOST_H_ */
+#endif /* SM_AT_CLIENT_H_ */

@@ -3,6 +3,6 @@
 
 menu "Libraries"
 
-rsource "sm_host/Kconfig"
+rsource "sm_at_client/Kconfig"
 
 endmenu
