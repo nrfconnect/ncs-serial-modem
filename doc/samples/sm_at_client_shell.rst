@@ -1,15 +1,15 @@
 .. _sm_shell_sample:
 
-|SM| Host Shell sample
-######################
+|SM| AT Client Shell sample
+###########################
 
 .. contents::
    :local:
    :depth: 2
 
-The |SM| Host Shell sample demonstrates how to send AT commands to the modem through the :ref:`Serial Modem <sm_description>` application running on an nRF91 Series SiP.
+The |SM| AT Client Shell sample demonstrates how to send AT commands to the modem through the :ref:`Serial Modem <sm_description>` application running on an nRF91 Series SiP.
 This sample enables an external MCU to send modem and |SM| proprietary AT commands for LTE connection and IP services.
-See more information on the functionality of this sample from the :ref:`lib_sm_host` library, which provides the core functionality for this sample.
+See more information on the functionality of this sample from the :ref:`lib_sm_at_client` library, which provides the core functionality for this sample.
 
 Requirements
 ************
@@ -43,7 +43,7 @@ The sample supports the following development kits:
      - `nrf52840dk`_
      - ``nrf52840dk/nrf52840``
 
-Connect the DK pins that are defined in the board-specific overlay files :file:`samples/sm_host_shell/boards/*.overlay` to the corresponding pins in the nRF91 Series DK, which are defined in :file:`app/overlay-external-mcu.overlay`.
+Connect the DK pins that are defined in the board-specific overlay files :file:`samples/sm_at_client_shell/boards/*.overlay` to the corresponding pins in the nRF91 Series DK, which are defined in :file:`app/overlay-external-mcu.overlay`.
 
 The following table shows how to connect UART, DTR and RI pins of the DK to the corresponding pins in the nRF91 Series DKs:
 
@@ -173,4 +173,4 @@ Dependencies
 
 This sample uses the following |NCS| libraries:
 
-* :ref:`lib_sm_host`
+* :ref:`lib_sm_at_client`

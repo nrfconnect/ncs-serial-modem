@@ -61,4 +61,4 @@ The following image illustrates the DTR and RI signal behavior in relation to th
 
    DTR/RI signal diagram
 
-The :ref:`sm_shell_sample` sample and :ref:`lib_sm_host` library show an example of how to use DTR and RI signals in an external MCU application.
+The :ref:`sm_shell_sample` sample and :ref:`lib_sm_at_client` library show an example of how to use DTR and RI signals in an external MCU application.

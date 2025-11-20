@@ -16,7 +16,7 @@
 	status = "okay";
 };
 
-/* Serial Modem Host Shell <-> Serial Modem UART */
+/* Serial Modem AT Client Shell <-> Serial Modem UART */
 /* Note: Disable VCOM0 from Board Configurator to release UART30 for SM. */
 &uart30 {
 	compatible = "nordic,nrf-uarte";

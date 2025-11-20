@@ -10,7 +10,7 @@ DTR UART driver
 The DTR UART driver implements the standard *asynchronous UART API* for the Data Communication Equipment (DCE) (also known as modem) with Data Terminal Ready (DTR) and Ring Indicator (RI) signals.
 
 Another device, Data Terminal Equipment (DTE) (also known as host), controls the power state of the DTR UART by asserting and deasserting the DTR signal.
-The :ref:`lib_sm_host` gives an example of DTE implementation.
+The :ref:`lib_sm_at_client` gives an example of DTE implementation.
 
 When the DTE, is ready to communicate with DCE, it asserts the DTR signal.
 This causes the DTR UART driver to resume the UART peripheral, RX, and TX operations.

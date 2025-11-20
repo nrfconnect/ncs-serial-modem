@@ -4,7 +4,7 @@
 ####
 
 The |SM| contains the |SM| application for nRF91-based devices, and is built on `nRF Connect SDK`_.
-It includes host examples in the form of the |SM| Host library and the |SM| Host Shell sample.
+It includes host examples in the form of the |SM| AT Client library and the |SM| AT Client Shell sample.
 
 .. toctree::
    :maxdepth: 2
@@ -13,8 +13,8 @@ It includes host examples in the form of the |SM| Host library and the |SM| Host
 
    gsg_guide
    app/README
-   samples/sm_host_shell
+   samples/sm_at_client_shell
    drivers/dtr_uart
-   lib/sm_host
+   lib/sm_at_client
    migration_notes
    release_notes

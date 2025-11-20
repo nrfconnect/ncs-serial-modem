@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
-#include <sm_host.h>
+#include <sm_at_client.h>
 #include <zephyr/logging/log.h>
 #include <string.h>
 
-LOG_MODULE_REGISTER(mdm_sm_mon, CONFIG_SM_HOST_LOG_LEVEL);
+LOG_MODULE_REGISTER(mdm_sm_mon, CONFIG_SM_AT_CLIENT_LOG_LEVEL);
 
 struct at_notif_fifo {
 	void *fifo_reserved;

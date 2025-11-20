@@ -20,10 +20,10 @@ The base of the |SM| repository is a copy of |NCS| SLM and related components fr
 The following |NCS| files were copied into this repository:
 
 * :file:`applications/serial_lte_modem` to :file:`app`
-* :file:`lib/modem_slm` to :file:`lib/sm_host`
-* :file:`samples/cellular/slm_shell` to :file:`samples/sm_host_shell`
-* :file:`include/modem/modm_slm.h` to :file:`include/sm_host.h`
-* :file:`doc/nrf/libraries/modem/modem_slm.rst` to :file:`doc/lib/sm_host.rst`
+* :file:`lib/modem_slm` to :file:`lib/sm_at_client`
+* :file:`samples/cellular/slm_shell` to :file:`samples/sm_at_client_shell`
+* :file:`include/modem/modm_slm.h` to :file:`include/sm_at_client.h`
+* :file:`doc/nrf/libraries/modem/modem_slm.rst` to :file:`doc/lib/sm_at_client.rst`
 
 Required changes
 ****************
@@ -35,15 +35,15 @@ This section gives instructions on how to migrate from the NCS v3.1.x Serial LTE
    * Rename the use of the following Kconfig options:
 
      * Rename ``CONFIG_SLM_*`` to ``CONFIG_SM_*``
-     * Rename ``CONFIG_MODEM_SLM_*`` to ``CONFIG_SM_HOST_*``
+     * Rename ``CONFIG_MODEM_SLM_*`` to ``CONFIG_SM_AT_CLIENT_*``
      * Rename ``CONFIG_SLM_CMUX_TX_BUFFER_SIZE`` to ``CONFIG_SM_URC_BUFFER_SIZE``
 
    * Code patches:
 
-     * Renamed the file names from ``slm_`` to ``sm_`` and ``modem_slm`` to ``sm_host``.
+     * Renamed the file names from ``slm_`` to ``sm_`` and ``modem_slm`` to ``sm_at_client``.
      * Functions and other symbols in the code have been renamed accordingly making automatic patching to likely fail.
 
-   * Default AT command terminator changed from ``\r\n`` (``CONFIG_SM_CR_LF_TERMINATION`` and ``CONFIG_SM_HOST_CR_LF_TERMINATION``) to ``\r`` (``CONFIG_SM_CR_TERMINATION`` and ``CONFIG_SM_HOST_CR_TERMINATION``).
+   * Default AT command terminator changed from ``\r\n`` (``CONFIG_SM_CR_LF_TERMINATION`` and ``CONFIG_SM_AT_CLIENT_CR_LF_TERMINATION``) to ``\r`` (``CONFIG_SM_CR_TERMINATION`` and ``CONFIG_SM_AT_CLIENT_CR_TERMINATION``).
 
    * Rename the following AT commands:
 
