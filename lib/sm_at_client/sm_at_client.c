@@ -198,7 +198,7 @@ static int rx_disable(void)
 	k_sem_reset(&uart_disabled_sem);
 
 	err = uart_rx_disable(uart_dev);
-	if (err) {
+	if (err && err != -EFAULT) {
 		LOG_ERR("UART RX disable failed: %d", err);
 		return err;
 	}
