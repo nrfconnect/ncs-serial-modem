@@ -7,6 +7,7 @@
 #define SM_PPP_
 
 #include <stdbool.h>
+#include <zephyr/kernel.h>
 
 /* Whether to forward CGEV notifications to the Serial Modem UART. */
 extern bool sm_fwd_cgev_notifs;
@@ -15,5 +16,7 @@ extern bool sm_fwd_cgev_notifs;
 int sm_ppp_init(void);
 
 bool sm_ppp_is_stopped(void);
+
+bool sm_ppp_is_running_on_cid(uint16_t cid);
 
 #endif
