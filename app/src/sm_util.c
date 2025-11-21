@@ -410,3 +410,20 @@ int util_get_peer_addr(struct sockaddr *peer, char addr[static INET6_ADDRSTRLEN]
 
 	return 0;
 }
+
+int sm_util_pdn_id_get(uint8_t cid)
+{
+	int ret;
+	char cmd[32];
+	int pdn_id;
+
+	sprintf(cmd, "AT%%XGETPDNID=%u", cid);
+
+	ret = sm_util_at_scanf(cmd, "%%XGETPDNID: %d", &pdn_id);
+	if (ret < 0) {
+		LOG_ERR("Failed to read PDN ID for CID %d, err %d", cid, ret);
+		return ret;
+	}
+
+	return pdn_id;
+}
