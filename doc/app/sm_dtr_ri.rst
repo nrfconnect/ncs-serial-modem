@@ -37,8 +37,8 @@ When the DTR signal is deasserted and asserted (the button is pushed and release
 DTR and RI with External MCU
 ****************************
 
-When you are using an external MCU as a host, you need to include the :file:`app/overlay-external-mcu.overlay` file in your build.
-This overlay file configures the UART, DTR, and RI pins for the nRF9151 DK.
+When you are using an external MCU as a host, you need to include the files :file:`app/overlay-external-mcu.overlay` and :file:`app/overlay-external-mcu.conf` in your build.
+The overlay file configures the UART, DTR, and RI pins for the nRF9151 DK.
 Depending on your board, you might need to modify the overlay file to match your specific hardware configuration.
 See :ref:`sm_connecting_91dk_mcu` for more information.
 

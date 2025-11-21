@@ -14,7 +14,7 @@ See more information on the functionality of this sample from the :ref:`lib_sm_h
 Requirements
 ************
 
-The |SM| application should be configured with :file:`app/overlay-external-mcu.overlay` on the nRF91 Series DK side.
+The |SM| application should be configured with the overlay files :file:`app/overlay-external-mcu.overlay` and :file:`app/overlay-external-mcu.conf` on the nRF91 Series DK side.
 
 The sample supports the following development kits:
 

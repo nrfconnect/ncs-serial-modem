@@ -257,6 +257,9 @@ The following configuration files are provided:
   The overlay is pin compatible with nRF9151DK.
   For other setups, you can customize the overlay to fit your configuration.
 
+* :file:`overlay-external-mcu.conf` - This configures the ``uart2`` to use hardware RX byte counting.
+  This overlay is required when ``uart2`` is used without hardware flow control.
+
 * :file:`overlay-carrier.conf` - Configuration file that adds |NCS| `LwM2M carrier`_ support.
   See :ref:`sm_carrier_library_support` for more information on how to connect to an operator's device management platform.
 
@@ -371,7 +374,7 @@ Connecting with an external MCU
 If you run your user application on an external MCU (for example, an nRF52 Series development kit), you can control the |SM| application on an nRF91 Series device directly from the application.
 See the :ref:`sm_shell_sample` for a sample implementation of such an application.
 
-To connect with an external MCU using UART_2, include the :file:`overlay-external-mcu.overlay` devicetree overlay in your build.
+To connect with an external MCU using UART_2, include the :file:`overlay-external-mcu.overlay` devicetree overlay and :file:`overlay-external-mcu.conf` in your build.
 This overlay configures the UART_2 pins, DTR pin, and RI pin for the nRF9151 DK.
 
 If you use a different setup, you can customize the :file:`overlay-external-mcu.overlay` file to match your hardware configuration in (for example) the following ways:
