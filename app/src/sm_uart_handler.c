@@ -171,7 +171,7 @@ static int rx_disable(void)
 	}
 
 	err = uart_rx_disable(sm_uart_dev);
-	if (err) {
+	if (err && err != -EFAULT) {
 		LOG_ERR("UART RX disable failed: %d", err);
 		return err;
 	}
