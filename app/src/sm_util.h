@@ -189,8 +189,49 @@ int util_resolve_host(int cid, const char *host, uint16_t port, int family, stru
  * @retval 0 If the operation was successful.
  *           Otherwise, a (negative) error code is returned.
  */
-
 int util_get_peer_addr(struct sockaddr *peer, char addr[static INET6_ADDRSTRLEN], uint16_t *port);
+
+/**
+ * @brief PDN connection dynamic information structure.
+ *
+ * This structure holds dynamic information about the PDN connection.
+ */
+struct sm_pdn_dynamic_info {
+	/**
+	 * @brief IPv4 Maximum Transmission Unit.
+	 */
+	uint32_t ipv4_mtu;
+	/**
+	 * @brief IPv6 Maximum Transmission Unit.
+	 */
+	uint32_t ipv6_mtu;
+	/**
+	 * @brief Primary IPv4 DNS address.
+	 */
+	struct in_addr dns_addr4_primary;
+	/**
+	 * @brief Secondary IPv4 DNS address.
+	 */
+	struct in_addr dns_addr4_secondary;
+	/**
+	 * @brief Primary IPv6 DNS address.
+	 */
+	struct in6_addr dns_addr6_primary;
+	/**
+	 * @brief Secondary IPv6 DNS address.
+	 */
+	struct in6_addr dns_addr6_secondary;
+};
+
+/**
+ * @brief Retrieve dynamic parameters of a given PDN connection.
+ *
+ * @param[in] cid The PDP context ID.
+ * @param[out] pdn_info PDN dynamic info.
+ *
+ * @return Zero on success or an error code on failure.
+ */
+int sm_util_pdn_dynamic_info_get(uint8_t cid, struct sm_pdn_dynamic_info *pdn_info);
 /** @} */
 
 #endif /* SM_UTIL_ */
