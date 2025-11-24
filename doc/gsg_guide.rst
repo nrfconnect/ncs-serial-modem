@@ -13,49 +13,80 @@ Follow the official `Getting started guide`_.
 Initialization
 **************
 
-Complete the following steps for initialization:
+This section represents alternative approaches for initializing the workspace.
 
-#. To initialize the workspace:
+Add |SM| into existing |NCS| workspace
+======================================
 
-   .. code-block::
+Assume you have an existing |NCS| workspace in the :file:`ncs` folder.
 
-      west init -m https://github.com/nrfconnect/ncs-serial-modem.git --mr main serial_modem
+#. Navigate to the workspace folder::
 
-#. Navigate to the project folder::
+      cd ncs
 
-    cd serial_modem
+#. Clone |SM| repository::
 
-#. Update the |NCS| modules.
+      git clone https://github.com/nrfconnect/ncs-serial-modem.git
 
-   .. code-block::
+#. Set manifest path to the |SM|::
+
+      west config manifest.path ncs-serial-modem
+
+#. Update the |NCS| modules::
 
       west update
 
-   This might take a while.
+   Depending on the current state of your |NCS| modules, this may take several minutes as it fetches all |NCS| modules according to the requirements of the |SM|.
+
+Initialize workspace and add |SM| from scratch
+==============================================
+
+Complete the following steps for initialization:
+
+#. To initialize the workspace::
+
+      west init -m https://github.com/nrfconnect/ncs-serial-modem --mr main ncs
+
+#. Navigate to the workspace folder::
+
+      cd ncs
+
+#. Update the |NCS| modules::
+
+      west update
+
+   This may take several minutes as it fetches all |NCS| modules according to the requirements of the |SM|.
 
 Building and running
 ********************
 
 Complete the following steps for building and running:
 
-#. Navigate to the project folder:
+#. From the workspace folder, navigate to the :file:`ncs-serial-modem` folder::
 
-   .. code-block::
+      cd ncs-serial-modem/app
 
-      cd project/app
-
-#. To build the application, run the following command:
-
-   .. code-block::
+#. To build the application, run the following command::
 
       west build -p -b nrf9151dk/nrf9151/ns
 
-#. To program the application, run the following command:
-
-   .. code-block::
+#. To program the application, run the following command::
 
       west flash
 
 The application is now built and flashed to the device.
 You can open a serial terminal to use the application.
 The default baud rate is 115200.
+
+.. note::
+
+   When building the |SM| application, the manifest path must point to the :file:`ncs-serial-modem` folder.
+   Otherwise linking will fail as drivers and libraries from |SM| will not be found.
+
+   To check your current manifest path, run the following command anywhere in your workspace::
+
+      west config manifest.path
+
+   To set the manifest path for |SM|, run the following command::
+
+      west config manifest.path ncs-serial-modem
