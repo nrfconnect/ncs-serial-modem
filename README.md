@@ -7,8 +7,6 @@ You can find the documentation in the [Serial Modem] (https://docs.nordicsemi.co
 
 Serial Modem release plan looks as follows:
 
-* v0.2.0: 21-Nov-2025
-  * First stable release after a lot of changes including many breaking changes to the API
 * v0.3.0: 19-Dec-2025
   * Aligns with NCS 3.2.0 release meaning SM v0.3.0 will be released 1-10 days after the NCS
 * v1.0.0: 20-Feb-2026
