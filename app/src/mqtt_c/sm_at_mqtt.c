@@ -38,6 +38,7 @@ enum sm_mqttsub_operation {
 static struct sm_mqtt_ctx {
 	int family; /* Socket address family */
 	bool connected;
+	bool disconnect_requested;
 	struct mqtt_utf8 client_id;
 	struct mqtt_utf8 username;
 	struct mqtt_utf8 password;
@@ -270,6 +271,14 @@ static void mqtt_thread_fn(void *arg1, void *arg2, void *arg3)
 			break;
 		}
 		if ((fds.revents & ZSOCK_POLLNVAL) == ZSOCK_POLLNVAL) {
+			if (ctx.disconnect_requested) {
+				/* POLLNVAL is expected because the MQTT library closes the socket
+				 * during disconnection. Suppress this error when handling socket
+				 * events after a disconnect.
+				 */
+				err = 0;
+				break;
+			}
 			LOG_ERR("ZSOCK_POLLNVAL");
 			err = -ENOTCONN;
 			break;
@@ -408,6 +417,7 @@ static int do_mqtt_connect(void)
 	}
 
 	ctx.connected = true;
+	ctx.disconnect_requested = false;
 	k_thread_create(&mqtt_thread, mqtt_thread_stack,
 			K_THREAD_STACK_SIZEOF(mqtt_thread_stack),
 			mqtt_thread_fn, NULL, NULL, NULL,
@@ -424,6 +434,7 @@ static int do_mqtt_disconnect(void)
 		return -ENOTCONN;
 	}
 
+	ctx.disconnect_requested = true;
 	err = mqtt_disconnect(&client, NULL);
 	if (err) {
 		LOG_ERR("ERROR: mqtt_disconnect %d", err);
