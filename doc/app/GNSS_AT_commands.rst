@@ -324,7 +324,7 @@ Syntax
 
    #XGNSSDEL=<mask>
 
-The ``<mask>`` parameter accepts an integer that is the ``OR`` value of the following bitmasks :
+The ``<mask>`` parameter accepts an integer that is a bitwise ``OR`` of the following bitmasks:
 
 * ``0x001`` - Ephemerides
 * ``0x002`` - Almanacs (excluding leap second and ionospheric correction)
@@ -334,7 +334,9 @@ The ``<mask>`` parameter accepts an integer that is the ``OR`` value of the foll
 * ``0x020`` - GPS week number
 * ``0x040`` - Leap second (UTC parameters)
 * ``0x100`` - Precision estimate of GPS time-of-week (TOW)
-* ``383`` - All of the above
+* ``0x400`` - Extended Kalman Filter (EKF) state (last position/velocity/time solution)
+
+For example, the integer value with all of the above bits enabled will be ``1407`` (``0x57f``).
 
 Example
 ~~~~~~~
@@ -345,7 +347,7 @@ Example
   OK
   AT+CFUN=31
   OK
-  AT#XGNSSDEL=511
+  AT#XGNSSDEL=1407
   OK
   AT+CFUN=0
   OK
