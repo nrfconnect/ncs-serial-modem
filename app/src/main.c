@@ -11,8 +11,10 @@
 #include <zephyr/dfu/mcuboot.h>
 #include <dfu/dfu_target.h>
 #include <zephyr/sys/reboot.h>
+#include <zephyr/logging/log_ctrl.h>
 #include <net/fota_download.h>
 #include "sm_at_host.h"
+#include "sm_at_dfu.h"
 #include "sm_at_fota.h"
 #include "sm_settings.h"
 #include "sm_util.h"
@@ -134,6 +136,44 @@ static void check_app_fota_status(void)
 	sm_fota_stage = FOTA_STAGE_COMPLETE;
 }
 
+static int bootloader_mode_init(void)
+{
+	int ret;
+
+	ret = nrf_modem_lib_bootloader_init();
+	if (ret) {
+		LOG_ERR("Failed to initialize bootloader mode: %d", ret);
+		return ret;
+	}
+	LOG_INF("Bootloader mode initiated successfully");
+
+	ret = sm_ctrl_pin_init();
+	if (ret) {
+		LOG_ERR("Failed to init ctrl_pin: %d", ret);
+		return ret;
+	}
+
+	k_work_queue_start(&sm_work_q, sm_wq_stack_area,
+		K_THREAD_STACK_SIZEOF(sm_wq_stack_area),
+		SM_WQ_PRIORITY, NULL);
+
+	ret = sm_at_host_bootloader_init();
+	if (ret) {
+		LOG_ERR("Failed to init at_host: %d", ret);
+		return ret;
+	}
+
+	ret = sm_at_send_str("Bootloader mode ready\r\n");
+	if (ret) {
+		LOG_ERR("Failed to send bootloader mode ready string: %d", ret);
+		return ret;
+	}
+
+	sm_bootloader_mode_enabled = true;
+
+	return 0;
+}
+
 int lte_auto_connect(void)
 {
 	int err = 0;
@@ -228,6 +268,8 @@ int start_execute(void)
 
 int main(void)
 {
+	int ret;
+
 	const uint32_t rr = nrf_power_resetreas_get(NRF_POWER_NS);
 
 	nrf_power_resetreas_clear(NRF_POWER_NS, 0x70017);
@@ -240,6 +282,21 @@ int main(void)
 		LOG_WRN("Failed to init sm settings");
 	}
 
+	if (sm_bootloader_mode_requested) {
+		/* Clear bootloader mode flag */
+		ret = bootloader_mode_request(false);
+		if (ret) {
+			LOG_ERR("Failed to clear bootloader mode flag, starting SM in normal mode");
+		} else {
+			ret = bootloader_mode_init();
+			if (ret) {
+				LOG_ERR("Failed to initialize bootloader mode: %d", ret);
+				goto exit_reboot;
+			}
+			goto exit;
+		}
+	}
+
 #if defined(CONFIG_SM_FULL_FOTA)
 	if (sm_modem_full_fota) {
 		sm_finish_modem_full_fota();
@@ -247,7 +304,7 @@ int main(void)
 	}
 #endif
 
-	int ret = nrf_modem_lib_init();
+	ret = nrf_modem_lib_init();
 
 	if (ret) {
 		LOG_ERR("Modem library init failed, err: %d", ret);
@@ -256,6 +313,8 @@ int main(void)
 		} else if (ret == -EIO) {
 			LOG_ERR("Please program full modem firmware with the bootloader or "
 				"external tools");
+			(void)bootloader_mode_request(true);
+			goto exit_reboot;
 		}
 	}
 
@@ -274,4 +333,8 @@ exit:
 		LOG_ERR("Failed to start SM (%d). It's not operational!!!", ret);
 	}
 	return ret;
+
+exit_reboot:
+	LOG_PANIC();
+	sys_reboot(SYS_REBOOT_COLD);
 }

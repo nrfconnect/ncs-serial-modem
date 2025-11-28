@@ -92,6 +92,14 @@ size_t sm_at_receive(const uint8_t *data, size_t len, bool *stop_at_receive);
 int sm_at_host_init(void);
 
 /**
+ * @brief Initialize AT host for bootloader mode
+ *
+ * @retval 0 If the operation was successful.
+ *           Otherwise, a (negative) error code is returned.
+ */
+int sm_at_host_bootloader_init(void);
+
+/**
  * @brief Powers the UART down.
  *
  * @retval 0 on success, or a (negative) error code.
