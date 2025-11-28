@@ -10,17 +10,26 @@
 #include "sm_uart_handler.h"
 #include "sm_util.h"
 #include "sm_ctrl_pin.h"
+#include "sm_at_dfu.h"
 #if defined(CONFIG_SM_PPP)
 #include "sm_ppp.h"
 #endif
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <zephyr/drivers/uart.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/pm/device.h>
 #include <zephyr/sys/ring_buffer.h>
+#include <zephyr/logging/log_ctrl.h>
+#include <zephyr/sys/reboot.h>
+
+/* Added for XRESET command */
+extern void final_call(void (*func)(void));
+extern FUNC_NORETURN void sm_reset(void);
+
 LOG_MODULE_REGISTER(sm_at_host, CONFIG_SM_LOG_LEVEL);
 
 #define SM_SYNC_STR     "Ready\r\n"
@@ -31,6 +40,11 @@ LOG_MODULE_REGISTER(sm_at_host, CONFIG_SM_LOG_LEVEL);
 #define CR		 '\r'
 #define LF		 '\n'
 #define HEXDUMP_LIMIT    16
+
+#define AT_XDFU_INIT_CMD "AT#XDFUINIT"
+#define AT_XDFU_WRITE_CMD "AT#XDFUWRITE"
+#define AT_XDFU_APPLY_CMD "AT#XDFUAPPLY"
+#define AT_XRESET_CMD "AT#XRESET"
 
 /* Operation mode variables */
 enum sm_operation_mode {
@@ -543,6 +557,50 @@ int sm_at_send_str(const char *str)
 	return sm_at_send(str, strlen(str));
 }
 
+static void handle_bootloader_at_cmd(uint8_t *buf, size_t buf_size, char *at_cmd)
+{
+	int err;
+
+	if (strncasecmp(at_cmd, AT_XDFU_INIT_CMD, sizeof(AT_XDFU_INIT_CMD) - 1) == 0) {
+		err = sm_at_handle_xdfu_init(buf + strlen(CRLF_STR),
+			buf_size - strlen(CRLF_STR), at_cmd);
+		if (err) {
+			LOG_ERR("AT command failed: %d", err);
+			rsp_send_error();
+		} else {
+			rsp_send_ok();
+		}
+	} else if (strncasecmp(at_cmd, AT_XDFU_WRITE_CMD,
+			   sizeof(AT_XDFU_WRITE_CMD) - 1) == 0) {
+		err = sm_at_handle_xdfu_write(buf + strlen(CRLF_STR),
+			buf_size - strlen(CRLF_STR), at_cmd);
+		if (err) {
+			LOG_ERR("AT command failed: %d", err);
+			rsp_send_error();
+		} else {
+			rsp_send_ok();
+		}
+	} else if (strncasecmp(at_cmd, AT_XDFU_APPLY_CMD,
+			       sizeof(AT_XDFU_APPLY_CMD) - 1) == 0) {
+		err = sm_at_handle_xdfu_apply(buf + strlen(CRLF_STR),
+						buf_size - strlen(CRLF_STR),
+						at_cmd);
+		if (err) {
+			LOG_ERR("AT command failed: %d", err);
+			rsp_send_error();
+		} else {
+			rsp_send_ok();
+		}
+	} else if (strncasecmp(at_cmd, AT_XRESET_CMD, sizeof(AT_XRESET_CMD) - 1) == 0) {
+		LOG_INF("Rebooting device via %s command", AT_XRESET_CMD);
+		LOG_PANIC();
+		final_call(sm_reset);
+	} else {
+		LOG_ERR("AT command not supported in bootloader mode: %s", at_cmd);
+		rsp_send_error();
+	}
+}
+
 static void cmd_send(uint8_t *buf, size_t cmd_length, size_t buf_size, bool *stop_at_receive)
 {
 	int err;
@@ -569,23 +627,30 @@ static void cmd_send(uint8_t *buf, size_t cmd_length, size_t buf_size, bool *sto
 		return;
 	}
 
-	/* Send to modem. Same buffer used for sending and for the response.
-	 * Reserve space for CRLF in response buffer.
-	 */
-	err = nrf_modem_at_cmd(buf + strlen(CRLF_STR), buf_size - strlen(CRLF_STR), "%s", at_cmd);
-	if (err == -SILENT_AT_COMMAND_RET) {
+	/* If bootloader mode is enabled, handle custom AT commands. */
+	if (sm_bootloader_mode_enabled) {
+		handle_bootloader_at_cmd(buf, buf_size, at_cmd);
 		return;
-	} else if (err == -SILENT_AT_CMUX_COMMAND_RET) {
-		/* Stop processing AT commands until CMUX pipe is established. */
-		*stop_at_receive = true;
-		return;
-	} else if (err < 0) {
-		LOG_ERR("AT command failed: %d", err);
-		rsp_send_error();
-		return;
-	} else if (err > 0) {
-		LOG_ERR("AT command error (%d), type: %d: value: %d",
-			err, nrf_modem_at_err_type(err), nrf_modem_at_err(err));
+	} else {
+		/* Send to modem. Same buffer used for sending and for the response.
+		 * Reserve space for CRLF in response buffer.
+		 */
+		err = nrf_modem_at_cmd(buf + strlen(CRLF_STR), buf_size - strlen(CRLF_STR),
+				       "%s", at_cmd);
+		if (err == -SILENT_AT_COMMAND_RET) {
+			return;
+		} else if (err == -SILENT_AT_CMUX_COMMAND_RET) {
+			/* Stop processing AT commands until CMUX pipe is established. */
+			*stop_at_receive = true;
+			return;
+		} else if (err < 0) {
+			LOG_ERR("AT command failed: %d", err);
+			rsp_send_error();
+			return;
+		} else if (err > 0) {
+			LOG_ERR("AT command error (%d), type: %d: value: %d",
+				err, nrf_modem_at_err_type(err), nrf_modem_at_err(err));
+		}
 	}
 
 	/** Format as TS 27.007 command V1 with verbose response format,
@@ -1209,4 +1274,28 @@ void sm_at_host_uninit(void)
 	at_host_power_off(true);
 
 	LOG_DBG("at_host uninit done");
+}
+
+int sm_at_host_bootloader_init(void)
+{
+	int err;
+
+	ring_buf_init(&urc_ctx.rb, sizeof(urc_ctx.buf), urc_ctx.buf);
+	k_mutex_init(&urc_ctx.mutex);
+
+	k_mutex_lock(&mutex_mode, K_FOREVER);
+	sm_datamode_time_limit = 0;
+	datamode_handler = NULL;
+	at_mode = SM_AT_COMMAND_MODE;
+	k_mutex_unlock(&mutex_mode);
+
+	k_work_init(&raw_send_scheduled_work, raw_send_scheduled);
+
+	err = sm_uart_handler_enable();
+	if (err) {
+		return err;
+	}
+
+	LOG_INF("at_host bootloader init done");
+	return 0;
 }

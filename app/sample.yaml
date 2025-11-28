@@ -73,6 +73,17 @@ tests:
       - thingy91x/nrf9151/ns
     integration_platforms:
       - nrf9151dk/nrf9151/ns
+  serial_modem.mfw_full_fota_and_dfu:
+    sysbuild: true
+    build_only: true
+    extra_args:
+      - EXTRA_CONF_FILE="overlay-full_fota.conf"
+    extra_configs:
+      - CONFIG_SM_DFU_MODEM_FULL=y
+    platform_allow:
+      - nrf9151dk/nrf9151/ns
+    integration_platforms:
+      - nrf9151dk/nrf9151/ns
   serial_modem.lwm2m_carrier:
     sysbuild: true
     build_only: true
