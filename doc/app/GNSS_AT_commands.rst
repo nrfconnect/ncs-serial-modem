@@ -37,39 +37,39 @@ Syntax
 
    #XGNSS=<op>,<cloud_assistance>,<interval>[,<timeout>]
 
-The ``<op>`` parameter can have the following integer values:
+* The ``<op>`` parameter can have the following integer values:
 
-* ``0`` - Stop the GNSS module.
-  In this case, no other parameter is allowed.
-* ``1`` - Start the GNSS module.
+  * ``0`` - Stop the GNSS module.
+    In this case, no other parameter is allowed.
+  * ``1`` - Start the GNSS module.
 
-``<cloud_assistance>`` is an integer that indicates whether to use the nRF Cloud assistive services that were enabled during compilation.
-It is ``0`` for disabled or ``1`` for enabled.
+* ``<cloud_assistance>`` parameter is an integer that indicates whether to use the nRF Cloud assistive services that were enabled during compilation.
+  It is ``0`` for disabled or ``1`` for enabled.
 
-``<interval>`` is an integer that indicates the GNSS fix interval in seconds.
-It can have one of the following values:
+* ``<interval>`` parameter is an integer that indicates the GNSS fix interval in seconds.
+  It can have one of the following values:
 
-* ``0`` - Single-fix navigation mode.
-* ``1`` - Continuous navigation mode.
-  The fix interval is set to 1 second.
-* Ranging from ``10`` to ``65535`` - Periodic navigation mode.
-  The fix interval is set to the specified value.
+  * ``0`` - Single-fix navigation mode.
+  * ``1`` - Continuous navigation mode.
+    The fix interval is set to 1 second.
+  * Ranging from ``10`` to ``65535`` - Periodic navigation mode.
+    The fix interval is set to the specified value.
 
-``timeout`` is an integer that indicates the maximum time in seconds that the GNSS receiver is allowed to run while trying to produce a valid Position, Velocity, and Time (PVT) estimate.
-It can only be specified in single-fix and periodic navigation modes.
+* ``timeout`` is an integer that indicates the maximum time in seconds that the GNSS receiver is allowed to run while trying to produce a valid Position, Velocity, and Time (PVT) estimate.
+  It can only be specified in single-fix and periodic navigation modes, and must be omitted in continuous navigation mode.
+  If omitted in single-fix or periodic navigation modes, the default value is 60 seconds.
 
-It can be one of the following:
+  It can be one of the following:
 
-* ``0`` - The GNSS receiver runs indefinitely until a valid PVT estimate is produced.
-* Any positive integer - The GNSS receiver is turned off after the specified time is up, even if a valid PVT estimate was not produced.
-* Omitted - In single-fix or periodic navigation mode, the timeout defaults to 60 seconds.
+  * ``0`` - The GNSS receiver runs indefinitely until a valid PVT estimate is produced.
+  * Any positive integer - The GNSS receiver is turned off after the specified time is up, even if a valid PVT estimate was not produced.
 
 In periodic navigation mode, the ``<interval>`` and ``<timeout>`` parameters are temporarily ignored during the first fix.
 
 .. note::
 
    When ``<cloud_assistance>`` is disabled, no request is made to nRF Cloud for assistance data.
-   However, if it has been previously enabled and used, such data may remain locally and will be used if still valid.
+   However, if it has been previously enabled and used, such data may remain locally available and will be used if still valid.
 
 .. note::
 
@@ -213,7 +213,7 @@ Example
 
   OK
   #XNRFCLOUD: 1,0
-  AT#XGNSS=1,0,1,30
+  AT#XGNSS=1,0,1
 
   #XGNSS: 1,1
 
