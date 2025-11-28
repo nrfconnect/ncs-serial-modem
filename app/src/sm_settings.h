@@ -29,6 +29,13 @@ int sm_settings_init(void);
 int sm_settings_fota_save(void);
 
 /**
+ * @brief Saves the bootloader mode settings to NVM.
+ *
+ * @retval 0 on success, nonzero otherwise.
+ */
+int sm_settings_bootloader_mode_save(void);
+
+/**
  * @brief Saves the auto-connect settings to NVM.
  *
  * @retval 0 on success, nonzero otherwise.
