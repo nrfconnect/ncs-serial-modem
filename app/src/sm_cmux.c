@@ -213,8 +213,8 @@ static void nonblock_tx_work_fn(struct k_work *work)
 		LOG_ERR("No URC context");
 		return;
 	}
-	if (in_datamode()) {
-		/* Do not send URCs in datamode. */
+	if (!in_at_mode()) {
+		/* Send URCs only in AT mode. */
 		return;
 	}
 

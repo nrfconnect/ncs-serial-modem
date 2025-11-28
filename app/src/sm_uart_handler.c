@@ -447,8 +447,8 @@ static void tx_write_nonblock_fn(struct k_work *)
 		return;
 	}
 
-	if (in_datamode()) {
-		/* Do not send URCs in datamode. */
+	if (!in_at_mode()) {
+		/* Send URCs only in AT mode. */
 		return;
 	}
 

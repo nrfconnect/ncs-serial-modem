@@ -940,6 +940,8 @@ Syntax
 Response syntax
 ~~~~~~~~~~~~~~~
 
+.. sm_recv_response_start
+
 ::
 
    #XRECV: <handle>,<mode>,<size>
@@ -953,6 +955,8 @@ Response syntax
 
 * The ``<size>`` value is an integer that represents the actual number of bytes received.
   In case of hex string mode, it represents the number of bytes before conversion to hexadecimal format.
+
+.. sm_recv_response_end
 
 Example
 ~~~~~~~~
@@ -1142,6 +1146,8 @@ Syntax
 Response syntax
 ~~~~~~~~~~~~~~~
 
+.. sm_recvfrom_response_start
+
 ::
 
    #XRECVFROM: <handle>,<mode>,<size>,"<ip_addr>",<port>
@@ -1159,6 +1165,8 @@ Response syntax
 * The ``<ip_addr>`` value is a string that represents the IPv4 or IPv6 address of the remote peer.
 
 * The ``<port>`` value is an integer that represents the UDP port of the remote peer.
+
+.. sm_recvfrom_response_end
 
 Example
 ~~~~~~~~
@@ -1428,6 +1436,103 @@ Example
 
    #XAPOLL: (0,1),<0,1,4,5>,<handle1>,<handle2>,...
 
+   OK
+
+Configure socket mode #XSOCKETMODE
+==================================
+
+The socket mode command allows you to configure the following aspects of a socket:
+
+* Automatic receival of data
+* Automatic receival of data in hex format
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XSOCKETMODE=<handle>,<auto_recv_flags>,<hex_format>
+
+* The ``<handle>`` parameter is an integer that identifies the socket handle.
+* The ``<auto_recv_flags>`` parameter is an integer that specifies the automatic receival flags.
+  It can be a combination of the following values summed up:
+
+  * ``0`` - No automatic receival.
+  * ``1`` - Automatic receival of data in AT-command mode.
+  * ``2`` - Automatic receival of data in data mode.
+* The ``<hex_format>`` parameter is an integer that specifies the hex format for received data.
+  It applies only when automatic receival is enabled.
+  It can be one of the following values:
+
+  * ``0`` - Data is received in binary format.
+  * ``1`` - Data is received in hex string format (supported only in AT-command mode).
+
+Response syntax
+~~~~~~~~~~~~~~~
+
+When the automatic receival is enabled and data is received, |SM| sends #XRECV and #XRECVFROM responses as URC notifications.
+
+.. include:: SOCKET_AT_commands.rst
+   :start-after: sm_recv_response_start
+   :end-before: sm_recv_response_end
+
+.. include:: SOCKET_AT_commands.rst
+   :start-after: sm_recvfrom_response_start
+   :end-before: sm_recvfrom_response_end
+
+Example
+~~~~~~~~
+
+::
+
+   AT#XSOCKET=1,1,0
+   #XSOCKET: 0,1,6
+   OK
+
+   AT#XCONNECT=0,"test.server.com",1234
+   #XCONNECT: 0,1
+   OK
+
+   // Enable automatic receival of data in AT-command mode in binary format.
+   AT#XSOCKETMODE=0,1,0
+   OK
+
+   // Send data to the test server, which will echo it back.
+   AT#XSEND=0,0,0,"Test"
+   #XSEND: 0,0,4
+   OK
+
+   // Data is automatically received.
+   #XRECV: 0,0,4
+   Test
+
+   // Enable automatic receival of data in AT-command mode in hex string format.
+   AT#XSOCKETMODE=0,1,1
+   OK
+
+   // Send data to the test server, which will echo it back.
+   AT#XSEND=0,0,0,"Test hex"
+   #XSEND: 0,0,8
+   OK
+
+   // Data is automatically received in hex string format.
+   #XRECV: 0,1,8
+   5465737420686578
+
+   // Enable automatic receival of data in data mode.
+   AT#XSOCKETMODE=0,2,0
+   OK
+
+   // Enter data mode and send data to the test server, which will echo it back.
+   AT#XSEND=0,2,0
+   OK
+   DATA TEST
+   DATA TEST
+   +++
+   #XDATAMODE: 0
+
+   AT#XCLOSE
+   #XCLOSE: 0,0
    OK
 
 Resolve hostname #XGETADDRINFO
