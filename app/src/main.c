@@ -13,6 +13,7 @@
 #include <zephyr/sys/reboot.h>
 #include <net/fota_download.h>
 #include "sm_at_host.h"
+#include "sm_at_dfu.h"
 #include "sm_at_fota.h"
 #include "sm_settings.h"
 #include "sm_util.h"
@@ -228,6 +229,8 @@ int start_execute(void)
 
 int main(void)
 {
+	int ret;
+
 	const uint32_t rr = nrf_power_resetreas_get(NRF_POWER_NS);
 
 	nrf_power_resetreas_clear(NRF_POWER_NS, 0x70017);
@@ -240,6 +243,43 @@ int main(void)
 		LOG_WRN("Failed to init sm settings");
 	}
 
+
+	if (sm_bootloader_mode_requested) {
+
+		if (nrf_modem_lib_bootloader_init() == 0) {
+			LOG_INF("Bootloader mode initiated successfully");
+
+			ret = sm_ctrl_pin_init();
+			if (ret) {
+				LOG_ERR("Failed to init ctrl_pin: %d", ret);
+				goto exit;
+			}
+
+			k_work_queue_start(&sm_work_q, sm_wq_stack_area,
+				K_THREAD_STACK_SIZEOF(sm_wq_stack_area),
+				SM_WQ_PRIORITY, NULL);
+
+			ret = sm_at_host_bootloader_init();
+			if (ret) {
+				LOG_ERR("Failed to init at_host: %d", ret);
+				goto exit;
+			}
+
+			if (request_bootloader_mode(false) != 0) {
+				LOG_ERR("Failed to clear bootloader mode flag");
+			}
+
+			sm_bootloader_mode_enabled = true;
+
+			goto exit;
+		} else {
+			LOG_ERR("Failed to enter bootloader mode");
+			if (request_bootloader_mode(false) != 0) {
+				LOG_ERR("Failed to clear bootloader mode flag");
+			}
+		}
+	}
+
 #if defined(CONFIG_SM_FULL_FOTA)
 	if (sm_modem_full_fota) {
 		sm_finish_modem_full_fota();
@@ -247,7 +287,7 @@ int main(void)
 	}
 #endif
 
-	int ret = nrf_modem_lib_init();
+	ret = nrf_modem_lib_init();
 
 	if (ret) {
 		LOG_ERR("Modem library init failed, err: %d", ret);
