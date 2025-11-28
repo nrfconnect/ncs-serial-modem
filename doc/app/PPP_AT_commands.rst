@@ -34,6 +34,11 @@ The set command allows you to start and stop PPP, and optionally define the PDN 
    When a PPP start has been issued, the PPP connection is automatically activated and deactivated when the PDN connection requested for PPP is established and lost, respectively.
    This will continue until a PPP stop is issued by either the user by the ``AT#XPPP=0`` command or by the remote peer disconnecting the PPP using LCP termination.
 
+.. note::
+
+   PPP cannot be started on a PDN connection that is already in use by another socket.
+   The reason is that PPP is a raw socket, which intercepts all downlink data intended for other sockets on the same PDN, which disrupts normal socket operations.
+
 Syntax
 ~~~~~~
 

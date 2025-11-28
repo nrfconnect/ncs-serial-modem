@@ -17,6 +17,7 @@
 #include "sm_at_host.h"
 #include "sm_at_socket.h"
 #include "sm_sockopt.h"
+#include "sm_ppp.h"
 
 LOG_MODULE_REGISTER(sm_sock, CONFIG_SM_LOG_LEVEL);
 
@@ -159,7 +160,7 @@ static int bind_to_pdn(struct sm_socket *sock)
 		ret = nrf_setsockopt(sock->fd, NRF_SOL_SOCKET, NRF_SO_BINDTOPDN, &pdn_id,
 				     sizeof(int));
 		if (ret < 0) {
-			LOG_ERR("nrf_setsockopt(%d) error: %d", NRF_SO_BINDTOPDN, -errno);
+			LOG_ERR("nrf_setsockopt(NRF_SO_BINDTOPDN) error: %d", -errno);
 			ret = -errno;
 		}
 	}
@@ -1109,6 +1110,41 @@ static int socket_datamode_callback(uint8_t op, const uint8_t *data, int len, ui
 	return ret;
 }
 
+/* Two RAW sockets cannot share the same CID. PPP is in practice a RAW socket.
+ * This function checks if a new socket can be created on the given CID.
+ * The CID cannot have a RAW sockets already, and if the new socket is RAW,
+ * the CID cannot have any other sockets already.
+ */
+static bool cid_validity_raw_socket_check(uint16_t cid, int type)
+{
+#if defined(CONFIG_SM_PPP)
+	/* PPP is raw socket so new socket cannot be created on the same CID */
+	if (sm_ppp_is_running_on_cid(cid)) {
+		LOG_ERR("Socket creation not allowed on PPP PDN (%d) when PPP is not stopped", cid);
+		return false;
+	}
+#endif
+	for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
+		if (socks[i].cid == cid) {
+			/* If the CID is used for RAW sockets*/
+			if (type == NRF_SOCK_RAW) {
+				LOG_ERR("Raw socket creation not allowed on PDN (%d) "
+					"which already has another socket", cid);
+				return false;
+			}
+
+			/* If the CID is used for a RAW socket */
+			if (socks[i].type == NRF_SOCK_RAW) {
+				LOG_ERR("Socket creation not allowed on PDN (%d) "
+					"which already has RAW socket", cid);
+				return false;
+			}
+		}
+	}
+
+	return true;
+}
+
 SM_AT_CMD_CUSTOM(xsocket, "AT#XSOCKET", handle_at_socket);
 static int handle_at_socket(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			    uint32_t param_count)
@@ -1149,6 +1185,10 @@ static int handle_at_socket(enum at_parser_cmd_type cmd_type, struct at_parser *
 					err = -EINVAL;
 					goto error;
 				}
+			}
+			if (!cid_validity_raw_socket_check(sock->cid, sock->type)) {
+				err = -EFAULT;
+				goto error;
 			}
 			err = do_socket_open(sock);
 			if (err) {
@@ -1259,6 +1299,10 @@ static int handle_at_secure_socket(enum at_parser_cmd_type cmd_type,
 					err = -EINVAL;
 					goto error;
 				}
+			}
+			if (!cid_validity_raw_socket_check(sock->cid, sock->type)) {
+				err = -EINVAL;
+				goto error;
 			}
 			err = do_secure_socket_open(sock, peer_verify);
 			if (err) {
