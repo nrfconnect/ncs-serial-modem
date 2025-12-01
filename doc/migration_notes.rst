@@ -169,6 +169,16 @@ Here is the list of changes:
        * ``0`` - Binary mode. Data received as binary data.
        * ``1`` - Hex string mode. Data received as hexadecimal string representation.
 
+   * ``AT#XAPOLL`` parameter changes:
+
+     Added ``<handle>`` as the first parameter to the ``AT#XAPOLL`` command.
+     If a handle is provided, the operation applies only to that specific socket.
+     If no handle is provided, operation applies to all open sockets.
+     Removed support for multiple socket handles in a single command.
+
+     * Old syntax: ``AT#XAPOLL=<op>[,<events>[,<handle1>[,<handle2> ...<handle8>]``
+     * New syntax: ``AT#XAPOLL=[<handle>],<op>[,<events>]``
+
    * Other socket operations now require handle parameter:
 
      * ``AT#XSOCKETOPT=<handle>,<op>,<name>[,<value>]`` (handle parameter added)

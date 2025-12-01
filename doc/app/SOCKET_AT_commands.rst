@@ -1218,25 +1218,24 @@ The test command is not supported.
 Asynchronous socket polling #XAPOLL
 ===================================
 
-The ``#XAPOLL`` command allows you to receive Unsolicited Result Code (URC) notifications for events on all opened sockets or for selected sockets that have already been opened.
-
-.. note::
-
-    The ``#XAPOLL`` command is not usable at the same time with the socket AT commands that use poll internally (``#XACCEPT``).
+The ``#XAPOLL`` command allows you to receive Unsolicited Result Code (URC) notifications for poll events on sockets.
 
 Set command
 -----------
 
 The set command allows you to activate or deactivate asynchronous polling for sockets.
 
-Activating asynchronous polling when it is already running, will stop the current polling and start a new one with the new parameters.
-
 Syntax
 ~~~~~~
 
 ::
 
-   #XAPOLL=<op>,<events>[,<handle1>[,<handle2> ...<handle8>]
+   #XAPOLL=[<handle>],<op>,[<events>]
+
+* The ``<handle>`` value sets the socket handle to poll.
+  Handles are sent in the ``AT#XSOCKET`` or ``AT#XSSOCKET`` responses.
+  Handles can also be obtained with ``AT#XSOCKET?`` or ``AT#XSSOCKET?`` commands.
+  If handle is omitted, the operation applies to all open sockets and to any new sockets that are created.
 
 * The ``<op>`` value can accept one of the following values:
 
@@ -1252,10 +1251,6 @@ Syntax
   * ``1`` - Read events (``POLLIN``) are polled, in addition to the default events.
   * ``4`` - Write events (``POLLOUT``) are polled, in addition to the default events.
 
-* The ``<handleN>`` value sets the socket handle to poll.
-  Handles are sent in the ``AT#XSOCKET`` or ``AT#XSSOCKET`` responses.
-  Handles can also be obtained with ``AT#XSOCKET?`` or ``AT#XSSOCKET?`` commands.
-  If no handles are specified, all open sockets will be polled, including any new sockets that are created after ``#XAPOLL`` has been started.
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -1290,93 +1285,94 @@ Example
 
 ::
 
-   AT#XAPOLL=1,5
+   // Start asynchronous polling for all sockets with POLLIN and POLLOUT events.
+   AT#XAPOLL=,1,5
 
    OK
 
    // Create a TCP socket and connect to the test server.
    AT#XSOCKET=1,1,0
 
-   #XSOCKET: 1,1,6
+   #XSOCKET: 0,1,6
 
    OK
 
-   AT#XCONNECT=1,"test.server.com",1234
+   AT#XCONNECT=0,"test.server.com",1234
 
-   #XCONNECT: 1,1
+   #XCONNECT: 0,1
 
    OK
 
-   #XAPOLL: 1,4
+   #XAPOLL: 0,4
 
    // Send data to the test server, which will echo it back.
-   AT#XSEND=1,0,0,"echo"
+   AT#XSEND=0,0,0,"echo"
 
-   #XSEND: 1,0,4
+   #XSEND: 0,0,4
 
    OK
 
-   #XAPOLL: 1,4
+   #XAPOLL: 0,4
 
    // Test server sends the data back and closes the connection. POLLIN and POLLHUP events are received.
-   #XAPOLL: 1,17
+   #XAPOLL: 0,17
 
-   AT#XRECV=1,0,0,1
+   AT#XRECV=0,0,0,1
 
-   #XRECV: 1,0,4
+   #XRECV: 0,0,4
    echo
    OK
 
    // Close the TCP socket.
-   AT#XCLOSE=1
+   AT#XCLOSE=0
 
-   #XCLOSE: 1,0
+   #XCLOSE: 0,0
 
    OK
 
    // Create a UDP socket and send network acknowledge data to another test server, which does not echo.
    AT#XSOCKET=2,2,0
 
-   #XSOCKET: 2,2,17
+   #XSOCKET: 0,2,17
 
    OK
 
-   #XAPOLL: 2,4
+   #XAPOLL: 0,4
 
-   AT#XCONNECT=2,"no_echo.test.server.com",1234
+   AT#XCONNECT=0,"no_echo.test.server.com",1234
 
-   #XCONNECT: 2,1
+   #XCONNECT: 0,1
 
    OK
 
    // Send data to the test server with network acknowledged send flag.
-   AT#XSEND=2,0,8192,"no echo"
+   AT#XSEND=0,0,8192,"no echo"
 
-   #XSEND: 2,1,7
+   #XSEND: 0,1,7
 
    OK
 
    // Unsolicited notification for network acknowledged send.
-   #XSENDNTF: 2,0,7
+   #XSENDNTF: 0,0,7
 
-   #XAPOLL: 2,4
+   #XAPOLL: 0,4
 
    // Close the UDP socket.
-   AT#XCLOSE=2
+   AT#XCLOSE=0
 
-   #XCLOSE: 2,0
+   #XCLOSE: 0,0
 
    OK
 
-   // Stop asynchronous polling.
-   AT#XAPOLL=0
+   // Stop asynchronous polling for all sockets.
+   AT#XAPOLL=,0
 
    OK
 
 Read command
 ------------
 
-The read command allows you to check the status of asynchronous polling.
+The read command lists the socket handles with the events that are being polled.
 
 Syntax
 ~~~~~~
@@ -1390,12 +1386,10 @@ Response syntax
 
 ::
 
-   #XAPOLL: <running>,<events>,[<handle1> ...<handle8>]
+   #XAPOLL: <handle>,<events>
 
-* The ``<running>`` value can be one of the following integers:
-
-  * ``0`` - Asynchronous polling is not running.
-  * ``1`` - Asynchronous polling is running.
+* The ``<handle>`` value is an integer.
+  It is the handle of the socket that is being polled.
 
 * The ``<events>`` value is an integer, which must be interpreted as a bit field.
   It represents the events that are being polled, which can be any combination of ``POLLIN`` and ``POLLOUT``.
@@ -1406,27 +1400,67 @@ Response syntax
   * ``1`` - Poll read events (``POLLIN``) in addition to the default events.
   * ``4`` - Poll write events (``POLLOUT``) in addition to the default events.
 
-* The ``<handleN>`` values return the socket handles that are being polled.
 
 Example
 ~~~~~~~
 
 ::
 
-   AT#XSOCKET=1,1,0
+   // Start asynchronous polling for all sockets with POLLIN event.
+   AT#XAPOLL=,1,1
 
+   OK
+
+   // Create socket 0.
+   AT#XSOCKET=1,1,0
 
    #XSOCKET: 0,1,6
 
    OK
-   AT#XAPOLL=1,1
 
+   // Create socket 1 to show that poll events can be configured per socket.
+   AT#XSOCKET=1,1,0
+
+   #XSOCKET: 1,1,6
 
    OK
+
+   // Activate only POLLOUT event polling for socket 1.
+   AT#XAPOLL=1,1,4
+
+   OK
+
+   // Create socket 2 to show that POLLIN for all sockets is still in effect.
+   AT#XSOCKET=1,1,0
+
+   #XSOCKET: 2,1,6
+
+   OK
+
+   // Read the current poll settings.
    AT#XAPOLL?
 
+   #XAPOLL: 0,1
 
-   #XAPOLL: 1,1,0
+   #XAPOLL: 1,4
+
+   #XAPOLL: 2,1
+
+   OK
+
+   // Stop asynchronous polling for all sockets.
+   AT#XAPOLL=,0
+
+   OK
+
+   // Close all sockets.
+   AT#XCLOSE
+
+   #XCLOSE: 0,0
+
+   #XCLOSE: 1,0
+
+   #XCLOSE: 2,0
 
    OK
 
@@ -1447,7 +1481,7 @@ Response syntax
 
 ::
 
-   #XAPOLL: <stop/start>,<events>,<handle1>,<handle2>,...
+   #XAPOLL: <handle>,(stop/start),(events)
 
 Example
 ~~~~~~~
@@ -1456,8 +1490,7 @@ Example
 
    AT#XAPOLL=?
 
-
-   #XAPOLL: (0,1),<0,1,4,5>,<handle1>,<handle2>,...
+   #XAPOLL: <handle>,(0,1),(0,1,4,5)
 
    OK
 
@@ -1525,42 +1558,51 @@ Example
    AT#XRECVCFG=,1,0
 
    OK
+
    AT#XSOCKET=1,1,0
 
    #XSOCKET: 0,1,6
 
    OK
+
    AT#XCONNECT=0,"test.server.com",1234
 
    #XCONNECT: 0,1
 
    OK
+
    // Send data to the test server, which will echo it back.
    AT#XSEND=0,0,0,"Test"
 
    #XSEND: 0,0,4
 
    OK
+
    // Data is automatically received.
    #XRECV: 0,0,4
    Test
+
    // Enable automatic data reception in AT-command mode in hex string format for socket 0.
    AT#XRECVCFG=0,1,1
 
    OK
+
    // Send data to the test server, which will echo it back.
    AT#XSEND=0,0,0,"Test hex"
 
    #XSEND: 0,0,8
 
    OK
+
    // Data is automatically received in hex string format.
    #XRECV: 0,1,8
    5465737420686578
+
    // Enable automatic reception of data in data mode.
    AT#XRECVCFG=0,2,0
 
    OK
+
    // Enter data mode and send data to the test server, which will echo it back.
    AT#XSEND=0,2,0
 
@@ -1576,12 +1618,14 @@ Example
    #XSOCKET: 1,2,17
 
    OK
+
    // Send data with unconnected UDP socket to the test server, which will echo it back with a delay.
    AT#XSENDTO=1,0,0,"test.server.com",1235,"Delayed UDP data"
 
    #XSENDTO: 1,0,16
 
    OK
+
    // Enter data mode with socket 0.
    AT#XSEND=0,2,0
 
@@ -1592,13 +1636,16 @@ Example
    // Exiting the data mode allows the delayed UDP data to be received.
    +++
    #XDATAMODE: 0
+
    // Unconnected UDP socket automatically receives the delayed data with RECVFROM.
    #XRECVFROM: 1,0,16,"111.112.113.114",1235
    Delayed UDP data
+
    // Disable automatic data reception for all sockets.
    AT#XRECVCFG=,0
 
    OK
+
    AT#XCLOSE
 
    #XCLOSE: 0,0

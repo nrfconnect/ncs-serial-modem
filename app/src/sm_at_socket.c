@@ -66,14 +66,14 @@ static char udp_url[SM_MAX_URL];
 static uint16_t udp_port;
 
 struct sm_async_poll {
-	uint16_t events;          /* Events to poll for this socket. */
-	atomic_t revents;         /* Events received for this socket. */
-	uint16_t delayed_revents; /* Events received for this socket during datamode. */
-	uint16_t xapoll_events;   /* Events to update for xapoll. */
-	uint8_t adr_flags;        /* Flags for automatic data reception. */
-	bool disable: 1;          /* Poll needs to stay disabled for this socket. */
-	bool xapoll_specific: 1;  /* xapoll specific socket to poll. */
-	bool adr_hex: 1;          /* Automatic data reception in hex mode. */
+	uint8_t events;                  /* Events to poll for this socket. */
+	atomic_t revents;                /* Events received for this socket. */
+	uint8_t delayed_revents;         /* Events received for this socket during datamode. */
+	uint8_t xapoll_events;           /* Events to update for xapoll. */
+	uint8_t xapoll_events_requested; /* Requested events for xapoll. */
+	uint8_t adr_flags;               /* Flags for automatic data reception. */
+	bool disable: 1;                 /* Poll needs to stay disabled for this socket. */
+	bool adr_hex: 1;                 /* Automatic data reception in hex mode. */
 };
 
 #define SM_MSG_SEND_ACK 0x2000
@@ -101,12 +101,10 @@ static struct sm_socket *datamode_sock; /* Socket for data mode */
 static char hex_data[1400 + 1]; /* Buffer for hex data conversion */
 
 static struct async_poll_ctx {
-	struct k_work poll_work; /* Work to send poll URCs. */
-	uint16_t xapoll_events;  /* Events to poll for async poll. */
-	uint8_t adr_flags;       /* Auto reception flags for all sockets. */
-	bool xapoll_all: 1;      /* Poll all the sockets. */
-	bool xapoll_running: 1;  /* Async poll is running. */
-	bool adr_hex: 1;         /* Auto reception hex mode for all sockets. */
+	struct k_work poll_work;         /* Work to send poll URCs. */
+	uint8_t xapoll_events_requested; /* Events requested for all the sockets for async poll. */
+	uint8_t adr_flags;               /* Auto reception flags for all sockets. */
+	bool adr_hex: 1;                 /* Auto reception hex mode for all sockets. */
 } poll_ctx;
 
 /* forward declarations */
@@ -197,7 +195,7 @@ static void poll_cb(struct nrf_pollfd *pollfd)
 }
 
 
-static int set_so_poll_cb(struct sm_socket *socket, uint16_t events)
+static int set_so_poll_cb(struct sm_socket *socket, uint8_t events)
 {
 	int err;
 
@@ -250,7 +248,7 @@ static void auto_reception(struct sm_socket *sock)
 	}
 }
 
-static int update_poll_events(struct sm_socket *sock, uint16_t events, bool update_xapoll)
+static int update_poll_events(struct sm_socket *sock, uint8_t events, bool update_xapoll)
 {
 	int ret;
 
@@ -261,10 +259,10 @@ static int update_poll_events(struct sm_socket *sock, uint16_t events, bool upda
 		return 0;
 	}
 
-	if (update_xapoll && poll_ctx.xapoll_running &&
-	    (poll_ctx.xapoll_all || sock->async_poll.xapoll_specific)) {
+	if (update_xapoll) {
 		/* Update expected xapoll events. */
-		sock->async_poll.xapoll_events |= (poll_ctx.xapoll_events & events);
+		sock->async_poll.xapoll_events |=
+			(sock->async_poll.xapoll_events_requested & events);
 	}
 
 	sock->async_poll.events |= events;
@@ -291,7 +289,7 @@ static void poll_work_fn(struct k_work *work)
 			continue;
 		}
 
-		uint16_t revents = atomic_clear(&sock->async_poll.revents);
+		uint8_t revents = atomic_clear(&sock->async_poll.revents);
 
 		LOG_DBG("Socket %d poll revents 0x%x", sock->fd, revents);
 
@@ -324,8 +322,8 @@ static void poll_work_fn(struct k_work *work)
 		assert(at_mode || (data_mode && sock == datamode_sock));
 
 		/* Send #XAPOLL URC for poll events. */
-		if (!data_mode && poll_ctx.xapoll_running) {
-			uint16_t xapoll_events = revents & (sock->async_poll.xapoll_events);
+		if (!data_mode) {
+			uint8_t xapoll_events = revents & (sock->async_poll.xapoll_events);
 
 			/* Do not send URC for the same events twice, unless send/recv is done. */
 			sock->async_poll.xapoll_events &= ~xapoll_events;
@@ -533,6 +531,7 @@ static int do_socket_open(struct sm_socket *sock)
 	/* Update poll events for xapoll and automatic data reception */
 	sock->async_poll.adr_flags = poll_ctx.adr_flags;
 	sock->async_poll.adr_hex = poll_ctx.adr_hex;
+	sock->async_poll.xapoll_events_requested = poll_ctx.xapoll_events_requested;
 	update_poll_events(
 		sock, NRF_POLLIN | NRF_POLLOUT | NRF_POLLERR | NRF_POLLHUP | NRF_POLLNVAL, true);
 
@@ -611,6 +610,7 @@ static int do_secure_socket_open(struct sm_socket *sock, int peer_verify)
 	/* Update poll events for xapoll and automatic data reception */
 	sock->async_poll.adr_flags = poll_ctx.adr_flags;
 	sock->async_poll.adr_hex = poll_ctx.adr_hex;
+	sock->async_poll.xapoll_events_requested = poll_ctx.xapoll_events_requested;
 	update_poll_events(
 		sock, NRF_POLLIN | NRF_POLLOUT | NRF_POLLERR | NRF_POLLHUP | NRF_POLLNVAL, true);
 
@@ -1200,10 +1200,12 @@ static int socket_datamode_callback(uint8_t op, const uint8_t *data, int len, ui
 			if (ret == -EAGAIN || ret == -ETIMEDOUT) {
 				LOG_WRN("Send failed: %d", ret);
 				return ret;
-			} else if (ret < 0) {
+			} else if (ret) {
 				LOG_ERR("Send failed: %d", ret);
 				exit_datamode_handler(ret);
 				return ret;
+			} else {
+				LOG_DBG("Send successful");
 			}
 		}
 	} else if (op == DATAMODE_EXIT) {
@@ -2025,51 +2027,50 @@ static int handle_at_getaddrinfo(enum at_parser_cmd_type cmd_type, struct at_par
 	return err;
 }
 
-static int apoll_stop(void)
+static void xapoll_stop(struct sm_socket *sock)
 {
-	poll_ctx.xapoll_running = false;
-	poll_ctx.xapoll_all = false;
-	poll_ctx.xapoll_events = 0;
+	if (sock) {
+		/* Stop events for a specific socket. */
+		sock->async_poll.xapoll_events_requested = 0;
+		return;
+	}
 
+	/* Stop events for all sockets. */
+	poll_ctx.xapoll_events_requested = 0;
 	for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
 		if (socks[i].fd != INVALID_SOCKET) {
-			socks[i].async_poll.xapoll_events = 0;
-			socks[i].async_poll.xapoll_specific = false;
+			socks[i].async_poll.xapoll_events_requested = 0;
 		}
 	}
-
-	return 0;
 }
 
-static void format_apoll_read_response(char *response, size_t size)
+static void xapoll_read_response(void)
 {
-	int offset = 0;
-
-	offset = snprintf(response, size, "\r\n#XAPOLL: %d,%d", poll_ctx.xapoll_running,
-			  (poll_ctx.xapoll_events & ~(NRF_POLLERR | NRF_POLLHUP | NRF_POLLNVAL)));
-
-	for (int i = 0; i < SM_MAX_SOCKET_COUNT && offset < size; i++) {
-		if (socks[i].fd != INVALID_SOCKET &&
-		    (poll_ctx.xapoll_all || socks[i].async_poll.xapoll_specific)) {
-			offset += snprintf(&response[offset], size - offset, ",%d", socks[i].fd);
+	for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
+		if (socks[i].fd != INVALID_SOCKET && socks[i].async_poll.xapoll_events_requested) {
+			rsp_send("\r\n#XAPOLL: %d,%d\r\n", socks[i].fd,
+				 socks[i].async_poll.xapoll_events_requested &
+					 ~(NRF_POLLERR | NRF_POLLHUP | NRF_POLLNVAL));
 		}
 	}
-
-	if (offset > size - sizeof("\r\n")) {
-		offset = size - sizeof("\r\n");
-	}
-	snprintf(&response[offset], size - offset, "\r\n");
 }
 
-static int set_apoll_all_sockets(void)
+static int set_xapoll_events(struct sm_socket *sock, uint8_t events)
 {
 	int ret;
 
-	poll_ctx.xapoll_running = true;
-	poll_ctx.xapoll_all = true;
+	if (sock) {
+		/* Set events for a specific socket. */
+		sock->async_poll.xapoll_events_requested = events;
+		return update_poll_events(sock, events, true);
+	}
+
+	/* Set events for all sockets. */
+	poll_ctx.xapoll_events_requested = events;
 	for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
 		if (socks[i].fd != INVALID_SOCKET) {
-			ret = update_poll_events(&socks[i], poll_ctx.xapoll_events, true);
+			socks[i].async_poll.xapoll_events_requested = events;
+			ret = update_poll_events(&socks[i], events, true);
 			if (ret) {
 				return ret;
 			}
@@ -2078,58 +2079,15 @@ static int set_apoll_all_sockets(void)
 	return 0;
 }
 
-static int set_apoll_specific_sockets(struct at_parser *parser, uint32_t param_count)
-{
-	int handle;
-	int err;
-	bool socket_found;
-
-	poll_ctx.xapoll_running = true;
-	poll_ctx.xapoll_all = false;
-
-	/* Clear previously set values. */
-	for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
-		if (socks[i].fd != INVALID_SOCKET) {
-			socks[i].async_poll.xapoll_specific = false;
-			socks[i].async_poll.xapoll_events = 0;
-		}
-	}
-
-	/* Go through all the given handles. */
-	for (int i = 3; i < param_count; i++) {
-		err = at_parser_num_get(parser, i, &handle);
-		if (err) {
-			return err;
-		}
-		socket_found = false;
-
-		/* Match given handles to socket handles. */
-		for (int j = 0; j < SM_MAX_SOCKET_COUNT; j++) {
-			if (socks[j].fd == handle) {
-				socks[j].async_poll.xapoll_specific = true;
-				err = update_poll_events(&socks[j], poll_ctx.xapoll_events, true);
-				if (err) {
-					return err;
-				}
-				socket_found = true;
-				break;
-			}
-		}
-		if (!socket_found) {
-			LOG_ERR("Socket %d not found", handle);
-			return -EINVAL;
-		}
-	}
-
-	return 0;
-}
-
-SM_AT_CMD_CUSTOM(xapoll, "AT#XAPOLL", handle_at_apoll);
-static int handle_at_apoll(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+SM_AT_CMD_CUSTOM(xapoll, "AT#XAPOLL", handle_at_xapoll);
+static int handle_at_xapoll(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			  uint32_t param_count)
 {
 	int err = -EINVAL;
 	int op;
+	int fd = -1;
+	struct sm_socket *sock = NULL;
+	uint16_t events;
 
 	enum async_poll_operation {
 		AT_ASYNCPOLL_STOP = 0,
@@ -2138,47 +2096,48 @@ static int handle_at_apoll(enum at_parser_cmd_type cmd_type, struct at_parser *p
 
 	switch (cmd_type) {
 	case AT_PARSER_CMD_TYPE_SET:
-		if (at_parser_num_get(parser, 1, &op) ||
+		/* Get the socket file descriptor, if it exists. */
+		err = at_parser_num_get(parser, 1, &fd);
+		if (err && err != -ENODATA) {
+			return err;
+		}
+		if (fd != -1) {
+			sock = find_socket(fd);
+			if (sock == NULL) {
+				return -EINVAL;
+			}
+		}
+		if (at_parser_num_get(parser, 2, &op) ||
 		    (op != AT_ASYNCPOLL_START && op != AT_ASYNCPOLL_STOP)) {
 			return -EINVAL;
 		}
 		if (op == AT_ASYNCPOLL_STOP) {
-			return apoll_stop();
+			xapoll_stop(sock);
+			return 0;
 		}
 
 		/* op == AT_ASYNCPOLL_START */
-		err = at_parser_num_get(parser, 2, &poll_ctx.xapoll_events);
+		err = at_parser_num_get(parser, 3, &events);
 		if (err) {
 			return err;
 		}
-		if (poll_ctx.xapoll_events & ~(NRF_POLLIN | NRF_POLLOUT)) {
-			LOG_ERR("Invalid poll events: 0x%02x", poll_ctx.xapoll_events);
+		if (events & ~(NRF_POLLIN | NRF_POLLOUT)) {
+			LOG_ERR("Invalid poll events: %d", events);
 			return -EINVAL;
 		}
 		/* Libmodem always returns these. */
-		poll_ctx.xapoll_events |= NRF_POLLERR | NRF_POLLHUP | NRF_POLLNVAL;
-		if (param_count == 3) {
-			err = set_apoll_all_sockets();
-			if (err) {
-				return err;
-			}
-		} else {
-			err = set_apoll_specific_sockets(parser, param_count);
-			if (err) {
-				return err;
-			}
-		}
+		events |= NRF_POLLERR | NRF_POLLHUP | NRF_POLLNVAL;
+
+		err = set_xapoll_events(sock, events);
 		break;
 
 	case AT_PARSER_CMD_TYPE_READ:
-		char response[64];
-
-		format_apoll_read_response(response, sizeof(response));
-		err = sm_at_send_str(response);
+		xapoll_read_response();
+		err = 0;
 		break;
 
 	case AT_PARSER_CMD_TYPE_TEST:
-		rsp_send("\r\n#XAPOLL: (%d,%d),<0,%d,%d,%d>,<handle1>,<handle2>,...\r\n",
+		rsp_send("\r\n#XAPOLL: <handle>,(%d,%d),(0,%d,%d,%d)\r\n",
 			 AT_ASYNCPOLL_STOP, AT_ASYNCPOLL_START, ZSOCK_POLLIN, ZSOCK_POLLOUT,
 			 ZSOCK_POLLIN | ZSOCK_POLLOUT);
 		err = 0;
@@ -2214,13 +2173,14 @@ static int handle_at_recvcfg(enum at_parser_cmd_type cmd_type, struct at_parser 
 			}
 		}
 		err = at_parser_num_get(parser, 2, &flags);
-		if (err) {
-			return err;
+		if (err || (flags & ~(SM_ADR_DISABLE | SM_ADR_AT_MODE | SM_ADR_DATA_MODE))) {
+			return -EINVAL;
 		}
 		if (param_count > 3) {
 			err = at_parser_num_get(parser, 3, &hex_mode);
-			if (err) {
-				return err;
+			if (err || (hex_mode != AT_SOCKET_MODE_UNFORMATTED &&
+				    hex_mode != AT_SOCKET_MODE_HEX)) {
+				return -EINVAL;
 			}
 		}
 		if ((flags & SM_ADR_DATA_MODE) && hex_mode) {
@@ -2290,13 +2250,12 @@ int sm_at_socket_init(void)
  */
 int sm_at_socket_uninit(void)
 {
-	apoll_stop();
-
 	for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
 		if (socks[i].fd != INVALID_SOCKET) {
 			do_socket_close(&socks[i]);
 		}
 	}
+	poll_ctx = (struct async_poll_ctx){0};
 
 	return 0;
 }
