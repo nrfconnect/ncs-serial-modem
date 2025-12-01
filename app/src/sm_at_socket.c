@@ -84,7 +84,6 @@ static struct sm_socket {
 	sec_tag_t sec_tag;  /* Security tag of the credential */
 	int family;         /* Socket address family */
 	int fd;             /* Socket descriptor. */
-	int fd_peer;        /* Socket descriptor for peer. */
 	uint16_t cid;       /* PDP Context ID, 0: primary; 1~10: secondary */
 	int send_flags;     /* Send flags */
 	bool send_cb_set;   /* Send callback set */
@@ -115,7 +114,6 @@ static void init_socket(struct sm_socket *socket)
 	socket->sec_tag = SEC_TAG_TLS_INVALID;
 	socket->role = AT_SOCKET_ROLE_CLIENT;
 	socket->fd = INVALID_SOCKET;
-	socket->fd_peer = INVALID_SOCKET;
 	socket->cid = 0;
 	socket->send_flags = 0;
 	socket->send_cb_set = false;
@@ -506,13 +504,6 @@ static int do_socket_close(struct sm_socket *sock)
 		return 0;
 	}
 
-	if (sock->fd_peer != INVALID_SOCKET) {
-		ret = nrf_close(sock->fd_peer);
-		if (ret) {
-			LOG_WRN("peer nrf_close() error: %d", -errno);
-		}
-		sock->fd_peer = INVALID_SOCKET;
-	}
 	ret = nrf_close(sock->fd);
 	if (ret) {
 		LOG_WRN("nrf_close() error: %d", -errno);
@@ -836,16 +827,6 @@ static int do_send(struct sm_socket *sock, const uint8_t *data, int len, int fla
 
 	LOG_DBG("send flags=%d", flags);
 
-	/* For TCP/TLS Server, send to incoming socket */
-	if (sock->type == NRF_SOCK_STREAM && sock->role == AT_SOCKET_ROLE_SERVER) {
-		if (sock->fd_peer != INVALID_SOCKET) {
-			sockfd = sock->fd_peer;
-		} else {
-			LOG_ERR("No connection");
-			return -EINVAL;
-		}
-	}
-
 	if (send_ntf) {
 		/* Set send callback. */
 		flags &= ~SM_MSG_SEND_ACK;
@@ -914,16 +895,6 @@ static int do_recv(struct sm_socket *sock, int timeout, int flags, enum sm_socke
 {
 	int ret;
 	int sockfd = sock->fd;
-
-	/* For TCP/TLS Server, receive from incoming socket */
-	if (sock->type == NRF_SOCK_STREAM && sock->role == AT_SOCKET_ROLE_SERVER) {
-		if (sock->fd_peer != INVALID_SOCKET) {
-			sockfd = sock->fd_peer;
-		} else {
-			LOG_ERR("No remote connection");
-			return -EINVAL;
-		}
-	}
 	struct timeval tmo = {.tv_sec = timeout};
 
 	ret = nrf_setsockopt(sock->fd, SOL_SOCKET, SO_RCVTIMEO, &tmo, sizeof(tmo));
