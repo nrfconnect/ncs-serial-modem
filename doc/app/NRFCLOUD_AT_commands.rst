@@ -17,8 +17,8 @@ The ``#XNRFCLOUD`` command controls the access to the nRF Cloud service.
 .. note::
    To use ``#XNRFCLOUD``, the following preconditions apply:
 
-   * You must first preconnect provision the device to nRF Cloud, using the UUID from the modem firmware as device ID.
-     See `nRF Cloud Preconnect Provisioning`_ for more information.
+   * You must first onboard the device to nRF Cloud, using the device-specific UUID as the device ID.
+     See `nRF Cloud Preconnect onboarding`_ for more information.
    * The :ref:`CONFIG_SM_NRF_CLOUD <CONFIG_SM_NRF_CLOUD>` Kconfig option must be enabled.
    * The device must have access to nRF Cloud through the LTE network.
 
@@ -50,9 +50,9 @@ It can have the following integer values:
 * ``1`` - The device location is sent to nRF Cloud.
 
 .. note::
-   Sending the device location to nRF Cloud is done in a best-effort way.
-   For it to happen, the device must have :ref:`GNSS <SM_AT_GNSS>` enabled and it must be acquiring fixes.
-   The minimal report interval is 5 seconds.
+   The location is sent to the nRF Cloud whenever a fix is produced by the GNSS module.
+   You must use the :ref:`#XGNSS <SM_AT_GNSS>` AT command to start GNSS either in single-fix or periodic navigation mode.
+   The interval between fixes must be at least 5 seconds.
 
 .. note::
    The application supports the nRF Cloud cloud2device appId ``MODEM`` to send an AT command from the cloud:
@@ -64,8 +64,6 @@ It can have the following integer values:
    * device2cloud schema::
 
        {"appId":"MODEM", "messageType":"RSP", "data":"<AT_response>"}.
-
-   The application executes the AT command in a best-effort way.
 
 .. note::
    The application supports the nRF Cloud cloud2device appId ``DEVICE`` to gracefully disconnect from the cloud:
@@ -155,15 +153,7 @@ Example
 
   AT#XNRFCLOUD?
 
-  #XNRFCLOUD: 1,0,16842753,"nrf-352656106443792"
-
-  OK
-
-::
-
-  AT#XNRFCLOUD?
-
-  #XNRFCLOUD: 1,0,8888,"50503041-3633-4261-803d-1e2b8f70111a"
+  #XNRFCLOUD: 1,0,16842753,"50503041-3633-4261-803d-1e2b8f70111a"
 
   OK
 
