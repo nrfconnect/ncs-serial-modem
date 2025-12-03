@@ -781,6 +781,9 @@ static int at_sec_sockopt_to_sockopt(enum at_sec_sockopt at_option, int *level, 
 	case AT_TLS_DTLS_HANDSHAKE_TIMEO:
 		*option = NRF_SO_SEC_DTLS_HANDSHAKE_TIMEO;
 		break;
+	case AT_TLS_DTLS_FRAG_EXT:
+		*option = NRF_SO_SEC_DTLS_FRAG_EXT;
+		break;
 	default:
 		LOG_WRN("Unsupported option: %d", at_option);
 		return -ENOTSUP;
