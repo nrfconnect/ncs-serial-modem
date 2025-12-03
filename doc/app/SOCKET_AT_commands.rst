@@ -617,6 +617,20 @@ Syntax
     * ``<value>`` is an integer that indicates the DTLS handshake timeout in seconds.
       It can be one of the following values: ``1``, ``3``, ``7``, ``15``, ``31``, ``63``, ``123``.
 
+  * ``22`` - :c:macro:`AT_TLS_DTLS_FRAG_EXT`.
+
+    * ``<value>`` is an integer that indicates the use of the DTLS fragmentation extension specified in RFC 6066.
+      It can be one of the following values:
+
+      * ``0`` - :c:macro:`DTLS_FRAG_EXT_DISABLED`.
+      * ``1`` - :c:macro:`DTLS_FRAG_EXT_512_ENABLED`.
+      * ``2`` - :c:macro:`DTLS_FRAG_EXT_1024_ENABLED`.
+
+      This is only supported by the following modem firmware:
+
+        * mfw_nrf91x1 v2.0.4 or later
+        * mfw_nrf9151-ntn
+
 See `nRF socket options <nrfxlib_nrf_sockets_>`_ for explanation of the supported options.
 
 
