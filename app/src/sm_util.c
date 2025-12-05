@@ -309,7 +309,7 @@ void util_get_ip_addr(int cid, char addr4[INET_ADDRSTRLEN], char addr6[INET6_ADD
 	 * PDN type "IPV6": PDP_addr_1 is <IPv6>, max 46(INET6_ADDRSTRLEN),':', digits, 'A'~'F'
 	 * PDN type "IPV4V6": <IPv4>,<IPv6> or <IPV4> or <IPv6>
 	 */
-	ret = sm_util_at_scanf(cmd, "+CGPADDR: %*d,\"%46[.:0-9A-F]\",\"%46[:0-9A-F]\"",
+	ret = sm_util_at_scanf(cmd, "+CGPADDR: %*d,\"%45[.:0-9A-F]\",\"%45[:0-9A-F]\"",
 				 addr1, addr2);
 	if (ret <= 0) {
 		return;
