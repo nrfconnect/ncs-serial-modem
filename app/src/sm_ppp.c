@@ -386,6 +386,14 @@ bool sm_ppp_is_stopped(void)
 	return (ppp_state == PPP_STATE_STOPPED);
 }
 
+bool sm_ppp_is_running_on_cid(uint16_t cid)
+{
+	if (!sm_ppp_is_stopped() && cid == ppp_pdn_cid) {
+		return true;
+	}
+	return false;
+}
+
 static int ppp_stop(enum ppp_reason reason)
 {
 	if (ppp_state == PPP_STATE_STOPPED) {
