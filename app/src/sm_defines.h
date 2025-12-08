@@ -11,7 +11,6 @@
 #include "sm_trap_macros.h"
 
 #define INVALID_SOCKET       -1
-#define INVALID_DTLS_CID     -1
 
 enum {
 	/* The command ran successfully and doesn't want the automatic response to be sent. */
@@ -25,11 +24,9 @@ enum {
 #define SM_AT_MAX_RSP_LEN   2100
 
 /** The maximum allowed length of data send/receive through the Serial Modem */
-#define SM_MAX_PAYLOAD_SIZE 1024 /** max size of payload sent in command mode */
 #define SM_MAX_MESSAGE_SIZE NRF_SOCKET_TLS_MAX_MESSAGE_SIZE
 
 #define SM_MAX_URL          128  /** max size of URL string */
-#define SM_MAX_FILEPATH     128  /** max size of filepath string */
 #define SM_MAX_USERNAME     32   /** max size of username in login */
 #define SM_MAX_PASSWORD     32   /** max size of password in login */
 

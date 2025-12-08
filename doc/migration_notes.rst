@@ -239,6 +239,148 @@ Removed features:
      * Use ``nrf54l15dk`` instead.
 
    * Native TLS support including ``overlay-native_tls.conf``.
+
+   * TCP and UDP clients.
+     This includes the removal of the following AT commands:
+
+      * ``AT#XTCPCLI``
+      * ``AT#XTCPSEND``
+      * ``AT#XUDPCLI``
+      * ``AT#XUDPSEND``
+
+      The following URC notifications have also been removed:
+
+      * ``#XTCPDATA``
+      * ``#XUDPDATA``
+
+      You can replace this functionality by using the socket AT commands.
+
+      Migration examples:
+
+        * TCP IPv4 client
+
+          |NCS| SLM approach:
+
+          .. code-block::
+
+             AT#XTCPCLI=1,"test.server.com",1234
+
+             #XTCPCLI: 0,"connected"
+
+             OK
+
+             AT#XTCPSEND="echo this"
+
+             #XTCPSEND: 9
+
+             OK
+
+             #XTCPDATA: 9
+             echo this
+
+             AT#XTCPCLI=0
+
+             OK
+
+             #XTCPCLI: 0,"disconnected"
+
+          |SM| approach:
+
+          .. code-block::
+
+             AT#XSOCKET=1,1,0
+
+             #XSOCKET: 0,1,6
+
+             OK
+
+             AT#XRECVCFG=0,3
+
+             OK
+
+             AT#XCONNECT=0,"test.server.com",1234
+
+             #XCONNECT: 0,1
+
+             OK
+
+             AT#XSEND=0,0,0,"echo this"
+
+             #XSEND: 0,0,9
+
+             OK
+
+             #XRECV: 0,0,9
+             echo this
+
+             AT#XCLOSE
+
+             #XCLOSE: 0,0
+
+             OK
+
+        * DTLS IPv6 client
+
+          |NCS| SLM approach:
+
+          .. code-block::
+
+             AT#XUDPCLI=2,"test.server.com",1235,1000
+
+             #XUDPCLI: 0,"connected"
+
+             OK
+
+             AT#XUDPSEND="echo this"
+
+             #XUDPSEND: 9
+
+             OK
+
+             #XUDPDATA: 9,"::",0
+             echo this
+
+             AT#XUDPCLI=0
+
+             OK
+
+          |SM| approach:
+
+          .. code-block::
+
+             AT#XSSOCKET=2,2,0,1000
+
+             #XSSOCKET: 0,2,273
+
+             OK
+
+             AT#XRECVCFG=0,3
+
+             OK
+
+             AT#XCONNECT=0,"test.server.com",1235
+
+             #XCONNECT: 0,1
+
+             OK
+
+             AT#XSEND=0,0,0,"echo this"
+
+             #XSEND: 0,0,9
+
+             OK
+
+             #XRECV: 0,0,9
+             echo this
+
+             AT#XCLOSE=0
+
+             #XCLOSE: 0,0
+
+             OK
+
+        You can set the parameters such as ``<hostname_verify>`` and ``<use_dtls_cid>`` using the ``AT#XSSOCKETOPT`` command.
+
    * TCP and UDP servers.
      This includes the removal of the following AT commands:
 

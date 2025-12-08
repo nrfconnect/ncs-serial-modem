@@ -45,4 +45,3 @@ The modem specific AT commands are documented in the `nRF91x1 AT Commands Refere
    PPP_AT_commands
    SMS_AT_commands
    SOCKET_AT_commands
-   TCPUDP_AT_commands
