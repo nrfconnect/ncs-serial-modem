@@ -20,6 +20,10 @@ jobs:
         with:
           path: serial_modem
 
+      - name: Install build libraries for native_sim
+        run: |
+          sudo apt install libc6-dev-i386
+
       - name: Prepare west project
         run: |
           python3 -m pip install west
