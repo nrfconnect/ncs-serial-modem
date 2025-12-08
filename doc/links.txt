@@ -34,6 +34,7 @@
 
 .. _`ug_tfm_security_by_separation`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/security/tfm/processing_environments.html#ug-tfm-security-by-separation
 .. _`ug_tfm`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/security/tfm/index.html#ug-tfm
+.. _`TF-M`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/security/tfm/processing_environments.html#app-boards-spe-nspe
 
 .. _`Serial LTE modem`: https://docs.nordicsemi.com/bundle/ncs-3.1.1/page/nrf/applications/serial_lte_modem/README.html
 .. _`LwM2M carrier`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/bin/lwm2m_carrier/index.html#liblwm2m-carrier-readme
