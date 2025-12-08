@@ -7,26 +7,8 @@
    :local:
    :depth: 2
 
-The |SM| PPP shell sample demonstrates how to use the nRF91 Series SiP as a Zephyr-compatible cellular modem through a PPP (Point-to-Point Protocol) interface.
+The |SM| PPP shell sample demonstrates how to use the nRF91 Series SiP as a Zephyr-compatible cellular modem through a Point-to-Point Protocol (PPP) interface.
 This sample enables an external MCU or Linux host to use Zephyr's native networking stack and shell commands to control the cellular modem, test network connectivity, and measure network performance.
-
-Overview
-********
-
-This sample showcases the integration between Zephyr's cellular modem driver and the |SM| application running on an nRF91 Series SiP.
-Instead of using AT commands directly, the controlling device can use Zephyr's standard networking APIs and shell commands to interact with the modem.
-
-The sample provides:
-
-* Full Zephyr networking stack (IPv4 and IPv6 support)
-* Network shell commands for interface management
-* Network performance testing using zperf
-* DNS resolution support
-* Automatic modem connection management
-* CMUX (GSM 07.10) multiplexing support
-* Power management with runtime power saving
-
-For more information about using the nRF91 Series SiP as a Zephyr-compatible modem, see :ref:`sm_as_zephyr_modem`.
 
 Requirements
 ************
@@ -53,11 +35,8 @@ The sample supports the following development kits:
    * - `nRF54L15 DK <nRF54L15 DK_>`_
      - PCA10156
      - `nrf54l15dk`_
-     - ``nrf54l15dk/nrf54l15/cpuapp``
-   * - `nRF54L15 DK <nRF54L15 DK_>`_ (TrustZone)
-     - PCA10156
-     - `nrf54l15dk`_
-     - ``nrf54l15dk/nrf54l15/cpuapp/ns``
+     - | ``nrf54l15dk/nrf54l15/cpuapp``
+       | ``nrf54l15dk/nrf54l15/cpuapp/ns`` (`TF-M`_)
    * - Native simulator
      - N/A
      - ``native_sim``
@@ -102,10 +81,55 @@ Native simulator setup
 ======================
 
 When running on the native simulator, the sample expects the |SM| to be available at ``/dev/ttyACM0`` on the Linux host system.
-Connect the nRF91 Series DK running |SM| to your Linux host via USB.
+Connect the nRF91 Series DK running |SM| to your Linux host through USB.
+
+Overview
+********
+
+This sample showcases the integration between Zephyr's cellular modem driver and the |SM| application running on an nRF91 Series SiP.
+Instead of using AT commands directly, the controlling device can use Zephyr's standard networking APIs and shell commands to interact with the modem.
+
+The sample provides:
+
+* Full Zephyr networking stack (IPv4 and IPv6 support).
+* Network shell commands for interface management.
+* Network performance testing using zperf.
+* DNS resolution support.
+* Automatic modem connection management.
+* CMUX (GSM 07.10) multiplexing support.
+* Power management with runtime power saving.
+
+For more information about using the nRF91 Series SiP as a Zephyr-compatible modem, see :ref:`sm_as_zephyr_modem`.
+
+Configuration
+*************
+
+The sample is configured with the following key features:
+
+* PPP Layer 2 networking
+* IPv4 and IPv6 support
+* TCP and UDP protocols
+* DNS resolver with automatic DNS server configuration from PPP
+* Network connection manager for automatic reconnection
+* Zephyr cellular modem driver with CMUX support
+* Runtime power management with automatic power saving
+* Network shell commands
+* Zperf for network performance testing
+
+The CMUX configuration enables:
+
+* Power save mode that closes CMUX pipes when idle
+* 5 second idle timeout before entering power save
+* MTU size of 127 bytes for optimal performance
 
 Building and running
 ********************
+
+This sample can be found under :file:`samples/sm_ppp_shell`.
+
+For more security, it is recommended to use the ``*/ns`` `variant <app_boards_names_>`_ of the board target (see the Requirements section above.)
+When built for this variant, the sample is configured to compile and run as a non-secure application using `security by separation <ug_tfm_security_by_separation_>`_.
+Therefore, it automatically includes `Trusted Firmware-M <ug_tfm_>`_ that prepares the required peripherals and secure services to be available for the application.
 
 nRF54L15 DK
 ===========
@@ -156,7 +180,7 @@ To start the cellular modem and establish a network connection:
 
    uart:~$ net iface up 1
 
-The modem will begin the network registration process.
+The modem begins the network registration process.
 You can monitor the connection status with:
 
 .. code-block:: console
@@ -205,27 +229,6 @@ To shut down the cellular connection and power off the modem:
 .. code-block:: console
 
    uart:~$ net iface down 1
-
-Configuration
-*************
-
-The sample is configured with the following key features:
-
-* PPP Layer 2 networking
-* IPv4 and IPv6 support
-* TCP and UDP protocols
-* DNS resolver with automatic DNS server configuration from PPP
-* Network connection manager for automatic reconnection
-* Zephyr cellular modem driver with CMUX support
-* Runtime power management with automatic power saving
-* Network shell commands
-* Zperf for network performance testing
-
-The CMUX configuration enables:
-
-* Power save mode that closes CMUX pipes when idle
-* 5-second idle timeout before entering power save
-* MTU size of 127 bytes for optimal performance
 
 Dependencies
 ************
