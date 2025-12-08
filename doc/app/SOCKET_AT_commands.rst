@@ -709,7 +709,7 @@ Connection #XCONNECT
 
 The ``#XCONNECT`` command allows you to connect to a server and to check the connection status.
 
-This command is for TCP and UDP clients.
+This command is for TCP and UDP client sockets.
 
 Set command
 -----------
@@ -1065,6 +1065,12 @@ Syntax
    A UDP payload size of 1200 bytes is commonly recommended, especially for IPv6, as it ensures the total packet size remains below the IPv6 minimum MTU of 1280 bytes, after accounting for headers and DTLS overhead.
    Keeping UDP packet sizes well below the theoretical maximum increases the likelihood of successful transmission.
    Even 1024 bytes could be used as a safe size for UDP packets.
+
+.. note::
+
+   With DTLS connections, the connection cannot be established with the ``#XSENDTO`` command.
+   Instead, it must be established using the ``#XCONNECT`` command.
+   This is a limitation in the nRF91 modem firmware.
 
 Response syntax
 ~~~~~~~~~~~~~~~

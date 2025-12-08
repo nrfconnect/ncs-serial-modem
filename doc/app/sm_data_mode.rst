@@ -13,7 +13,7 @@ When running in data mode, the application does the following:
 
 * It considers all the data received from the MCU over the UART bus as arbitrary data to be streamed through the LTE network by various service modules.
 * It buffers the URCs received from modem and threads and sends them to the MCU only after exiting data mode.
-* For the socket that is in data mode with automatic data reception, and TCP and UDP clients, the data streamed from a remote service is considered binary data to be sent to the MCU over the UART.
+* For the socket that is in data mode with automatic data reception, the data streamed from a remote service is considered binary data to be sent to the MCU over the UART.
 
 Overview
 ********
@@ -22,8 +22,6 @@ You can manually switch between AT-command mode and data mode.
 However, the |SM| data mode is applied automatically while using the following modules:
 
 * Socket ``send()`` and ``sendto()``
-* TCP/TLS proxy send
-* UDP/DTLS proxy send
 * MQTT publish
 * GNSS nRF Cloud send message
 * LwM2M carrier library app data send
@@ -44,8 +42,6 @@ See the following examples:
 
 Other examples:
 
-* ``AT#XTCPSEND``
-* ``AT#XUDPSEND``
 * ``AT#XMQTTPUB=<topic>,"",<qos>,<retain>``
 * ``AT#XNRFCLOUD=2``
 * ``AT#XCARRIER="app_data_set"``
@@ -81,9 +77,6 @@ After exiting the data mode, the |SM| application returns to the AT command mode
 .. note::
    The |SM| application sends the termination string :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` and moves to a state where the data received on the UART is dropped in the following scenarios:
 
-   * The remote server disconnects the TCP client.
-   * The TCP client disconnects from the remote server due to an error.
-   * The UDP client disconnects from the remote server due to an error.
    * The socket in data mode encounters an unrecoverable error.
 
    For |SM| to stop dropping the data received from UART and move to AT-command mode, the MCU needs to send the termination command :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` back to the |SM| application.
@@ -235,6 +228,6 @@ Example
    AT#XSEND=0,2,0
 
    OK
-   Test TCP datamode
+   Test datamode
    +++
    #XDATAMODE: 0

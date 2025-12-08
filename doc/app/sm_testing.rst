@@ -56,7 +56,7 @@ Complete the following steps to test the functionality provided by the :ref:`SM_
 TCP/UDP AT commands
 *******************
 
-The following sections show how to test the functionalities provided by the :ref:`SM_AT_SOCKET` and the :ref:`SM_AT_TCP_UDP`.
+The following sections show how to test the functionalities provided by the :ref:`SM_AT_SOCKET`.
 
 Network connection is required for these tests, so insert a SIM card and connect to the network:
 
@@ -67,8 +67,8 @@ Network connection is required for these tests, so insert a SIM card and connect
 
       OK
 
-TCP client
-==========
+TCP connection
+==============
 
 The following steps assume that you have a TCP echo server available.
 You can connect to public HTTP servers (port 80), but you cannot send and receive data.
@@ -151,70 +151,8 @@ You can connect to public HTTP servers (port 80), but you cannot send and receiv
 
          OK
 
-#. Test the TCP connection with a TCP client service:
-
-   a. Check the available values for the XTCPCLI command.
-
-      .. parsed-literal::
-         :class: highlight
-
-         **AT#XTCPCLI=?**
-
-         #XTCPCLI: (0,1,2),<url>,<port>,<sec_tag>,<peer_verify>,<hostname_verify>
-
-         OK
-
-   #. Create a TCP client and connect to a server.
-      Replace *example.com* with the hostname or IPv4 address of a TCP echo server, and *1234* with the corresponding port.
-      Then read the information (handle and protocol) about the connection.
-
-      .. parsed-literal::
-         :class: highlight
-
-         **AT#XTCPCLI=1,"**\ *example.com*\ **",**\ *1234*
-
-         #XTCPCLI: 0,"connected"
-
-         OK
-
-         **AT#XTCPCLI?**
-
-         #XTCPCLI: 0,1
-
-         OK
-
-   #. Send plaintext data to the TCP echo server and retrieve the response.
-
-      .. parsed-literal::
-         :class: highlight
-
-         **AT#XTCPSEND="Test TCP"**
-         #XTCPSEND: 8
-         OK
-
-         #XTCPDATA: 8
-         Test TCP
-
-   #. Disconnect and confirm the status of the connection.
-      Handle of ``-1`` indicates that no connection is open.
-
-      .. parsed-literal::
-         :class: highlight
-
-         **AT#XTCPCLI=0**
-
-         #XTCPCLI: 0,"disconnected"
-
-         OK
-
-         **AT#XTCPCLI?**
-
-         #XTCPCLI: -1,1
-
-         OK
-
-UDP client
-==========
+UDP connection
+==============
 
 The following steps assume that you have a UDP echo server available.
 
@@ -315,63 +253,13 @@ The following steps assume that you have a UDP echo server available.
 
          OK
 
-#. Test the UDP connection with the UDP client service:
-
-   a. Check the available values for the XUDPCLI command.
-
-      .. parsed-literal::
-         :class: highlight
-
-         **AT#XUDPCLI=?**
-
-         #XUDPCLI: (0,1,2),<url>,<port>,<sec_tag>,<use_dtls_cid>,<peer_verify>,<hostname_verify>
-
-         OK
-
-   #. Create a UDP client.
-      Replace *example.com* with the hostname or IPv4 address of a UDP server and, *1234* with the corresponding port.
-
-      .. parsed-literal::
-         :class: highlight
-
-         **AT#XUDPCLI=1,"**\ *example.com*\ **",**\ *1234*
-
-         #XUDPCLI: 0,"connected"
-
-         OK
-
-   #. Send plaintext data to the UDP server and retrieve the response.
-
-      .. parsed-literal::
-         :class: highlight
-
-         **AT#XUDPSEND="Test UDP"**
-
-         #XUDPSEND: 8
-
-         OK
-
-         #XUDPDATA: 8,"<*IP address*>",<*port*>
-         Test UDP
-
-   #. Close the UDP client.
-
-      .. parsed-literal::
-         :class: highlight
-
-         **AT#XUDPCLI=0**
-
-         #XUDPCLI: 0,"disconnected"
-
-         OK
-
-TLS client
-==========
+TLS connection
+==============
 
 The following steps assume that you have a TLS echo server available.
 You can connect to public HTTPS servers (port 443), but you cannot send and receive the data.
 
-A TLS client connection requires a valid certificate for the TLS server.
+A TLS connection requires a valid certificate for the TLS server.
 
 Update your TLS (root) certificate in PEM format with your selected security tag (in this example, 1000), and start the modem:
 
@@ -448,16 +336,16 @@ Update your TLS (root) certificate in PEM format with your selected security tag
       .. parsed-literal::
          :class: highlight
 
-         **AT#XSEND=0,0,0,"Test TLS client"**
+         **AT#XSEND=0,0,0,"Test TLS"**
 
-         #XSEND: 0,0,15
+         #XSEND: 0,0,8
 
          OK
 
          **AT#XRECV=0,0,0,0**
 
-         #XRECV: 0,0,15
-         Test TLS client
+         #XRECV: 0,0,8
+         Test TLS
          OK
 
    #. Close the socket.
@@ -471,54 +359,8 @@ Update your TLS (root) certificate in PEM format with your selected security tag
 
          OK
 
-#. Test the TLS connection with a TLS client service:
-
-   a. Create a TLS client and connect to a server.
-      Replace *example.com* with the hostname or IPv4 address of a TLS server, and *1234* with the corresponding port.
-      Then read the information about the connection.
-
-      .. parsed-literal::
-         :class: highlight
-
-         **AT#XTCPCLI=1,"**\ *example.com*\ **",**\ *1234*,**1000**
-
-         #XTCPCLI: 0,"connected"
-
-         OK
-
-         **AT#XTCPCLI?**
-
-         #XTCPCLI: 0,1
-
-         OK
-
-   #. Send plaintext data to the TLS server and retrieve the response.
-
-      .. parsed-literal::
-         :class: highlight
-
-         **AT#XTCPSEND="Test TLS client"**
-
-         #XTCPSEND: 15
-
-         OK
-
-         #XTCPDATA: 15
-         Test TLS client
-
-   #. Disconnect from the server.
-
-      .. parsed-literal::
-         :class: highlight
-
-         **AT#XTCPCLI=0**
-
-         #XTCPCLI: 0,"disconnected"
-
-         OK
-
-DTLS client
-===========
+DTLS connection
+===============
 
 The following steps assume that you have a DTLS echo server available with pre-shared key (PSK) authentication.
 
@@ -568,16 +410,16 @@ Update your hex-encoded PSK and the PSK identity to be used for the DTLS connect
       .. parsed-literal::
          :class: highlight
 
-         **AT#XSEND=0,0,0,"Test DTLS client"**
+         **AT#XSEND=0,0,0,"Test DTLS"**
 
-         #XSEND: 0,0,16
+         #XSEND: 0,0,9
 
          OK
 
          **AT#XRECV=0,0,0,0**
 
-         #XRECV: 0,0,16
-         Test DTLS client
+         #XRECV: 0,0,9
+         Test DTLS
          OK
 
    #. Close the socket.
@@ -588,31 +430,6 @@ Update your hex-encoded PSK and the PSK identity to be used for the DTLS connect
          **AT#XCLOSE=0**
 
          #XCLOSE: 0,0
-
-         OK
-
-#. Test the DTLS connection with a DTLS client service:
-
-   a. Create a DTLS client and connect to a DTLS server.
-      Replace *example.com* with the hostname or IPv4 address of a DTLS server and *1234* with the corresponding port.
-
-      .. parsed-literal::
-         :class: highlight
-
-         **AT#XUDPCLI=1,"**\ *example.com*\ **",**\ *1234*\ **,1001**
-
-         #XUDPCLI: 0,"connected"
-
-         OK
-
-   #. Disconnect from the server.
-
-      .. parsed-literal::
-         :class: highlight
-
-         **AT#XUDPCLI=0**
-
-         #XUDPCLI: 0,"disconnected"
 
          OK
 

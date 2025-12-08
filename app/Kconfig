@@ -135,17 +135,6 @@ config SM_AUTO_CONNECT
 	  Enables automatic connection to the network using the PDN configuration defined in 'SM_auto_connect.h'.
 
 #
-# TCP/TLS proxy
-#
-config SM_TCP_POLL_TIME
-	int "Poll time-out in seconds for TCP connection"
-	default 10
-
-config SM_UDP_POLL_TIME
-	int "Poll time-out in seconds for UDP connection"
-	default 10
-
-#
 # Data mode
 #
 config SM_DATAMODE_TERMINATOR

@@ -139,11 +139,6 @@ CONFIG_SM_LF_TERMINATION - LF termination
 CONFIG_SM_CR_LF_TERMINATION - CR+LF termination
    This option configures the application to accept AT commands ending with a carriage return followed by a line feed.
 
-.. _CONFIG_SM_TCP_POLL_TIME:
-
-CONFIG_SM_TCP_POLL_TIME - Poll timeout in seconds for TCP connection
-   This option specifies the poll timeout for the TCP connection, in seconds.
-
 .. _CONFIG_SM_SMS:
 
 CONFIG_SM_SMS - SMS support in |SM|
