@@ -7,7 +7,7 @@
    :local:
    :depth: 2
 
-The |SM| AT Client library exposes the AT command interface of the :ref:`Serial Modem <sm_description>` application for external devices over a serial interface.
+The |SM| AT Client library exposes the AT command interface of the :ref:`serial_modem_app` for external devices over a serial interface.
 This library is intended for applications running on an external MCU that are connected to an nRF91 Series SiP through UART.
 
 Overview

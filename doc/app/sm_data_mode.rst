@@ -1,7 +1,7 @@
 .. _sm_data_mode:
 
-Running in data mode
-####################
+Data mode
+#########
 
 .. contents::
    :local:

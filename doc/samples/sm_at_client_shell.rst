@@ -1,15 +1,15 @@
 .. _sm_at_client_shell_sample:
 
-|SM| AT Client Shell sample
-###########################
+AT Client Shell sample
+######################
 
 .. contents::
    :local:
    :depth: 2
 
-The |SM| AT Client Shell sample demonstrates how to send AT commands to the modem through the :ref:`Serial Modem <sm_description>` application running on an nRF91 Series SiP.
+The |SM| AT Client Shell sample demonstrates how to send AT commands to the modem through the :ref:`serial_modem_app` running on an nRF91 Series SiP.
 This sample enables an external MCU to send modem and |SM| proprietary AT commands for LTE connection and IP services.
-See more information on the functionality of this sample from the :ref:`lib_sm_at_client` library, which provides the core functionality for this sample.
+See more information on the functionality of this sample from the :ref:`lib_sm_at_client`, which provides the core functionality for this sample.
 
 Requirements
 ************

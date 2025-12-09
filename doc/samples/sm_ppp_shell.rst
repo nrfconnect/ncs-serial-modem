@@ -1,7 +1,7 @@
-.. _sm_ppp_shell:
+.. _sm_ppp_shell_sample:
 
-|SM| PPP shell sample
-#####################
+PPP shell sample
+################
 
 .. contents::
    :local:
@@ -246,7 +246,7 @@ References
 **********
 
 * :ref:`sm_as_zephyr_modem`
-* :ref:`sm_description`
+* :ref:`serial_modem_app`
 * `Zephyr Networking`_
 * `Zephyr Network APIs`_
 * `Zephyr Modem modules`_

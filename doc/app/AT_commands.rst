@@ -1,7 +1,7 @@
 .. _SM_AT_commands:
 
-|SM| specific AT commands
-#########################
+|SM| AT commands
+################
 
 The application sample uses a series of proprietary AT commands to let the nRF91 development kit operate as a |SM| (SM).
 
