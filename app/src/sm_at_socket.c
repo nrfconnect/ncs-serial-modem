@@ -1200,12 +1200,12 @@ static int socket_datamode_callback(uint8_t op, const uint8_t *data, int len, ui
 			if (ret == -EAGAIN || ret == -ETIMEDOUT) {
 				LOG_WRN("Send failed: %d", ret);
 				return ret;
-			} else if (ret) {
+			} else if (ret < 0) {
 				LOG_ERR("Send failed: %d", ret);
 				exit_datamode_handler(ret);
 				return ret;
 			} else {
-				LOG_DBG("Send successful");
+				LOG_DBG("Sent %d bytes", ret);
 			}
 		}
 	} else if (op == DATAMODE_EXIT) {
