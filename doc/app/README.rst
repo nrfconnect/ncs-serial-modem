@@ -20,7 +20,5 @@ See the subpages for how to use the application, how to extend it, and informati
    nRF91_as_Zephyr_modem
    PPP_linux
    sm_data_mode
-   sm_dtr_ri
-   ../drivers/dtr_uart
    sm_extending
    sm_testing
