@@ -84,6 +84,7 @@
 .. _`Zephyr Network APIs`: https://docs.zephyrproject.org/latest/connectivity/networking/api/apis.html
 .. _`Zephyr Modem modules`: https://docs.zephyrproject.org/latest/services/modem/index.html
 .. _`zperf: Network Traffic Generator`: https://docs.zephyrproject.org/latest/connectivity/networking/api/zperf.html
+.. _`Zephyr CMUX Power Saving`: https://docs.zephyrproject.org/latest/services/modem/index.html#cmux-power-saving
 
 .. ### github.com
 
