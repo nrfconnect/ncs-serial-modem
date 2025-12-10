@@ -1,0 +1,466 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="900"
+   height="450"
+   version="1.1"
+   id="svg128"
+   sodipodi:docname="cmux-wakeup-timing.svg"
+   inkscape:version="1.2.2 (b0a8486541, 2022-12-01)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview130"
+     pagecolor="#ffffff"
+     bordercolor="#999999"
+     borderopacity="1"
+     inkscape:showpageshadow="0"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     showgrid="false"
+     inkscape:zoom="2.8570039"
+     inkscape:cx="409.16991"
+     inkscape:cy="321.49064"
+     inkscape:window-width="3790"
+     inkscape:window-height="2094"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg128" />
+  <defs
+     id="defs4">
+    <marker
+       style="overflow:visible"
+       id="marker5779"
+       refX="0"
+       refY="0"
+       orient="auto-start-reverse"
+       inkscape:stockid="Arrow2"
+       markerWidth="7.6999998"
+       markerHeight="5.5999999"
+       viewBox="0 0 7.7 5.6"
+       inkscape:isstock="true"
+       inkscape:collect="always"
+       preserveAspectRatio="xMidYMid">
+      <path
+         transform="scale(0.7)"
+         d="M -2,-4 9,0 -2,4 c 2,-2.33 2,-5.66 0,-8 z"
+         style="fill:context-stroke;fill-rule:evenodd;stroke:none"
+         id="path5777" />
+    </marker>
+    <marker
+       style="overflow:visible"
+       id="Arrow2"
+       refX="0"
+       refY="0"
+       orient="auto-start-reverse"
+       inkscape:stockid="Arrow2"
+       markerWidth="7.6999998"
+       markerHeight="5.5999999"
+       viewBox="0 0 7.7 5.6"
+       inkscape:isstock="true"
+       inkscape:collect="always"
+       preserveAspectRatio="xMidYMid">
+      <path
+         transform="scale(0.7)"
+         d="M -2,-4 9,0 -2,4 c 2,-2.33 2,-5.66 0,-8 z"
+         style="fill:context-stroke;fill-rule:evenodd;stroke:none"
+         id="arrow2L" />
+    </marker>
+    <style
+       id="style2">
+      .signal-line { stroke: #333; stroke-width: 2; fill: none; }
+      .signal-label { font-family: Arial, sans-serif; font-size: 11px; fill: #333; }
+      .signal-name { font-family: Arial, sans-serif; font-size: 13px; font-weight: bold; fill: #2c5aa0; }
+      .timing-label { font-family: Arial, sans-serif; font-size: 10px; fill: #666; }
+      .grid-line { stroke: #ddd; stroke-width: 1; stroke-dasharray: 2,2; }
+      .inactive { stroke: #999; stroke-width: 1.5; }
+      .active { stroke: #2c5aa0; stroke-width: 2; }
+      .arrow { fill: #333; }
+      .high { stroke: #2c5aa0; stroke-width: 2; }
+      .low { stroke: #d32f2f; stroke-width: 2; }
+    </style>
+  </defs>
+  <!-- Background -->
+  <rect
+     x="0"
+     y="0"
+     width="900"
+     height="450"
+     fill="#fafafa"
+     stroke="#ccc"
+     stroke-width="1"
+     id="rect6" />
+  <!-- Title -->
+  <text
+     x="450"
+     y="25"
+     text-anchor="middle"
+     class="signal-name"
+     font-size="16"
+     id="text8">UART Wake-up Sequence</text>
+  <!-- Signal names on the left -->
+  <text
+     x="30"
+     y="70"
+     class="signal-name"
+     id="text10">RING</text>
+  <text
+     x="30"
+     y="150"
+     class="signal-name"
+     id="text12">Host UART</text>
+  <text
+     x="30"
+     y="230"
+     class="signal-name"
+     id="text14">DTR</text>
+  <text
+     x="30"
+     y="310"
+     class="signal-name"
+     id="text16">nRF91 UART</text>
+  <!-- Signal level indicators -->
+  <g
+     id="g4603"
+     transform="translate(-0.95707781,12.818006)">
+    <text
+       x="120"
+       y="50"
+       class="signal-label"
+       fill="#2c5aa0"
+       id="text18">High</text>
+    <text
+       x="120"
+       y="50"
+       class="signal-label"
+       dy="15"
+       fill="#d32f2f"
+       id="text20">Low</text>
+  </g>
+  <!-- Time axis -->
+  <line
+     x1="150"
+     y1="380"
+     x2="850"
+     y2="380"
+     class="signal-line"
+     stroke-width="2"
+     id="line22" />
+  <text
+     x="500"
+     y="410"
+     text-anchor="middle"
+     class="signal-label"
+     font-size="12"
+     id="text24">Time</text>
+  <!-- Grid lines for timing reference -->
+  <line
+     x1="250"
+     y1="60"
+     x2="250"
+     y2="380"
+     class="grid-line"
+     id="line26" />
+  <line
+     x1="370"
+     y1="60"
+     x2="370"
+     y2="380"
+     class="grid-line"
+     id="line28" />
+  <line
+     x1="490"
+     y1="60"
+     x2="490"
+     y2="380"
+     class="grid-line"
+     id="line30" />
+  <line
+     x1="610"
+     y1="60"
+     x2="610"
+     y2="380"
+     class="grid-line"
+     id="line32" />
+  <line
+     x1="730"
+     y1="60"
+     x2="730"
+     y2="380"
+     class="grid-line"
+     id="line34" />
+  <!-- Timing markers -->
+  <text
+     x="250"
+     y="400"
+     text-anchor="middle"
+     class="timing-label"
+     id="text36">t0</text>
+  <text
+     x="370"
+     y="400"
+     text-anchor="middle"
+     class="timing-label"
+     id="text38">t1</text>
+  <text
+     x="490"
+     y="400"
+     text-anchor="middle"
+     class="timing-label"
+     id="text40">t2</text>
+  <text
+     x="610"
+     y="400"
+     text-anchor="middle"
+     class="timing-label"
+     id="text42">t3</text>
+  <text
+     x="730"
+     y="400"
+     text-anchor="middle"
+     class="timing-label"
+     id="text44">t4</text>
+  <!-- RING signal (active low) -->
+  <!-- Inactive (high) before pulse -->
+  <line
+     x1="150"
+     y1="60"
+     x2="250"
+     y2="60"
+     class="high"
+     id="line46" />
+  <!-- Transition to low -->
+  <line
+     x1="250"
+     y1="60"
+     x2="250"
+     y2="80"
+     class="signal-line"
+     stroke-width="2"
+     id="line48" />
+  <!-- Pulse (low) for 120ms -->
+  <line
+     x1="250"
+     y1="80"
+     x2="370"
+     y2="80"
+     class="low"
+     id="line50" />
+  <!-- Transition back to high -->
+  <line
+     x1="370"
+     y1="80"
+     x2="370"
+     y2="60"
+     class="signal-line"
+     stroke-width="2"
+     id="line52" />
+  <!-- Inactive (high) after pulse -->
+  <line
+     x1="370"
+     y1="60"
+     x2="850"
+     y2="60"
+     class="high"
+     id="line54" />
+  <!-- RING labels -->
+  <text
+     x="200"
+     y="55"
+     class="signal-label"
+     id="text56">Inactive</text>
+  <text
+     x="600"
+     y="55"
+     class="signal-label"
+     id="text60">Inactive</text>
+  <!-- Host UART signal -->
+  <!-- Inactive -->
+  <line
+     x1="150"
+     y1="140"
+     x2="490"
+     y2="140"
+     class="inactive"
+     id="line62" />
+  <!-- Transition to active -->
+  <line
+     x1="490"
+     y1="140"
+     x2="490"
+     y2="120"
+     class="signal-line"
+     stroke-width="2"
+     id="line64" />
+  <!-- Active -->
+  <line
+     x1="490"
+     y1="120"
+     x2="850"
+     y2="120"
+     class="active"
+     id="line66" />
+  <!-- Host UART labels -->
+  <text
+     x="320"
+     y="135"
+     class="signal-label"
+     id="text68">Inactive</text>
+  <text
+     x="670"
+     y="115"
+     class="signal-label"
+     id="text70">Active</text>
+  <!-- DTR signal (active low) -->
+  <!-- Inactive (high) -->
+  <line
+     x1="150"
+     y1="220"
+     x2="490"
+     y2="220"
+     class="high"
+     id="line72" />
+  <!-- Transition to low (asserted) -->
+  <line
+     x1="490"
+     y1="220"
+     x2="490"
+     y2="240"
+     class="signal-line"
+     stroke-width="2"
+     id="line74" />
+  <!-- Asserted (low) -->
+  <line
+     x1="490"
+     y1="240"
+     x2="850"
+     y2="240"
+     class="low"
+     id="line76" />
+  <!-- DTR labels -->
+  <text
+     x="320"
+     y="202.73097"
+     class="signal-label"
+     id="text78">Inactive</text>
+  <text
+     x="320"
+     y="202.73097"
+     class="signal-label"
+     dy="12"
+     id="text80">(High)</text>
+  <text
+     x="670.3454"
+     y="218.99501"
+     class="signal-label"
+     id="text82">Asserted</text>
+  <text
+     x="670.3454"
+     y="218.99501"
+     class="signal-label"
+     dy="12"
+     id="text84">(Low)</text>
+  <!-- nRF91 UART signal -->
+  <!-- Inactive -->
+  <line
+     x1="150"
+     y1="300"
+     x2="610"
+     y2="300"
+     class="inactive"
+     id="line86" />
+  <!-- Transition to active -->
+  <line
+     x1="610"
+     y1="300"
+     x2="610"
+     y2="280"
+     class="signal-line"
+     stroke-width="2"
+     id="line88" />
+  <!-- Active -->
+  <line
+     x1="610"
+     y1="280"
+     x2="850"
+     y2="280"
+     class="active"
+     id="line90" />
+  <!-- nRF91 UART labels -->
+  <text
+     x="380"
+     y="295"
+     class="signal-label"
+     id="text92">Inactive</text>
+  <text
+     x="730"
+     y="275"
+     class="signal-label"
+     id="text94">Active</text>
+  <!-- Timing annotations with arrows -->
+  <!-- RING pulse annotation -->
+  <text
+     x="305.88928"
+     y="98.316025"
+     text-anchor="middle"
+     class="timing-label"
+     id="text98">100ms pulse</text>
+  <!-- Host UART enable annotation -->
+  <text
+     x="453.67838"
+     y="84.776009"
+     text-anchor="middle"
+     class="timing-label"
+     id="text102">Host enables</text>
+  <text
+     x="455.39807"
+     y="84.806023"
+     text-anchor="middle"
+     class="timing-label"
+     dy="12"
+     id="text104">UART</text>
+  <!-- DTR assertion annotation -->
+  <text
+     x="490"
+     y="275"
+     text-anchor="middle"
+     class="timing-label"
+     id="text108">DTR asserted</text>
+  <!-- nRF91 UART enable annotation -->
+  <text
+     x="614.57324"
+     y="256.89789"
+     text-anchor="middle"
+     class="timing-label"
+     id="text112">nRF91 enables</text>
+  <text
+     x="610"
+     y="255"
+     text-anchor="middle"
+     class="timing-label"
+     dy="12"
+     id="text114">UART</text>
+  <!-- Timing relationship arrows -->
+  <path
+     d="M 372.57384,82.106925 473.11466,131.713"
+     class="signal-line"
+     stroke-width="1"
+     stroke-dasharray="2.49686, 2.49686"
+     fill="none"
+     stroke="#666"
+     id="path116"
+     style="marker-end:url(#Arrow2)" />
+  <path
+     d="m 494.5784,245.73563 97.3014,45.07379"
+     class="signal-line"
+     stroke-width="1"
+     stroke-dasharray="2.34141, 2.34141"
+     fill="none"
+     stroke="#666"
+     id="path120"
+     style="marker-end:url(#marker5779)" />
+  <!-- Delay annotations -->
+</svg>
