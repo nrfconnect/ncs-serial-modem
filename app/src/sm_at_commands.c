@@ -150,7 +150,7 @@ static int handle_at_sleep(enum at_parser_cmd_type cmd_type, struct at_parser *p
 	return ret;
 }
 
-static void final_call(void (*func)(void))
+void final_call(void (*func)(void))
 {
 	/* Delegate the final call to a worker so that the "OK" response is properly sent. */
 	static struct k_work_delayable worker;

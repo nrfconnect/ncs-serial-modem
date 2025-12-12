@@ -182,6 +182,10 @@ config SM_MQTTC
 config SM_FULL_FOTA
 	bool "Full modem FOTA support"
 
+config SM_FULL_MODEM_DFU
+	bool "Full modem DFU support"
+	default n
+
 config SM_PPP
 	bool "PPP support"
 
