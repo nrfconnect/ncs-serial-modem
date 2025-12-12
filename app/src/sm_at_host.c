@@ -59,9 +59,29 @@ enum sm_debug_print {
 	SM_DEBUG_PRINT_SHORT,
 	SM_DEBUG_PRINT_FULL
 };
-static bool echo;
-static bool incomplete_echo; /* Are we in progress of echoing a command? */
+
+static void echo_timer_handler(struct k_timer *timer);
+static struct echo_ctx {
+	bool enabled;
+	struct k_timer timer;
+} echo_ctx = {
+	.enabled = false,
+	.timer = Z_TIMER_INITIALIZER(echo_ctx.timer, echo_timer_handler, NULL),
+};
+
 static struct sm_urc_ctx urc_ctx;
+
+/* Event callback mechanism */
+static void event_work_fn(struct k_work *work);
+static struct event_ctx {
+	sys_slist_t event_cbs;
+	struct k_work work;
+	atomic_t events;
+} event_ctx = {
+	.event_cbs = SYS_SLIST_STATIC_INIT(&event_ctx.event_cbs),
+	.work = Z_WORK_INITIALIZER(event_work_fn),
+	.events = ATOMIC_INIT(0),
+};
 
 /* global functions defined in different files */
 int sm_at_init(void);
@@ -107,6 +127,12 @@ static bool set_sm_mode(enum sm_operation_mode mode)
 	return ret;
 }
 
+static void sm_at_host_event_notify(enum sm_event event)
+{
+	atomic_or(&event_ctx.events, event);
+	k_work_submit_to_queue(&sm_work_q, &event_ctx.work);
+}
+
 static bool exit_datamode(void)
 {
 	bool ret = false;
@@ -132,7 +158,7 @@ static bool exit_datamode(void)
 		rsp_send("\r\n#XDATAMODE: %d\r\n", datamode_handler_result);
 		datamode_handler_result = 0;
 
-		sm_at_socket_notify_datamode_exit();
+		sm_at_host_event_notify(SM_EVENT_AT_MODE);
 
 		LOG_INF("Exit datamode");
 		ret = true;
@@ -141,7 +167,7 @@ static bool exit_datamode(void)
 	k_mutex_unlock(&mutex_mode);
 
 	/* Flush the TX buffer. */
-	sm_tx_write(NULL, 0, true, false, K_NO_WAIT);
+	sm_tx_write(NULL, 0, true, false);
 
 	return ret;
 }
@@ -236,7 +262,7 @@ static void inactivity_timer_handler(struct k_timer *timer)
 {
 	ARG_UNUSED(timer);
 
-	LOG_INF("time limit reached");
+	LOG_DBG("Time limit reached");
 	if (!ring_buf_is_empty(&data_rb)) {
 		k_work_submit_to_queue(&sm_work_q, &raw_send_scheduled_work);
 	} else {
@@ -496,8 +522,7 @@ static int sm_at_send_internal(const uint8_t *data, size_t len, bool urc,
 		return -EINTR;
 	}
 
-	ret = sm_tx_write(data, len, true, urc, incomplete_echo ?
-			  K_MSEC(CONFIG_SM_URC_DELAY_WITH_INCOMPLETE_ECHO_MS) : K_NO_WAIT);
+	ret = sm_tx_write(data, len, true, urc);
 	if (!ret) {
 		if (print_debug == SM_DEBUG_PRINT_FULL) {
 			LOG_HEXDUMP_DBG(data, len, "TX");
@@ -647,7 +672,7 @@ static size_t cmd_rx_handler(const uint8_t *buf, const size_t len, bool *stop_at
 		}
 	}
 
-	if (echo) {
+	if (echo_ctx.enabled) {
 		const uint8_t terminator_len = IS_ENABLED(CONFIG_SM_CR_LF_TERMINATION) ? 2 : 1;
 		bool truncate = false;
 		size_t echo_fragment_len = processed;
@@ -663,7 +688,15 @@ static size_t cmd_rx_handler(const uint8_t *buf, const size_t len, bool *stop_at
 		 * CONFIG_SM_URC_DELAY_WITH_INCOMPLETE_ECHO_MS delay in URCs after every
 		 * UART RX buffer (keystroke, when typing).
 		 */
-		incomplete_echo = !send;
+		if (!send) {
+			k_timer_start(&echo_ctx.timer,
+				      K_MSEC(CONFIG_SM_URC_DELAY_WITH_INCOMPLETE_ECHO_MS),
+				      K_NO_WAIT);
+		} else {
+			k_timer_stop(&echo_ctx.timer);
+			sm_at_host_event_notify(SM_EVENT_URC);
+		}
+
 		(void)sm_at_send_internal(buf, echo_fragment_len, false, SM_DEBUG_PRINT_NONE);
 		echo_len += echo_fragment_len;
 
@@ -987,6 +1020,132 @@ int sm_at_cb_wrapper(char *buf, size_t len, char *at_cmd, sm_at_callback *cb)
 	return err;
 }
 
+static int at_host_power_off(bool shutting_down)
+{
+	int err;
+
+	if (shutting_down) {
+		err = sm_uart_handler_disable();
+		if (err) {
+			LOG_WRN("Failed to disable UART. (%d)", err);
+		}
+	}
+
+	err = pm_device_action_run(sm_uart_dev, PM_DEVICE_ACTION_SUSPEND);
+	if (err) {
+		LOG_WRN("Failed to suspend UART. (%d)", err);
+	}
+
+	return err;
+}
+
+int sm_at_host_power_off(void)
+{
+	const int err = at_host_power_off(false);
+
+	/* Write sync str to buffer so it is sent first when resuming, do not flush. */
+	if (!IS_ENABLED(CONFIG_SM_SKIP_READY_MSG)) {
+		sm_tx_write(SM_SYNC_STR, strlen(SM_SYNC_STR), false, false);
+	}
+
+	return err;
+}
+
+int sm_at_host_power_on(void)
+{
+	const int err = pm_device_action_run(sm_uart_dev, PM_DEVICE_ACTION_RESUME);
+
+	if (err && err != -EALREADY) {
+		LOG_ERR("Failed to resume UART. (%d)", err);
+		return err;
+	}
+
+	/* Flush the TX buffer. */
+	sm_tx_write(NULL, 0, true, false);
+
+	return 0;
+}
+
+void sm_at_host_echo(bool enable)
+{
+	echo_ctx.enabled = enable;
+	k_timer_stop(&echo_ctx.timer);
+}
+
+bool sm_at_host_echo_urc_delay(void)
+{
+	return k_timer_remaining_get(&echo_ctx.timer) > 0;
+}
+
+static void echo_timer_handler(struct k_timer *timer)
+{
+	ARG_UNUSED(timer);
+
+	LOG_DBG("Time limit reached");
+	sm_at_host_event_notify(SM_EVENT_URC);
+}
+
+void sm_at_host_register_event_cb(struct sm_event_callback *cb, enum sm_event event)
+{
+	sys_snode_t *p;
+
+	LOG_DBG("Register event cb: %p for event: %d", (void *)cb, event);
+	cb->events |= event;
+	if (sys_slist_find(&event_ctx.event_cbs, &cb->node, &p)) {
+		return;
+	}
+	sys_slist_append(&event_ctx.event_cbs, &cb->node);
+}
+
+static void event_work_fn(struct k_work *work)
+{
+	ARG_UNUSED(work);
+
+	struct sm_event_callback *event_cb;
+	sys_snode_t *node, *tmp;
+
+	enum sm_event events = atomic_clear(&event_ctx.events);
+
+	SYS_SLIST_FOR_EACH_NODE_SAFE(&event_ctx.event_cbs, node, tmp) {
+		event_cb = CONTAINER_OF(node, struct sm_event_callback, node);
+		if (event_cb->events & events) {
+			LOG_DBG("Notify event cb: %p for events: %d", (void *)event_cb, events);
+			event_cb->cb(NULL);
+			sys_slist_remove(&event_ctx.event_cbs, NULL, node);
+		}
+	}
+}
+
+struct sm_urc_ctx *sm_at_host_urc_ctx_acquire(enum sm_urc_owner owner)
+{
+	k_mutex_lock(&urc_ctx.mutex, K_FOREVER);
+
+	if (urc_ctx.owner == SM_URC_OWNER_NONE || urc_ctx.owner == owner) {
+		urc_ctx.owner = owner;
+		k_mutex_unlock(&urc_ctx.mutex);
+		return &urc_ctx;
+	}
+
+	k_mutex_unlock(&urc_ctx.mutex);
+	return NULL;
+}
+
+void sm_at_host_urc_ctx_release(struct sm_urc_ctx *ctx, enum sm_urc_owner owner)
+{
+	if (ctx != &urc_ctx) {
+		LOG_ERR("Invalid URC context");
+		return;
+	}
+
+	k_mutex_lock(&ctx->mutex, K_FOREVER);
+
+	if (ctx->owner == owner) {
+		ctx->owner = SM_URC_OWNER_NONE;
+	}
+
+	k_mutex_unlock(&ctx->mutex);
+}
+
 int sm_at_host_init(void)
 {
 	int err;
@@ -1034,90 +1193,10 @@ int sm_at_host_init(void)
 	return 0;
 }
 
-static int at_host_power_off(bool shutting_down)
-{
-	int err;
-
-	if (shutting_down) {
-		err = sm_uart_handler_disable();
-		if (err) {
-			LOG_WRN("Failed to disable UART. (%d)", err);
-		}
-	}
-
-	err = pm_device_action_run(sm_uart_dev, PM_DEVICE_ACTION_SUSPEND);
-	if (err) {
-		LOG_WRN("Failed to suspend UART. (%d)", err);
-	}
-
-	return err;
-}
-
-int sm_at_host_power_off(void)
-{
-	const int err = at_host_power_off(false);
-
-	/* Write sync str to buffer so it is sent first when resuming, do not flush. */
-	if (!IS_ENABLED(CONFIG_SM_SKIP_READY_MSG)) {
-		sm_tx_write(SM_SYNC_STR, strlen(SM_SYNC_STR), false, false, K_NO_WAIT);
-	}
-
-	return err;
-}
-
-int sm_at_host_power_on(void)
-{
-	const int err = pm_device_action_run(sm_uart_dev, PM_DEVICE_ACTION_RESUME);
-
-	if (err && err != -EALREADY) {
-		LOG_ERR("Failed to resume UART. (%d)", err);
-		return err;
-	}
-
-	/* Flush the TX buffer. */
-	sm_tx_write(NULL, 0, true, false, K_NO_WAIT);
-
-	return 0;
-}
-
-void sm_at_host_echo(bool enable)
-{
-	echo = enable;
-	incomplete_echo = false;
-}
-
-struct sm_urc_ctx *sm_at_host_urc_ctx_acquire(enum sm_urc_owner owner)
-{
-	k_mutex_lock(&urc_ctx.mutex, K_FOREVER);
-
-	if (urc_ctx.owner == SM_URC_OWNER_NONE || urc_ctx.owner == owner) {
-		urc_ctx.owner = owner;
-		k_mutex_unlock(&urc_ctx.mutex);
-		return &urc_ctx;
-	}
-
-	k_mutex_unlock(&urc_ctx.mutex);
-	return NULL;
-}
-
-void sm_at_host_urc_ctx_release(struct sm_urc_ctx *ctx, enum sm_urc_owner owner)
-{
-	if (ctx != &urc_ctx) {
-		LOG_ERR("Invalid URC context");
-		return;
-	}
-
-	k_mutex_lock(&ctx->mutex, K_FOREVER);
-
-	if (ctx->owner == owner) {
-		ctx->owner = SM_URC_OWNER_NONE;
-	}
-
-	k_mutex_unlock(&ctx->mutex);
-}
-
 void sm_at_host_uninit(void)
 {
+	k_timer_stop(&echo_ctx.timer);
+
 	k_mutex_lock(&mutex_mode, K_FOREVER);
 	if (at_mode == SM_DATA_MODE) {
 		k_timer_stop(&inactivity_timer);

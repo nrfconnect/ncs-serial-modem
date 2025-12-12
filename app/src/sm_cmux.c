@@ -61,7 +61,7 @@ static struct {
 
 	/* Outgoing data for AT DLCI. */
 	struct sm_urc_ctx *urc_ctx;
-	struct k_work_delayable nonblock_tx_work;
+	struct k_work nonblock_tx_work;
 	struct k_work_delayable stop_work;
 	struct k_sem tx_sem;
 } cmux;
@@ -110,7 +110,7 @@ static void dlci_pipe_event_handler(struct modem_pipe *pipe,
 		 */
 	case MODEM_PIPE_EVENT_OPENED:
 		LOG_INF("DLCI %u%s opened.", dlci->address, is_at ? " (AT)" : "");
-		k_work_schedule_for_queue(&sm_work_q, &cmux.nonblock_tx_work, K_NO_WAIT);
+		k_work_submit_to_queue(&sm_work_q, &cmux.nonblock_tx_work);
 		break;
 
 	case MODEM_PIPE_EVENT_CLOSED:
@@ -202,8 +202,12 @@ static int cmux_write_at_channel_block(const uint8_t *data, size_t *len)
 	return 0;
 }
 
-static void nonblock_tx_work_fn(struct k_work *work)
+static void nonblock_tx_work_fn(struct k_work *)
 {
+	static struct sm_event_callback event_cb = {
+		.cb = nonblock_tx_work_fn
+	};
+
 	uint8_t *data;
 	size_t len;
 	int err;
@@ -213,8 +217,16 @@ static void nonblock_tx_work_fn(struct k_work *work)
 		LOG_ERR("No URC context");
 		return;
 	}
+
+	if (sm_at_host_echo_urc_delay()) {
+		LOG_DBG("Defer URC processing until %s", "echo delay has elapsed");
+		sm_at_host_register_event_cb(&event_cb, SM_EVENT_URC);
+		return;
+	}
+
 	if (!in_at_mode()) {
-		/* Send URCs only in AT mode. */
+		LOG_DBG("Defer URC processing until %s", "in AT mode");
+		sm_at_host_register_event_cb(&event_cb, SM_EVENT_AT_MODE);
 		return;
 	}
 
@@ -254,10 +266,12 @@ static int cmux_write_at_channel_nonblock(const uint8_t *data, size_t len)
 
 	k_mutex_unlock(&uc->mutex);
 
+	k_work_submit_to_queue(&sm_work_q, &cmux.nonblock_tx_work);
+
 	return ret;
 }
 
-static int cmux_write_at_channel(const uint8_t *data, size_t len, bool urc, k_timeout_t urc_delay)
+static int cmux_write_at_channel(const uint8_t *data, size_t len, bool urc)
 {
 	int ret;
 
@@ -266,17 +280,9 @@ static int cmux_write_at_channel(const uint8_t *data, size_t len, bool urc, k_ti
 	 */
 	if (k_current_get() == &sm_work_q.thread && !urc) {
 		ret = cmux_write_at_channel_block(data, &len);
-		if (!ret) {
-			/* Possible waiting URC is delayed for urc_delay. */
-			k_work_reschedule_for_queue(&sm_work_q, &cmux.nonblock_tx_work, urc_delay);
-		}
 	} else {
 		/* In other contexts, we buffer until Serial Modem work queue becomes available. */
 		ret = cmux_write_at_channel_nonblock(data, len);
-		if (!ret) {
-			/* URC is delayed for urc_delay only if it has not been scheduled. */
-			k_work_schedule_for_queue(&sm_work_q, &cmux.nonblock_tx_work, urc_delay);
-		}
 	}
 
 	return ret;
@@ -316,7 +322,7 @@ void sm_cmux_init(void)
 	k_work_init(&cmux.rx_work, rx_work_fn);
 
 	k_sem_init(&cmux.tx_sem, 1, 1);
-	k_work_init_delayable(&cmux.nonblock_tx_work, nonblock_tx_work_fn);
+	k_work_init(&cmux.nonblock_tx_work, nonblock_tx_work_fn);
 	k_work_init_delayable(&cmux.stop_work, stop_work_fn);
 
 	cmux.at_channel = 0;

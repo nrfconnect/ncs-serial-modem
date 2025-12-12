@@ -277,10 +277,20 @@ static int update_poll_events(struct sm_socket *sock, uint8_t events, bool updat
 	return 0;
 }
 
-static void poll_work_fn(struct k_work *work)
+static void poll_work_fn(struct k_work *)
 {
+	static struct sm_event_callback poll_event_cb = {
+		.cb = poll_work_fn,
+	};
+
 	bool at_mode = in_at_mode();
 	bool data_mode = in_datamode();
+
+	if (sm_at_host_echo_urc_delay()) {
+		LOG_DBG("Defer poll processing until echo URC delay has elapsed");
+		sm_at_host_register_event_cb(&poll_event_cb, SM_EVENT_URC);
+		return;
+	}
 
 	for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
 		struct sm_socket *sock = &socks[i];
@@ -298,6 +308,7 @@ static void poll_work_fn(struct k_work *work)
 			sock->async_poll.delayed_revents |= revents;
 			LOG_DBG("Socket %d delayed revents 0x%x", sock->fd,
 				sock->async_poll.delayed_revents);
+			sm_at_host_register_event_cb(&poll_event_cb, SM_EVENT_AT_MODE);
 		}
 
 		/* Do not process any socket events if not in correct mode. */
@@ -376,12 +387,6 @@ static void poll_work_fn(struct k_work *work)
 			}
 		}
 	}
-}
-
-void sm_at_socket_notify_datamode_exit(void)
-{
-	/* Update events that were received during data mode. */
-	k_work_submit_to_queue(&sm_work_q, &poll_ctx.poll_work);
 }
 
 static void send_cb_fn(struct k_work *work)

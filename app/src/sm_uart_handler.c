@@ -30,7 +30,7 @@ uint32_t sm_uart_baudrate;
 static void rx_process(struct k_work *work);
 static void tx_write_nonblock_fn(struct k_work *);
 static K_WORK_DELAYABLE_DEFINE(rx_process_work, rx_process);
-static K_WORK_DELAYABLE_DEFINE(tx_write_nonblock_work, tx_write_nonblock_fn);
+static K_WORK_DEFINE(tx_write_nonblock_work, tx_write_nonblock_fn);
 struct rx_buf_t {
 	atomic_t ref_counter;
 	size_t len;
@@ -437,6 +437,10 @@ static int tx_write_block(const uint8_t *data, size_t *len, bool flush)
 
 static void tx_write_nonblock_fn(struct k_work *)
 {
+	static struct sm_event_callback event_cb = {
+		.cb = tx_write_nonblock_fn
+	};
+
 	struct sm_urc_ctx *uc = urc_ctx; /* Take a local copy. */
 	uint8_t *data;
 	size_t len;
@@ -447,8 +451,15 @@ static void tx_write_nonblock_fn(struct k_work *)
 		return;
 	}
 
+	if (sm_at_host_echo_urc_delay()) {
+		LOG_DBG("Defer URC processing until %s", "echo delay has elapsed");
+		sm_at_host_register_event_cb(&event_cb, SM_EVENT_URC);
+		return;
+	}
+
 	if (!in_at_mode()) {
-		/* Send URCs only in AT mode. */
+		LOG_DBG("Defer URC processing until %s", "in AT mode");
+		sm_at_host_register_event_cb(&event_cb, SM_EVENT_AT_MODE);
 		return;
 	}
 
@@ -495,41 +506,35 @@ static int tx_write_nonblock(const uint8_t *data, size_t len)
 	}
 
 	k_mutex_unlock(&uc->mutex);
+
+	k_work_submit_to_queue(&sm_work_q, &tx_write_nonblock_work);
+
 	return ret;
 }
 
-static int sm_uart_tx_write(const uint8_t *data, size_t len, bool flush, bool urc,
-			    k_timeout_t urc_delay)
+static int sm_uart_tx_write(const uint8_t *data, size_t len, bool flush, bool urc)
 {
 	int ret;
 
 	/* Send only from Serial Modem work queue to guarantee URC ordering. */
 	if (k_current_get() == &sm_work_q.thread && !urc) {
 		ret = tx_write_block(data, &len, flush);
-		if (!ret) {
-			/* Possible waiting URC is delayed for urc_delay. */
-			k_work_reschedule_for_queue(&sm_work_q, &tx_write_nonblock_work, urc_delay);
-		}
 	} else {
 		/* In other contexts, we buffer until Serial Modem work queue becomes available. */
 		ret = tx_write_nonblock(data, len);
-		if (!ret) {
-			/* URC is delayed for urc_delay only if it has not been scheduled. */
-			k_work_schedule_for_queue(&sm_work_q, &tx_write_nonblock_work, urc_delay);
-		}
 	}
 
 	return ret;
 }
 
-int sm_tx_write(const uint8_t *data, size_t len, bool flush, bool urc, k_timeout_t urc_delay)
+int sm_tx_write(const uint8_t *data, size_t len, bool flush, bool urc)
 {
 #if SM_PIPE
 	if (atomic_test_bit(&sm_pipe.state, SM_PIPE_STATE_OPEN_BIT) && sm_pipe.tx_cb != NULL) {
-		return sm_pipe.tx_cb(data, len, urc, urc_delay);
+		return sm_pipe.tx_cb(data, len, urc);
 	}
 #endif
-	return sm_uart_tx_write(data, len, flush, urc, urc_delay);
+	return sm_uart_tx_write(data, len, flush, urc);
 }
 
 int sm_uart_handler_enable(void)
