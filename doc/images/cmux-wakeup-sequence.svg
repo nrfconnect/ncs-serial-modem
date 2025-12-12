@@ -1,0 +1,693 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="800"
+   height="350"
+   version="1.1"
+   id="svg196"
+   sodipodi:docname="cmux-wakeup-sequence.svg"
+   inkscape:version="1.2.2 (b0a8486541, 2022-12-01)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview198"
+     pagecolor="#ffffff"
+     bordercolor="#999999"
+     borderopacity="1"
+     inkscape:showpageshadow="0"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     showgrid="false"
+     inkscape:zoom="3.5769917"
+     inkscape:cx="372.7993"
+     inkscape:cy="104.41735"
+     inkscape:window-width="3790"
+     inkscape:window-height="2094"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg196" />
+  <defs
+     id="defs4">
+    <style
+       id="style2">
+      .signal-line { stroke: #333; stroke-width: 2; fill: none; }
+      .signal-label { font-family: Arial, sans-serif; font-size: 11px; fill: #333; }
+      .signal-name { font-family: Arial, sans-serif; font-size: 13px; font-weight: bold; fill: #2c5aa0; }
+      .timing-label { font-family: Arial, sans-serif; font-size: 10px; fill: #666; }
+      .grid-line { stroke: #ddd; stroke-width: 1; stroke-dasharray: 2,2; }
+      .high { stroke: #2c5aa0; stroke-width: 2; }
+      .low { stroke: #d32f2f; stroke-width: 2; }
+      .frame-box { fill: #f0f8f0; stroke: #4a7c59; stroke-width: 1.5; }
+      .frame-field { fill: #fff4e6; stroke: #d68910; stroke-width: 1; }
+    </style>
+  </defs>
+  <!-- Title -->
+  <text
+     x="394.14413"
+     y="17.104731"
+     text-anchor="middle"
+     class="signal-name"
+     font-size="14"
+     id="text6">CMUX Wake-up Sequence</text>
+  <!-- Signal names on the left -->
+  <text
+     x="31.106869"
+     y="100.08466"
+     class="signal-name"
+     id="text8">Host</text>
+  <text
+     x="31.589291"
+     y="183.98619"
+     class="signal-name"
+     id="text10"><tspan
+       sodipodi:role="line"
+       id="tspan1395"
+       x="31.589291"
+       y="183.98619">Serial</tspan><tspan
+       sodipodi:role="line"
+       id="tspan1397"
+       x="31.589291"
+       y="200.23619">Modem</tspan></text>
+  <!-- Time axis -->
+  <line
+     x1="100"
+     y1="280"
+     x2="751.33569"
+     y2="280"
+     class="signal-line"
+     stroke-width="2"
+     id="line12" />
+  <text
+     x="394.2919"
+     y="310"
+     text-anchor="middle"
+     class="signal-label"
+     font-size="12"
+     id="text14">Time</text>
+  <!-- Grid lines for timing reference -->
+  <line
+     x1="200"
+     y1="50"
+     x2="200"
+     y2="280"
+     class="grid-line"
+     id="line16" />
+  <line
+     x1="350"
+     y1="50"
+     x2="350"
+     y2="280"
+     class="grid-line"
+     id="line18" />
+  <line
+     x1="500"
+     y1="50"
+     x2="500"
+     y2="280"
+     class="grid-line"
+     id="line20" />
+  <line
+     x1="650"
+     y1="50"
+     x2="650"
+     y2="280"
+     class="grid-line"
+     id="line22" />
+  <line
+     x1="750"
+     y1="50"
+     x2="750"
+     y2="280"
+     class="grid-line"
+     id="line24" />
+  <!-- Timing markers -->
+  <text
+     x="200"
+     y="300"
+     text-anchor="middle"
+     class="timing-label"
+     id="text26">t0</text>
+  <text
+     x="350"
+     y="300"
+     text-anchor="middle"
+     class="timing-label"
+     id="text28">t1</text>
+  <text
+     x="500"
+     y="300"
+     text-anchor="middle"
+     class="timing-label"
+     id="text30">t2</text>
+  <text
+     x="650"
+     y="300"
+     text-anchor="middle"
+     class="timing-label"
+     id="text32">t3</text>
+  <text
+     x="750"
+     y="300"
+     text-anchor="middle"
+     class="timing-label"
+     id="text34">t4</text>
+  <!-- Host signal: idle, then sending flag characters continuously -->
+  <line
+     x1="101.10686"
+     y1="90.084663"
+     x2="201.10687"
+     y2="90.084663"
+     class="high"
+     id="line36" />
+  <!-- Host sends flags continuously starting at t0 -->
+  <!-- Flag 1 -->
+  <line
+     x1="201.10687"
+     y1="90.084663"
+     x2="201.10687"
+     y2="70.084663"
+     class="signal-line"
+     stroke-width="2"
+     id="line38" />
+  <line
+     x1="201.10687"
+     y1="70.084663"
+     x2="221.10687"
+     y2="70.084663"
+     class="low"
+     id="line40" />
+  <line
+     x1="221.10687"
+     y1="70.084663"
+     x2="221.10687"
+     y2="90.084663"
+     class="signal-line"
+     stroke-width="2"
+     id="line42" />
+  <line
+     x1="221.10687"
+     y1="90.084663"
+     x2="241.10687"
+     y2="90.084663"
+     class="high"
+     id="line44" />
+  <!-- Flag 2 -->
+  <line
+     x1="241.10687"
+     y1="90.084663"
+     x2="241.10687"
+     y2="70.084663"
+     class="signal-line"
+     stroke-width="2"
+     id="line46" />
+  <line
+     x1="241.10687"
+     y1="70.084663"
+     x2="261.10687"
+     y2="70.084663"
+     class="low"
+     id="line48" />
+  <line
+     x1="261.10687"
+     y1="70.084663"
+     x2="261.10687"
+     y2="90.084663"
+     class="signal-line"
+     stroke-width="2"
+     id="line50" />
+  <line
+     x1="261.10687"
+     y1="90.084663"
+     x2="281.10687"
+     y2="90.084663"
+     class="high"
+     id="line52" />
+  <!-- Flag 3 -->
+  <line
+     x1="281.10687"
+     y1="90.084663"
+     x2="281.10687"
+     y2="70.084663"
+     class="signal-line"
+     stroke-width="2"
+     id="line54" />
+  <line
+     x1="281.10687"
+     y1="70.084663"
+     x2="301.10687"
+     y2="70.084663"
+     class="low"
+     id="line56" />
+  <line
+     x1="301.10687"
+     y1="70.084663"
+     x2="301.10687"
+     y2="90.084663"
+     class="signal-line"
+     stroke-width="2"
+     id="line58" />
+  <line
+     x1="301.10687"
+     y1="90.084663"
+     x2="321.10687"
+     y2="90.084663"
+     class="high"
+     id="line60" />
+  <!-- More flags (continuous) -->
+  <line
+     x1="321.10687"
+     y1="90.084663"
+     x2="321.10687"
+     y2="70.084663"
+     class="signal-line"
+     stroke-width="2"
+     id="line62" />
+  <line
+     x1="321.10687"
+     y1="70.084663"
+     x2="341.10687"
+     y2="70.084663"
+     class="low"
+     id="line64" />
+  <line
+     x1="341.10687"
+     y1="70.084663"
+     x2="341.10687"
+     y2="90.084663"
+     class="signal-line"
+     stroke-width="2"
+     id="line66" />
+  <!-- Host receives 3 flags from modem, stops sending flags, sends CMUX frame -->
+  <line
+     x1="401.21689"
+     y1="91.496002"
+     x2="401.21689"
+     y2="71.496002"
+     class="signal-line"
+     stroke-width="2"
+     id="line70" />
+  <!-- CMUX Frame -->
+  <rect
+     x="401.21689"
+     y="51.496002"
+     width="200"
+     height="20"
+     class="frame-box"
+     rx="2"
+     id="rect72" />
+  <!-- FLAG -->
+  <rect
+     x="406.21689"
+     y="53.496002"
+     width="20"
+     height="16"
+     class="frame-field"
+     rx="1"
+     id="rect74" />
+  <text
+     x="416.21689"
+     y="64.496002"
+     text-anchor="middle"
+     class="signal-label"
+     font-size="8"
+     id="text76">FLAG</text>
+  <!-- Addr -->
+  <rect
+     x="431.21689"
+     y="53.496002"
+     width="25"
+     height="16"
+     class="frame-field"
+     rx="1"
+     id="rect78" />
+  <text
+     x="443.71689"
+     y="64.496002"
+     text-anchor="middle"
+     class="signal-label"
+     font-size="8"
+     id="text80">Addr</text>
+  <!-- CTRL -->
+  <rect
+     x="461.21689"
+     y="53.496002"
+     width="25"
+     height="16"
+     class="frame-field"
+     rx="1"
+     id="rect82" />
+  <text
+     x="473.71689"
+     y="64.496002"
+     text-anchor="middle"
+     class="signal-label"
+     font-size="8"
+     id="text84">CTRL</text>
+  <!-- len -->
+  <rect
+     x="491.21689"
+     y="53.496002"
+     width="25"
+     height="16"
+     class="frame-field"
+     rx="1"
+     id="rect86" />
+  <text
+     x="503.71689"
+     y="64.496002"
+     text-anchor="middle"
+     class="signal-label"
+     font-size="8"
+     id="text88">len</text>
+  <!-- data -->
+  <rect
+     x="521.21692"
+     y="53.496002"
+     width="35"
+     height="16"
+     class="frame-field"
+     rx="1"
+     id="rect90" />
+  <text
+     x="538.71692"
+     y="64.496002"
+     text-anchor="middle"
+     class="signal-label"
+     font-size="8"
+     id="text92">data</text>
+  <!-- FCS -->
+  <rect
+     x="561.21692"
+     y="53.496002"
+     width="25"
+     height="16"
+     class="frame-field"
+     rx="1"
+     id="rect94" />
+  <text
+     x="573.71692"
+     y="64.496002"
+     text-anchor="middle"
+     class="signal-label"
+     font-size="8"
+     id="text96">FCS</text>
+  <!-- FLAG -->
+  <rect
+     x="591.21692"
+     y="53.496002"
+     width="20"
+     height="16"
+     class="frame-field"
+     rx="1"
+     id="rect98" />
+  <text
+     x="601.21692"
+     y="64.496002"
+     text-anchor="middle"
+     class="signal-label"
+     font-size="8"
+     id="text100">FLAG</text>
+  <line
+     x1="601.21692"
+     y1="71.496002"
+     x2="601.21692"
+     y2="91.496002"
+     class="signal-line"
+     stroke-width="2"
+     id="line102" />
+  <line
+     x1="601.78699"
+     y1="90.516068"
+     x2="751.78699"
+     y2="90.516068"
+     class="high"
+     id="line104" />
+  <!-- Modem signal: idle, receives 3 flags, then sends 3 flags -->
+  <line
+     x1="100"
+     y1="189.13217"
+     x2="323.49612"
+     y2="189.13217"
+     class="high"
+     id="line106" />
+  <!-- Modem receives 3 flags (shown as signal transitions) -->
+  <!-- Receives flag 1 -->
+  <line
+     x1="323.50439"
+     y1="189.33269"
+     x2="323.50439"
+     y2="169.33269"
+     class="signal-line"
+     stroke-width="2"
+     id="line108" />
+  <line
+     x1="323.50439"
+     y1="169.33269"
+     x2="343.50439"
+     y2="169.33269"
+     class="low"
+     id="line110" />
+  <line
+     x1="343.50439"
+     y1="169.33269"
+     x2="343.50439"
+     y2="189.33269"
+     class="signal-line"
+     stroke-width="2"
+     id="line112" />
+  <line
+     x1="343.50439"
+     y1="189.33269"
+     x2="363.50439"
+     y2="189.33269"
+     class="high"
+     id="line114" />
+  <!-- Receives flag 2 -->
+  <line
+     x1="363.50439"
+     y1="189.33269"
+     x2="363.50439"
+     y2="169.33269"
+     class="signal-line"
+     stroke-width="2"
+     id="line116" />
+  <line
+     x1="363.50439"
+     y1="169.33269"
+     x2="383.50439"
+     y2="169.33269"
+     class="low"
+     id="line118" />
+  <line
+     x1="383.50439"
+     y1="169.33269"
+     x2="383.50439"
+     y2="189.33269"
+     class="signal-line"
+     stroke-width="2"
+     id="line120" />
+  <line
+     x1="383.50439"
+     y1="189.33269"
+     x2="403.50439"
+     y2="189.33269"
+     class="high"
+     id="line122" />
+  <!-- Receives flag 3 -->
+  <line
+     x1="403.50439"
+     y1="189.33269"
+     x2="403.50439"
+     y2="169.33269"
+     class="signal-line"
+     stroke-width="2"
+     id="line124" />
+  <line
+     x1="403.50439"
+     y1="169.33269"
+     x2="423.50439"
+     y2="169.33269"
+     class="low"
+     id="line126" />
+  <line
+     x1="423.50439"
+     y1="169.33269"
+     x2="423.50439"
+     y2="189.33269"
+     class="signal-line"
+     stroke-width="2"
+     id="line128" />
+  <!-- Modem starts sending flags after receiving 3 flags -->
+  <!-- Flag 1 -->
+  <!-- Flag 2 -->
+  <!-- Flag 3 -->
+  <line
+     x1="424.73148"
+     y1="190"
+     x2="751.04236"
+     y2="190"
+     class="high"
+     id="line154" />
+  <!-- Labels -->
+  <text
+     x="151.10687"
+     y="85.084663"
+     class="signal-label"
+     id="text156">Idle</text>
+  <text
+     x="467.89774"
+     y="40.82552"
+     class="signal-label"
+     font-size="9"
+     id="text162">CMUX Frame</text>
+  <text
+     x="501.21689"
+     y="86.496002"
+     class="signal-label"
+     id="text164">Awake</text>
+  <text
+     x="150"
+     y="185"
+     class="signal-label"
+     id="text166">Idle</text>
+  <text
+     x="501.59491"
+     y="184.60336"
+     class="signal-label"
+     id="text176">Awake</text>
+  <!-- Annotations -->
+  <text
+     x="239.91168"
+     y="106.24564"
+     text-anchor="middle"
+     class="timing-label"
+     id="text178">Host sends flags</text>
+  <text
+     x="239.91168"
+     y="106.24564"
+     text-anchor="middle"
+     class="timing-label"
+     dy="12"
+     id="text180">continuously</text>
+  <text
+     x="274.58176"
+     y="169.99255"
+     text-anchor="middle"
+     class="timing-label"
+     id="text182">Modem receives</text>
+  <text
+     x="274.58176"
+     y="169.99255"
+     text-anchor="middle"
+     class="timing-label"
+     dy="12"
+     id="text184">3 flags</text>
+  <text
+     x="358.65668"
+     y="156.07787"
+     text-anchor="middle"
+     class="timing-label"
+     id="text186">starts repeating</text>
+  <text
+     x="209.10435"
+     y="66.111847"
+     text-anchor="middle"
+     class="timing-label"
+     id="text1142"><tspan
+       sodipodi:role="line"
+       id="tspan1146"
+       x="209.10435"
+       y="66.111847">0xF9</tspan></text>
+  <text
+     x="249.45007"
+     y="66.469666"
+     text-anchor="middle"
+     class="timing-label"
+     id="text2614"><tspan
+       sodipodi:role="line"
+       id="tspan2612"
+       x="249.45007"
+       y="66.469666">0xF9</tspan></text>
+  <text
+     x="290.02759"
+     y="65.751099"
+     text-anchor="middle"
+     class="timing-label"
+     id="text2618"><tspan
+       sodipodi:role="line"
+       id="tspan2616"
+       x="290.02759"
+       y="65.751099">0xF9</tspan></text>
+  <text
+     x="329.44244"
+     y="65.71714"
+     text-anchor="middle"
+     class="timing-label"
+     id="text2622"><tspan
+       sodipodi:role="line"
+       id="tspan2620"
+       x="329.44244"
+       y="65.71714">0xF9</tspan></text>
+  <line
+     x1="341.00476"
+     y1="90.026932"
+     x2="361.00476"
+     y2="90.026932"
+     class="high"
+     id="line2624" />
+  <line
+     x1="361.00476"
+     y1="90.026932"
+     x2="361.00476"
+     y2="70.026932"
+     class="signal-line"
+     stroke-width="2"
+     id="line2626" />
+  <line
+     x1="361.00476"
+     y1="70.026932"
+     x2="381.00476"
+     y2="70.026932"
+     class="low"
+     id="line2628" />
+  <line
+     x1="381.00476"
+     y1="70.026932"
+     x2="381.00476"
+     y2="90.026932"
+     class="signal-line"
+     stroke-width="2"
+     id="line2630" />
+  <text
+     x="369.34033"
+     y="65.659409"
+     text-anchor="middle"
+     class="timing-label"
+     id="text2634"><tspan
+       sodipodi:role="line"
+       id="tspan2632"
+       x="369.34033"
+       y="65.659409">0xF9</tspan></text>
+  <line
+     x1="381.03821"
+     y1="90.497238"
+     x2="401.03821"
+     y2="90.497238"
+     class="high"
+     id="line2636" />
+  <text
+     x="453.23706"
+     y="107.06327"
+     text-anchor="middle"
+     class="timing-label"
+     id="text2638">Host start transmission</text>
+  <text
+     x="358.65668"
+     y="156.07787"
+     text-anchor="middle"
+     class="timing-label"
+     id="text2640">starts repeating</text>
+</svg>
