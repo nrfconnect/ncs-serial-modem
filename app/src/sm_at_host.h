@@ -210,6 +210,33 @@ int sm_at_cb_wrapper(char *buf, size_t len, char *at_cmd, sm_at_callback cb);
 void sm_at_host_echo(bool enable);
 
 /**
+ * @brief Check whether echo URC delay is in progress.
+ *
+ * @retval true if echo URC delay is in progress, false otherwise.
+ */
+bool sm_at_host_echo_urc_delay(void);
+
+/** @brief Events which can be notified by the AT host. */
+enum sm_event {
+	SM_EVENT_URC = 0x01,     /**< URC can be sent. */
+	SM_EVENT_AT_MODE = 0x02, /**< Entered AT command mode. */
+};
+
+/** @brief Event callback structure. */
+struct sm_event_callback {
+	sys_snode_t node;
+	void (*cb)(struct k_work *work);
+	enum sm_event events;
+};
+
+/**
+ * @brief Register an event callback to be notified when the specified event occurs.
+ * @param cb Pointer to the event callback structure.
+ * @param event Event to register for.
+ */
+void sm_at_host_register_event_cb(struct sm_event_callback *cb, enum sm_event event);
+
+/**
  * @brief Acquire ownership of the URC context for a specific owner.
  *
  * If the context is unowned (NONE) or already owned by the given owner,
