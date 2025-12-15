@@ -223,6 +223,10 @@ The following configuration files are provided:
   It can be customized to fit your configuration, such as UART settings, baud rate, and flow control.
   By default, it sets the baud rate of the PPP UART to 1 000 000.
 
+* :file:`overlay-trace-backend-cmux.conf` - Configuration file that enables CMUX modem trace backend.
+  When enabled, modem traces are transmitted on a dedicated CMUX channel.
+  See the :ref:`sm_modem_trace_cmux` documentation for more information.
+
 * :file:`overlay-memfault.conf` - Configuration file that enables `Memfault`_.
   For more information about Memfault features in |NCS|, see the `Memfault library`_ docs.
 
