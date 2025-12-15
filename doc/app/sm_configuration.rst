@@ -284,6 +284,10 @@ The following configuration files are provided:
   This disables most of the IP-based protocols available through AT commands (such as MQTT) as it is expected that the controlling chip's own IP stack is used instead.
   See :ref:`CONFIG_SM_PPP <CONFIG_SM_PPP>` and :ref:`SM_AT_PPP` for more information.
 
+* :file:`overlay-trace-backend-cmux.conf` - Configuration file that enables CMUX modem trace backend.
+  When enabled, modem traces are transmitted on a dedicated CMUX channel.
+  See the :ref:`sm_modem_trace_cmux` documentation for more information.
+
 * :file:`overlay-memfault.conf` - Configuration file that enables `Memfault`_.
   For more information about Memfault features in |NCS|, see the `Memfault library`_ docs.
 

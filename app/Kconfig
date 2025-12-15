@@ -334,6 +334,21 @@ config SM_PGPS_INJECT_FIX_DATA
 
 endif # SM_GNSS
 
+if NRF_MODEM_LIB_TRACE
+
+choice NRF_MODEM_LIB_TRACE_BACKEND
+
+config SM_MODEM_TRACE_BACKEND_CMUX
+	bool "CMUX modem trace backend"
+	depends on SM_CMUX
+	help
+	  When CMUX is enabled, modem traces are transmitted on a dedicated CMUX channel.
+	  The trace channel is the first channel after the AT command channel and the PPP channel.
+
+endchoice # NRF_MODEM_LIB_TRACE_BACKEND
+
+endif
+
 #
 # Hardware RX byte counting for UART
 #
