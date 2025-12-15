@@ -14,7 +14,7 @@ You can use the |SM| (SM) application to make an nRF91 Series SiP work as a stan
 The Linux device can use a standard PPP daemon and ldattach utility to connect to the cellular network through the nRF91 Series SiP.
 
 The setup differentiates from a typical dial-up modem connection as the GSM 0710 multiplexer protocol (CMUX) is used to multiplex multiple data streams over a single serial port.
-This allows you to use the same serial port for both AT commands and PPP data.
+This allows you to use the same serial port for AT commands, PPP data, and modem traces.
 
 Prerequisites
 =============
@@ -31,7 +31,7 @@ Configuration
 
 You can adjust the serial port baud rate using the devicetree overlay file.
 The `baud rate is set to 115200 <Testing and optimization_>`_ by default.
-If you change the baud rate, set the same rate in the :file:`scripts/sm_start_ppp.sh` and :file:`scripts/sm_stop_ppp.sh` scripts.
+If you change the baud rate in the devicetree, use the ``-b`` parameter with the :file:`scripts/sm_start_ppp.sh` script to specify the matching baud rate.
 
 .. note::
    The standard ``ldattach`` utility sets MRU and MTU to 127 bytes.
@@ -48,17 +48,13 @@ Managing the connection
 ***********************
 
 The start and stop scripts are provided in the :file:`scripts` directory of the |SM| application.
-The scripts assume that the nRF91 Series SiP is connected to the Linux device using the ``/dev/ttyACM0`` serial port.
-
-If needed, adjust the serial port settings in the scripts as follows:
-
-.. code-block:: none
-
-   MODEM=/dev/ttyACM0
-   BAUD=115200
 
 To start the PPP connection, run the :file:`scripts/sm_start_ppp.sh` script.
 To stop the PPP connection, run the :file:`scripts/sm_stop_ppp.sh` script.
+
+The start script accepts command-line parameters to configure the connection.
+Run ``sm_start_ppp.sh -h`` to see all available options.
+By default, the script uses ``/dev/ttyACM0`` at 115200 baud.
 
 The scripts need superuser privileges to run, so use ``sudo``.
 The PPP link is set as a default route if there is no existing default route.
@@ -70,24 +66,8 @@ The following example shows how to start the connection and verify its operation
 .. code-block:: shell
 
    $ sudo scripts/sm_start_ppp.sh
-   Wait modem to boot
-   Attach CMUX channel to modem...
    Connect and wait for PPP link...
-   send (AT+CFUN=1^M)
-   expect (OK)
-
-
-   OK
-   -- got it
-
-   send ()
-   expect (#XPPP: 1,0)
-
-
-
-
-   #XPPP: 1,0
-   -- got it
+   PPP link started
 
    $ ip addr show ppp0
    7: ppp0: <POINTOPOINT,MULTICAST,NOARP,UP,LOWER_UP> mtu 1464 qdisc fq_codel state UNKNOWN group default qlen 3
@@ -133,13 +113,75 @@ The following example shows how to start the connection and verify its operation
    [  5]   0.00-11.58  sec  89.5 KBytes  63.3 Kbits/sec                  receiver
 
    $ sudo scripts/sm_stop_ppp.sh
-   send (AT+CFUN=0^M)
-   expect (#XPPP: 0,0)
+   Stopping PPP link...
+   Waiting for Shutdown script to complete...
+
+.. _sm_modem_trace_cmux:
+
+Collecting modem traces through CMUX backend
+********************************************
+
+The |SM| application supports collecting modem traces through the CMUX multiplexer.
+When enabled, modem traces are sent through a dedicated CMUX channel, allowing simultaneous AT commands, PPP data, and trace collection over the same serial port.
+The trace CMUX channel is the first channel after the AT command channel and the PPP channel.
+
+Configuration
+=============
+
+To use the CMUX trace backend, build the |SM| application with the trace backend configuration overlay in addition to the PPP and CMUX overlays:
+
+.. code-block:: console
+
+   west build -p -b nrf9151dk/nrf9151/ns -- -DEXTRA_CONF_FILE="overlay-ppp.conf;overlay-cmux.conf;overlay-trace-backend-cmux.conf"
+
+For optimal throughput and to minimize trace data loss, configure the UART to run at maximum speed:
+
+1. Set the UART speed in your device tree configuration (for example, 1000000 baud).
+#. Use the ``-b`` parameter with the script to match this speed (for example, ``-b 1000000``).
+
+.. note::
+   Some trace data will be dropped.
+   The amount depends on the UART speed, ongoing modem operations, and the trace level set with ``AT%XMODEMTRACE``.
+
+Setting trace level
+===================
+
+Configure the modem trace level using the `AT%XMODEMTRACE <xmodemtrace_>`_ command.
+
+The modem trace subsystem automatically sends the ``AT%XMODEMTRACE=1,2`` command at startup.
+This provides the most trace data and includes the crash dump collection.
+Depending on the drop rate you observe, you might need to select a different ``<set_id>`` to reduce the amount of trace data generated.
+
+Collecting traces with the script
+=================================
+
+The :file:`sm_start_ppp.sh` script includes support for collecting modem traces.
+Use the ``-T`` flag to enable trace collection.
+Traces are saved to the :file:`/var/log/nrf91-modem-trace.bin` file.
+The trace collection starts after the CMUX channel is established and continues until you stop the connection with the :file:`sm_stop_ppp.sh` script.
+
+The stop script automatically terminates trace collection and preserves the trace file for later analysis.
+
+.. code-block:: console
+
+   # Start PPP connection with trace collection with baud rate matching the device tree setting
+   $ sudo scripts/sm_start_ppp.sh -b 1000000 -T
+   Trace file: /var/log/nrf91-modem-trace.bin
+   Connect and wait for PPP link...
+   PPP link started
+
+   # Check that the trace is being collected
+   $ ls -la /var/log/nrf91-modem-trace.bin
+   -rw-r--r-- 1 root root 3467306 Jan 16 12:13 /var/log/nrf91-modem-trace.bin
+
+   # Stop PPP connection (also stops trace collection)
+   $ sudo scripts/sm_stop_ppp.sh
+   Stopping PPP link...
+   Waiting for Shutdown script to complete...
+   Stopping trace collection...
 
 
-   OK
+You can open the :file:`/var/log/nrf91-modem-trace.bin` file using the `Cellular Monitor app`_ for analysis.
+This allows you to see the AT commands, network, and IP-level details of the communication between the modem and the cellular network.
 
-
-
-   #XPPP: 0,0
-   -- got it
+If the modem crashes and the crash dump collection was enabled, you can send the trace file to Nordic Semiconductor support for further analysis.

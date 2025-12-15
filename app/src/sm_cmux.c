@@ -367,10 +367,14 @@ static struct cmux_dlci *cmux_get_dlci(enum cmux_channel channel)
 		return &cmux.dlcis[!cmux.at_channel];
 	}
 #endif
+#if defined(CONFIG_SM_MODEM_TRACE_BACKEND_CMUX)
+	if (channel == CMUX_MODEM_TRACE_CHANNEL) {
+		return &cmux.dlcis[CMUX_MODEM_TRACE_CHANNEL + 1];
+	}
+#endif
 #if defined(CONFIG_SM_GNSS_OUTPUT_NMEA_ON_CMUX_CHANNEL)
 	if (channel == CMUX_GNSS_CHANNEL) {
-		/* The last DLCI. */
-		return &cmux.dlcis[CHANNEL_COUNT - 1];
+		return &cmux.dlcis[CMUX_GNSS_CHANNEL + 1];
 	}
 #endif
 	assert(false);
@@ -383,6 +387,13 @@ struct modem_pipe *sm_cmux_reserve(enum cmux_channel channel)
 	 * until the channel is released (below) and we attach back to the pipe.
 	 */
 	return cmux_get_dlci(channel)->pipe;
+}
+
+bool sm_cmux_dlci_is_open(enum cmux_channel channel)
+{
+	struct cmux_dlci *dlci = cmux_get_dlci(channel);
+
+	return (dlci->instance.state == MODEM_CMUX_DLCI_STATE_OPEN);
 }
 
 void sm_cmux_release(enum cmux_channel channel)

@@ -39,7 +39,7 @@ tests:
       - thingy91x/nrf9151/ns
     integration_platforms:
       - nrf9151dk/nrf9151/ns
-  serial_modem.ppp_cmux_linux:
+  serial_modem.ppp_cmux:
     sysbuild: true
     build_only: true
     extra_args:
@@ -49,7 +49,7 @@ tests:
       - thingy91x/nrf9151/ns
     integration_platforms:
       - nrf9151dk/nrf9151/ns
-  serial_modem.ppp_cmux_zephyr_with_extmcu:
+  serial_modem.ppp_cmux_with_extmcu:
     sysbuild: true
     build_only: true
     extra_args:
@@ -57,6 +57,16 @@ tests:
       - EXTRA_DTC_OVERLAY_FILE="overlay-external-mcu.overlay"
     platform_allow:
       - nrf9151dk/nrf9151/ns
+    integration_platforms:
+      - nrf9151dk/nrf9151/ns
+  serial_modem.ppp_cmux_with_modem_trace:
+    sysbuild: true
+    build_only: true
+    extra_args:
+      - EXTRA_CONF_FILE="overlay-cmux.conf;overlay-ppp.conf;overlay-trace-backend-cmux.conf"
+    platform_allow:
+      - nrf9151dk/nrf9151/ns
+      - thingy91x/nrf9151/ns
     integration_platforms:
       - nrf9151dk/nrf9151/ns
   serial_modem.memfault:

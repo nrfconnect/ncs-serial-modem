@@ -37,6 +37,9 @@ Modem traces
 To send modem traces over UART on an nRF91 Series DK, configuration must be added for the UART device in the devicetree and Kconfig.
 This is done by adding the `modem trace UART snippet`_ when building and programming.
 
+It is also possible to send modem traces over CMUX channel.
+See the :ref:`sm_modem_trace_cmux` documentation for more information.
+
 Use the `Cellular Monitor app`_ for capturing and analyzing modem traces.
 
 TF-M logging must use the same UART as the application. For more details, see `shared TF-M logging`_.
