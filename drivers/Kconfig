@@ -3,6 +3,20 @@
 #
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 
+if NRF_MODEM_LIB_TRACE
+
+choice NRF_MODEM_LIB_TRACE_BACKEND
+
+config NRF_MODEM_LIB_TRACE_BACKEND_CMUX
+	bool "Stream modem coredump to CMUX"
+	depends on SM_CMUX
+	help
+	  Use CMUX trace backend for modem coredump.
+
+endchoice # NRF_MODEM_LIB_TRACE_BACKEND
+
+endif
+
 menu "Drivers"
 rsource "dtr_uart/Kconfig"
 endmenu

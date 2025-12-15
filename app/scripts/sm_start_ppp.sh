@@ -185,7 +185,7 @@ PPP_CMUX=$(ls /dev/gsmtty* | sort -V | head -n 2 | tail -n 1)
 log_dbg "AT CMUX:  $AT_CMUX"
 log_dbg "PPP CMUX: $PPP_CMUX"
 
-sleep 1
+sleep 5
 stty -F $AT_CMUX clocal
 
 echo "Connect and wait for PPP link..."

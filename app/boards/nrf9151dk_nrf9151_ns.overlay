@@ -14,6 +14,7 @@
 &uart0 {
 	status = "okay";
 	hw-flow-control;
+	current-speed = <1000000>;
 
 	dtr_uart0: dtr-uart {
 		compatible = "nordic,dtr-uart";

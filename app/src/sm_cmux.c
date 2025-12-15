@@ -302,6 +302,11 @@ static bool cmux_is_started(void)
 	return (cmux.uart_pipe != NULL);
 }
 
+bool sm_cmux_is_started(void)
+{
+	return cmux_is_started();
+}
+
 void sm_cmux_init(void)
 {
 	const struct modem_cmux_config cmux_config = {
@@ -370,6 +375,18 @@ static struct cmux_dlci *cmux_get_dlci(enum cmux_channel channel)
 		return &cmux.dlcis[!cmux.at_channel];
 	}
 #endif
+#if defined(CONFIG_NRF_MODEM_LIB_TRACE_BACKEND_CMUX)
+	if (channel == CMUX_COREDUMP_CHANNEL) {
+#if defined(CONFIG_SM_GNSS_OUTPUT_NMEA_ON_CMUX_CHANNEL)
+		/* The second to last DLCI. */
+		return &cmux.dlcis[CHANNEL_COUNT - 2];
+#else
+		/* The last DLCI. */
+		return &cmux.dlcis[CHANNEL_COUNT - 1];
+#endif
+	}
+#endif
+
 #if defined(CONFIG_SM_GNSS_OUTPUT_NMEA_ON_CMUX_CHANNEL)
 	if (channel == CMUX_GNSS_CHANNEL) {
 		/* The last DLCI. */
