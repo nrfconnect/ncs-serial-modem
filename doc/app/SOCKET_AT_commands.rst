@@ -17,6 +17,13 @@ Socket #XSOCKET
 
 The ``#XSOCKET`` command allows you to open a socket and to check the socket handle.
 
+.. note::
+
+   A socket cannot be created on a PDN connection that is already in use by a raw socket.
+   A raw socket cannot be created on a PDN connection that is already in use by another socket.
+   The reason is that a raw socket cannot keep its data separate from the data of another IP socket when both are operating on the same PDN.
+   When a raw socket is active, it intercepts all downlink data intended for other sockets on the same PDN, which disrupts normal socket operations.
+
 Set command
 -----------
 
@@ -181,6 +188,12 @@ The ``#XSSOCKET`` command allows you to open a secure socket and to check the so
 
 .. note::
    TLS and DTLS servers are currently not supported.
+
+.. note::
+
+   A secure socket cannot be created on a PDN connection that is already in use by a raw socket.
+   The reason is that a raw socket cannot keep its data separate from the data of another IP socket when both are operating on the same PDN.
+   When a raw socket is active, it intercepts all downlink data intended for other sockets on the same PDN, which disrupts normal socket operations.
 
 Set command
 -----------
