@@ -168,7 +168,7 @@ Syntax
 Response syntax
 ~~~~~~~~~~~~~~~
 
-.. include:: PPP_AT_commands.rst
+.. include:: at_ppp.rst
    :start-after: sm_ppp_status_notif_start
    :end-before: sm_ppp_status_notif_end
 

@@ -13,7 +13,7 @@ It includes host examples in the form of the |SM| AT Client library and the |SM|
 
    gsg_guide
    app/README
-   app/AT_commands
+   app/at_commands
    uart_configuration
    samples/README
    migration_notes

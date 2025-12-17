@@ -1555,11 +1555,11 @@ Response syntax
 When in the AT-command mode and the automatic data reception is enabled, |SM| sends ``#XRECV`` and ``#XRECVFROM`` responses as URC notifications when data is received.
 ``#XRECV`` is used for TCP, raw, and connected UDP sockets, while ``#XRECVFROM`` is used for unconnected UDP sockets.
 
-.. include:: SOCKET_AT_commands.rst
+.. include:: at_socket.rst
    :start-after: sm_recv_response_start
    :end-before: sm_recv_response_end
 
-.. include:: SOCKET_AT_commands.rst
+.. include:: at_socket.rst
    :start-after: sm_recvfrom_response_start
    :end-before: sm_recvfrom_response_end
 
