@@ -263,7 +263,7 @@ Syntax
 Response syntax
 ~~~~~~~~~~~~~~~
 
-.. include:: GNSS_AT_commands.rst
+.. include:: at_gnss.rst
    :start-after: sm_gps_status_notif_start
    :end-before: sm_gps_status_notif_end
 
