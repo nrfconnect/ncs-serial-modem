@@ -12,7 +12,7 @@ They list the required AT commands and the expected responses.
 
 Some scenarios are generic and should work out of the box, while others require you to set up a server that you can test against.
 
-See :ref:`sm_building` for instructions on how to build and run the |SM| application.
+See :ref:`sm_build_and_run` for instructions on how to build and run the |SM| application.
 :ref:`sm_testing_section` describes how to turn on the modem and conduct the tests.
 
 Generic AT commands
