@@ -163,6 +163,12 @@ CONFIG_SM_PGPS_INJECT_FIX_DATA - Injects the data obtained when acquiring a fix.
    In that case, this option should be disabled.
    The default value is ``y``.
 
+.. _CONFIG_SM_DFU_MODEM_FULL:
+
+CONFIG_SM_DFU_MODEM_FULL - Enable full modem DFU
+   This option enables support for full modem firmware updates using the ``#XDFUINIT``, ``#XDFUWRITE``, and ``#XDFUAPPLY`` commands.
+   See the :ref:`DFU_AT_commands` for more information.
+
 .. _sm_config_files:
 
 Configuration files
