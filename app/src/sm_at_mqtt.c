@@ -13,7 +13,6 @@
 #include <zephyr/random/random.h>
 #include "sm_util.h"
 #include "sm_at_host.h"
-#include "sm_at_mqtt.h"
 
 LOG_MODULE_REGISTER(sm_mqtt, CONFIG_SM_LOG_LEVEL);
 
@@ -810,7 +809,7 @@ static int handle_at_mqtt_unsubscribe(enum at_parser_cmd_type cmd_type,
 	return err;
 }
 
-int sm_at_mqtt_init(void)
+static int sm_at_mqtt_init(void)
 {
 	pub_param.message_id = 0;
 	memset(&ctx, 0, sizeof(ctx));
@@ -821,10 +820,4 @@ int sm_at_mqtt_init(void)
 
 	return 0;
 }
-
-int sm_at_mqtt_uninit(void)
-{
-	client.broker = NULL;
-
-	return 0;
-}
+SYS_INIT(sm_at_mqtt_init, APPLICATION, 0);

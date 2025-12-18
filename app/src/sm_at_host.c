@@ -32,13 +32,6 @@ extern FUNC_NORETURN void sm_reset(void);
 
 LOG_MODULE_REGISTER(sm_at_host, CONFIG_SM_LOG_LEVEL);
 
-#define SM_SYNC_STR     "Ready\r\n"
-#define SM_SYNC_ERR_STR "INIT ERROR\r\n"
-#define OK_STR		 "\r\nOK\r\n"
-#define ERROR_STR	 "\r\nERROR\r\n"
-#define CRLF_STR	 "\r\n"
-#define CR		 '\r'
-#define LF		 '\n'
 #define HEXDUMP_LIMIT    16
 
 #define AT_XDFU_INIT_CMD "AT#XDFUINIT"
@@ -1211,10 +1204,8 @@ void sm_at_host_urc_ctx_release(struct sm_urc_ctx *ctx, enum sm_urc_owner owner)
 	k_mutex_unlock(&ctx->mutex);
 }
 
-int sm_at_host_init(void)
+static int sm_at_host_ctx_init(void)
 {
-	int err;
-
 	ring_buf_init(&urc_ctx.rb, sizeof(urc_ctx.buf), urc_ctx.buf);
 	k_mutex_init(&urc_ctx.mutex);
 
@@ -1226,37 +1217,9 @@ int sm_at_host_init(void)
 
 	k_work_init(&raw_send_scheduled_work, raw_send_scheduled);
 
-	err = sm_uart_handler_enable();
-	if (err) {
-		return err;
-	}
-
-	err = sm_at_init();
-	if (err) {
-		/* Send "INIT ERROR" string to indicate that AT host init failed */
-		err = sm_at_send_str(SM_SYNC_ERR_STR);
-		if (err) {
-			return err;
-		}
-		return -EFAULT;
-	}
-
-	if (!IS_ENABLED(CONFIG_SM_SKIP_READY_MSG)) {
-		/* Send Ready string to indicate that AT host is ready */
-		err = sm_at_send_str(SM_SYNC_STR);
-		if (err) {
-			return err;
-		}
-	}
-
-	/* This is here and not earlier because in case of firmware
-	 * update it will send an AT response so the UART must be up.
-	 */
-	sm_fota_post_process();
-
-	LOG_INF("at_host init done");
 	return 0;
 }
+SYS_INIT(sm_at_host_ctx_init, APPLICATION, 0);
 
 void sm_at_host_uninit(void)
 {

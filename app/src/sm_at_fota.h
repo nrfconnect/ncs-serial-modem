@@ -39,22 +39,6 @@ extern enum fota_stage sm_fota_stage; /* Current stage of FOTA process. */
 extern enum fota_status sm_fota_status; /* FOTA process status. */
 extern int32_t sm_fota_info; /* FOTA download percentage or failure cause in case of error. */
 
-/**
- * @brief Initialize FOTA AT command parser.
- *
- * @retval 0 If the operation was successful.
- *           Otherwise, a (negative) error code is returned.
- */
-int sm_at_fota_init(void);
-
-/**
- * @brief Uninitialize FOTA AT command parser.
- *
- * @retval 0 If the operation was successful.
- *           Otherwise, a (negative) error code is returned.
- */
-int sm_at_fota_uninit(void);
-
 /** @brief Sets the FOTA state variables to their default values. */
 void sm_fota_init_state(void);
 

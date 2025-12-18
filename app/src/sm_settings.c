@@ -47,7 +47,7 @@ static struct settings_handler sm_settings_conf = {
 	.h_set = settings_set
 };
 
-int sm_settings_init(void)
+static int sm_settings_init(void)
 {
 	int ret;
 
@@ -68,6 +68,10 @@ int sm_settings_init(void)
 
 	return ret;
 }
+/* Run before APPLICATION init functions, so modules can use settings that are load from
+ * flash
+ */
+SYS_INIT(sm_settings_init, POST_KERNEL, CONFIG_APPLICATION_INIT_PRIORITY);
 
 int sm_settings_fota_save(void)
 {

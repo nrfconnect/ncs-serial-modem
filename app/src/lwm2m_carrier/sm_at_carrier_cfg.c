@@ -711,7 +711,8 @@ static int do_cfg_uri(enum at_parser_cmd_type, struct at_parser *parser, uint32_
 	return lwm2m_settings_server_uri_set(server_uri);
 }
 
-int sm_at_carrier_cfg_init(void)
+#if defined(CONFIG_SM_CARRIER_AUTO_STARTUP)
+static int sm_at_carrier_cfg_init(void)
 {
 	if (IS_ENABLED(CONFIG_SM_CARRIER_AUTO_STARTUP)) {
 		return lwm2m_settings_auto_startup_set(true);
@@ -719,3 +720,5 @@ int sm_at_carrier_cfg_init(void)
 
 	return 0;
 }
+SYS_INIT(sm_at_carrier_cfg_init, APPLICATION, 0);
+#endif
