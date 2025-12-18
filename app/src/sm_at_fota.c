@@ -22,6 +22,7 @@
 #include "sm_settings.h"
 #include "sm_at_host.h"
 #include "sm_at_fota.h"
+#include "sm_defines.h"
 
 LOG_MODULE_REGISTER(sm_fota, CONFIG_SM_LOG_LEVEL);
 
@@ -408,15 +409,18 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 	return err;
 }
 
-int sm_at_fota_init(void)
+static int sm_at_fota_init(void)
 {
-	return fota_download_init(fota_dl_handler);
-}
+	int ret = fota_download_init(fota_dl_handler);
 
-int sm_at_fota_uninit(void)
-{
+	if (ret) {
+		LOG_ERR("fota_download_init failed: %d", ret);
+		sm_init_failed = true;
+		return ret;
+	}
 	return 0;
 }
+SYS_INIT(sm_at_fota_init, APPLICATION, 0);
 
 void sm_fota_init_state(void)
 {

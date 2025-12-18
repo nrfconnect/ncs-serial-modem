@@ -169,7 +169,7 @@ void sm_ctrl_pin_enter_shutdown(void)
 	assert(false);
 }
 
-void sm_ctrl_pin_init_gpios(void)
+static int sm_ctrl_pin_init_gpios(void)
 {
 #if SM_DTR_GPIOS
 	nrf_gpio_cfg_sense_set(dtr_gpio.pin, NRF_GPIO_PIN_SENSE_LOW);
@@ -179,17 +179,21 @@ void sm_ctrl_pin_init_gpios(void)
 	/* Configure Modem Power GPIO */
 	if (!gpio_is_ready_dt(&mdm_pwr_gpio)) {
 		LOG_ERR("Modem Power GPIO not ready");
-		return;
+		sm_init_failed = true;
+		return -ENODEV;
 	}
 	int err = gpio_pin_configure_dt(&mdm_pwr_gpio, GPIO_INPUT);
 
 	if (err < 0) {
 		LOG_ERR("Failed to configure Modem Power GPIO (%d).", err);
-		return;
+		sm_init_failed = true;
+		return err;
 	}
 	nrf_gpio_cfg_sense_set(mdm_pwr_gpio.pin, NRF_GPIO_PIN_SENSE_LOW);
 #endif
+	return 0;
 }
+SYS_INIT(sm_ctrl_pin_init_gpios, POST_KERNEL, CONFIG_APPLICATION_INIT_PRIORITY);
 
 
 #if SM_HAS_PWR_KEY
@@ -215,24 +219,29 @@ int sm_ctrl_pin_init(void)
 	err = ext_xtal_control(true);
 	if (err) {
 		LOG_ERR("Failed to enable ext XTAL: %d", err);
+		sm_init_failed = true;
 		return err;
 	}
 #if SM_HAS_PWR_KEY
 	if (!gpio_is_ready_dt(&mdm_pwr_gpio)) {
 		LOG_ERR("Modem Power GPIO not ready");
+		sm_init_failed = true;
 		return -ENODEV;
 	}
 	err = gpio_pin_interrupt_configure_dt(&mdm_pwr_gpio, GPIO_INT_EDGE_TO_ACTIVE);
 	if (err) {
 		LOG_ERR("Failed to configure Modem Power GPIO interrupt (%d).", err);
+		sm_init_failed = true;
 		return err;
 	}
 	gpio_init_callback(&mdm_pwr_gpio_cb, pwr_pin_callback, BIT(mdm_pwr_gpio.pin));
 	err = gpio_add_callback_dt(&mdm_pwr_gpio, &mdm_pwr_gpio_cb);
 	if (err) {
 		LOG_ERR("Failed to add Modem Power GPIO callback (%d).", err);
+		sm_init_failed = true;
 		return err;
 	}
 #endif
 	return 0;
 }
+SYS_INIT(sm_ctrl_pin_init, APPLICATION, 0);

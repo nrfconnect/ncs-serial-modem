@@ -302,7 +302,7 @@ static bool cmux_is_started(void)
 	return (cmux.uart_pipe != NULL);
 }
 
-void sm_cmux_init(void)
+static int sm_cmux_init(void)
 {
 	const struct modem_cmux_config cmux_config = {
 		.callback = cmux_event_handler,
@@ -327,10 +327,17 @@ void sm_cmux_init(void)
 
 	cmux.at_channel = 0;
 	cmux.requested_at_channel = UINT_MAX;
+	return 0;
 }
+SYS_INIT(sm_cmux_init, APPLICATION, 0);
 
-void sm_cmux_uninit(void)
+static void stop_work_fn(struct k_work *work)
 {
+	int err;
+
+	ARG_UNUSED(work);
+
+	/* Will stop the UART when calling the close_pipe() function. */
 	if (cmux_is_started()) {
 		modem_cmux_release(&cmux.instance);
 
@@ -342,16 +349,6 @@ void sm_cmux_uninit(void)
 		}
 		sm_at_host_urc_ctx_release(cmux.urc_ctx, SM_URC_OWNER_CMUX);
 	}
-}
-
-static void stop_work_fn(struct k_work *work)
-{
-	int err;
-
-	ARG_UNUSED(work);
-
-	/* Will stop the UART when calling the close_pipe() function. */
-	sm_cmux_uninit();
 
 	err = sm_uart_handler_enable();
 	if (err) {

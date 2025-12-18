@@ -11,7 +11,6 @@
 #include <nrf_socket.h>
 #include "sm_util.h"
 #include "sm_at_host.h"
-#include "sm_at_icmp.h"
 
 LOG_MODULE_REGISTER(sm_icmp, CONFIG_SM_LOG_LEVEL);
 
@@ -38,7 +37,8 @@ static struct ping_argv_t {
 	uint16_t pdn;
 } ping_argv;
 
-static struct k_work ping_work;
+static void ping_task(struct k_work *item);
+K_WORK_DEFINE(ping_work, ping_task);
 
 static inline void setip(uint8_t *buffer, uint32_t ipaddr)
 {
@@ -411,7 +411,7 @@ close_end:
 	return (uint32_t)delta_t;
 }
 
-void ping_task(struct k_work *item)
+static void ping_task(struct k_work *item)
 {
 	struct zsock_addrinfo *si = ping_argv.src;
 	struct zsock_addrinfo *di = ping_argv.dest;
@@ -569,19 +569,4 @@ static int handle_at_icmp_ping(enum at_parser_cmd_type cmd_type, struct at_parse
 	}
 
 	return err;
-}
-
-/**@brief API to initialize ICMP AT commands handler
- */
-int sm_at_icmp_init(void)
-{
-	k_work_init(&ping_work, ping_task);
-	return 0;
-}
-
-/**@brief API to uninitialize ICMP AT commands handler
- */
-int sm_at_icmp_uninit(void)
-{
-	return 0;
 }

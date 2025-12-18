@@ -16,9 +16,10 @@
 #include "sm_at_host.h"
 #include "sm_at_dfu.h"
 #include "sm_at_fota.h"
-#include "sm_settings.h"
 #include "sm_util.h"
 #include "sm_ctrl_pin.h"
+#include "sm_uart_handler.h"
+#include "sm_defines.h"
 
 LOG_MODULE_REGISTER(sm, CONFIG_SM_LOG_LEVEL);
 
@@ -27,6 +28,7 @@ LOG_MODULE_REGISTER(sm, CONFIG_SM_LOG_LEVEL);
 static K_THREAD_STACK_DEFINE(sm_wq_stack_area, SM_WQ_STACK_SIZE);
 
 struct k_work_q sm_work_q;
+bool sm_init_failed = false;
 
 NRF_MODEM_LIB_ON_INIT(lwm2m_init_hook, on_modem_lib_init, NULL);
 NRF_MODEM_LIB_ON_DFU_RES(main_dfu_hook, on_modem_dfu_res, NULL);
@@ -147,12 +149,6 @@ static int bootloader_mode_init(void)
 	}
 	LOG_INF("Bootloader mode initiated successfully");
 
-	ret = sm_ctrl_pin_init();
-	if (ret) {
-		LOG_ERR("Failed to init ctrl_pin: %d", ret);
-		return ret;
-	}
-
 	k_work_queue_start(&sm_work_q, sm_wq_stack_area,
 		K_THREAD_STACK_SIZEOF(sm_wq_stack_area),
 		SM_WQ_PRIORITY, NULL);
@@ -242,24 +238,27 @@ int start_execute(void)
 
 	LOG_INF("Serial Modem");
 
-	err = sm_ctrl_pin_init();
-	if (err) {
-		LOG_ERR("Failed to init ctrl_pin: %d", err);
-		return err;
-	}
-
 	k_work_queue_start(&sm_work_q, sm_wq_stack_area,
 		   K_THREAD_STACK_SIZEOF(sm_wq_stack_area),
 		   SM_WQ_PRIORITY, NULL);
 
-	/* This will send "READY" or "INIT ERROR" to UART so after this nothing
-	 * should be done that can fail
-	 */
-	err = sm_at_host_init();
-	if (err) {
-		LOG_ERR("Failed to init at_host: %d", err);
-		return err;
+	if (!IS_ENABLED(CONFIG_SM_SKIP_READY_MSG)) {
+		/* Send Ready string to indicate that AT host is ready */
+		if (sm_init_failed) {
+			err = sm_at_send_str(SM_SYNC_ERR_STR);
+		} else {
+			err = sm_at_send_str(SM_SYNC_STR);
+		}
+
+		if (err) {
+			return err;
+		}
 	}
+
+	/* This is here and not earlier because in case of firmware
+	 * update it will send an AT response so the UART must be up.
+	 */
+	sm_fota_post_process();
 
 	(void)lte_auto_connect();
 
@@ -275,13 +274,6 @@ int main(void)
 	nrf_power_resetreas_clear(NRF_POWER_NS, 0x70017);
 	LOG_DBG("RR: 0x%08x", rr);
 
-	sm_ctrl_pin_init_gpios();
-
-	/* Init and load settings */
-	if (sm_settings_init() != 0) {
-		LOG_WRN("Failed to init sm settings");
-	}
-
 	if (sm_bootloader_mode_requested) {
 		/* Clear bootloader mode flag */
 		ret = bootloader_mode_request(false);
@@ -295,6 +287,12 @@ int main(void)
 			}
 			goto exit;
 		}
+	}
+
+	ret = sm_uart_handler_enable();
+	if (ret) {
+		LOG_ERR("Failed to enable UART handler (%d).", ret);
+		goto exit;
 	}
 
 #if defined(CONFIG_SM_FULL_FOTA)
