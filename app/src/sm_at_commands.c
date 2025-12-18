@@ -442,13 +442,6 @@ int sm_at_init(void)
 #if defined(CONFIG_SM_CMUX)
 	sm_cmux_init();
 #endif
-#if defined(CONFIG_SM_PPP)
-	err = sm_ppp_init();
-	if (err) {
-		LOG_ERR("%s initialization failed (%d).", "PPP", err);
-		return err;
-	}
-#endif
 	return err;
 }
 

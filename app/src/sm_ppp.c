@@ -67,7 +67,6 @@ struct ppp_event {
 };
 
 struct ppp_work {
-	struct k_work work;
 	struct k_msgq queue;
 	struct ppp_event queue_buf[4];
 };
@@ -92,17 +91,17 @@ static struct modem_pipe *ppp_pipe;
 static unsigned int ppp_pdn_cid;
 
 enum {
+	EVENT_FD_IDX,  /* Eventfd to signal incoming PPP events (always valid). */
 	ZEPHYR_FD_IDX, /* Raw Zephyr socket to pass data to/from the PPP link. */
-	MODEM_FD_IDX, /* Raw modem socket to pass data to/from the LTE link. */
-	EVENT_FD_IDX, /* Eventfd to signal the PPP thread. */
+	MODEM_FD_IDX,  /* Raw modem socket to pass data to/from the LTE link. */
 	PPP_FDS_COUNT
 };
 const char *const ppp_socket_names[PPP_FDS_COUNT] = {
+	[EVENT_FD_IDX] = "event",
 	[ZEPHYR_FD_IDX] = "Zephyr",
-	[MODEM_FD_IDX] = "modem",
-	[EVENT_FD_IDX] = "eventfd"
+	[MODEM_FD_IDX] = "modem"
 };
-static int ppp_fds[PPP_FDS_COUNT] = { -1, -1 };
+static int ppp_fds[PPP_FDS_COUNT] = { -1, -1, -1 };
 
 static const char *ppp_action_str(enum ppp_action action)
 {
@@ -165,18 +164,13 @@ static bool open_ppp_sockets(void)
 		return false;
 	}
 
-	ppp_fds[EVENT_FD_IDX] = eventfd(0, 0);
-	if (ppp_fds[EVENT_FD_IDX] < 0) {
-		LOG_ERR("Eventfd creation failed (%d).", -errno);
-		return false;
-	}
-
 	return true;
 }
 
 static void close_ppp_sockets(void)
 {
-	for (size_t i = 0; i != ARRAY_SIZE(ppp_fds); ++i) {
+	/* Close only PPP sockets (Zephyr and modem), not the event FD */
+	for (size_t i = EVENT_FD_IDX + 1; i < ARRAY_SIZE(ppp_fds); ++i) {
 		if (ppp_fds[i] < 0) {
 			continue;
 		}
@@ -239,9 +233,13 @@ static void delegate_ppp_event(enum ppp_action action, enum ppp_reason reason)
 
 	if (k_msgq_put(&ppp_work.queue, &event, K_NO_WAIT)) {
 		LOG_ERR("Failed to queue PPP event.");
+		return;
 	}
 
-	k_work_submit_to_queue(&sm_work_q, &ppp_work.work);
+	/* Signal the PPP thread that an event is available */
+	if (eventfd_write(ppp_fds[EVENT_FD_IDX], 1) != 0) {
+		LOG_ERR("Failed to signal PPP event (%d).", errno);
+	}
 }
 
 static bool ppp_is_running(void)
@@ -364,12 +362,6 @@ static int ppp_start(void)
 
 	net_if_carrier_on(ppp_iface);
 
-	k_thread_create(&ppp_data_passing_thread_id, ppp_data_passing_thread_stack,
-			K_THREAD_STACK_SIZEOF(ppp_data_passing_thread_stack),
-			ppp_data_passing_thread, NULL, NULL, NULL,
-			K_PRIO_COOP(10), 0, K_NO_WAIT);
-	k_thread_name_set(&ppp_data_passing_thread_id, "ppp_data_passing");
-
 	ppp_state = PPP_STATE_RUNNING;
 	send_status_notification();
 
@@ -423,10 +415,6 @@ static int ppp_stop(enum ppp_reason reason)
 #endif
 
 	net_if_carrier_off(ppp_iface);
-
-	/* Close the thread. */
-	eventfd_write(ppp_fds[EVENT_FD_IDX], 1);
-	k_thread_join(&ppp_data_passing_thread_id, K_SECONDS(1));
 
 	close_ppp_sockets();
 
@@ -550,13 +538,12 @@ static int at_cfun_set_callback(char *buf, size_t len, char *at_cmd)
 	return 0;
 }
 
-static void ppp_work_fn(struct k_work *work)
+static void ppp_work_fn(void)
 {
-	struct ppp_work *const ppp_work = CONTAINER_OF(work, struct ppp_work, work);
 	struct ppp_event event;
 	int err = 0;
 
-	while (k_msgq_get(&ppp_work->queue, &event, K_NO_WAIT) == 0) {
+	while (k_msgq_get(&ppp_work.queue, &event, K_NO_WAIT) == 0) {
 
 		LOG_INF("PPP %s, reason: %d", ppp_action_str(event.action), event.reason);
 
@@ -584,8 +571,8 @@ static void ppp_work_fn(struct k_work *work)
 	}
 }
 
-static void ppp_net_mgmt_event_handler(struct net_mgmt_event_callback *cb,
-				       uint64_t mgmt_event, struct net_if *iface)
+static void ppp_net_mgmt_event_handler(uint64_t mgmt_event, struct net_if *iface, void *info,
+				       size_t info_length, void *user_data)
 {
 	switch (mgmt_event) {
 	case NET_EVENT_PPP_PHASE_RUNNING:
@@ -610,10 +597,15 @@ static void ppp_net_mgmt_event_handler(struct net_mgmt_event_callback *cb,
 		delegate_ppp_event(PPP_STOP, PPP_REASON_PEER_DISCONNECTED);
 
 		break;
+	default:
+		break;
 	}
 }
+NET_MGMT_REGISTER_EVENT_HANDLER(sm_ppp_event_handler,
+				NET_EVENT_PPP_PHASE_RUNNING | NET_EVENT_PPP_PHASE_DEAD,
+				ppp_net_mgmt_event_handler, NULL);
 
-int sm_ppp_init(void)
+static int sm_ppp_init(void)
 {
 #if !defined(CONFIG_SM_CMUX)
 	if (!device_is_ready(ppp_uart_dev)) {
@@ -640,25 +632,32 @@ int sm_ppp_init(void)
 		}
 	}
 #endif
+	/* Initialize event message queue */
 	k_msgq_init(&ppp_work.queue, (char *)&ppp_work.queue_buf, sizeof(struct ppp_event),
 		    sizeof(ppp_work.queue_buf) / sizeof(struct ppp_event));
-	k_work_init(&ppp_work.work, ppp_work_fn);
+
+	/* Create event eventfd for signaling events to the PPP thread */
+	ppp_fds[EVENT_FD_IDX] = eventfd(0, EFD_NONBLOCK);
+	if (ppp_fds[EVENT_FD_IDX] < 0) {
+		LOG_ERR("Failed to create event eventfd (%d).", errno);
+		return -errno;
+	}
+
+	/* Start the PPP thread which will handle events and data passing */
+	k_thread_create(&ppp_data_passing_thread_id, ppp_data_passing_thread_stack,
+			K_THREAD_STACK_SIZEOF(ppp_data_passing_thread_stack),
+			ppp_data_passing_thread, NULL, NULL, NULL,
+			K_PRIO_COOP(10), 0, K_NO_WAIT);
+	k_thread_name_set(&ppp_data_passing_thread_id, "ppp_data_passing");
 
 	ppp_iface = modem_ppp_get_iface(&ppp_module);
 
 	net_if_flag_set(ppp_iface, NET_IF_POINTOPOINT);
 
-	{
-		static struct net_mgmt_event_callback ppp_net_mgmt_event_cb;
-
-		net_mgmt_init_event_callback(&ppp_net_mgmt_event_cb, ppp_net_mgmt_event_handler,
-					    NET_EVENT_PPP_PHASE_RUNNING | NET_EVENT_PPP_PHASE_DEAD);
-		net_mgmt_add_event_callback(&ppp_net_mgmt_event_cb);
-	}
-
 	LOG_DBG("PPP initialized.");
 	return 0;
 }
+SYS_INIT(sm_ppp_init, APPLICATION, 0);
 
 SM_AT_CMD_CUSTOM(xppp, "AT#XPPP", handle_at_ppp);
 static int handle_at_ppp(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
@@ -706,33 +705,79 @@ static int handle_at_ppp(enum at_parser_cmd_type cmd_type, struct at_parser *par
 
 static void ppp_data_passing_thread(void*, void*, void*)
 {
-	const size_t mtu = net_if_get_mtu(ppp_iface);
 	struct zsock_pollfd fds[PPP_FDS_COUNT];
-
-	for (size_t i = 0; i != ARRAY_SIZE(fds); ++i) {
-		fds[i].fd = ppp_fds[i];
-		fds[i].events = ZSOCK_POLLIN;
-	}
+	size_t mtu = 0;
 
 	while (true) {
-		const int poll_ret = zsock_poll(fds, ARRAY_SIZE(fds), -1);
+		int nfds = 0;
 
-		if (poll_ret <= 0) {
-			LOG_ERR("Sockets polling failed (%d, %d). Restart.", poll_ret, -errno);
-			delegate_ppp_event(PPP_RESTART, PPP_REASON_ERROR);
-			return;
+		/* Always poll the event FD for incoming events */
+		fds[nfds].fd = ppp_fds[EVENT_FD_IDX];
+		fds[nfds].events = ZSOCK_POLLIN;
+		nfds++;
+
+		/* When PPP is running, also poll the PPP data sockets */
+		if (ppp_is_running()) {
+			if (mtu == 0) {
+				mtu = net_if_get_mtu(ppp_iface);
+			}
+
+			fds[nfds].fd = ppp_fds[ZEPHYR_FD_IDX];
+			fds[nfds].events = ZSOCK_POLLIN;
+			nfds++;
+
+			fds[nfds].fd = ppp_fds[MODEM_FD_IDX];
+			fds[nfds].events = ZSOCK_POLLIN;
+			nfds++;
+		} else {
+			mtu = 0;
 		}
 
-		for (size_t src = 0; src != ARRAY_SIZE(fds); ++src) {
-			const short revents = fds[src].revents;
+		const int poll_ret = zsock_poll(fds, nfds, -1);
+
+		if (poll_ret <= 0) {
+			LOG_ERR("Sockets polling failed (%d, %d).", poll_ret, -errno);
+			if (ppp_is_running()) {
+				ppp_state = PPP_STATE_STARTING;
+				delegate_ppp_event(PPP_RESTART, PPP_REASON_ERROR);
+			}
+			k_sleep(K_SECONDS(1));
+			continue;
+		}
+
+		for (int i = 0; i < nfds; ++i) {
+			const short revents = fds[i].revents;
+			const int fd = fds[i].fd;
 
 			if (!revents) {
 				continue;
 			}
 
-			if (src == EVENT_FD_IDX) {
-				LOG_DBG("Exit thread.");
-				return;
+			/* Check if this is the event FD */
+			if (fd == ppp_fds[EVENT_FD_IDX]) {
+				if (revents & ZSOCK_POLLIN) {
+					eventfd_t value;
+					/* Read the eventfd to clear it */
+					if (eventfd_read(ppp_fds[EVENT_FD_IDX], &value) == 0) {
+						LOG_DBG("Processing PPP events.");
+						/* Process all queued events */
+						ppp_work_fn();
+					} else {
+						LOG_ERR("Failed to read eventfd (%d).", errno);
+					}
+				}
+				continue;
+			}
+
+			/* Determine the source index for PPP data sockets */
+			size_t src;
+
+			if (fd == ppp_fds[ZEPHYR_FD_IDX]) {
+				src = ZEPHYR_FD_IDX;
+			} else if (fd == ppp_fds[MODEM_FD_IDX]) {
+				src = MODEM_FD_IDX;
+			} else {
+				continue;
 			}
 
 			if (!(revents & ZSOCK_POLLIN)) {
@@ -744,7 +789,7 @@ static void ppp_data_passing_thread(void*, void*, void*)
 					LOG_DBG("Connection down. Stop.");
 				}
 				delegate_ppp_event(PPP_STOP, PPP_REASON_NETWORK);
-				return;
+				continue;
 			}
 
 			const ssize_t len =
