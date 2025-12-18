@@ -470,8 +470,8 @@ static int handle_at_cmux(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 #endif
 		if (cmux_is_started()) {
 			/* Update the AT channel after answering "OK" on the current DLCI. */
-			rsp_send_ok();
 			cmux.requested_at_channel = at_channel;
+			rsp_send_ok();
 			return -SILENT_AT_COMMAND_RET;
 		}
 		cmux.at_channel = at_channel;
