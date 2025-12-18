@@ -27,31 +27,10 @@
 #include "sm_settings.h"
 #include "sm_at_host.h"
 #include "sm_at_socket.h"
-#include "sm_at_icmp.h"
 #include "sm_at_sms.h"
 #include "sm_at_fota.h"
 #include "sm_version.h"
-#if defined(CONFIG_SM_NRF_CLOUD)
 #include "sm_at_nrfcloud.h"
-#endif
-#if defined(CONFIG_SM_GNSS)
-#include "sm_at_gnss.h"
-#endif
-#if defined(CONFIG_SM_MQTTC)
-#include "sm_at_mqtt.h"
-#endif
-#if defined(CONFIG_SM_CARRIER)
-#include "sm_at_carrier.h"
-#endif
-#if defined(CONFIG_LWM2M_CARRIER_SETTINGS)
-#include "sm_at_carrier_cfg.h"
-#endif
-#if defined(CONFIG_SM_PPP)
-#include "sm_ppp.h"
-#endif
-#if defined(CONFIG_SM_CMUX)
-#include "sm_cmux.h"
-#endif
 
 LOG_MODULE_REGISTER(sm_at, CONFIG_SM_LOG_LEVEL);
 
@@ -62,10 +41,13 @@ enum sleep_modes {
 	SLEEP_MODE_IDLE
 };
 
+static void go_sleep_wk(struct k_work *);
 static struct {
 	struct k_work_delayable work;
 	uint32_t mode;
-} sleep_control;
+} sleep_control = {
+	.work = Z_WORK_DELAYABLE_INITIALIZER(go_sleep_wk),
+};
 
 bool verify_datamode_control(uint16_t time_limit, uint16_t *time_limit_min);
 
@@ -373,78 +355,6 @@ static int handle_ate1(enum at_parser_cmd_type cmd_type, struct at_parser *, uin
 	return 0;
 }
 
-int sm_at_init(void)
-{
-	int err;
-
-	k_work_init_delayable(&sleep_control.work, go_sleep_wk);
-
-	err = sm_at_socket_init();
-	if (err) {
-		LOG_ERR("%s initialization failed (%d).", "Socket", err);
-		return -EFAULT;
-	}
-	err = sm_at_icmp_init();
-	if (err) {
-		LOG_ERR("%s initialization failed (%d).", "ICMP", err);
-		return -EFAULT;
-	}
-#if defined(CONFIG_SM_SMS)
-	err = sm_at_sms_init();
-	if (err) {
-		LOG_ERR("%s initialization failed (%d).", "SMS", err);
-		return -EFAULT;
-	}
-#endif
-	err = sm_at_fota_init();
-	if (err) {
-		LOG_ERR("%s initialization failed (%d).", "FOTA", err);
-		return -EFAULT;
-	}
-#if defined(CONFIG_SM_NRF_CLOUD)
-	err = sm_at_nrfcloud_init();
-	if (err) {
-		/* Allow nRF Cloud initialization to fail as sometimes JWT is missing
-		 * especially during development.
-		 */
-		LOG_ERR("%s initialization failed (%d).", "nRF Cloud", err);
-		err = 0;
-	}
-#endif
-#if defined(CONFIG_SM_GNSS)
-	err = sm_at_gnss_init();
-	if (err) {
-		LOG_ERR("%s initialization failed (%d).", "GNSS", err);
-		return -EFAULT;
-	}
-#endif
-#if defined(CONFIG_SM_MQTTC)
-	err = sm_at_mqtt_init();
-	if (err) {
-		LOG_ERR("%s initialization failed (%d).", "MQTT", err);
-		return -EFAULT;
-	}
-#endif
-#if defined(CONFIG_SM_CARRIER)
-	err = sm_at_carrier_init();
-	if (err) {
-		LOG_ERR("%s initialization failed (%d).", "LwM2M carrier", err);
-		return -EFAULT;
-	}
-#endif
-#if defined(CONFIG_LWM2M_CARRIER_SETTINGS)
-	err = sm_at_carrier_cfg_init();
-	if (err) {
-		LOG_ERR("%s initialization failed (%d).", "LwM2M carrier", err);
-		return -EFAULT;
-	}
-#endif
-#if defined(CONFIG_SM_CMUX)
-	sm_cmux_init();
-#endif
-	return err;
-}
-
 void sm_at_uninit(void)
 {
 	int err;
@@ -453,45 +363,16 @@ void sm_at_uninit(void)
 	if (err) {
 		LOG_WRN("%s uninitialization failed (%d).", "Socket", err);
 	}
-	err = sm_at_icmp_uninit();
-	if (err) {
-		LOG_WRN("%s uninitialization failed (%d).", "ICMP", err);
+	if (IS_ENABLED(CONFIG_SM_SMS)) {
+		err = sm_at_sms_uninit();
+		if (err) {
+			LOG_WRN("%s uninitialization failed (%d).", "SMS", err);
+		}
 	}
-#if defined(CONFIG_SM_SMS)
-	err = sm_at_sms_uninit();
-	if (err) {
-		LOG_WRN("%s uninitialization failed (%d).", "SMS", err);
+	if (IS_ENABLED(CONFIG_SM_NRF_CLOUD)) {
+		err = sm_at_nrfcloud_uninit();
+		if (err) {
+			LOG_WRN("%s uninitialization failed (%d).", "nRF Cloud", err);
+		}
 	}
-#endif
-	err = sm_at_fota_uninit();
-	if (err) {
-		LOG_WRN("%s uninitialization failed (%d).", "FOTA", err);
-	}
-#if defined(CONFIG_SM_NRF_CLOUD)
-	err = sm_at_nrfcloud_uninit();
-	if (err) {
-		LOG_WRN("%s uninitialization failed (%d).", "nRF Cloud", err);
-	}
-#endif
-#if defined(CONFIG_SM_GNSS)
-	err = sm_at_gnss_uninit();
-	if (err) {
-		LOG_WRN("%s uninitialization failed (%d).", "GNSS", err);
-	}
-#endif
-#if defined(CONFIG_SM_MQTTC)
-	err = sm_at_mqtt_uninit();
-	if (err) {
-		LOG_WRN("%s uninitialization failed (%d).", "MQTT", err);
-	}
-#endif
-#if defined(CONFIG_SM_CARRIER)
-	err = sm_at_carrier_uninit();
-	if (err) {
-		LOG_WRN("%s uninitialization failed (%d).", "LwM2M carrier", err);
-	}
-#endif
-#if defined(CONFIG_SM_CMUX)
-	sm_cmux_uninit();
-#endif
 }

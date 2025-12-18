@@ -2241,9 +2241,7 @@ static int handle_at_recvcfg(enum at_parser_cmd_type cmd_type, struct at_parser 
 	return err;
 }
 
-/**@brief API to initialize Socket AT commands handler
- */
-int sm_at_socket_init(void)
+static int sm_at_socket_init(void)
 {
 	for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
 		init_socket(&socks[i]);
@@ -2253,6 +2251,7 @@ int sm_at_socket_init(void)
 
 	return 0;
 }
+SYS_INIT(sm_at_socket_init, APPLICATION, 0);
 
 /**@brief API to uninitialize Socket AT commands handler
  */
