@@ -251,6 +251,33 @@ config SM_PGPS_INJECT_FIX_DATA
 
 endif # SM_GNSS
 
+config SM_BUTTONS
+	bool "Button handling module"
+	depends on BOARD_NRF9151DK
+	depends on INPUT_GPIO_KEYS
+	help
+	  Module that handles button presses to send AT commands to the modem.
+
+if SM_BUTTONS
+
+config SM_BUTTON0_AT
+	string "AT command for button 0"
+	default "AT+CFUN=4"
+
+config SM_BUTTON1_AT
+	string "AT command for button 1"
+	default "AT+CFUN=1"
+
+config SM_BUTTON2_AT
+	string "AT command for button 2"
+	default "AT+CGATT=0"
+
+config SM_BUTTON3_AT
+	string "AT command for button 3"
+	default "AT+CGATT=1"
+
+endif # SM_BUTTONS
+
 module = SM
 module-str = serial modem
 source "$(ZEPHYR_BASE)/subsys/logging/Kconfig.template.log_config"

@@ -27,6 +27,7 @@ target_sources_ifdef(CONFIG_SM_CMUX app PRIVATE src/sm_cmux.c)
 target_sources_ifdef(CONFIG_SM_GNSS app PRIVATE src/sm_at_gnss.c)
 target_sources_ifdef(CONFIG_SM_NRF_CLOUD app PRIVATE src/sm_at_nrfcloud.c)
 target_sources_ifdef(CONFIG_SM_MQTTC app PRIVATE src/sm_at_mqtt.c)
+target_sources_ifdef(CONFIG_SM_BUTTONS app PRIVATE src/buttons.c)
 
 add_subdirectory_ifdef(CONFIG_SM_CARRIER src/lwm2m_carrier)
 
