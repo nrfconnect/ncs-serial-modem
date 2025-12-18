@@ -13,6 +13,7 @@
 #include "sm_at_fota.h"
 #include "sm_at_dfu.h"
 #include "sm_settings.h"
+#include "sm_defines.h"
 
 LOG_MODULE_REGISTER(sm_settings, CONFIG_SM_LOG_LEVEL);
 
@@ -47,27 +48,34 @@ static struct settings_handler sm_settings_conf = {
 	.h_set = settings_set
 };
 
-int sm_settings_init(void)
+static int sm_settings_init(void)
 {
 	int ret;
 
 	ret = settings_subsys_init();
 	if (ret) {
 		LOG_ERR("Init setting failed: %d", ret);
+		sm_init_failed = true;
 		return ret;
 	}
 	ret = settings_register(&sm_settings_conf);
 	if (ret) {
 		LOG_ERR("Register setting failed: %d", ret);
+		sm_init_failed = true;
 		return ret;
 	}
 	ret = settings_load_subtree("sm");
 	if (ret) {
 		LOG_ERR("Load setting failed: %d", ret);
+		sm_init_failed = true;
 	}
 
 	return ret;
 }
+/* Run before APPLICATION init functions, so modules can use settings that are load from
+ * flash
+ */
+SYS_INIT(sm_settings_init, POST_KERNEL, CONFIG_APPLICATION_INIT_PRIORITY);
 
 int sm_settings_fota_save(void)
 {

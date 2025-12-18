@@ -15,14 +15,13 @@
 #include "sm_at_host.h"
 #include "sm_settings.h"
 #include "sm_util.h"
-#include "sm_at_carrier.h"
 
 LOG_MODULE_REGISTER(sm_carrier, CONFIG_SM_LOG_LEVEL);
 
 /* Static variable to report the memory free resource. */
 static int m_mem_free;
-
-struct k_work_delayable reconnect_work;
+static void reconnect_wk(struct k_work *work);
+static K_WORK_DELAYABLE_DEFINE(reconnect_work, reconnect_wk);
 
 /* Global functions defined in different files. */
 int lte_auto_connect(void);
@@ -966,16 +965,4 @@ static int do_carrier_send(enum at_parser_cmd_type, struct at_parser *parser,
 	}
 
 	return lwm2m_carrier_data_send(path, path_len);
-}
-
-int sm_at_carrier_init(void)
-{
-	k_work_init_delayable(&reconnect_work, reconnect_wk);
-
-	return 0;
-}
-
-int sm_at_carrier_uninit(void)
-{
-	return 0;
 }

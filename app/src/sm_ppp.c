@@ -7,6 +7,7 @@
 #include "sm_ppp.h"
 #include "sm_at_host.h"
 #include "sm_util.h"
+#include "sm_defines.h"
 #include "sm_ctrl_pin.h"
 #if defined(CONFIG_SM_CMUX)
 #include "sm_cmux.h"
@@ -644,6 +645,7 @@ static int sm_ppp_init(void)
 	ppp_fds[EVENT_FD_IDX] = eventfd(0, EFD_NONBLOCK);
 	if (ppp_fds[EVENT_FD_IDX] < 0) {
 		LOG_ERR("Failed to create event eventfd (%d).", errno);
+		sm_init_failed = true;
 		return -errno;
 	}
 

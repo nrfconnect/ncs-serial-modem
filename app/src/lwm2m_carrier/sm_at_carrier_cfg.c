@@ -11,6 +11,7 @@
 #include "sm_at_host.h"
 #include "sm_settings.h"
 #include "sm_util.h"
+#include "sm_defines.h"
 
 LOG_MODULE_REGISTER(sm_carrier_cfg, CONFIG_SM_LOG_LEVEL);
 
@@ -711,11 +712,21 @@ static int do_cfg_uri(enum at_parser_cmd_type, struct at_parser *parser, uint32_
 	return lwm2m_settings_server_uri_set(server_uri);
 }
 
-int sm_at_carrier_cfg_init(void)
+#if defined(CONFIG_SM_CARRIER_AUTO_STARTUP)
+static int sm_at_carrier_cfg_init(void)
 {
+	int ret;
+
 	if (IS_ENABLED(CONFIG_SM_CARRIER_AUTO_STARTUP)) {
-		return lwm2m_settings_auto_startup_set(true);
+		ret = lwm2m_settings_auto_startup_set(true);
+		if (ret) {
+			LOG_ERR("Failed to set auto_startup: %d", ret);
+			sm_init_failed = true;
+			return ret;
+		}
 	}
 
 	return 0;
 }
+SYS_INIT(sm_at_carrier_cfg_init, APPLICATION, 0);
+#endif

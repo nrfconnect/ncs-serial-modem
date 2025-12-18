@@ -42,18 +42,6 @@ void sm_ctrl_pin_enter_sleep_no_uninit(bool at_host_power_off);
  */
 void sm_ctrl_pin_enter_shutdown(void);
 
-/**
- * @brief Initialize Serial Modem control pins.
- */
-void sm_ctrl_pin_init_gpios(void);
-
-/**
- * @brief Initialize Serial Modem control pin module.
- *
- * @retval 0 on success, nonzero otherwise.
- */
-int sm_ctrl_pin_init(void);
-
 /** @} */
 
 #endif /* SM_CTRL_PIN_ */
