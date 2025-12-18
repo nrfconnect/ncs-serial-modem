@@ -27,6 +27,6 @@ enum cmux_channel {
 	CMUX_EXT_CHANNEL_COUNT
 };
 struct modem_pipe *sm_cmux_reserve(enum cmux_channel);
-void sm_cmux_release(enum cmux_channel, bool fallback);
+void sm_cmux_release(enum cmux_channel);
 
 #endif
