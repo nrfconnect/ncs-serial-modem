@@ -11,9 +11,6 @@
 /* Whether to forward CGEV notifications to the Serial Modem UART. */
 extern bool sm_fwd_cgev_notifs;
 
-/** @retval 0 on success. */
-int sm_ppp_init(void);
-
 bool sm_ppp_is_stopped(void);
 
 #endif
