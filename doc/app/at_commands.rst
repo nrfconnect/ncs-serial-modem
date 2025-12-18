@@ -36,6 +36,7 @@ The modem specific AT commands are documented in the `nRF91x1 AT Commands Refere
 
    at_generic
    at_cmux
+   at_dfu
    at_fota
    at_gnss
    at_icmp
