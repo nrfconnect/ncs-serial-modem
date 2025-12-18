@@ -419,7 +419,7 @@ static int ppp_stop(enum ppp_reason reason)
 	modem_ppp_release(&ppp_module);
 
 #if defined(CONFIG_SM_CMUX)
-	sm_cmux_release(CMUX_PPP_CHANNEL, reason == PPP_REASON_PEER_DISCONNECTED);
+	sm_cmux_release(CMUX_PPP_CHANNEL);
 #endif
 
 	net_if_carrier_off(ppp_iface);

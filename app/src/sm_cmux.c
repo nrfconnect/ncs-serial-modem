@@ -388,11 +388,14 @@ struct modem_pipe *sm_cmux_reserve(enum cmux_channel channel)
 	return cmux_get_dlci(channel)->pipe;
 }
 
-void sm_cmux_release(enum cmux_channel channel, bool fallback)
+void sm_cmux_release(enum cmux_channel channel)
 {
 	struct cmux_dlci *dlci = cmux_get_dlci(channel);
 
-	if (channel == CMUX_PPP_CHANNEL && fallback) {
+	/* When PPP is stopped from first DLCI, move AT channel there.
+	 * First open DLCI should always be the AT channel.
+	 */
+	if (channel == CMUX_PPP_CHANNEL && cmux.at_channel != 0) {
 		cmux.at_channel = 0;
 	}
 	modem_pipe_attach(dlci->pipe, dlci_pipe_event_handler, dlci);
