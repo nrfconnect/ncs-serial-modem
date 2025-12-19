@@ -28,6 +28,13 @@
 #define SM_DATAMODE_FLAGS_MORE_DATA (1 << 0)
 #define SM_DATAMODE_FLAGS_EXIT_HANDLER (1 << 1)
 
+/* This is needed for unit testing to allow static functions to be visible */
+#if defined(CONFIG_UNITY)
+#define STATIC
+#else
+#define STATIC static
+#endif
+
 extern uint8_t sm_data_buf[SM_MAX_MESSAGE_SIZE];  /* For socket data. */
 extern uint8_t sm_at_buf[CONFIG_SM_AT_BUF_SIZE + 1]; /* AT command buffer. */
 
@@ -262,12 +269,12 @@ void sm_at_host_urc_ctx_release(struct sm_urc_ctx *ctx, enum sm_urc_owner owner)
  * @param _callback The AT command handler callback.
  *
  */
-#define SM_AT_CMD_CUSTOM(entry, _filter, _callback)                                               \
-	static int _callback(enum at_parser_cmd_type cmd_type, struct at_parser *parser,           \
-			     uint32_t);                                                            \
-	static int _callback##_wrapper_##entry(char *buf, size_t len, char *at_cmd)                \
+#define SM_AT_CMD_CUSTOM(entry, _filter, _callback)                                                \
+	STATIC int _callback(enum at_parser_cmd_type cmd_type, struct at_parser *parser,           \
+			     uint32_t param_count);                                                \
+	STATIC int _callback##_wrapper_##entry(char *buf, size_t len, char *at_cmd)                \
 	{                                                                                          \
-		return sm_at_cb_wrapper(buf, len, at_cmd, _callback);                             \
+		return sm_at_cb_wrapper(buf, len, at_cmd, _callback);                              \
 	}                                                                                          \
 	AT_CMD_CUSTOM(entry, _filter, _callback##_wrapper_##entry);
 

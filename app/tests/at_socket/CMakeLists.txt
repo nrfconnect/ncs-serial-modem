@@ -72,13 +72,6 @@ target_sources(app PRIVATE
   ../../src/sm_at_commands.c
 )
 
-# Make static wrapper functions non-static in sm_at_socket.c for testing
-# This is needed because nrf_modem_at_wrapper.c needs to call the wrapper functions
-# We only apply this to sm_at_socket.c, not globally, to avoid breaking other code
-set_source_files_properties(../../src/sm_at_socket.c
-  PROPERTIES COMPILE_FLAGS "-Dstatic="
-)
-
 # Include directories - override headers first
 set(includes
   "${PROJECT_SOURCE_DIR}/include/"

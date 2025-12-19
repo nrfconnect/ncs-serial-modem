@@ -68,7 +68,7 @@ int sm_power_off_modem(void)
 }
 
 SM_AT_CMD_CUSTOM(xsmver, "AT#XSMVER", handle_at_smver);
-static int handle_at_smver(enum at_parser_cmd_type cmd_type, struct at_parser *, uint32_t)
+STATIC int handle_at_smver(enum at_parser_cmd_type cmd_type, struct at_parser *, uint32_t)
 {
 	int ret = -EINVAL;
 
@@ -101,7 +101,7 @@ static void go_sleep_wk(struct k_work *)
 }
 
 SM_AT_CMD_CUSTOM(xsleep, "AT#XSLEEP", handle_at_sleep);
-static int handle_at_sleep(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+STATIC int handle_at_sleep(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			   uint32_t)
 {
 	int ret = -EINVAL;
@@ -148,7 +148,7 @@ static void sm_shutdown(void)
 }
 
 SM_AT_CMD_CUSTOM(xshutdown, "AT#XSHUTDOWN", handle_at_shutdown);
-static int handle_at_shutdown(enum at_parser_cmd_type cmd_type, struct at_parser *, uint32_t)
+STATIC int handle_at_shutdown(enum at_parser_cmd_type cmd_type, struct at_parser *, uint32_t)
 {
 	if (cmd_type != AT_PARSER_CMD_TYPE_SET) {
 		return -EINVAL;
@@ -167,7 +167,7 @@ FUNC_NORETURN void sm_reset(void)
 }
 
 SM_AT_CMD_CUSTOM(xreset, "AT#XRESET", handle_at_reset);
-static int handle_at_reset(enum at_parser_cmd_type cmd_type, struct at_parser *, uint32_t)
+STATIC int handle_at_reset(enum at_parser_cmd_type cmd_type, struct at_parser *, uint32_t)
 {
 	if (cmd_type != AT_PARSER_CMD_TYPE_SET) {
 		return -EINVAL;
@@ -214,7 +214,7 @@ out:
 }
 
 SM_AT_CMD_CUSTOM(xmodemreset, "AT#XMODEMRESET", handle_at_modemreset);
-static int handle_at_modemreset(enum at_parser_cmd_type cmd_type, struct at_parser *, uint32_t)
+STATIC int handle_at_modemreset(enum at_parser_cmd_type cmd_type, struct at_parser *, uint32_t)
 {
 	if (cmd_type != AT_PARSER_CMD_TYPE_SET) {
 		return -EINVAL;
@@ -229,7 +229,7 @@ static int handle_at_modemreset(enum at_parser_cmd_type cmd_type, struct at_pars
 }
 
 SM_AT_CMD_CUSTOM(xuuid, "AT#XUUID", handle_at_uuid);
-static int handle_at_uuid(enum at_parser_cmd_type cmd_type, struct at_parser *, uint32_t)
+STATIC int handle_at_uuid(enum at_parser_cmd_type cmd_type, struct at_parser *, uint32_t)
 {
 	int ret;
 
@@ -250,7 +250,7 @@ static int handle_at_uuid(enum at_parser_cmd_type cmd_type, struct at_parser *, 
 }
 
 SM_AT_CMD_CUSTOM(xdatactrl, "AT#XDATACTRL", handle_at_datactrl);
-static int handle_at_datactrl(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+STATIC int handle_at_datactrl(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			      uint32_t)
 {
 	int ret = 0;
@@ -286,7 +286,7 @@ static int handle_at_datactrl(enum at_parser_cmd_type cmd_type, struct at_parser
 }
 
 SM_AT_CMD_CUSTOM(xclac, "AT#XCLAC", handle_at_clac);
-static int handle_at_clac(enum at_parser_cmd_type cmd_type, struct at_parser *, uint32_t)
+STATIC int handle_at_clac(enum at_parser_cmd_type cmd_type, struct at_parser *, uint32_t)
 {
 	if (cmd_type != AT_PARSER_CMD_TYPE_SET) {
 		return -EINVAL;
@@ -338,7 +338,7 @@ static int handle_at_clac(enum at_parser_cmd_type cmd_type, struct at_parser *, 
 }
 
 SM_AT_CMD_CUSTOM(ate0, "ATE0", handle_ate0);
-static int handle_ate0(enum at_parser_cmd_type cmd_type, struct at_parser *, uint32_t)
+STATIC int handle_ate0(enum at_parser_cmd_type cmd_type, struct at_parser *, uint32_t)
 {
 	sm_at_host_echo(false);
 
@@ -346,7 +346,7 @@ static int handle_ate0(enum at_parser_cmd_type cmd_type, struct at_parser *, uin
 }
 
 SM_AT_CMD_CUSTOM(ate1, "ATE1", handle_ate1);
-static int handle_ate1(enum at_parser_cmd_type cmd_type, struct at_parser *, uint32_t)
+STATIC int handle_ate1(enum at_parser_cmd_type cmd_type, struct at_parser *, uint32_t)
 {
 	sm_at_host_echo(true);
 
