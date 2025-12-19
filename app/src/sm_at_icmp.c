@@ -518,7 +518,7 @@ static int ping_test_handler(const char *target)
 }
 
 SM_AT_CMD_CUSTOM(xping, "AT#XPING", handle_at_icmp_ping);
-static int handle_at_icmp_ping(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+STATIC int handle_at_icmp_ping(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			       uint32_t param_count)
 {
 	int err = -EINVAL;

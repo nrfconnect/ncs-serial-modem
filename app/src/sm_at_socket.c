@@ -1229,7 +1229,7 @@ static int socket_datamode_callback(uint8_t op, const uint8_t *data, int len, ui
 }
 
 SM_AT_CMD_CUSTOM(xsocket, "AT#XSOCKET", handle_at_socket);
-static int handle_at_socket(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+STATIC int handle_at_socket(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			    uint32_t param_count)
 {
 	int err = -EINVAL;
@@ -1311,7 +1311,7 @@ error:
 }
 
 SM_AT_CMD_CUSTOM(xssocket, "AT#XSSOCKET", handle_at_secure_socket);
-static int handle_at_secure_socket(enum at_parser_cmd_type cmd_type,
+STATIC int handle_at_secure_socket(enum at_parser_cmd_type cmd_type,
 				   struct at_parser *parser, uint32_t param_count)
 {
 	int err = -EINVAL;
@@ -1423,7 +1423,7 @@ error:
 }
 
 SM_AT_CMD_CUSTOM(xclose, "AT#XCLOSE", handle_at_close);
-static int handle_at_close(enum at_parser_cmd_type cmd_type,
+STATIC int handle_at_close(enum at_parser_cmd_type cmd_type,
 			   struct at_parser *parser, uint32_t param_count)
 {
 	int err = -EINVAL;
@@ -1466,7 +1466,7 @@ static int handle_at_close(enum at_parser_cmd_type cmd_type,
 }
 
 SM_AT_CMD_CUSTOM(xsocketopt, "AT#XSOCKETOPT", handle_at_socketopt);
-static int handle_at_socketopt(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+STATIC int handle_at_socketopt(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			       uint32_t param_count)
 {
 	int err = -EINVAL;
@@ -1524,7 +1524,7 @@ static int handle_at_socketopt(enum at_parser_cmd_type cmd_type, struct at_parse
 }
 
 SM_AT_CMD_CUSTOM(xssocketopt, "AT#XSSOCKETOPT", handle_at_secure_socketopt);
-static int handle_at_secure_socketopt(enum at_parser_cmd_type cmd_type,
+STATIC int handle_at_secure_socketopt(enum at_parser_cmd_type cmd_type,
 				      struct at_parser *parser, uint32_t)
 {
 	int err = -EINVAL;
@@ -1592,7 +1592,7 @@ static int handle_at_secure_socketopt(enum at_parser_cmd_type cmd_type,
 }
 
 SM_AT_CMD_CUSTOM(xbind, "AT#XBIND", handle_at_bind);
-static int handle_at_bind(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+STATIC int handle_at_bind(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			  uint32_t)
 {
 	int err = -EINVAL;
@@ -1625,7 +1625,7 @@ static int handle_at_bind(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 }
 
 SM_AT_CMD_CUSTOM(xconnect, "AT#XCONNECT", handle_at_connect);
-static int handle_at_connect(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+STATIC int handle_at_connect(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			     uint32_t)
 {
 	int err = -EINVAL;
@@ -1668,7 +1668,7 @@ static int handle_at_connect(enum at_parser_cmd_type cmd_type, struct at_parser 
 }
 
 SM_AT_CMD_CUSTOM(xsend, "AT#XSEND", handle_at_send);
-static int handle_at_send(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+STATIC int handle_at_send(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			  uint32_t param_count)
 {
 	int err = -EINVAL;
@@ -1749,7 +1749,7 @@ static int handle_at_send(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 }
 
 SM_AT_CMD_CUSTOM(xrecv, "AT#XRECV", handle_at_recv);
-static int handle_at_recv(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+STATIC int handle_at_recv(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			  uint32_t param_count)
 {
 	int err = -EINVAL;
@@ -1806,7 +1806,7 @@ static int handle_at_recv(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 }
 
 SM_AT_CMD_CUSTOM(xsendto, "AT#XSENDTO", handle_at_sendto);
-static int handle_at_sendto(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+STATIC int handle_at_sendto(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			    uint32_t param_count)
 {
 
@@ -1898,7 +1898,7 @@ static int handle_at_sendto(enum at_parser_cmd_type cmd_type, struct at_parser *
 }
 
 SM_AT_CMD_CUSTOM(xrecvfrom, "AT#XRECVFROM", handle_at_recvfrom);
-static int handle_at_recvfrom(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+STATIC int handle_at_recvfrom(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			      uint32_t param_count)
 {
 	int err = -EINVAL;
@@ -1955,7 +1955,7 @@ static int handle_at_recvfrom(enum at_parser_cmd_type cmd_type, struct at_parser
 }
 
 SM_AT_CMD_CUSTOM(xgetaddrinfo, "AT#XGETADDRINFO", handle_at_getaddrinfo);
-static int handle_at_getaddrinfo(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+STATIC int handle_at_getaddrinfo(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 				 uint32_t param_count)
 {
 	int err = -EINVAL;
@@ -2087,7 +2087,7 @@ static int set_xapoll_events(struct sm_socket *sock, uint8_t events)
 }
 
 SM_AT_CMD_CUSTOM(xapoll, "AT#XAPOLL", handle_at_xapoll);
-static int handle_at_xapoll(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+STATIC int handle_at_xapoll(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			  uint32_t param_count)
 {
 	int err = -EINVAL;
@@ -2158,7 +2158,7 @@ static int handle_at_xapoll(enum at_parser_cmd_type cmd_type, struct at_parser *
 }
 
 SM_AT_CMD_CUSTOM(xrecvcfg, "AT#XRECVCFG", handle_at_recvcfg);
-static int handle_at_recvcfg(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+STATIC int handle_at_recvcfg(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 				 uint32_t param_count)
 {
 	int err = -EINVAL;
