@@ -296,7 +296,10 @@ static inline void uart_callback_notify_pipe_transmit_idle(void)
 {
 #if SM_PIPE
 	if (atomic_test_bit(&sm_pipe.state, SM_PIPE_STATE_OPEN_BIT)) {
-		k_work_submit_to_queue(&sm_work_q, &sm_pipe.notify_transmit_idle);
+		/* This needs to be done in system work queue to avoid deadlock while
+		 * collecting modem crash dump.
+		 */
+		k_work_submit(&sm_pipe.notify_transmit_idle);
 	}
 #endif
 }
@@ -308,8 +311,10 @@ static inline void uart_callback_notify_pipe_closure(void)
 	    !atomic_test_bit(&sm_pipe.state, SM_PIPE_STATE_OPEN_BIT) &&
 	    !atomic_test_bit(&uart_state, SM_UART_STATE_RX_ENABLED_BIT) &&
 	    !atomic_test_bit(&uart_state, SM_UART_STATE_TX_ENABLED_BIT)) {
-		/* Pipe is closed, RX and TX are idle, notify the closure */
-		k_work_submit_to_queue(&sm_work_q, &sm_pipe.notify_closed);
+		/* Pipe is closed, RX and TX are idle, notify the closure.
+		 * This should be done in system work queue.
+		 */
+		k_work_submit(&sm_pipe.notify_closed);
 	}
 #endif
 }
