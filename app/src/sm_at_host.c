@@ -392,6 +392,16 @@ static int cmd_grammar_check(const char *cmd, size_t length)
 		return 0;
 	}
 
+	/* Check ATD */
+	if (toupper(*cmd) == 'D') {
+		cmd += 1;
+		if (*cmd == '*') {
+			return 0;
+		} else {
+			return -EINVAL;
+		}
+	}
+
 	/* check AT<separator> */
 	if ((*cmd != '+') && (*cmd != '%') && (*cmd != '#')) {
 		return -EINVAL;
@@ -1032,12 +1042,12 @@ int sm_at_cb_wrapper(char *buf, size_t len, char *at_cmd, sm_at_callback *cb)
 
 	err = at_parser_cmd_count_get(&parser, &valid_count);
 	if (err) {
-		return err;
+		//return err;
 	}
 
 	err = at_parser_cmd_type_get(&parser, &type);
 	if (err) {
-		return err;
+		//return err;
 	}
 
 	err = cb(type, &parser, valid_count);

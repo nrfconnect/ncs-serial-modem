@@ -702,6 +702,33 @@ static int handle_at_ppp(enum at_parser_cmd_type cmd_type, struct at_parser *par
 	}
 	return -SILENT_AT_COMMAND_RET;
 }
+SM_AT_CMD_CUSTOM(atd, "ATD*99", handle_atd);
+static int handle_atd(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+			 uint32_t param_count)
+{
+	uint8_t cid = 0;
+	uint8_t l2 = 1; /* Default to PPP */
+
+	if (sscanf(parser->cursor, "*99***%hhu*%hhu#", &cid, &l2) == 2 ||
+	    sscanf(parser->cursor, "*99***%hhu#", &cid) == 1 ||
+	    sscanf(parser->cursor, "*99**%hhu#", &l2) == 1 ||
+	    strcmp(parser->cursor, "*99#") == 0) {
+		LOG_INF("Parsed CID: %d L2: %d", cid, l2);
+	} else {
+		LOG_ERR("Failed to parse ATD command.");
+		return -EINVAL;
+	}
+	if (l2 != 1) {
+		LOG_ERR("Only PPP (L2=1) is supported.");
+		return -EINVAL;
+	}
+
+	// TODO: check if CID is valid
+
+	ppp_pdn_cid = cid;
+
+	return 0;
+}
 
 static void ppp_data_passing_thread(void*, void*, void*)
 {
