@@ -62,7 +62,6 @@ test_runner_generate(src/test_at_socket.c)
 # Add sources
 target_sources(app PRIVATE
   src/test_at_socket.c
-  src/logging_stubs.c
   src/uart_stubs.c
   src/sm_at_host_stubs.c
   src/control_pin_stubs.c
@@ -73,13 +72,6 @@ target_sources(app PRIVATE
   ../../src/sm_at_host.c
   ../../src/sm_at_commands.c
   ../../src/sm_at_icmp.c
-)
-
-# Make static wrapper functions non-static in sm_at_socket.c for testing
-# This is needed because nrf_modem_at_wrapper.c needs to call the wrapper functions
-# We only apply this to sm_at_socket.c, not globally, to avoid breaking other code
-set_source_files_properties(../../src/sm_at_socket.c
-  PROPERTIES COMPILE_FLAGS "-Dstatic="
 )
 
 # Include directories - override headers first
