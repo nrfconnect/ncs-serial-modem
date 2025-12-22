@@ -10,19 +10,17 @@
 
 struct modem_pipe;
 
-/* CMUX channels. Does not include AT-channel. */
+/* Default CMUX channels. */
 enum cmux_channel {
+	CMUX_AT_CHANNEL = 1,
 #if defined(CONFIG_SM_PPP)
-	CMUX_PPP_CHANNEL,
+	CMUX_PPP_CHANNEL = 2,
 #endif
-#if defined(CONFIG_SM_MODEM_TRACE_BACKEND_CMUX)
-	CMUX_MODEM_TRACE_CHANNEL,
-#endif
+	CMUX_MODEM_TRACE_CHANNEL = 3,
+	CMUX_USER_CHANNEL_0,
+	CMUX_USER_CHANNEL_1,
 	CMUX_EXT_CHANNEL_COUNT
 };
-struct modem_pipe *sm_cmux_reserve(enum cmux_channel channel);
-void sm_cmux_release(enum cmux_channel channel);
-bool sm_cmux_dlci_is_open(enum cmux_channel channel);
 
 #if CONFIG_SM_CMUX
 bool sm_cmux_is_started(void);

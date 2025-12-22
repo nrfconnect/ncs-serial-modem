@@ -13,6 +13,7 @@
 
 #include "nrf_socket.h"
 #include "sm_at_host.h"
+#include "uart_stub.h"
 
 /* CMock-generated mocks */
 #include "cmock_nrf_socket.h"
@@ -31,8 +32,6 @@
 extern const char *get_captured_response(void);
 extern size_t get_captured_response_len(void);
 extern void clear_captured_response(void);
-
-struct k_work_q sm_work_q;
 
 /* Helper callbacks for mocking nrf_getsockopt with output parameters */
 static int mock_getsockopt_timeval_callback(int socket, int level, int option_name,
@@ -91,20 +90,6 @@ void tearDown(void)
 	/* This is run after EACH test */
 	/* Reset any stubs to prevent interference between tests */
 	__cmock_nrf_getsockopt_Stub(NULL);
-}
-
-/*
- * Helper function to send AT command via sm_at_receive()
- * This simulates receiving AT command bytes over UART
- */
-static void send_at_command(const char *at_cmd)
-{
-	bool stop_at_receive = false;
-	const uint8_t *cmd_bytes = (const uint8_t *)at_cmd;
-	size_t cmd_len = strlen(at_cmd);
-
-	/* Send command through sm_at_receive() */
-	sm_at_receive(cmd_bytes, cmd_len, &stop_at_receive);
 }
 
 /*
@@ -983,7 +968,6 @@ void test_xsend_data_mode(void)
 {
 	const char *response;
 	const char *test_data = "Hello World";
-	bool stop_at_receive = false;
 
 	/* Create socket first */
 	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 1);
@@ -1004,7 +988,7 @@ void test_xsend_data_mode(void)
 	/* do_send calls clear_so_send_cb (or set if flags have ack) */
 	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Clear/set send callback */
 	__cmock_nrf_send_ExpectAndReturn(1, test_data, 11, 0, 11);
-	sm_at_receive((const uint8_t *)test_data, 11, &stop_at_receive);
+	uart_stub_rx((const uint8_t *)test_data, 11);
 
 	/* Exit data mode with termination pattern */
 	send_at_command("+++");
@@ -1026,7 +1010,6 @@ void test_xsend_data_mode_partial_quit_string(void)
 {
 	const char *response;
 	const char *test_data = "Hello++World";
-	bool stop_at_receive = false;
 
 	/* Create socket first */
 	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 1);
@@ -1049,7 +1032,7 @@ void test_xsend_data_mode_partial_quit_string(void)
 	 */
 	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Clear/set send callback */
 	__cmock_nrf_send_ExpectAndReturn(1, test_data, 12, 0, 12);
-	sm_at_receive((const uint8_t *)test_data, 12, &stop_at_receive);
+	uart_stub_rx((const uint8_t *)test_data, 12);
 
 	/* Exit data mode with full quit string (+++) */
 	send_at_command("+++");
@@ -1294,7 +1277,6 @@ void test_xsendto_data_mode(void)
 {
 	const char *response;
 	const char *test_data = "Hello World";
-	bool stop_at_receive = false;
 
 	/* Create UDP socket first */
 	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_DGRAM, NRF_IPPROTO_UDP, 2);
@@ -1317,7 +1299,7 @@ void test_xsendto_data_mode(void)
 	__cmock_zsock_getaddrinfo_Stub(mock_getaddrinfo_success_callback);
 	__cmock_nrf_sendto_ExpectAnyArgsAndReturn(11);
 	__cmock_zsock_freeaddrinfo_ExpectAnyArgs();
-	sm_at_receive((const uint8_t *)test_data, 11, &stop_at_receive);
+	uart_stub_rx((const uint8_t *)test_data, 11);
 
 	/* Exit data mode with termination pattern */
 	send_at_command("+++");
