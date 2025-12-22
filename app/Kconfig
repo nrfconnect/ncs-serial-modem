@@ -211,6 +211,15 @@ config SM_MODEM_PIPE_TIMEOUT
 
 endif # SM_CMUX || SM_PPP
 
+config HEAP_MEM_POOL_ADD_SIZE_SM_AT
+	int "Additional heap memory pool size for AT Host"
+	default 16384 if SM_CMUX
+	default 8192
+	help
+	  Additional heap memory pool size required for AT Host.
+	  This value is added to the total heap memory pool size defined in
+	  CONFIG_HEAP_MEM_POOL_SIZE.
+
 if SM_MQTTC
 
 config SM_MQTTC_MESSAGE_BUFFER_LEN

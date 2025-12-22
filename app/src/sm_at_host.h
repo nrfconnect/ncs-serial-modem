@@ -20,6 +20,7 @@
 #include <modem/at_cmd_custom.h>
 #include <modem/at_parser.h>
 #include "sm_defines.h"
+#include <zephyr/modem/pipe.h>
 
 /* This delay is necessary to send AT responses at low baud rates. */
 #define SM_UART_RESPONSE_DELAY K_MSEC(50)
@@ -28,30 +29,16 @@
 #define SM_DATAMODE_FLAGS_MORE_DATA (1 << 0)
 #define SM_DATAMODE_FLAGS_EXIT_HANDLER (1 << 1)
 
-extern uint8_t sm_data_buf[SM_MAX_MESSAGE_SIZE];  /* For socket data. */
-extern uint8_t sm_at_buf[CONFIG_SM_AT_BUF_SIZE + 1]; /* AT command buffer. */
-
 extern uint16_t sm_datamode_time_limit; /* Send trigger by time in data mode. */
-
-enum sm_urc_owner {
-	SM_URC_OWNER_NONE,
-	SM_URC_OWNER_AT,
-	SM_URC_OWNER_CMUX
-};
-
-/* Buffer for URC messages. */
-struct sm_urc_ctx {
-	struct ring_buf rb;
-	uint8_t buf[CONFIG_SM_URC_BUFFER_SIZE];
-	struct k_mutex mutex;
-	enum sm_urc_owner owner;
-};
 
 /** @brief Operations in data mode. */
 enum sm_datamode_operation {
 	DATAMODE_SEND,  /* Send data in datamode */
 	DATAMODE_EXIT   /* Exit data mode */
 };
+
+/** Forward declaration */
+struct sm_at_host_ctx;
 
 /** @brief Data mode sending handler type.
  *
@@ -61,35 +48,8 @@ enum sm_datamode_operation {
  */
 typedef int (*sm_datamode_handler_t)(uint8_t op, const uint8_t *data, int len, uint8_t flags);
 
-/**
- * @brief Sends the given data via the current AT backend.
- *
- * @retval 0 on success.
- */
-int sm_at_send(const uint8_t *data, size_t len);
-
-/** @brief Identical to sm_at_send(str, strlen(str)). */
+/** @brief Sends the given string via the current AT backend. */
 int sm_at_send_str(const char *str);
-
-/**
- * @brief Processes received AT bytes.
- *
- * @param data AT command bytes received.
- * @param len Length of AT command bytes received.
- * @param stop_at_receive Pointer to a boolean variable that will be set to true
- *        if the reception should be stopped.
- *
- * @retval Number of bytes processed.
- */
-size_t sm_at_receive(const uint8_t *data, size_t len, bool *stop_at_receive);
-
-/**
- * @brief Initialize AT host for bootloader mode
- *
- * @retval 0 If the operation was successful.
- *           Otherwise, a (negative) error code is returned.
- */
-int sm_at_host_bootloader_init(void);
 
 /**
  * @brief Powers the UART down.
@@ -218,6 +178,7 @@ bool sm_at_host_echo_urc_delay(void);
 
 /** @brief Events which can be notified by the AT host. */
 enum sm_event {
+	SM_EVENT_NONE,		 /**< No event. */
 	SM_EVENT_URC = 0x01,     /**< URC can be sent. */
 	SM_EVENT_AT_MODE = 0x02, /**< Entered AT command mode. */
 };
@@ -237,20 +198,86 @@ struct sm_event_callback {
 void sm_at_host_register_event_cb(struct sm_event_callback *cb, enum sm_event event);
 
 /**
- * @brief Acquire ownership of the URC context for a specific owner.
+ * @brief Set the active modem pipe for AT communication.
  *
- * If the context is unowned (NONE) or already owned by the given owner,
- * set the owner and return the context pointer.
- * Otherwise, return NULL.
+ * This allows switching between UART pipe (direct mode) and CMUX DLCI pipe.
+ *
+ * @param pipe Pointer to the modem_pipe to use for AT traffic.
  */
-struct sm_urc_ctx *sm_at_host_urc_ctx_acquire(enum sm_urc_owner owner);
+int sm_at_host_set_pipe(struct sm_at_host_ctx *ctx, struct modem_pipe *pipe);
 
 /**
- * @brief Release ownership of the URC context.
+ * @brief Release the conxtext from associated pipe and mark for descruction.
  *
- * Only releases if the current owner matches.
+ * This detaches and releases the modem pipe from the AT host context
+ * and mark the conxtext for descruction.
+ *
+ * @param ctx AT host context
  */
-void sm_at_host_urc_ctx_release(struct sm_urc_ctx *ctx, enum sm_urc_owner owner);
+void sm_at_host_release(struct sm_at_host_ctx *ctx);
+
+/**
+ * @brief Attach a modem pipe to AT host module.
+ *
+ * If the pipe is already open, triggers the context creation immediately.
+ * Otherwise, the context will be created when the pipe is opened.
+ *
+ * @param pipe Modem pipe to attach.
+ */
+void sm_at_host_attach(struct modem_pipe *pipe);
+
+/**
+ * @brief Get the modem pipe associated with the given AT host context.
+ *
+ * @param ctx AT host context
+ * @return struct modem_pipe* or NULL if none is set.
+ */
+struct modem_pipe *sm_at_host_get_pipe(struct sm_at_host_ctx *ctx);
+
+
+/** @brief Get the AT host context associated with a given modem pipe. */
+struct sm_at_host_ctx *sm_at_host_get_ctx_from(struct modem_pipe *pipe);
+
+/**
+ * @brief Get the AT host context for URC transmission.
+ *
+ * URCs are always sent to the first (primary) instance.
+ *
+ * @return Pointer to first AT host context
+ */
+struct sm_at_host_ctx *sm_at_host_get_urc_ctx(void);
+
+/**
+ * @brief Get the current AT host context.
+ *
+ * Returns the context of the currently executing AT command/work.
+ * Falls back to first instance if no context is currently active.
+ *
+ * The returned context is only valid during the execution of an AT command
+ *
+ * @return Pointer to current AT host context
+ */
+struct sm_at_host_ctx *sm_at_host_get_current(void);
+
+/**
+ * @brief Get the modem pipe associated with the current AT host context.
+ *
+ * @return struct modem_pipe* or NULL if no active context or pipe is set.
+ */
+static inline struct modem_pipe *sm_at_host_get_current_pipe(void)
+{
+	return sm_at_host_get_pipe(sm_at_host_get_current());
+}
+
+/**
+ * @brief Get the modem pipe associated with the URC AT host context.
+ *
+ * @return struct modem_pipe*
+ */
+static inline struct modem_pipe *sm_at_host_get_urc_pipe(void)
+{
+	return sm_at_host_get_pipe(sm_at_host_get_urc_ctx());
+}
 
 /**
  * @brief Define a wrapper for a Serial Modem custom AT command callback.

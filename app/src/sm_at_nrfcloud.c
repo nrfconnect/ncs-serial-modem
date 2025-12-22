@@ -26,6 +26,8 @@ LOG_MODULE_REGISTER(sm_nrfcloud, CONFIG_SM_LOG_LEVEL);
 
 static struct k_work cloud_cmd;
 static K_SEM_DEFINE(sem_date_time, 0, 1);
+uint8_t sm_at_buf[CONFIG_SM_AT_BUF_SIZE + 1];
+
 
 #if defined(CONFIG_NRF_CLOUD_LOCATION)
 

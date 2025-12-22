@@ -27,10 +27,7 @@ LOG_MODULE_REGISTER(sm_uart_handler, CONFIG_SM_LOG_LEVEL);
 const struct device *const sm_uart_dev = DEVICE_DT_GET(DT_CHOSEN(ncs_sm_uart));
 uint32_t sm_uart_baudrate;
 
-static void rx_process(struct k_work *work);
-static void tx_write_nonblock_fn(struct k_work *);
-static K_WORK_DELAYABLE_DEFINE(rx_process_work, rx_process);
-static K_WORK_DEFINE(tx_write_nonblock_work, tx_write_nonblock_fn);
+static int sm_uart_pipe_init_internal(void);
 struct rx_buf_t {
 	atomic_t ref_counter;
 	size_t len;
@@ -54,8 +51,6 @@ K_MSGQ_DEFINE(rx_event_queue, sizeof(struct rx_event_t), UART_RX_EVENT_COUNT, 4)
 
 RING_BUF_DECLARE(tx_buf, CONFIG_SM_UART_TX_BUF_SIZE);
 
-struct sm_urc_ctx *urc_ctx; /* URC context for handling unsolicited responses. */
-
 enum sm_uart_state {
 	SM_UART_STATE_TX_ENABLED_BIT,
 	SM_UART_STATE_RX_ENABLED_BIT,
@@ -64,22 +59,19 @@ enum sm_uart_state {
 };
 static atomic_t uart_state;
 
-#if SM_PIPE
-
 enum sm_pipe_state {
 	SM_PIPE_STATE_INIT_BIT,
 	SM_PIPE_STATE_OPEN_BIT,
 };
 static struct {
 	struct modem_pipe pipe;
-	sm_pipe_tx_t tx_cb;
 	atomic_t state;
 
 	struct k_work notify_transmit_idle;
 	struct k_work notify_closed;
-} sm_pipe;
-
-#endif
+} sm_pipe = {
+	.state = ATOMIC_INIT(0),
+};
 
 K_SEM_DEFINE(tx_done_sem, 0, 1);
 
@@ -196,49 +188,11 @@ static void rx_recovery(void)
 
 	err = rx_enable();
 	if (err) {
-		k_work_schedule_for_queue(&sm_work_q, &rx_process_work, K_MSEC(UART_RX_MARGIN_MS));
+		// TODO: Retry with delay?
+		LOG_ERR("UART RX recovery failed: %d", err);
 	}
 
 	atomic_clear_bit(&uart_state, SM_UART_STATE_RX_RECOVERY_BIT);
-}
-
-static void rx_process(struct k_work *work)
-{
-#if SM_PIPE
-	/* With pipe, CMUX layer is notified and it requests the data. */
-	if (atomic_test_bit(&sm_pipe.state, SM_PIPE_STATE_OPEN_BIT)) {
-		modem_pipe_notify_receive_ready(&sm_pipe.pipe);
-		return;
-	}
-#endif
-	/* Without pipe, we push the data immediately. */
-	struct rx_event_t rx_event;
-	size_t processed;
-	bool stop_at_receive = false;
-	int err;
-
-	while (k_msgq_get(&rx_event_queue, &rx_event, K_NO_WAIT) == 0) {
-		processed = sm_at_receive(rx_event.buf, rx_event.len, &stop_at_receive);
-
-		if (processed == rx_event.len) {
-			/* All data processed, release the buffer. */
-			rx_buf_unref(rx_event.buf);
-		} else {
-			rx_event.len -= processed;
-			rx_event.buf += processed;
-			err = k_msgq_put_front(&rx_event_queue, &rx_event, K_NO_WAIT);
-			if (err) {
-				LOG_ERR("RX event queue full, dropped %zu bytes", rx_event.len);
-				rx_buf_unref(rx_event.buf);
-			}
-		}
-
-		if (stop_at_receive) {
-			break;
-		}
-	}
-
-	rx_recovery();
 }
 
 static void tx_enable(void)
@@ -294,19 +248,16 @@ static int tx_start(void)
 
 static inline void uart_callback_notify_pipe_transmit_idle(void)
 {
-#if SM_PIPE
 	if (atomic_test_bit(&sm_pipe.state, SM_PIPE_STATE_OPEN_BIT)) {
 		/* This needs to be done in system work queue to avoid deadlock while
 		 * collecting modem crash dump.
 		 */
 		k_work_submit(&sm_pipe.notify_transmit_idle);
 	}
-#endif
 }
 
 static inline void uart_callback_notify_pipe_closure(void)
 {
-#if SM_PIPE
 	if (atomic_test_bit(&sm_pipe.state, SM_PIPE_STATE_INIT_BIT) &&
 	    !atomic_test_bit(&sm_pipe.state, SM_PIPE_STATE_OPEN_BIT) &&
 	    !atomic_test_bit(&uart_state, SM_UART_STATE_RX_ENABLED_BIT) &&
@@ -316,7 +267,6 @@ static inline void uart_callback_notify_pipe_closure(void)
 		 */
 		k_work_submit(&sm_pipe.notify_closed);
 	}
-#endif
 }
 
 static void uart_callback(const struct device *dev, struct uart_event *evt, void *user_data)
@@ -356,7 +306,7 @@ static void uart_callback(const struct device *dev, struct uart_event *evt, void
 			rx_buf_unref(evt->data.rx.buf);
 			break;
 		}
-		k_work_schedule_for_queue(&sm_work_q, &rx_process_work, K_NO_WAIT);
+		modem_pipe_notify_receive_ready(&sm_pipe.pipe);
 		break;
 	case UART_RX_BUF_REQUEST:
 		if (k_msgq_num_free_get(&rx_event_queue) < UART_RX_EVENT_COUNT_FOR_BUF) {
@@ -381,7 +331,8 @@ static void uart_callback(const struct device *dev, struct uart_event *evt, void
 		break;
 	case UART_RX_DISABLED:
 		atomic_clear_bit(&uart_state, SM_UART_STATE_RX_ENABLED_BIT);
-		k_work_reschedule_for_queue(&sm_work_q, &rx_process_work, K_NO_WAIT);
+		/* Notify pipe that receive may be ready after re-enable */
+		modem_pipe_notify_receive_ready(&sm_pipe.pipe);
 		break;
 	default:
 		break;
@@ -390,171 +341,19 @@ static void uart_callback(const struct device *dev, struct uart_event *evt, void
 	uart_callback_notify_pipe_closure();
 }
 
-/* Write the data to tx_buffer and trigger sending. Repeat until everything is sent.
- * Returns 0 on success or a negative error code.
- */
-static int tx_write_block(const uint8_t *data, size_t *len, bool flush)
+static void notify_transmit_idle_fn(struct k_work *work)
 {
-	size_t ret;
-	size_t sent = 0;
-	int err;
-
-	while (sent < *len) {
-		ret = ring_buf_put(&tx_buf, data + sent, *len - sent);
-		if (ret) {
-			sent += ret;
-			continue;
-		}
-
-		/* Buffer full, block and start TX. */
-		err = k_sem_take(&tx_done_sem, K_FOREVER);
-		if (err) {
-			LOG_ERR("TX %s failed (%d). TX buf overflow, %zu dropped.",
-				"semaphore take", err, *len - sent);
-			*len = sent;
-			return err;
-		}
-		err = tx_start();
-		if (err) {
-			LOG_ERR("TX %s failed (%d). TX buf overflow, %zu dropped.", "start", err,
-				*len - sent);
-			k_sem_give(&tx_done_sem);
-			*len = sent;
-			return err;
-		}
-	}
-
-	*len = sent;
-	if (flush && k_sem_take(&tx_done_sem, K_NO_WAIT) == 0) {
-		err = tx_start();
-		if (err == -EAGAIN) {
-			k_sem_give(&tx_done_sem);
-			return 0;
-		} else if (err) {
-			LOG_ERR("TX %s failed (%d).", "start", err);
-			k_sem_give(&tx_done_sem);
-			return err;
-		}
-	}
-
-	return 0;
+	ARG_UNUSED(work);
+	modem_pipe_notify_transmit_idle(&sm_pipe.pipe);
+}
+static void notify_closed_fn(struct k_work *work)
+{
+	ARG_UNUSED(work);
+	LOG_DBG("UART pipe closed!!!");
+	modem_pipe_notify_closed(&sm_pipe.pipe);
 }
 
-static void tx_write_nonblock_fn(struct k_work *)
-{
-	static struct sm_event_callback event_cb = {
-		.cb = tx_write_nonblock_fn
-	};
-
-	struct sm_urc_ctx *uc = urc_ctx; /* Take a local copy. */
-	uint8_t *data;
-	size_t len;
-	int err = 0;
-
-	if (uc == NULL) {
-		LOG_DBG("No URC context");
-		return;
-	}
-
-	if (sm_at_host_echo_urc_delay()) {
-		LOG_DBG("Defer URC processing until %s", "echo delay has elapsed");
-		sm_at_host_register_event_cb(&event_cb, SM_EVENT_URC);
-		return;
-	}
-
-	if (!in_at_mode()) {
-		LOG_DBG("Defer URC processing until %s", "in AT mode");
-		sm_at_host_register_event_cb(&event_cb, SM_EVENT_AT_MODE);
-		return;
-	}
-
-	/* Do not lock the URC mutex.
-	 * This is the only reader and URC context ownership cannot be transferred as we
-	 * are in the same work queue that processes AT-commands.
-	 * Locking the mutex would cause a deadlock in tx_write_nonblock if the DTR is deasserted
-	 * while we are emptying the buffer.
-	 */
-	do {
-		len = ring_buf_get_claim(&uc->rb, &data, ring_buf_capacity_get(&uc->rb));
-		if (!len) {
-			break;
-		}
-		err = tx_write_block(data, &len, true);
-		ring_buf_get_finish(&uc->rb, len);
-
-	} while (!ring_buf_is_empty(&uc->rb) && !err);
-
-	if (err) {
-		LOG_WRN("URC transmit failed (%d). %d bytes unsent.", err,
-			ring_buf_size_get(&uc->rb));
-	}
-}
-
-static int tx_write_nonblock(const uint8_t *data, size_t len)
-{
-	int ret = 0;
-	struct sm_urc_ctx *uc = urc_ctx; /* Take a local copy. */
-
-	if (uc == NULL) {
-		LOG_ERR("No URC context");
-		return -EFAULT;
-	}
-
-	/* Lock to prevent concurrent writes. */
-	k_mutex_lock(&uc->mutex, K_FOREVER);
-
-	if (ring_buf_space_get(&uc->rb) >= len) {
-		ring_buf_put(&uc->rb, data, len);
-	} else {
-		LOG_WRN("URC buf overflow, dropping %u bytes.", len);
-		ret = -ENOBUFS;
-	}
-
-	k_mutex_unlock(&uc->mutex);
-
-	bool running = (sm_work_q.flags & K_WORK_QUEUE_STARTED) == K_WORK_QUEUE_STARTED;
-
-	if (running) {
-		k_work_submit_to_queue(&sm_work_q, &tx_write_nonblock_work);
-	} else {
-		/* Work queue not running yet, use system work queue. */
-		k_work_submit(&tx_write_nonblock_work);
-	}
-
-	return ret;
-}
-
-static int sm_uart_tx_write(const uint8_t *data, size_t len, bool flush, bool urc)
-{
-	int ret;
-
-	/* Send only from Serial Modem work queue to guarantee URC ordering.
-	 * But only if the work queue is running.
-	 * During statup, we need to use the system workqueue
-	 */
-	bool running = (sm_work_q.flags & K_WORK_QUEUE_STARTED) == K_WORK_QUEUE_STARTED;
-
-	if (running && k_current_get() == &sm_work_q.thread && !urc) {
-		ret = tx_write_block(data, &len, flush);
-	} else {
-		/* In other contexts, we buffer until Serial Modem work queue becomes available. */
-		ret = tx_write_nonblock(data, len);
-	}
-
-	return ret;
-}
-
-int sm_tx_write(const uint8_t *data, size_t len, bool flush, bool urc)
-{
-#if SM_PIPE
-	if (atomic_test_bit(&sm_pipe.state, SM_PIPE_STATE_OPEN_BIT) && sm_pipe.tx_cb != NULL) {
-		return sm_pipe.tx_cb(data, len, urc);
-	}
-#endif
-	return sm_uart_tx_write(data, len, flush, urc);
-}
-
-int sm_uart_handler_enable(void)
+static int sm_uart_handler_enable(void)
 {
 	int err;
 	uint32_t start_time;
@@ -598,23 +397,16 @@ int sm_uart_handler_enable(void)
 		return -EFAULT;
 	}
 
-	urc_ctx = sm_at_host_urc_ctx_acquire(SM_URC_OWNER_AT);
-	if (!urc_ctx) {
-		LOG_ERR("Failed to acquire URC context");
-		return -EFAULT;
+	/* Initialize UART pipe for unified interface */
+	err = sm_uart_pipe_init_internal();
+	if (err && err != -EALREADY) {
+		LOG_ERR("Failed to initialize UART pipe: %d", err);
+		return err;
 	}
-
-	tx_enable();
-	err = rx_enable();
-	if (err) {
-		return -EFAULT;
-	}
-
-	/* Flush possibly pending data in case Serial Modem was idle. */
-	tx_start();
 
 	return 0;
 }
+SYS_INIT(sm_uart_handler_enable, POST_KERNEL, 100);
 
 int sm_uart_handler_disable(void)
 {
@@ -632,12 +424,8 @@ int sm_uart_handler_disable(void)
 		return err;
 	}
 
-	(void)k_work_cancel_delayable(&rx_process_work);
-
 	return 0;
 }
-
-#if SM_PIPE
 
 static int pipe_open(void *data)
 {
@@ -652,6 +440,7 @@ static int pipe_open(void *data)
 	if (atomic_test_bit(&sm_pipe.state, SM_PIPE_STATE_OPEN_BIT)) {
 		return -EALREADY;
 	}
+	atomic_set_bit(&sm_pipe.state, SM_PIPE_STATE_OPEN_BIT);
 
 	atomic_clear_bit(&uart_state, SM_UART_STATE_RX_RECOVERY_DISABLED_BIT);
 	ret = rx_enable();
@@ -661,7 +450,6 @@ static int pipe_open(void *data)
 
 	tx_enable();
 
-	atomic_set_bit(&sm_pipe.state, SM_PIPE_STATE_OPEN_BIT);
 	modem_pipe_notify_opened(&sm_pipe.pipe);
 
 	return 0;
@@ -755,6 +543,8 @@ static int pipe_close(void *data)
 {
 	ARG_UNUSED(data);
 
+	LOG_DBG("Closing UART pipe");
+
 	if (!atomic_test_bit(&sm_pipe.state, SM_PIPE_STATE_OPEN_BIT)) {
 		return -EALREADY;
 	}
@@ -771,49 +561,26 @@ static const struct modem_pipe_api modem_pipe_api = {
 	.close = pipe_close,
 };
 
-static void notify_transmit_idle_fn(struct k_work *work)
+struct modem_pipe *sm_uart_pipe_get(void)
 {
-	ARG_UNUSED(work);
-	modem_pipe_notify_transmit_idle(&sm_pipe.pipe);
-}
-static void notify_closed_fn(struct k_work *work)
-{
-	ARG_UNUSED(work);
-	modem_pipe_notify_closed(&sm_pipe.pipe);
+	if (atomic_test_bit(&sm_pipe.state, SM_PIPE_STATE_INIT_BIT)) {
+		return &sm_pipe.pipe;
+	}
+	return NULL;
 }
 
-static void at_to_cmux_switch(void)
+static int sm_uart_pipe_init_internal(void)
 {
-	/* TX handling when moving from AT to CMUX. */
+	if (atomic_test_bit(&sm_pipe.state, SM_PIPE_STATE_INIT_BIT)) {
+		return -EALREADY;
+	}
 
-	/* - Complete (OK message) TX transmission through regular UART. */
-	tx_disable(K_MSEC(10));
-
-	/* - Release URC context for handling unsolicited responses.
-	 *   We are serving AT#XCMUX, so it is not possible that the URC sending would be active.
-	 */
-	sm_at_host_urc_ctx_release(urc_ctx, SM_URC_OWNER_AT);
-	urc_ctx = NULL;
-
-	/* RX handling when moving from AT to CMUX:
-	 * - RX and RX buffers are retained.
-	 * - Data in RX buffers is routed to CMUX AT channel.
-	 */
-}
-
-struct modem_pipe *sm_uart_pipe_init(sm_pipe_tx_t pipe_tx_cb)
-{
 	k_work_init(&sm_pipe.notify_transmit_idle, notify_transmit_idle_fn);
 	k_work_init(&sm_pipe.notify_closed, notify_closed_fn);
 
-	sm_pipe.tx_cb = pipe_tx_cb;
 	atomic_set_bit(&sm_pipe.state, SM_PIPE_STATE_INIT_BIT);
 
 	modem_pipe_init(&sm_pipe.pipe, &sm_pipe, &modem_pipe_api);
 
-	at_to_cmux_switch();
-
-	return &sm_pipe.pipe;
+	return 0;
 }
-
-#endif /* SM_PIPE */

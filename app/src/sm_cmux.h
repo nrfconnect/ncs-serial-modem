@@ -18,9 +18,9 @@ enum cmux_channel {
 #if defined(CONFIG_SM_GNSS_OUTPUT_NMEA_ON_CMUX_CHANNEL)
 	CMUX_GNSS_CHANNEL,
 #endif
+	CMUX_USER_CHANNEL_0,
+	CMUX_USER_CHANNEL_1,
 	CMUX_EXT_CHANNEL_COUNT
 };
-struct modem_pipe *sm_cmux_reserve(enum cmux_channel);
-void sm_cmux_release(enum cmux_channel);
 
 #endif

@@ -53,7 +53,7 @@ static uint16_t mqtt_broker_port;
 static char mqtt_clientid[MQTT_MAX_CID_LEN + 1];
 static char mqtt_username[SM_MAX_USERNAME + 1];
 static char mqtt_password[SM_MAX_PASSWORD + 1];
-
+extern uint8_t sm_data_buf[SM_MAX_MESSAGE_SIZE]; /* TODO: replace with something else */
 static struct mqtt_publish_param pub_param;
 static uint8_t pub_topic[MQTT_MAX_TOPIC_LEN];
 

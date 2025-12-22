@@ -99,6 +99,7 @@ static struct sm_socket {
 
 static struct sm_socket *datamode_sock; /* Socket for data mode */
 static char hex_data[1400 + 1]; /* Buffer for hex data conversion */
+uint8_t sm_data_buf[SM_MAX_MESSAGE_SIZE];
 
 static struct async_poll_ctx {
 	struct k_work poll_work;         /* Work to send poll URCs. */

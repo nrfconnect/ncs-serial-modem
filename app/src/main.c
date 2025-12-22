@@ -143,12 +143,6 @@ static int bootloader_mode_init(void)
 	}
 	LOG_INF("Bootloader mode initiated successfully");
 
-	ret = sm_at_host_bootloader_init();
-	if (ret) {
-		LOG_ERR("Failed to init at_host: %d", ret);
-		return ret;
-	}
-
 	ret = sm_at_send_str("Bootloader mode ready\r\n");
 	if (ret) {
 		LOG_ERR("Failed to send bootloader mode ready string: %d", ret);
@@ -256,12 +250,6 @@ static int sm_main(void)
 			}
 			return ret;
 		}
-	}
-
-	ret = sm_uart_handler_enable();
-	if (ret) {
-		LOG_ERR("Failed to enable UART handler (%d).", ret);
-		return ret;
 	}
 
 #if defined(CONFIG_SM_FULL_FOTA)
