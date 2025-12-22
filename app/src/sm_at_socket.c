@@ -92,6 +92,7 @@ static struct sm_socket {
 
 static struct sm_socket *datamode_sock; /* Socket for data mode */
 static uint8_t bin_data[1400]; /* Buffer for hex2bin data conversion */
+uint8_t sm_data_buf[SM_MAX_MESSAGE_SIZE];
 
 static struct async_poll_ctx {
 	struct k_work poll_work;         /* Work to send poll URCs. */
@@ -237,7 +238,7 @@ static void auto_reception(struct sm_socket *sock)
 	}
 	if (!in_datamode()) {
 		/* <CR><LF> after the data. */
-		sm_at_send_str("\r\n");
+		rsp_send("\r\n");
 	}
 }
 

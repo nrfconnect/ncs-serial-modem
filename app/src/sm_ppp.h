@@ -7,11 +7,18 @@
 #define SM_PPP_
 
 #include <stdbool.h>
+#include <zephyr/modem/pipe.h>
 
 /* Whether to forward CGEV notifications to the Serial Modem UART. */
 extern bool sm_fwd_cgev_notifs;
 
 bool sm_ppp_is_stopped(void);
 void sm_ppp_set_auto_start(bool enable);
+
+/** Set the permanent modem pipe for PPP communication */
+void sm_ppp_attach(struct modem_pipe *pipe);
+
+/** Detach the modem pipe from PPP communication */
+void sm_ppp_detach(void);
 
 #endif

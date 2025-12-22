@@ -21,7 +21,9 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/pm/device.h>
+#include <zephyr/sys/atomic.h>
 #include <zephyr/sys/ring_buffer.h>
+#include <zephyr/modem/pipe.h>
 #include <zephyr/logging/log_ctrl.h>
 #include <zephyr/sys/reboot.h>
 
@@ -31,41 +33,21 @@ extern FUNC_NORETURN void sm_reset(void);
 
 LOG_MODULE_REGISTER(sm_at_host, CONFIG_SM_LOG_LEVEL);
 
-#define HEXDUMP_LIMIT    16
-
-#define AT_XDFU_INIT_CMD "AT#XDFUINIT"
+#define HEXDUMP_LIMIT     16
+#define URC_RETRY_DELAY   K_MSEC(100)
+#define AT_BUF_MIN_SIZE   128
+#define AT_BUF_MAX_SIZE   8192
+#define AT_XDFU_INIT_CMD  "AT#XDFUINIT"
 #define AT_XDFU_WRITE_CMD "AT#XDFUWRITE"
 #define AT_XDFU_APPLY_CMD "AT#XDFUAPPLY"
-#define AT_XRESET_CMD "AT#XRESET"
+#define AT_XRESET_CMD     "AT#XRESET"
 
 /* Operation mode variables */
 enum sm_operation_mode {
-	SM_AT_COMMAND_MODE,		/* AT command host or bridge */
-	SM_DATA_MODE,			/* Raw data sending */
-	SM_NULL_MODE			/* Discard incoming until next command */
+	SM_AT_COMMAND_MODE, /* AT command host or bridge */
+	SM_DATA_MODE,       /* Raw data sending */
+	SM_NULL_MODE        /* Discard incoming until next command */
 };
-static enum sm_operation_mode at_mode;
-K_MUTEX_DEFINE(mutex_mode); /* Protects the operation mode variables. */
-
-static struct data_mode {
-	sm_datamode_handler_t handler;
-	int handler_result;
-	uint16_t time_limit; /* Time limit for idle period before sending in ms. */
-	size_t data_len; /* Expected data length in data mode. */
-} data_mode;
-
-uint8_t sm_at_buf[CONFIG_SM_AT_BUF_SIZE + 1];
-uint8_t sm_data_buf[SM_MAX_MESSAGE_SIZE];
-static bool inside_quotes;
-static size_t at_cmd_len;
-static size_t echo_len;
-static uint8_t prev_character;
-
-RING_BUF_DECLARE(data_rb, CONFIG_SM_DATAMODE_BUF_SIZE);
-static uint8_t quit_str_partial_match;
-K_MUTEX_DEFINE(mutex_data); /* Protects the data_rb and quit_str_partial_match. */
-
-static struct k_work raw_send_scheduled_work;
 
 enum sm_debug_print {
 	SM_DEBUG_PRINT_NONE,
@@ -73,114 +55,562 @@ enum sm_debug_print {
 	SM_DEBUG_PRINT_FULL
 };
 
+struct data_mode {
+	sm_datamode_handler_t handler;
+	int handler_result;
+	uint16_t time_limit; /* Time limit for idle period before sending in ms. */
+	size_t data_len;     /* Expected data length in data mode. */
+};
+
+/* Forward declarations */
 static void echo_timer_handler(struct k_timer *timer);
-static struct echo_ctx {
-	bool enabled;
-	struct k_timer timer;
-} echo_ctx = {
-	.enabled = false,
-	.timer = Z_TIMER_INITIALIZER(echo_ctx.timer, echo_timer_handler, NULL),
+static void event_work_fn(struct sm_at_host_ctx *ctx);
+static void raw_send_scheduled(struct k_work *work);
+static void at_pipe_rx_work_fn(struct k_work *work);
+static void at_pipe_event_handler(struct modem_pipe *pipe, enum modem_pipe_event event,
+				  void *user_data);
+static size_t sm_at_receive(struct sm_at_host_ctx *ctx, uint8_t c);
+static void sm_at_host_work_fn(struct k_work *work);
+static void sm_at_host_event_notify(struct sm_at_host_ctx *ctx, enum sm_event event);
+
+/**
+ * @brief AT host context structure.
+ *
+ * Contains all state variables, buffers, and synchronization primitives
+ * for a single AT command pipe instance.
+ *
+ * Lifecycle:
+ *
+ * @startuml
+ * [*] --> Attached: sm_at_host_attach(pipe)
+ * Attached: modem_pipe_attach(pipe, null_pipe_handler, NULL)
+ * Attached --> Create: MODEM_PIPE_EVENT_OPENED
+ * state allocated as "Memory is allocated for context" {
+ * Create: sm_at_host_create()
+ * Create: modem_pipe_attach(pipe, at_pipe_event_handler, ctx)
+ * Create --> Open
+ * Open --> Open: MODEM_PIPE_EVENT_RECEIVE_READY\nk_work_submit(...,at_pipe_rx_work_fn)
+ * Open --> Closing: MODEM_PIPE_EVENT_CLOSED
+ * Open --> Closing: sm_at_host_release(ctx)
+ * Closing: sm_at_host_destroy(ctx)
+ * state c <<choice>>
+ * Closing --> c
+ * c --> Destroy: [not last one]
+ * c -> Idle: [last one]
+ * Idle: modem_pipe_attach(pipe, null_pipe_handler, NULL)
+ * Idle -up-> Create: MODEM_PIPE_EVENT_OPENED
+ * }
+ * Destroy: free(ctx->data_rb_buf)\nfree(ctx->at_buf)\nfree(ctx)
+ * Destroy --> [*]
+ * @enduml
+ *
+ */
+struct sm_at_host_ctx {
+	/* List node for instance management */
+	sys_snode_t node;
+
+	/* Pipe instance reference */
+	atomic_ptr_t pipe;
+	struct k_event pipe_event;
+
+	/* Operation mode variables */
+	enum sm_operation_mode at_mode;
+	struct data_mode data_mode;
+
+	/* Data buffers */
+	uint8_t *at_buf;
+	size_t at_buf_size;
+	struct ring_buf data_rb;
+	uint8_t *data_rb_buf;
+	uint8_t quit_str_partial_match;
+	struct k_mutex mutex_data;
+
+	/* Work items and timers */
+	struct k_work rx_work;
+	struct k_work raw_send_scheduled_work;
+	struct k_timer inactivity_timer;
+
+	/* AT command reception state (for cmd_rx_handler) */
+	bool inside_quotes;
+	size_t at_cmd_len;
+	size_t echo_len;
+	uint8_t prev_character;
+
+	/* null_handler state */
+	size_t null_dropped_count;
+	uint8_t null_match_count;
+
+	/* Echo context */
+	struct {
+		bool enabled;
+		struct k_timer timer;
+	} echo_ctx;
+
+	/* Event callback mechanism */
+	struct {
+		sys_slist_t event_cbs;
+		atomic_t events;
+	} event_ctx;
 };
 
-static struct sm_urc_ctx urc_ctx;
-
-/* Event callback mechanism */
-static void event_work_fn(struct k_work *work);
-static struct event_ctx {
-	sys_slist_t event_cbs;
-	struct k_work work;
-	atomic_t events;
-} event_ctx = {
-	.event_cbs = SYS_SLIST_STATIC_INIT(&event_ctx.event_cbs),
-	.work = Z_WORK_INITIALIZER(event_work_fn),
-	.events = ATOMIC_INIT(0),
+enum sm_pipe_event {
+	SM_PIPE_EVENT_NONE,
+	SM_PIPE_EVENT_OPENED,
+	SM_PIPE_EVENT_CLOSED,
 };
 
-/* global functions defined in different files */
-int sm_at_init(void);
-void sm_at_uninit(void);
+struct sm_at_host_msg {
+	struct sm_at_host_ctx *ctx;
+	struct modem_pipe *pipe;
+	enum sm_pipe_event pipe_event;
+	enum sm_event sm_event;
+};
+K_MSGQ_DEFINE(sm_at_host_msgq, sizeof(struct sm_at_host_msg), 10, 1);
 
-static enum sm_operation_mode get_sm_mode(void)
+static sys_slist_t instance_list = SYS_SLIST_STATIC_INIT(instance_list);
+static K_WORK_DEFINE(sm_at_host_work, sm_at_host_work_fn);
+RING_BUF_DECLARE(urc_buf, CONFIG_SM_URC_BUFFER_SIZE);
+uint8_t sm_response_buf[CONFIG_SM_AT_BUF_SIZE + 1];
+/* Current executing context (set by entry points) */
+static struct sm_at_host_ctx *current_ctx;
+
+uint16_t sm_datamode_time_limit;
+
+/**
+ * @brief Create a new AT host instance.
+ *
+ * Allocates and initializes a new AT host context for the given modem pipe.
+ * Used by CMUX to create instances for additional DLC channels.
+ *
+ * @param pipe Modem pipe to attach to the new AT host instance.
+ * @return Pointer to the created context, or NULL on failure.
+ */
+static struct sm_at_host_ctx *sm_at_host_create(struct modem_pipe *pipe);
+
+/**
+ * @brief Destroy an AT host instance.
+ *
+ * Cleans up and frees an AT host instance.
+ * Cannot be used while executing an AT command on the context.
+ * Use sm_at_host_release() instead.
+ *
+ * @param ctx AT host context to destroy.
+ * @return 0 on success, negative error code on failure.
+ */
+static int sm_at_host_destroy(struct sm_at_host_ctx *ctx);
+
+static void send_msg(struct sm_at_host_msg msg)
 {
-	enum sm_operation_mode mode;
+	int ret;
 
-	k_mutex_lock(&mutex_mode, K_FOREVER);
-	mode = at_mode;
-	k_mutex_unlock(&mutex_mode);
+	while (k_msgq_put(&sm_at_host_msgq, &msg, K_NO_WAIT) != 0) {
+		LOG_ERR("AT host message queue full, purging old data");
+		k_msgq_purge(&sm_at_host_msgq);
+	}
 
-	return mode;
+	ret = k_work_submit_to_queue(&sm_work_q, &sm_at_host_work);
+	if (ret < 0) {
+		if (ret == -ENODEV) {
+			/* sm_work_q is not yet running */
+			if (msg.ctx) {
+				k_timer_start(&msg.ctx->echo_ctx.timer, URC_RETRY_DELAY, K_NO_WAIT);
+				return;
+			}
+		}
+		LOG_ERR("Failed to schedule AT host work: %d", ret);
+	}
+}
+
+static void sm_at_pipe_opened(struct sm_at_host_ctx *ctx, struct modem_pipe *pipe)
+{
+	struct sm_at_host_msg msg = {
+		.ctx = ctx,
+		.pipe = pipe,
+		.pipe_event = SM_PIPE_EVENT_OPENED,
+	};
+
+	/* Don't trigger event if pipe is re-attached to existing context
+	 * it was previously attached to
+	 * or if the already attached pipe is re-opened.
+	 */
+	if (ctx) {
+		if (atomic_ptr_cas(&ctx->pipe, NULL, pipe)) {
+			return;
+		}
+
+		if (atomic_ptr_get(&ctx->pipe) == pipe) {
+			return;
+		}
+	}
+
+	/* Other cases need handling from worker queue, we might be inside
+	 * spinlock from pipe callback, so cannot modify the pipe itself.
+	 */
+	send_msg(msg);
+}
+
+static void sm_at_pipe_closed(struct sm_at_host_ctx *ctx, struct modem_pipe *pipe)
+{
+	struct sm_at_host_msg msg = {
+		.ctx = ctx,
+		.pipe = pipe,
+		.pipe_event = SM_PIPE_EVENT_CLOSED,
+	};
+
+	if (ctx) {
+		if (atomic_ptr_cas(&ctx->pipe, pipe, NULL)) {
+			send_msg(msg);
+		}
+	}
+}
+
+/**
+ * @brief Set the current AT host context.
+ *
+ * Called by entry points to set the active context for the current execution.
+ *
+ * @param ctx Context to set as current (can be NULL to clear)
+ */
+static inline void sm_at_host_set_current_ctx(struct sm_at_host_ctx *ctx)
+{
+	current_ctx = ctx;
+}
+
+/**
+ * @brief Get the current AT host context.
+ *
+ * Returns the context of the currently executing AT command/work.
+ * Falls back to first/URC instance if no context is currently active.
+ *
+ * @return Pointer to current AT host context
+ */
+struct sm_at_host_ctx *sm_at_host_get_current(void)
+{
+	struct sm_at_host_ctx *ctx;
+
+	ctx = current_ctx ? current_ctx : sm_at_host_get_urc_ctx();
+
+	return ctx;
+}
+
+struct sm_at_host_ctx *sm_at_host_get_ctx_from(struct modem_pipe *pipe)
+{
+	struct sm_at_host_ctx *ctx;
+
+	if (!pipe) {
+		return NULL;
+	}
+
+	SYS_SLIST_FOR_EACH_CONTAINER(&instance_list, ctx, node) {
+		if (atomic_ptr_get(&ctx->pipe) == pipe) {
+			return ctx;
+		}
+	}
+	return NULL;
+}
+
+struct sm_at_host_ctx *sm_at_host_get_urc_ctx(void)
+{
+	struct sm_at_host_ctx *ctx;
+
+	ctx = SYS_SLIST_PEEK_HEAD_CONTAINER(&instance_list, ctx, node);
+	return ctx;
+}
+
+struct modem_pipe *sm_at_host_get_pipe(struct sm_at_host_ctx *ctx)
+{
+	return ctx ? atomic_ptr_get(&ctx->pipe) : NULL;
+}
+
+/**
+ * @brief Check if ctx pointer is still valid.
+ *
+ * @param ctx
+ * @return true ctx is valid
+ * @return false ctx is already destroyed
+ */
+static bool sm_at_ctx_check(struct sm_at_host_ctx *ctx)
+{
+	struct sm_at_host_ctx *p;
+
+	if (!ctx) {
+		return false;
+	}
+
+	SYS_SLIST_FOR_EACH_CONTAINER(&instance_list, p, node) {
+		if (p == ctx) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/* Process received data from pipe */
+static void at_pipe_rx_work_fn(struct k_work *work)
+{
+	struct sm_at_host_ctx *ctx = CONTAINER_OF(work, struct sm_at_host_ctx, rx_work);
+	int ret;
+	uint8_t rx_buf;
+
+	if (!sm_at_ctx_check(ctx)) {
+		LOG_ERR("AT pipe RX work: context destroyed");
+		return;
+	}
+
+	struct modem_pipe *pipe = atomic_ptr_get(&ctx->pipe);
+
+	if (!pipe) {
+		LOG_WRN("AT pipe RX work: no pipe assigned (ctx: %p)", (void *)ctx);
+		return;
+	}
+	/* Set as current context */
+	sm_at_host_set_current_ctx(ctx);
+
+	/* Read data from ctx->pipe */
+	do {
+		ret = modem_pipe_receive(pipe, &rx_buf, sizeof(rx_buf));
+		if (ret < 0) {
+			LOG_ERR("Pipe receive failed: %d (ctx %p, pipe %p)", ret, (void *)ctx,
+				(void *)pipe);
+			break;
+		}
+
+		if (ret > 0) {
+			/* Process received AT data */
+			sm_at_receive(ctx, rx_buf);
+		}
+	} while (ret > 0 && atomic_ptr_get(&ctx->pipe) == pipe);
+
+	/* Clear current context */
+	sm_at_host_set_current_ctx(NULL);
+}
+
+/* Pipe event handler for AT communication */
+static void at_pipe_event_handler(struct modem_pipe *pipe, enum modem_pipe_event event,
+				  void *user_data)
+{
+	int ret;
+	struct sm_at_host_ctx *ctx = (struct sm_at_host_ctx *)user_data;
+
+	if (!ctx || !sm_at_ctx_check(ctx)) {
+		LOG_ERR("Invalid context in pipe event handler");
+		return;
+	}
+
+	k_event_post(&ctx->pipe_event, BIT(event));
+
+	switch (event) {
+	case MODEM_PIPE_EVENT_RECEIVE_READY:
+		/* Ensure pipe have not changed */
+		if (atomic_ptr_get(&ctx->pipe) != pipe) {
+			LOG_ERR("Received data on pipe %p not assigned to ctx %p", (void *)pipe,
+				(void *)ctx);
+			break;
+		}
+		ret = k_work_submit_to_queue(&sm_work_q, &ctx->rx_work);
+		if (ret < 0) {
+			LOG_ERR("Failed to submit RX work: %d", ret);
+		}
+		break;
+
+	case MODEM_PIPE_EVENT_CLOSED:
+		sm_at_pipe_closed(ctx, pipe);
+		break;
+
+	case MODEM_PIPE_EVENT_OPENED:
+		sm_at_pipe_opened(ctx, pipe);
+		break;
+	default:
+		break;
+	}
+}
+
+static int sm_at_host_pipe_tx_blocking(struct sm_at_host_ctx *ctx, const uint8_t *buf, size_t size)
+{
+	struct modem_pipe *pipe = ctx ? atomic_ptr_get(&ctx->pipe) : NULL;
+	int ret;
+
+	if (!pipe) {
+		LOG_WRN("No pipe assigned for transmission (ctx: %p)", (void *)ctx);
+		return -EINVAL;
+	}
+
+	for (size_t len = size; len > 0;) {
+		ret = modem_pipe_transmit(pipe, buf, len);
+		if (ret < 0) {
+			LOG_ERR("Pipe transmit failed: %d (ctx %p, pipe %p)", ret, (void *)ctx,
+				(void *)pipe);
+			return ret;
+		} else if (ret == 0) {
+			/* No data transmitted, wait for transmit idle event */
+			if (k_event_wait(&ctx->pipe_event, BIT(MODEM_PIPE_EVENT_TRANSMIT_IDLE),
+					 true, K_SECONDS(1)) == 0) {
+				LOG_ERR("Failed to wait for transmit idle event");
+				return -EIO;
+			}
+		} else {
+			buf += ret;
+			len -= ret;
+		}
+	}
+	return size;
+}
+
+static void null_pipe_handler(struct modem_pipe *pipe, enum modem_pipe_event event, void *user_data)
+{
+	switch (event) {
+	case MODEM_PIPE_EVENT_OPENED:
+		LOG_DBG("Null pipe(%p) handler event: %d", (void *)pipe, event);
+		sm_at_pipe_opened(NULL, pipe);
+		break;
+	default:
+		break;
+	}
+}
+
+int sm_at_host_set_pipe(struct sm_at_host_ctx *ctx, struct modem_pipe *pipe)
+{
+	if (!ctx || !pipe) {
+		LOG_ERR("sm_at_host_set_pipe(%p, %p) invalid", (void *)ctx, (void *)pipe);
+		return -EINVAL;
+	}
+
+	if (!sm_at_ctx_check(ctx)) {
+		LOG_ERR("sm_at_host_set_pipe: context destroyed");
+		return -EINVAL;
+	}
+
+	struct modem_pipe *old_pipe = atomic_ptr_set(&ctx->pipe, pipe);
+
+	LOG_DBG("Setting AT host pipe: %p (old: %p, ctx: %p)", (void *)pipe, (void *)old_pipe,
+		(void *)ctx);
+
+	/* Release old pipe if attached */
+	if (old_pipe) {
+		modem_pipe_attach(old_pipe, null_pipe_handler, NULL);
+	}
+
+	/* Release old CTX if the pipe had one */
+	struct sm_at_host_ctx *old_ctx = sm_at_host_get_ctx_from(pipe);
+
+	if (old_ctx && old_ctx != ctx && atomic_ptr_cas(&old_ctx->pipe, pipe, (void *)0xdeadbeef)) {
+		LOG_DBG("Pipe %p already attached to another context %p, destroying old context",
+			(void *)pipe, (void *)old_ctx);
+		sm_at_host_destroy(old_ctx);
+	}
+
+	/* Attach to new pipe */
+	modem_pipe_attach(pipe, at_pipe_event_handler, ctx);
+	return 0;
+}
+
+void sm_at_host_release(struct sm_at_host_ctx *ctx)
+{
+	struct modem_pipe *pipe;
+
+	if (!sm_at_ctx_check(ctx)) {
+		return;
+	}
+
+	pipe = atomic_ptr_get(&ctx->pipe);
+	modem_pipe_release(pipe);
+	sm_at_pipe_closed(ctx, pipe);
+
+	LOG_DBG("Releasing AT host pipe: %p (ctx: %p)", (void *)pipe, (void *)ctx);
+}
+
+void sm_at_host_attach(struct modem_pipe *pipe)
+{
+	modem_pipe_attach(pipe, null_pipe_handler, NULL);
+	if (sm_pipe_is_open(pipe)) {
+		sm_at_pipe_opened(NULL, pipe);
+	}
+}
+
+static enum sm_operation_mode get_sm_mode(struct sm_at_host_ctx *ctx)
+{
+	return ctx->at_mode;
 }
 
 /* Lock mutex_mode, before calling. */
-static bool set_sm_mode(enum sm_operation_mode mode)
+static bool set_sm_mode(struct sm_at_host_ctx *ctx, enum sm_operation_mode mode)
 {
 	bool ret = false;
 
-	if (at_mode == SM_AT_COMMAND_MODE) {
+	if (ctx->at_mode == SM_AT_COMMAND_MODE) {
 		if (mode == SM_DATA_MODE) {
+			if (ctx->data_rb_buf == NULL) {
+				LOG_DBG("Allocating datamode buffer of size %d",
+					CONFIG_SM_DATAMODE_BUF_SIZE);
+				ctx->data_rb_buf = malloc(CONFIG_SM_DATAMODE_BUF_SIZE);
+				if (ctx->data_rb_buf == NULL) {
+					LOG_ERR("Failed to allocate datamode buffer");
+					return false;
+				}
+				ring_buf_init(&ctx->data_rb, CONFIG_SM_DATAMODE_BUF_SIZE,
+					      ctx->data_rb_buf);
+			}
 			ret = true;
 		}
-	} else if (at_mode == SM_DATA_MODE) {
+	} else if (ctx->at_mode == SM_DATA_MODE) {
 		if (mode == SM_NULL_MODE || mode == SM_AT_COMMAND_MODE) {
 			ret = true;
 		}
-	} else if (at_mode == SM_NULL_MODE) {
+	} else if (ctx->at_mode == SM_NULL_MODE) {
 		if (mode == SM_AT_COMMAND_MODE || mode == SM_NULL_MODE) {
 			ret = true;
 		}
 	}
 
 	if (ret) {
-		LOG_DBG("SM mode changed: %d -> %d", at_mode, mode);
-		at_mode = mode;
+		LOG_DBG("SM mode changed: %d -> %d", ctx->at_mode, mode);
+		ctx->at_mode = mode;
 	} else {
-		LOG_ERR("Failed to change SM mode: %d -> %d", at_mode, mode);
+		LOG_ERR("Failed to change SM mode: %d -> %d", ctx->at_mode, mode);
 	}
 
 	return ret;
 }
 
-static void sm_at_host_event_notify(enum sm_event event)
+static void sm_at_host_event_notify(struct sm_at_host_ctx *ctx, enum sm_event event)
 {
-	atomic_or(&event_ctx.events, event);
-	k_work_submit_to_queue(&sm_work_q, &event_ctx.work);
+	atomic_or(&ctx->event_ctx.events, event);
+	send_msg((struct sm_at_host_msg){
+		.ctx = ctx,
+		.sm_event = event,
+	});
 }
 
 static bool exit_datamode(void)
 {
+	struct sm_at_host_ctx *ctx = sm_at_host_get_current();
 	bool ret = false;
 
-	k_mutex_lock(&mutex_mode, K_FOREVER);
-
-	if (set_sm_mode(SM_AT_COMMAND_MODE)) {
-		if (data_mode.handler) {
-			(void)data_mode.handler(DATAMODE_EXIT, NULL, 0, SM_DATAMODE_FLAGS_NONE);
+	if (set_sm_mode(ctx, SM_AT_COMMAND_MODE)) {
+		if (ctx->data_mode.handler) {
+			(void)ctx->data_mode.handler(DATAMODE_EXIT, NULL, 0,
+						     SM_DATAMODE_FLAGS_NONE);
 		}
-		data_mode.handler = NULL;
-		data_mode.data_len = 0;
-		quit_str_partial_match = 0;
+		ctx->data_mode.handler = NULL;
+		ctx->data_mode.data_len = 0;
+		ctx->quit_str_partial_match = 0;
 
-		k_mutex_lock(&mutex_data, K_FOREVER);
-		ring_buf_reset(&data_rb);
-		k_mutex_unlock(&mutex_data);
+		k_mutex_lock(&ctx->mutex_data, K_FOREVER);
+		ring_buf_reset(&ctx->data_rb);
+		k_mutex_unlock(&ctx->mutex_data);
 
-		if (data_mode.handler_result) {
-			LOG_ERR("Data mode handler error: %d", data_mode.handler_result);
-			data_mode.handler_result = -1;
+		if (ctx->data_mode.handler_result) {
+			LOG_ERR("Datamode handler error: %d", ctx->data_mode.handler_result);
+			ctx->data_mode.handler_result = -1;
 		}
-		rsp_send("\r\n#XDATAMODE: %d\r\n", data_mode.handler_result);
-		data_mode.handler_result = 0;
+		rsp_send("\r\n#XDATAMODE: %d\r\n", ctx->data_mode.handler_result);
+		ctx->data_mode.handler_result = 0;
 
-		sm_at_host_event_notify(SM_EVENT_AT_MODE);
+		sm_at_host_event_notify(ctx, SM_EVENT_AT_MODE);
 
 		LOG_INF("Exit data mode");
 		ret = true;
 	}
-
-	k_mutex_unlock(&mutex_mode);
-
-	/* Flush the TX buffer. */
-	sm_tx_write(NULL, 0, true, false);
 
 	return ret;
 }
@@ -188,10 +618,11 @@ static bool exit_datamode(void)
 /* Lock mutex_data, before calling. */
 static void raw_send(uint8_t flags)
 {
-	uint8_t *data;
 	int claim;
 	int ret;
 	bool retry = true;
+	uint8_t *data = NULL;
+	struct sm_at_host_ctx *ctx = sm_at_host_get_current();
 
 	do {
 		/* ring_buf_get_claim() might not return full size.
@@ -199,8 +630,8 @@ static void raw_send(uint8_t flags)
 		 */
 		uint8_t send_flags = flags;
 
-		ret = ring_buf_size_get(&data_rb);
-		claim = ring_buf_get_claim(&data_rb, &data, CONFIG_SM_DATAMODE_BUF_SIZE);
+		ret = ring_buf_size_get(&ctx->data_rb);
+		claim = ring_buf_get_claim(&ctx->data_rb, &data, CONFIG_SM_DATAMODE_BUF_SIZE);
 		if (claim <= 0) {
 			break;
 		}
@@ -212,10 +643,8 @@ static void raw_send(uint8_t flags)
 		LOG_HEXDUMP_DBG(data, MIN(claim, HEXDUMP_LIMIT), "RX");
 		LOG_INF("Send: %d bytes, Data: %p", claim, (void *)data);
 
-		/* Lock the mutex for handler. */
-		k_mutex_lock(&mutex_mode, K_FOREVER);
-		if (data_mode.handler) {
-			ret = data_mode.handler(DATAMODE_SEND, data, claim, send_flags);
+		if (ctx->data_mode.handler) {
+			ret = ctx->data_mode.handler(DATAMODE_SEND, data, claim, send_flags);
 			if (ret < 0 || (ret == 0 && !retry)) {
 				/* Exit data mode on send failure. Further data is dropped. */
 				LOG_ERR("Send failed: %d, Dropped: %d bytes", ret, claim);
@@ -228,13 +657,11 @@ static void raw_send(uint8_t flags)
 				LOG_DBG("Sent %d bytes", ret);
 				retry = true;
 			}
-			ring_buf_get_finish(&data_rb, ret);
+			ring_buf_get_finish(&ctx->data_rb, ret);
 		} else {
 			LOG_ERR("No handler. Dropped %d bytes", claim);
-			ring_buf_get_finish(&data_rb, claim);
+			ring_buf_get_finish(&ctx->data_rb, claim);
 		}
-
-		k_mutex_unlock(&mutex_mode);
 
 	} while (true);
 }
@@ -242,16 +669,17 @@ static void raw_send(uint8_t flags)
 /* Lock mutex_data, before calling. */
 static void write_data_buf(const uint8_t *buf, size_t len)
 {
+	struct sm_at_host_ctx *ctx = sm_at_host_get_current();
 	size_t ret;
 	size_t index = 0;
 
 	/* Reset the ring buffer so that UDP packets have enough continuous space. */
-	if (ring_buf_is_empty(&data_rb)) {
-		ring_buf_reset(&data_rb);
+	if (ring_buf_is_empty(&ctx->data_rb)) {
+		ring_buf_reset(&ctx->data_rb);
 	}
 
 	while (index < len) {
-		ret = ring_buf_put(&data_rb, buf + index, len - index);
+		ret = ring_buf_put(&ctx->data_rb, buf + index, len - index);
 		if (ret) {
 			index += ret;
 		} else {
@@ -263,89 +691,90 @@ static void write_data_buf(const uint8_t *buf, size_t len)
 
 static void raw_send_scheduled(struct k_work *work)
 {
-	ARG_UNUSED(work);
+	struct sm_at_host_ctx *ctx =
+		CONTAINER_OF(work, struct sm_at_host_ctx, raw_send_scheduled_work);
 
-	k_mutex_lock(&mutex_data, K_FOREVER);
+	/* Set as current context */
+	sm_at_host_set_current_ctx(ctx);
+
+	k_mutex_lock(&ctx->mutex_data, K_FOREVER);
 
 	/* Interpret partial quit_str as data, if we send due to timeout. */
-	if (quit_str_partial_match > 0) {
-		write_data_buf(CONFIG_SM_DATAMODE_TERMINATOR, quit_str_partial_match);
-		quit_str_partial_match = 0;
+	if (ctx->quit_str_partial_match > 0) {
+		write_data_buf(CONFIG_SM_DATAMODE_TERMINATOR, ctx->quit_str_partial_match);
+		ctx->quit_str_partial_match = 0;
 	}
 
 	raw_send(SM_DATAMODE_FLAGS_NONE);
 
-	k_mutex_unlock(&mutex_data);
+	k_mutex_unlock(&ctx->mutex_data);
+
+	/* Clear current context */
+	sm_at_host_set_current_ctx(NULL);
 }
 
 static void inactivity_timer_handler(struct k_timer *timer)
 {
-	ARG_UNUSED(timer);
+	struct sm_at_host_ctx *ctx = CONTAINER_OF(timer, struct sm_at_host_ctx, inactivity_timer);
 
 	LOG_DBG("Time limit reached");
-	if (!ring_buf_is_empty(&data_rb)) {
-		k_work_submit_to_queue(&sm_work_q, &raw_send_scheduled_work);
+	if (!ring_buf_is_empty(&ctx->data_rb)) {
+		k_work_submit_to_queue(&sm_work_q, &ctx->raw_send_scheduled_work);
 	} else {
 		LOG_DBG("data buffer empty");
 	}
 }
-K_TIMER_DEFINE(inactivity_timer, inactivity_timer_handler, NULL);
 
 /* Search for quit_str and send data prior to that. Tracks quit_str over several calls. */
-static size_t raw_rx_handler(const uint8_t *buf, const size_t len)
+static size_t raw_rx_handler(struct sm_at_host_ctx *ctx, uint8_t c)
 {
-	k_mutex_lock(&mutex_data, K_FOREVER);
+	k_mutex_lock(&ctx->mutex_data, K_FOREVER);
 
 	const char *const quit_str = CONFIG_SM_DATAMODE_TERMINATOR;
-	size_t processed;
 	bool quit_str_match = false;
-	uint8_t quit_str_match_count = quit_str_partial_match;
-	uint8_t prev_quit_str_match_count = quit_str_partial_match;
-	uint8_t prev_quit_str_match_count_original = quit_str_partial_match;
+	uint8_t quit_str_match_count = ctx->quit_str_partial_match;
+	uint8_t prev_quit_str_match_count = ctx->quit_str_partial_match;
+	uint8_t prev_quit_str_match_count_original = ctx->quit_str_partial_match;
 
 	/* If <data_len> is set in datamode, skip searching for quit_str. Just send data until
 	 * length is reached.
 	 */
-	if (data_mode.data_len > 0) {
-		for (processed = 0; processed < len && data_mode.data_len > 0; processed++) {
-			write_data_buf(&buf[processed], 1);
-			data_mode.data_len--;
-		}
-		if (data_mode.data_len == 0) {
+	if (ctx->data_mode.data_len > 0) {
+		write_data_buf(&c, 1);
+		ctx->data_mode.data_len--;
+		if (ctx->data_mode.data_len == 0) {
 			raw_send(SM_DATAMODE_FLAGS_NONE);
 			(void)exit_datamode();
 		}
 	} else {
 		/* Find quit_str or partial match at the end of the buffer. */
-		for (processed = 0; processed < len && quit_str_match == false; processed++) {
-			if (buf[processed] == quit_str[quit_str_match_count]) {
-				quit_str_match_count++;
-				if (quit_str_match_count == strlen(quit_str)) {
-					quit_str_match = true;
+		if (c == quit_str[quit_str_match_count]) {
+			quit_str_match_count++;
+			if (quit_str_match_count == strlen(quit_str)) {
+				quit_str_match = true;
+			}
+		} else if (quit_str_match_count > 0) {
+			/* Check if we match a beginning of a new quit_str.
+			 * We either match the first character, or in the edge case of
+			 * quit_str starting with multiple same characters, e.g. "aaabbb",
+			 * we match all but the current character (with input aaaa).
+			 */
+			for (int i = 0; i < quit_str_match_count; i++) {
+				if (c != quit_str[i]) {
+					quit_str_match_count = i;
+					break;
 				}
-			} else if (quit_str_match_count > 0) {
-				/* Check if we match a beginning of a new quit_str.
-				 * We either match the first character, or in the edge case of
-				 * quit_str starting with multiple same characters, e.g. "aaabbb",
-				 * we match all but the current character (with input aaaa).
+			}
+			if (quit_str_match_count == 0) {
+				/* No match.
+				 * Previous partial quit_str is data.
 				 */
-				for (int i = 0; i < quit_str_match_count; i++) {
-					if (buf[processed] != quit_str[i]) {
-						quit_str_match_count = i;
-						break;
-					}
-				}
-				if (quit_str_match_count == 0) {
-					/* No match.
-					 * Previous partial quit_str is data.
-					 */
-					prev_quit_str_match_count = 0;
-				} else if (prev_quit_str_match_count > 0) {
-					/* Partial match.
-					 * Part of the previous partial quit_str is data.
-					 */
-					prev_quit_str_match_count--;
-				}
+				prev_quit_str_match_count = 0;
+			} else if (prev_quit_str_match_count > 0) {
+				/* Partial match.
+				 * Part of the previous partial quit_str is data.
+				 */
+				prev_quit_str_match_count--;
 			}
 		}
 
@@ -354,19 +783,19 @@ static size_t raw_rx_handler(const uint8_t *buf, const size_t len)
 			       prev_quit_str_match_count_original - prev_quit_str_match_count);
 
 		/* Write data from buf until the start of the possible (partial) quit_str. */
-		write_data_buf(buf, processed - (quit_str_match_count - prev_quit_str_match_count));
+		write_data_buf(&c, 1 - (quit_str_match_count - prev_quit_str_match_count));
 
 		if (quit_str_match) {
 			raw_send(SM_DATAMODE_FLAGS_NONE);
 			(void)exit_datamode();
-			quit_str_partial_match = 0;
+			ctx->quit_str_partial_match = 0;
 		} else {
-			quit_str_partial_match = quit_str_match_count;
+			ctx->quit_str_partial_match = quit_str_match_count;
 		}
 	}
-	k_mutex_unlock(&mutex_data);
+	k_mutex_unlock(&ctx->mutex_data);
 
-	return processed;
+	return 1;
 }
 
 /*
@@ -390,7 +819,7 @@ static int cmd_grammar_check(const char *cmd, size_t length)
 
 	/* check AT (if not, no check) */
 	if (length < 2 || toupper((int)cmd[0]) != 'A' || toupper((int)cmd[1]) != 'T') {
-		return -ENOENT;
+		return -EINVAL;
 	}
 
 	/* check AT<NULL> */
@@ -532,8 +961,8 @@ static void format_final_result(char *buf, size_t buf_len, size_t buf_max_len)
 	}
 }
 
-static int sm_at_send_internal(const uint8_t *data, size_t len, bool urc,
-			       enum sm_debug_print print_debug)
+static int sm_at_send_internal(struct sm_at_host_ctx *ctx, const uint8_t *data, size_t len,
+			       bool urc, enum sm_debug_print print_debug)
 {
 	int ret;
 
@@ -542,25 +971,32 @@ static int sm_at_send_internal(const uint8_t *data, size_t len, bool urc,
 		return -EINTR;
 	}
 
-	ret = sm_tx_write(data, len, true, urc);
-	if (!ret) {
-		if (print_debug == SM_DEBUG_PRINT_FULL) {
-			LOG_HEXDUMP_DBG(data, len, "TX");
-		} else if (print_debug == SM_DEBUG_PRINT_SHORT) {
-			LOG_HEXDUMP_DBG(data, MIN(HEXDUMP_LIMIT, len), "TX");
+	if (urc) {
+		ret = ring_buf_put(&urc_buf, data, len);
+		if (ret < len) {
+			LOG_ERR("URC buffer full, dropped %d bytes", len - ret);
 		}
+		if (ctx->at_cmd_len > 0) {
+			LOG_DBG("AT command in progress, delaying URC processing");
+			k_timer_start(&ctx->echo_ctx.timer, URC_RETRY_DELAY, K_NO_WAIT);
+		} else {
+			sm_at_host_event_notify(ctx, SM_EVENT_URC);
+		}
+		return 0;
 	}
-	return ret;
-}
 
-int sm_at_send(const uint8_t *data, size_t len)
-{
-	return sm_at_send_internal(data, len, false, SM_DEBUG_PRINT_FULL);
-}
+	ret = sm_at_host_pipe_tx_blocking(ctx, data, len);
+	if (ret < 0) {
+		return ret;
+	}
 
-int sm_at_send_str(const char *str)
-{
-	return sm_at_send(str, strlen(str));
+	if (print_debug == SM_DEBUG_PRINT_FULL) {
+		LOG_HEXDUMP_DBG(data, len, "TX");
+	} else if (print_debug == SM_DEBUG_PRINT_SHORT) {
+		LOG_HEXDUMP_DBG(data, MIN(HEXDUMP_LIMIT, len), "TX");
+	}
+
+	return (ret == len) ? 0 : -EIO;
 }
 
 static void handle_bootloader_at_cmd(uint8_t *buf, size_t buf_size, char *at_cmd)
@@ -568,29 +1004,26 @@ static void handle_bootloader_at_cmd(uint8_t *buf, size_t buf_size, char *at_cmd
 	int err;
 
 	if (strncasecmp(at_cmd, AT_XDFU_INIT_CMD, sizeof(AT_XDFU_INIT_CMD) - 1) == 0) {
-		err = sm_at_handle_xdfu_init(buf + strlen(CRLF_STR),
-			buf_size - strlen(CRLF_STR), at_cmd);
+		err = sm_at_handle_xdfu_init(buf + strlen(CRLF_STR), buf_size - strlen(CRLF_STR),
+					     at_cmd);
 		if (err) {
 			LOG_ERR("AT command failed: %d", err);
 			rsp_send_error();
 		} else {
 			rsp_send_ok();
 		}
-	} else if (strncasecmp(at_cmd, AT_XDFU_WRITE_CMD,
-			   sizeof(AT_XDFU_WRITE_CMD) - 1) == 0) {
-		err = sm_at_handle_xdfu_write(buf + strlen(CRLF_STR),
-			buf_size - strlen(CRLF_STR), at_cmd);
+	} else if (strncasecmp(at_cmd, AT_XDFU_WRITE_CMD, sizeof(AT_XDFU_WRITE_CMD) - 1) == 0) {
+		err = sm_at_handle_xdfu_write(buf + strlen(CRLF_STR), buf_size - strlen(CRLF_STR),
+					      at_cmd);
 		if (err) {
 			LOG_ERR("AT command failed: %d", err);
 			rsp_send_error();
 		} else {
 			rsp_send_ok();
 		}
-	} else if (strncasecmp(at_cmd, AT_XDFU_APPLY_CMD,
-			       sizeof(AT_XDFU_APPLY_CMD) - 1) == 0) {
-		err = sm_at_handle_xdfu_apply(buf + strlen(CRLF_STR),
-						buf_size - strlen(CRLF_STR),
-						at_cmd);
+	} else if (strncasecmp(at_cmd, AT_XDFU_APPLY_CMD, sizeof(AT_XDFU_APPLY_CMD) - 1) == 0) {
+		err = sm_at_handle_xdfu_apply(buf + strlen(CRLF_STR), buf_size - strlen(CRLF_STR),
+					      at_cmd);
 		if (err) {
 			LOG_ERR("AT command failed: %d", err);
 			rsp_send_error();
@@ -607,7 +1040,7 @@ static void handle_bootloader_at_cmd(uint8_t *buf, size_t buf_size, char *at_cmd
 	}
 }
 
-static void cmd_send(uint8_t *buf, size_t cmd_length, size_t buf_size, bool *stop_at_receive)
+static void cmd_send(struct sm_at_host_ctx *ctx, uint8_t *buf, size_t cmd_length)
 {
 	int err;
 	size_t offset = 0;
@@ -640,127 +1073,145 @@ static void cmd_send(uint8_t *buf, size_t cmd_length, size_t buf_size, bool *sto
 
 	/* If bootloader mode is enabled, handle custom AT commands. */
 	if (sm_bootloader_mode_enabled) {
-		handle_bootloader_at_cmd(buf, buf_size, at_cmd);
+		handle_bootloader_at_cmd(sm_response_buf, sizeof(sm_response_buf), at_cmd);
 		return;
-	} else {
-		/* Send to modem. Same buffer used for sending and for the response.
-		 * Reserve space for CRLF in response buffer.
-		 */
-		err = nrf_modem_at_cmd(buf + strlen(CRLF_STR), buf_size - strlen(CRLF_STR),
-				       "%s", at_cmd);
-		if (err == -SILENT_AT_COMMAND_RET) {
-			return;
-		} else if (err == -SILENT_AT_CMUX_COMMAND_RET) {
-			/* Stop processing AT commands until CMUX pipe is established. */
-			*stop_at_receive = true;
-			return;
-		} else if (err < 0) {
-			LOG_ERR("AT command failed: %d", err);
-			rsp_send_error();
-			return;
-		} else if (err > 0) {
-			LOG_ERR("AT command error (%d), type: %d: value: %d",
-				err, nrf_modem_at_err_type(err), nrf_modem_at_err(err));
-		}
+	}
+
+	/* Send to modem.
+	 * Reserve space for CRLF in the response buffer.
+	 */
+	err = nrf_modem_at_cmd(sm_response_buf + strlen(CRLF_STR),
+			       sizeof(sm_response_buf) - strlen(CRLF_STR), "%s", at_cmd);
+	if (err == -SILENT_AT_COMMAND_RET) {
+		return;
+	} else if (err < 0) {
+		LOG_ERR("AT command failed: %d", err);
+		rsp_send_error();
+		return;
+	} else if (err > 0) {
+		LOG_ERR("AT command error (%d), type: %d: value: %d", err,
+			nrf_modem_at_err_type(err), nrf_modem_at_err(err));
 	}
 
 	/** Format as TS 27.007 command V1 with verbose response format,
 	 *  based on current return of API nrf_modem_at_cmd() and MFWv1.3.x
 	 */
-	buf[0] = CR;
-	buf[1] = LF;
-	if (strlen(buf) > strlen(CRLF_STR)) {
-		format_final_result(buf, strlen(buf), buf_size);
-		err = sm_at_send_str(buf);
+	sm_response_buf[0] = CR;
+	sm_response_buf[1] = LF;
+	if (strlen(sm_response_buf) > strlen(CRLF_STR)) {
+		format_final_result(sm_response_buf, strlen(sm_response_buf),
+				    sizeof(sm_response_buf));
+		err = sm_at_send_internal(ctx, sm_response_buf, strlen(sm_response_buf), false,
+					  SM_DEBUG_PRINT_FULL);
 		if (err) {
 			LOG_ERR("AT command response failed: %d", err);
 		}
 	}
 }
 
-static size_t cmd_rx_handler(const uint8_t *buf, const size_t len, bool *stop_at_receive)
+static size_t cmd_rx_handler(struct sm_at_host_ctx *ctx, uint8_t c)
 {
-	size_t processed;
 	bool send = false;
 
-	for (processed = 0; processed < len && send == false; processed++) {
-		/* Don't buffer anything until "AT" is received */
-		if ((at_cmd_len == 0 && toupper(buf[processed]) != 'A') ||
-		    (at_cmd_len == 1 && toupper(buf[processed]) != 'T')) {
-			inside_quotes = false;
-			at_cmd_len = 0;
-			continue;
+	/* Don't buffer anything until "AT" is received */
+	if ((ctx->at_cmd_len == 0 && toupper(c) != 'A') ||
+	    (ctx->at_cmd_len == 1 && toupper(c) != 'T')) {
+		ctx->inside_quotes = false;
+		ctx->at_cmd_len = 0;
+		return 1;
+	}
+	/* Ensure enough space in the AT command buffer */
+	if (ctx->at_cmd_len >= ctx->at_buf_size - 2) {
+		size_t new_size = ctx->at_buf_size * 2;
+
+		if (new_size > AT_BUF_MAX_SIZE) {
+			LOG_ERR("AT command buffer overflow, max size reached");
+			rsp_send_error();
+			goto cmd_finnish_or_fail;
+		}
+		uint8_t *new_buf = realloc(ctx->at_buf, new_size);
+
+		if (!new_buf) {
+			LOG_ERR("Failed to expand AT command buffer");
+			rsp_send_error();
+			goto cmd_finnish_or_fail;
+		}
+		ctx->at_buf = new_buf;
+		ctx->at_buf_size = new_size;
+		LOG_DBG("Expanded AT command buffer to size %zu", new_size);
+	}
+
+	/* Handle control characters */
+	switch (c) {
+	case 0x08: /* Backspace. */
+		   /* Fall through. */
+	case 0x7F: /* DEL character */
+		if (ctx->at_cmd_len == 0) {
+			break;
 		}
 
-		/* Handle control characters */
-		switch (buf[processed]) {
-		case 0x08: /* Backspace. */
-			/* Fall through. */
-		case 0x7F: /* DEL character */
-			if (at_cmd_len == 0) {
-				continue;
-			}
-
-			at_cmd_len--;
-			/* If the removed character was a quote, need to toggle the flag. */
-			if (prev_character == '"') {
-				inside_quotes = !inside_quotes;
-			}
-			if (at_cmd_len > 0) {
-				prev_character = sm_at_buf[at_cmd_len - 1];
-			} else {
-				prev_character = '\0';
-			}
-			continue;
+		ctx->at_cmd_len--;
+		/* If the removed character was a quote, need to toggle the flag. */
+		if (ctx->prev_character == '"') {
+			ctx->inside_quotes = !ctx->inside_quotes;
 		}
+		if (ctx->at_cmd_len > 0) {
+			ctx->prev_character = ctx->at_buf[ctx->at_cmd_len - 1];
+		} else {
+			ctx->prev_character = '\0';
+		}
+		break;
+	default:
+		break;
+	}
 
-		/* Handle termination characters, if outside quotes. */
-		if (!inside_quotes) {
-			switch (buf[processed]) {
-			case '\r':
-				if (IS_ENABLED(CONFIG_SM_CR_TERMINATION)) {
+	/* Handle termination characters, if outside quotes. */
+	if (!ctx->inside_quotes) {
+		switch (c) {
+		case '\r':
+			if (IS_ENABLED(CONFIG_SM_CR_TERMINATION)) {
+				send = true;
+			}
+			break;
+		case '\n':
+			if (IS_ENABLED(CONFIG_SM_LF_TERMINATION)) {
+				send = true;
+			} else if (IS_ENABLED(CONFIG_SM_CR_LF_TERMINATION)) {
+				if (ctx->at_cmd_len > 0 && ctx->prev_character == '\r') {
+					ctx->at_cmd_len--; /* trim the CR char */
 					send = true;
 				}
-				break;
-			case '\n':
-				if (IS_ENABLED(CONFIG_SM_LF_TERMINATION)) {
-					send = true;
-				} else if (IS_ENABLED(CONFIG_SM_CR_LF_TERMINATION)) {
-					if (at_cmd_len > 0 && prev_character == '\r') {
-						at_cmd_len--; /* trim the CR char */
-						send = true;
-					}
-				}
-				break;
 			}
-		}
-
-		if (send == false) {
-			/* Write character to AT buffer, leave space for null */
-			if (at_cmd_len < sizeof(sm_at_buf) - 1) {
-				sm_at_buf[at_cmd_len] = buf[processed];
-			}
-			at_cmd_len++;
-
-			/* Handle special written character */
-			if (buf[processed] == '"') {
-				inside_quotes = !inside_quotes;
-			}
-
-			prev_character = buf[processed];
+			break;
 		}
 	}
 
-	if (echo_ctx.enabled) {
+	if (send == false) {
+		/* Write character to AT buffer, leave space for null */
+		if (ctx->at_cmd_len < ctx->at_buf_size - 1) {
+			ctx->at_buf[ctx->at_cmd_len] = c;
+		}
+		ctx->at_cmd_len++;
+
+		/* Handle special written character */
+		if (c == '"') {
+			ctx->inside_quotes = !ctx->inside_quotes;
+		}
+
+		ctx->prev_character = c;
+	}
+
+	if (ctx->echo_ctx.enabled) {
 		const uint8_t terminator_len = IS_ENABLED(CONFIG_SM_CR_LF_TERMINATION) ? 2 : 1;
 		bool truncate = false;
-		size_t echo_fragment_len = processed;
+		size_t echo_fragment_len = 1;
 
 		/* Check if echo should be truncated. */
-		if (echo_len + echo_fragment_len + (send ? 0 : terminator_len) >
+		if (ctx->echo_len + echo_fragment_len + (send ? 0 : terminator_len) >
 		    CONFIG_SM_AT_ECHO_MAX_LEN) {
 			truncate = true;
-			echo_fragment_len = CONFIG_SM_AT_ECHO_MAX_LEN - echo_len - terminator_len;
+			echo_fragment_len =
+				CONFIG_SM_AT_ECHO_MAX_LEN - ctx->echo_len - terminator_len;
 		}
 
 		/* Echoing incomplete AT-command will cause
@@ -768,119 +1219,116 @@ static size_t cmd_rx_handler(const uint8_t *buf, const size_t len, bool *stop_at
 		 * UART RX buffer (keystroke, when typing).
 		 */
 		if (!send) {
-			k_timer_start(&echo_ctx.timer,
+			k_timer_start(&ctx->echo_ctx.timer,
 				      K_MSEC(CONFIG_SM_URC_DELAY_WITH_INCOMPLETE_ECHO_MS),
 				      K_NO_WAIT);
 		} else {
-			k_timer_stop(&echo_ctx.timer);
-			sm_at_host_event_notify(SM_EVENT_URC);
+			k_timer_stop(&ctx->echo_ctx.timer);
+			sm_at_host_event_notify(ctx, SM_EVENT_URC);
 		}
 
-		(void)sm_at_send_internal(buf, echo_fragment_len, false, SM_DEBUG_PRINT_NONE);
-		echo_len += echo_fragment_len;
+		(void)sm_at_send_internal(ctx, (uint8_t *)&c, echo_fragment_len, false,
+					  SM_DEBUG_PRINT_NONE);
+		ctx->echo_len += echo_fragment_len;
 
 		/* Send truncated termination characters.*/
 		if (send && truncate) {
 			if (IS_ENABLED(CONFIG_SM_CR_TERMINATION)) {
-				(void)sm_at_send_internal((uint8_t *)"\r", 1, false,
+				(void)sm_at_send_internal(ctx, (uint8_t *)"\r", 1, false,
 							  SM_DEBUG_PRINT_NONE);
 			} else if (IS_ENABLED(CONFIG_SM_LF_TERMINATION)) {
-				(void)sm_at_send_internal((uint8_t *)"\n", 1, false,
+				(void)sm_at_send_internal(ctx, (uint8_t *)"\n", 1, false,
 							  SM_DEBUG_PRINT_NONE);
 			} else {
-				(void)sm_at_send_internal((uint8_t *)"\r\n", 2, false,
+				(void)sm_at_send_internal(ctx, (uint8_t *)"\r\n", 2, false,
 							  SM_DEBUG_PRINT_NONE);
 			}
 		}
 	}
 
 	if (send) {
-		if (at_cmd_len > sizeof(sm_at_buf) - 1) {
-			LOG_ERR("AT command buffer overflow, %d dropped", at_cmd_len);
+		if (ctx->at_cmd_len > ctx->at_buf_size - 1) {
+			LOG_ERR("AT command buffer overflow, %d dropped", ctx->at_cmd_len);
 			rsp_send_error();
-		} else if (at_cmd_len > 0) {
-			sm_at_buf[at_cmd_len] = '\0';
-			cmd_send(sm_at_buf, at_cmd_len, sizeof(sm_at_buf), stop_at_receive);
+		} else if (ctx->at_cmd_len > 0) {
+			ctx->at_buf[ctx->at_cmd_len] = '\0';
+			cmd_send(ctx, ctx->at_buf, ctx->at_cmd_len);
 		} else {
 			/* Ignore 0 size command. */
 		}
+cmd_finnish_or_fail:
+		ctx->inside_quotes = false;
+		ctx->at_cmd_len = 0;
+		ctx->echo_len = 0;
+		/* Release extra AT buffer */
+		if (ctx->at_buf_size > AT_BUF_MIN_SIZE) {
+			uint8_t *new_buf = realloc(ctx->at_buf, AT_BUF_MIN_SIZE);
 
-		inside_quotes = false;
-		at_cmd_len = 0;
-		echo_len = 0;
+			if (new_buf) {
+				ctx->at_buf = new_buf;
+				ctx->at_buf_size = AT_BUF_MIN_SIZE;
+				LOG_DBG("Released AT command buffer to size %zu", AT_BUF_MIN_SIZE);
+			}
+		}
 	}
 
-	return processed;
+	return 1;
 }
 
 /* Search for quit_str and exit datamode when one is found. */
-static size_t null_handler(const uint8_t *buf, const size_t len)
+static size_t null_handler(struct sm_at_host_ctx *ctx, uint8_t c)
 {
 	const char *const quit_str = CONFIG_SM_DATAMODE_TERMINATOR;
-	static size_t dropped_count;
-	static uint8_t match_count;
-
-	size_t processed;
 	bool match = false;
 
-	if (dropped_count == 0) {
+	if (ctx->null_dropped_count == 0) {
 		LOG_WRN("Data pipe broken. Dropping data until data mode is terminated.");
 	}
 
-	for (processed = 0; processed < len && match == false; processed++) {
-		if (buf[processed] == quit_str[match_count]) {
-			match_count++;
-			if (match_count == strlen(quit_str)) {
-				match = true;
-			}
-		} else {
-			match_count = 0;
+	if (c == quit_str[ctx->null_match_count]) {
+		ctx->null_match_count++;
+		if (ctx->null_match_count == strlen(quit_str)) {
+			match = true;
 		}
-		dropped_count++;
+	} else {
+		ctx->null_match_count = 0;
 	}
+	ctx->null_dropped_count++;
 
 	if (match) {
-		dropped_count -= strlen(quit_str);
-		dropped_count += ring_buf_size_get(&data_rb);
-		LOG_WRN("Terminating data mode. Dropped %d bytes", dropped_count);
+		ctx->null_dropped_count -= strlen(quit_str);
+		ctx->null_dropped_count += ring_buf_size_get(&ctx->data_rb);
+		LOG_WRN("Terminating data mode. Dropped %d bytes", ctx->null_dropped_count);
 		(void)exit_datamode();
 
-		match_count = 0;
-		dropped_count = 0;
+		ctx->null_match_count = 0;
+		ctx->null_dropped_count = 0;
 	}
 
-	return processed;
+	return 1;
 }
 
-size_t sm_at_receive(const uint8_t *buf, size_t len, bool *stop_at_receive)
+static size_t sm_at_receive(struct sm_at_host_ctx *ctx, uint8_t c)
 {
 	size_t ret = 0;
 
-	k_timer_stop(&inactivity_timer);
+	k_timer_stop(&ctx->inactivity_timer);
 
-	while (ret < len) {
-
-		switch (get_sm_mode()) {
-		case SM_AT_COMMAND_MODE:
-			ret += cmd_rx_handler(buf + ret, len - ret, stop_at_receive);
-			if (*stop_at_receive) {
-				return ret;
-			}
-			break;
-		case SM_DATA_MODE:
-			ret += raw_rx_handler(buf + ret, len - ret);
-			break;
-		case SM_NULL_MODE:
-			ret += null_handler(buf + ret, len - ret);
-			break;
-		}
-
-		assert(ret <= len);
+	switch (get_sm_mode(ctx)) {
+	case SM_AT_COMMAND_MODE:
+		ret = cmd_rx_handler(ctx, c);
+		break;
+	case SM_DATA_MODE:
+		ret = raw_rx_handler(ctx, c);
+		break;
+	case SM_NULL_MODE:
+		ret = null_handler(ctx, c);
+		break;
 	}
 
 	/* start inactivity timer in datamode */
-	if (get_sm_mode() == SM_DATA_MODE) {
-		k_timer_start(&inactivity_timer, K_MSEC(data_mode.time_limit), K_NO_WAIT);
+	if (get_sm_mode(ctx) == SM_DATA_MODE) {
+		k_timer_start(&ctx->inactivity_timer, K_MSEC(ctx->data_mode.time_limit), K_NO_WAIT);
 	}
 
 	return ret;
@@ -896,22 +1344,23 @@ static void notification_handler(const char *notification)
 		return;
 	}
 #endif
-	sm_at_send_internal(CRLF_STR, strlen(CRLF_STR), true, SM_DEBUG_PRINT_FULL);
-	sm_at_send_internal(notification, strlen(notification), true, SM_DEBUG_PRINT_FULL);
+
+	urc_send(CRLF_STR "%s", notification);
 }
 
 void rsp_send_ok(void)
 {
-	sm_at_send_str(OK_STR);
+	rsp_send(OK_STR);
 }
 
 void rsp_send_error(void)
 {
-	sm_at_send_str(ERROR_STR);
+	rsp_send(ERROR_STR);
 }
 
 static void rsp_send_internal(bool urc, const char *fmt, va_list arg_ptr)
 {
+	struct sm_at_host_ctx *ctx = urc ? sm_at_host_get_urc_ctx() : sm_at_host_get_current();
 	static K_MUTEX_DEFINE(mutex_rsp_buf);
 	static char rsp_buf[SM_AT_MAX_RSP_LEN];
 	int rsp_len;
@@ -921,7 +1370,7 @@ static void rsp_send_internal(bool urc, const char *fmt, va_list arg_ptr)
 	rsp_len = vsnprintf(rsp_buf, sizeof(rsp_buf), fmt, arg_ptr);
 	rsp_len = MIN(rsp_len, sizeof(rsp_buf) - 1);
 
-	sm_at_send_internal(rsp_buf, rsp_len, urc, SM_DEBUG_PRINT_FULL);
+	sm_at_send_internal(ctx, rsp_buf, rsp_len, urc, SM_DEBUG_PRINT_FULL);
 
 	k_mutex_unlock(&mutex_rsp_buf);
 }
@@ -946,7 +1395,9 @@ void urc_send(const char *fmt, ...)
 
 void data_send(const uint8_t *data, size_t len)
 {
-	sm_at_send_internal(data, len, false, SM_DEBUG_PRINT_SHORT);
+	struct sm_at_host_ctx *ctx = sm_at_host_get_current();
+
+	sm_at_send_internal(ctx, data, len, false, SM_DEBUG_PRINT_SHORT);
 }
 
 static uint16_t get_min_data_mode_idle_timeout_ms(void)
@@ -973,54 +1424,55 @@ static uint16_t get_min_data_mode_idle_timeout_ms(void)
 
 int enter_datamode(sm_datamode_handler_t handler, size_t data_len)
 {
-	k_mutex_lock(&mutex_mode, K_FOREVER);
+	struct sm_at_host_ctx *ctx = sm_at_host_get_current();
 
-	if (handler == NULL || data_mode.handler != NULL || set_sm_mode(SM_DATA_MODE) == false) {
+	if (handler == NULL || ctx->data_mode.handler != NULL ||
+	    set_sm_mode(ctx, SM_DATA_MODE) == false) {
 		LOG_ERR("Failed to enter data mode");
-		k_mutex_unlock(&mutex_mode);
 		return -EINVAL;
 	}
 
-	k_mutex_lock(&mutex_data, K_FOREVER);
-	ring_buf_reset(&data_rb);
-	k_mutex_unlock(&mutex_data);
+	k_mutex_lock(&ctx->mutex_data, K_FOREVER);
+	ring_buf_reset(&ctx->data_rb);
+	k_mutex_unlock(&ctx->mutex_data);
 
-	data_mode.handler = handler;
-	data_mode.data_len = data_len;
-	if (data_mode.time_limit == 0) {
-		data_mode.time_limit = get_min_data_mode_idle_timeout_ms();
+	ctx->data_mode.handler = handler;
+	ctx->data_mode.data_len = data_len;
+	if (ctx->data_mode.time_limit == 0) {
+		ctx->data_mode.time_limit = get_min_data_mode_idle_timeout_ms();
 	}
 	LOG_INF("Enter data mode");
-
-	k_mutex_unlock(&mutex_mode);
 
 	return 0;
 }
 
 bool in_datamode(void)
 {
-	return (get_sm_mode() == SM_DATA_MODE);
+	struct sm_at_host_ctx *ctx = sm_at_host_get_current();
+
+	return (get_sm_mode(ctx) == SM_DATA_MODE);
 }
 
 bool in_at_mode(void)
 {
-	return (get_sm_mode() == SM_AT_COMMAND_MODE);
+	struct sm_at_host_ctx *ctx = sm_at_host_get_current();
+
+	return (get_sm_mode(ctx) == SM_AT_COMMAND_MODE);
 }
 
 void exit_datamode_handler(int result)
 {
-	k_mutex_lock(&mutex_mode, K_FOREVER);
+	struct sm_at_host_ctx *ctx = sm_at_host_get_current();
 
-	if (set_sm_mode(SM_NULL_MODE)) {
-		if (data_mode.handler) {
-			data_mode.handler(DATAMODE_EXIT, NULL, 0, SM_DATAMODE_FLAGS_EXIT_HANDLER);
+	if (set_sm_mode(ctx, SM_NULL_MODE)) {
+		if (ctx->data_mode.handler) {
+			ctx->data_mode.handler(DATAMODE_EXIT, NULL, 0,
+					       SM_DATAMODE_FLAGS_EXIT_HANDLER);
 		}
-		data_mode.handler = NULL;
-		data_mode.handler_result = result;
-		data_mode.data_len = 0;
+		ctx->data_mode.handler = NULL;
+		ctx->data_mode.handler_result = result;
+		ctx->data_mode.data_len = 0;
 	}
-
-	k_mutex_unlock(&mutex_mode);
 }
 
 int sm_at_cb_wrapper(char *buf, size_t len, char *at_cmd, sm_at_callback *cb)
@@ -1063,11 +1515,11 @@ int sm_at_cb_wrapper(char *buf, size_t len, char *at_cmd, sm_at_callback *cb)
 		switch (nrf_modem_at_err_type(err)) {
 		case NRF_MODEM_AT_CME_ERROR:
 			err = at_cmd_custom_respond(buf, len, "+CME ERROR: %d\r\n",
-				nrf_modem_at_err(err));
+						    nrf_modem_at_err(err));
 			break;
 		case NRF_MODEM_AT_CMS_ERROR:
 			err = at_cmd_custom_respond(buf, len, "+CMS ERROR: %d\r\n",
-				nrf_modem_at_err(err));
+						    nrf_modem_at_err(err));
 			break;
 		case NRF_MODEM_AT_ERROR:
 		default:
@@ -1087,10 +1539,16 @@ int sm_at_cb_wrapper(char *buf, size_t len, char *at_cmd, sm_at_callback *cb)
 
 static int at_host_power_off(bool shutting_down)
 {
-	int err;
+	struct sm_at_host_ctx *ctx = sm_at_host_get_current();
+	int err = 0;
+	struct modem_pipe *pipe = ctx ? atomic_ptr_get(&ctx->pipe) : NULL;
 
 	if (shutting_down) {
-		err = sm_uart_handler_disable();
+		if (!pipe) {
+			LOG_WRN("Failed to disable UART. (no pipe)");
+		} else {
+			err = modem_pipe_close(pipe, K_FOREVER);
+		}
 		if (err) {
 			LOG_WRN("Failed to disable UART. (%d)", err);
 		}
@@ -1109,7 +1567,7 @@ int sm_at_host_power_off(void)
 	const int err = at_host_power_off(false);
 
 	/* Write sync str to buffer so it is sent first when resuming, do not flush. */
-	sm_tx_write(SM_SYNC_STR, strlen(SM_SYNC_STR), false, false);
+	urc_send(SM_SYNC_STR);
 
 	return err;
 }
@@ -1123,53 +1581,56 @@ int sm_at_host_power_on(void)
 		return err;
 	}
 
-	/* Flush the TX buffer. */
-	sm_tx_write(NULL, 0, true, false);
-
 	return 0;
 }
 
 void sm_at_host_echo(bool enable)
 {
-	echo_ctx.enabled = enable;
-	k_timer_stop(&echo_ctx.timer);
+	struct sm_at_host_ctx *ctx = sm_at_host_get_current();
+
+	ctx->echo_ctx.enabled = enable;
+	k_timer_stop(&ctx->echo_ctx.timer);
 }
 
 bool sm_at_host_echo_urc_delay(void)
 {
-	return k_timer_remaining_get(&echo_ctx.timer) > 0;
+	struct sm_at_host_ctx *ctx = sm_at_host_get_current();
+
+	return k_timer_remaining_get(&ctx->echo_ctx.timer) > 0;
 }
 
 static void echo_timer_handler(struct k_timer *timer)
 {
-	ARG_UNUSED(timer);
+	struct sm_at_host_ctx *ctx = CONTAINER_OF(timer, struct sm_at_host_ctx, echo_ctx.timer);
 
 	LOG_DBG("Time limit reached");
-	sm_at_host_event_notify(SM_EVENT_URC);
+	sm_at_host_event_notify(ctx, SM_EVENT_URC);
 }
 
 void sm_at_host_register_event_cb(struct sm_event_callback *cb, enum sm_event event)
 {
+	struct sm_at_host_ctx *ctx = sm_at_host_get_current();
 	sys_snode_t *p;
 
 	LOG_DBG("Register event cb: %p for event: %d", (void *)cb, event);
 	cb->events |= event;
-	if (sys_slist_find(&event_ctx.event_cbs, &cb->node, &p)) {
+	if (sys_slist_find(&ctx->event_ctx.event_cbs, &cb->node, &p)) {
 		return;
 	}
-	sys_slist_append(&event_ctx.event_cbs, &cb->node);
+	sys_slist_append(&ctx->event_ctx.event_cbs, &cb->node);
 }
 
-static void event_work_fn(struct k_work *work)
+static void event_work_fn(struct sm_at_host_ctx *ctx)
 {
-	ARG_UNUSED(work);
+	/* Set as current context */
+	sm_at_host_set_current_ctx(ctx);
 
 	struct sm_event_callback *event_cb;
 	sys_snode_t *node, *tmp;
 
-	enum sm_event events = atomic_clear(&event_ctx.events);
+	enum sm_event events = atomic_clear(&ctx->event_ctx.events);
 
-	SYS_SLIST_FOR_EACH_NODE_SAFE(&event_ctx.event_cbs, node, tmp) {
+	SYS_SLIST_FOR_EACH_NODE_SAFE(&ctx->event_ctx.event_cbs, node, tmp) {
 		event_cb = CONTAINER_OF(node, struct sm_event_callback, node);
 		if (event_cb->events & events) {
 			LOG_DBG("Notify event cb: %p for events: %d", (void *)event_cb, events);
@@ -1177,115 +1638,289 @@ static void event_work_fn(struct k_work *work)
 			event_cb->events &= ~events;
 		}
 		if (event_cb->events == 0) {
-			sys_slist_remove(&event_ctx.event_cbs, NULL, node);
+			sys_slist_remove(&ctx->event_ctx.event_cbs, NULL, node);
 			LOG_DBG("Event cb: %p removed", (void *)event_cb);
+		}
+	}
+
+	/* Clear current context */
+	sm_at_host_set_current_ctx(NULL);
+}
+
+/**
+ * @brief Initialize an AT host context structure.
+ *
+ * Common initialization logic for both first and additional instances.
+ *
+ * @param ctx Context to initialize
+ * @param pipe Modem pipe to attach (can be NULL)
+ * @return 0 on success, negative error code on failure
+ */
+static int sm_at_host_ctx_init(struct sm_at_host_ctx *ctx, struct modem_pipe *pipe)
+{
+	/* Initialize context structure */
+	memset(ctx, 0, sizeof(*ctx));
+
+	ctx->at_buf = malloc(AT_BUF_MIN_SIZE);
+	if (!ctx->at_buf) {
+		LOG_ERR("Failed to allocate AT command buffer");
+		return -ENOMEM;
+	}
+	ctx->at_buf_size = AT_BUF_MIN_SIZE;
+
+	/* Initialize mutexes */
+	k_mutex_init(&ctx->mutex_data);
+	k_event_init(&ctx->pipe_event);
+
+	/* Initialize mode */
+	ctx->at_mode = SM_AT_COMMAND_MODE;
+	atomic_ptr_set(&ctx->pipe, pipe);
+
+	/* Initialize work items and timers */
+	k_work_init(&ctx->raw_send_scheduled_work, raw_send_scheduled);
+	k_work_init(&ctx->rx_work, at_pipe_rx_work_fn);
+	k_timer_init(&ctx->inactivity_timer, inactivity_timer_handler, NULL);
+	k_timer_init(&ctx->echo_ctx.timer, echo_timer_handler, NULL);
+
+	/* Initialize event context */
+	sys_slist_init(&ctx->event_ctx.event_cbs);
+	atomic_set(&ctx->event_ctx.events, 0);
+
+	return 0;
+}
+
+static struct sm_at_host_ctx *sm_at_host_create(struct modem_pipe *pipe)
+{
+	struct sm_at_host_ctx *ctx;
+	int err;
+
+	if (!pipe) {
+		LOG_ERR("Cannot create AT host without pipe");
+		return NULL;
+	}
+
+	bool urcs_queued = !ring_buf_is_empty(&urc_buf);
+
+	/* If the first instance already exists, and is
+	 * not attached to any pipe, use it
+	 */
+	ctx = sm_at_host_get_urc_ctx();
+	if (ctx && atomic_ptr_cas(&ctx->pipe, NULL, pipe)) {
+		LOG_DBG("Reusing first AT host instance %p for pipe %p", (void *)ctx, (void *)pipe);
+		modem_pipe_attach(pipe, at_pipe_event_handler, ctx);
+		if (urcs_queued) {
+			sm_at_host_event_notify(ctx, SM_EVENT_URC);
+		}
+		return ctx;
+	}
+
+	/* Allocate new instance from heap */
+	ctx = malloc(sizeof(*ctx));
+	if (!ctx) {
+		LOG_ERR("Failed to allocate AT host context");
+		return NULL;
+	}
+
+	/* Initialize the context */
+	err = sm_at_host_ctx_init(ctx, pipe);
+	if (err) {
+		free(ctx);
+		return NULL;
+	}
+
+	/* Add to instance list */
+	sys_slist_append(&instance_list, &ctx->node);
+
+	modem_pipe_attach(pipe, at_pipe_event_handler, ctx);
+
+	LOG_INF("Created AT host instance %p for pipe %p", (void *)ctx, (void *)pipe);
+	return ctx;
+}
+
+static void sm_at_host_work_fn(struct k_work *work)
+{
+	struct sm_at_host_msg msg;
+
+	while (k_msgq_get(&sm_at_host_msgq, &msg, K_NO_WAIT) == 0) {
+		struct sm_at_host_ctx *ctx = sm_at_ctx_check(msg.ctx) ? msg.ctx : NULL;
+
+		switch (msg.pipe_event) {
+		case SM_PIPE_EVENT_OPENED:
+			if (ctx) {
+				struct modem_pipe *current = atomic_ptr_get(&ctx->pipe);
+
+				if (current && current != msg.pipe) {
+					LOG_ERR("Pipe mismatch on open event (ctx=%p, pipe=%p, "
+						"event_pipe=%p)",
+						(void *)ctx, (void *)current, (void *)msg.pipe);
+					break;
+				}
+				if (!atomic_ptr_cas(&ctx->pipe, NULL, msg.pipe)) {
+					LOG_ERR("CTX already attached to another pipe (ctx=%p, "
+						"pipe=%p, event_pipe=%p)",
+						(void *)ctx, (void *)current, (void *)msg.pipe);
+					break;
+				}
+				modem_pipe_attach(msg.pipe, at_pipe_event_handler, ctx);
+				LOG_DBG("AT ctx %p reopened pipe %p", (void *)ctx,
+					(void *)msg.pipe);
+				break;
+			}
+			sm_at_host_create(msg.pipe);
+			break;
+		case SM_PIPE_EVENT_CLOSED:
+			/* NOTE: If close event is pushed into message queue but not processed
+			 * before context is attached to a new pipe, we need to ignore the event
+			 */
+			if (ctx) {
+				if (atomic_ptr_cas(&ctx->pipe, NULL, (void *)0xdeadbeef)) {
+					if (msg.pipe->user_data == ctx) {
+						/* Detach, in case new user have not attached yet */
+						LOG_DBG("Detached CTX from pipe %p",
+							(void *)msg.pipe);
+						modem_pipe_attach(msg.pipe, null_pipe_handler,
+								  NULL);
+					}
+					sm_at_host_destroy(ctx);
+				} else {
+					LOG_DBG("Ignoring close event for pipe %p on ctx %p with "
+						"pipe %p",
+						(void *)msg.pipe, (void *)ctx,
+						(void *)atomic_ptr_get(&ctx->pipe));
+				}
+			} else {
+				if (msg.pipe->callback == at_pipe_event_handler) {
+					/* Detach, in case new user have not attached yet */
+					modem_pipe_attach(msg.pipe, null_pipe_handler, NULL);
+					LOG_DBG("Detached from pipe %p", (void *)msg.pipe);
+				}
+			}
+			break;
+		default:
+			break;
+		}
+
+		switch (msg.sm_event) {
+		case SM_EVENT_URC:
+			/* Don't interrupt AT command execution */
+			if (msg.ctx->at_cmd_len == 0) {
+				while (!ring_buf_is_empty(&urc_buf)) {
+					uint8_t *p;
+					size_t len = ring_buf_get_claim(&urc_buf, &p, UINT16_MAX);
+					int send = sm_at_host_pipe_tx_blocking(msg.ctx, p, len);
+
+					if (send < len) {
+						LOG_ERR("Failed to send URC: %d", send);
+					}
+					ring_buf_get_finish(&urc_buf, len);
+				}
+				event_work_fn(msg.ctx);
+			} else {
+				/* Postpone URC sending */
+				k_timer_start(&msg.ctx->echo_ctx.timer, URC_RETRY_DELAY, K_NO_WAIT);
+			}
+			break;
+		case SM_EVENT_AT_MODE:
+			if (msg.ctx->at_cmd_len == 0) {
+				event_work_fn(msg.ctx);
+			} else {
+				k_timer_start(&msg.ctx->echo_ctx.timer, URC_RETRY_DELAY, K_NO_WAIT);
+			}
+			break;
+		default:
+			break;
 		}
 	}
 }
 
-struct sm_urc_ctx *sm_at_host_urc_ctx_acquire(enum sm_urc_owner owner)
+static int sm_at_host_destroy(struct sm_at_host_ctx *ctx)
 {
-	k_mutex_lock(&urc_ctx.mutex, K_FOREVER);
+	struct k_work_sync sync;
 
-	if (urc_ctx.owner == SM_URC_OWNER_NONE || urc_ctx.owner == owner) {
-		urc_ctx.owner = owner;
-		k_mutex_unlock(&urc_ctx.mutex);
-		return &urc_ctx;
+	if (!ctx) {
+		return -EINVAL;
 	}
 
-	k_mutex_unlock(&urc_ctx.mutex);
-	return NULL;
-}
-
-void sm_at_host_urc_ctx_release(struct sm_urc_ctx *ctx, enum sm_urc_owner owner)
-{
-	if (ctx != &urc_ctx) {
-		LOG_ERR("Invalid URC context");
-		return;
+	if (!sm_at_ctx_check(ctx)) {
+		return -EINVAL;
 	}
 
-	k_mutex_lock(&ctx->mutex, K_FOREVER);
-
-	if (ctx->owner == owner) {
-		ctx->owner = SM_URC_OWNER_NONE;
+	if (current_ctx == ctx) {
+		LOG_ERR("Cannot destroy current AT host context");
+		return -EPERM;
 	}
 
-	k_mutex_unlock(&ctx->mutex);
-}
+	/* Cannot destroy first instance */
+	if (sys_slist_len(&instance_list) == 1) {
+		LOG_DBG("Cannot destroy first AT host instance");
+		/* Destroy the pipe reference so we don't send to a closed pipe */
+		atomic_ptr_set(&ctx->pipe, NULL);
+		return -EPERM;
+	}
 
-void sm_at_host_reset(void)
-{
-	k_mutex_lock(&mutex_mode, K_FOREVER);
-	data_mode.time_limit = 0;
-	data_mode.handler = NULL;
-	at_mode = SM_AT_COMMAND_MODE;
-	inside_quotes = 0;
-	at_cmd_len = 0;
-	echo_len = 0;
-	prev_character = 0;
-	k_mutex_unlock(&mutex_mode);
+	/* Stop timers */
+	k_timer_stop(&ctx->echo_ctx.timer);
+	k_timer_stop(&ctx->inactivity_timer);
+	k_work_cancel_sync(&ctx->rx_work, &sync);
+	k_work_cancel_sync(&ctx->raw_send_scheduled_work, &sync);
+
+	/* Remove from instance list */
+	sys_slist_find_and_remove(&instance_list, &ctx->node);
+
+	LOG_INF("Destroyed AT host instance %p", (void *)ctx);
+
+	/* Free the context */
+	free(ctx->data_rb_buf);
+	free(ctx->at_buf);
+	free(ctx);
+
+	return 0;
 }
 
 static int sm_at_host_init(void)
 {
-	ring_buf_init(&urc_ctx.rb, sizeof(urc_ctx.buf), urc_ctx.buf);
-	k_mutex_init(&urc_ctx.mutex);
+	struct modem_pipe *pipe = sm_uart_pipe_get();
+	struct sm_at_host_ctx *ctx;
+	int err;
 
-	sm_at_host_reset();
+	if (!pipe) {
+		LOG_ERR("No UART pipe available for AT host");
+		return -ENODEV;
+	}
 
-	k_work_init(&raw_send_scheduled_work, raw_send_scheduled);
+	ctx = sm_at_host_create(pipe);
+	if (!ctx) {
+		LOG_ERR("Failed to create AT host context");
+		return -ENOMEM;
+	}
 
+	/* Open the pipe */
+	err = modem_pipe_open(pipe, K_FOREVER);
+	if (err) {
+		LOG_ERR("Failed to open AT pipe: %d", err);
+		modem_pipe_release(pipe);
+		sm_at_host_destroy(ctx);
+		return err;
+	}
+
+	LOG_INF("at_host init done");
 	return 0;
 }
 SYS_INIT(sm_at_host_init, APPLICATION, 0);
 
 void sm_at_host_uninit(void)
 {
-	k_timer_stop(&echo_ctx.timer);
-
-	k_mutex_lock(&mutex_mode, K_FOREVER);
-	if (at_mode == SM_DATA_MODE) {
-		k_timer_stop(&inactivity_timer);
-	}
-	data_mode.handler = NULL;
-	k_mutex_unlock(&mutex_mode);
-
-	at_host_power_off(true);
-
-	LOG_DBG("at_host uninit done");
-}
-
-int sm_at_host_bootloader_init(void)
-{
-	int err;
-
-	ring_buf_init(&urc_ctx.rb, sizeof(urc_ctx.buf), urc_ctx.buf);
-	k_mutex_init(&urc_ctx.mutex);
-
-	k_mutex_lock(&mutex_mode, K_FOREVER);
-	data_mode.time_limit = 0;
-	data_mode.handler = NULL;
-	at_mode = SM_AT_COMMAND_MODE;
-	k_mutex_unlock(&mutex_mode);
-
-	k_work_init(&raw_send_scheduled_work, raw_send_scheduled);
-
-	err = sm_uart_handler_enable();
-	if (err) {
-		return err;
-	}
-
-	LOG_INF("at_host bootloader init done");
-	return 0;
+	/* TODO: implement this */
+	LOG_ERR("at_host uninit not yet implemented");
 }
 
 SM_AT_CMD_CUSTOM(xdatactrl, "AT#XDATACTRL", handle_at_datactrl);
-STATIC int handle_at_datactrl(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
-			      uint32_t)
+STATIC int handle_at_datactrl(enum at_parser_cmd_type cmd_type, struct at_parser *parser, uint32_t)
 {
 	int ret = 0;
 	uint16_t min_time_limit = get_min_data_mode_idle_timeout_ms();
 	uint16_t time_limit;
+	struct sm_at_host_ctx *ctx = sm_at_host_get_current();
 
 	switch (cmd_type) {
 	case AT_PARSER_CMD_TYPE_SET:
@@ -1297,11 +1932,11 @@ STATIC int handle_at_datactrl(enum at_parser_cmd_type cmd_type, struct at_parser
 			LOG_ERR("Invalid time_limit: %d, min: %d", time_limit, min_time_limit);
 			return -EINVAL;
 		}
-		data_mode.time_limit = time_limit;
+		ctx->data_mode.time_limit = time_limit;
 		break;
 
 	case AT_PARSER_CMD_TYPE_READ:
-		rsp_send("\r\n#XDATACTRL: %d,%d\r\n", data_mode.time_limit, min_time_limit);
+		rsp_send("\r\n#XDATACTRL: %d,%d\r\n", ctx->data_mode.time_limit, min_time_limit);
 		break;
 
 	case AT_PARSER_CMD_TYPE_TEST:

@@ -33,6 +33,7 @@ bool sm_fwd_cgev_notifs;
 
 static struct net_if *ppp_iface;
 static bool sm_ppp_auto_start;
+static bool sm_ppp_keep_pipe_attached;
 static uint8_t ppp_data_buf[1500];
 static struct sockaddr_ll ppp_zephyr_dst_addr;
 
@@ -309,15 +310,6 @@ static void ppp_retrieve_pdn_info(struct ppp_context *const ctx)
 	LOG_DBG("MTU set to %u.", mtu);
 }
 
-static int drop_at_write(const uint8_t *data, size_t len, bool urc)
-{
-	ARG_UNUSED(urc);
-	LOG_DBG("Drop AT: '%.*s'", len, data);
-
-	/* Drop all data */
-	return len;
-}
-
 static int ppp_start(void)
 {
 	int ret;
@@ -352,28 +344,21 @@ static int ppp_start(void)
 	}
 
 	send_status_notification();
+	if (!ppp_pipe) {
+		struct sm_at_host_ctx *ctx = sm_at_host_get_current();
+		struct modem_pipe *pipe = ctx ? sm_at_host_get_pipe(ctx) : NULL;
 
-	if (sm_cmux_is_started()) {
-		ppp_pipe = sm_cmux_reserve(CMUX_PPP_CHANNEL);
-		modem_ppp_attach(&ppp_module, ppp_pipe);
-		/* The pipe opening is managed by CMUX. */
-	} else {
-		/* Wait for TX buffer to drain */
-		k_sleep(K_MSEC(10));
-		ppp_pipe = sm_uart_pipe_init(&drop_at_write);
-		if (!ppp_pipe) {
-			ret = -ENOSYS;
-			goto error;
-		}
-
-		modem_ppp_attach(&ppp_module, ppp_pipe);
-		ret = modem_pipe_open(ppp_pipe, K_SECONDS(CONFIG_SM_MODEM_PIPE_TIMEOUT));
-		if (ret) {
-			LOG_ERR("Failed to open PPP pipe (%d).", ret);
+		if (!ctx || !pipe) {
+			LOG_ERR("No pipe available for PPP.");
 			ppp_start_failure();
+			ret = -ENODEV;
 			goto error;
 		}
+		ppp_pipe = pipe;
+		sm_at_host_release(ctx);
 	}
+
+	modem_ppp_attach(&ppp_module, ppp_pipe);
 
 	net_if_carrier_on(ppp_iface);
 
@@ -384,10 +369,9 @@ static int ppp_start(void)
 error:
 	ppp_state = PPP_STATE_STOPPED;
 
-	if (!sm_cmux_is_started() && ppp_pipe) {
-		modem_pipe_close(ppp_pipe, K_SECONDS(CONFIG_SM_MODEM_PIPE_TIMEOUT));
+	if (ppp_pipe) {
 		modem_ppp_release(&ppp_module);
-		sm_uart_handler_enable();
+		sm_at_host_attach(ppp_pipe);
 	}
 	ppp_pipe = NULL;
 	return ret;
@@ -400,17 +384,27 @@ bool sm_ppp_is_stopped(void)
 
 static int ppp_stop(enum ppp_reason reason)
 {
+	bool restarting = false;
+
 	if (ppp_state == PPP_STATE_STOPPED) {
 		LOG_INF("PPP already stopped");
 		return 0;
 	}
+
 	ppp_state = PPP_STATE_STOPPING;
 
-	/* When CMUX is used, PPP connection may recover on the same pipe,
-	 * on other cases, it will be closed and pipe is returned to AT mode.
-	 */
-	if (reason == PPP_REASON_PEER_DISCONNECTED || reason == PPP_REASON_CMD ||
-	    !sm_cmux_is_started()) {
+	if (sm_ppp_keep_pipe_attached) {
+		switch (reason) {
+		case PPP_REASON_NETWORK:
+		case PPP_REASON_ERROR:
+			restarting = true;
+			break;
+		default:
+			break;
+		}
+	}
+
+	if (!restarting) {
 		at_monitor_pause(&sm_ppp_on_cgev);
 	}
 
@@ -425,16 +419,10 @@ static int ppp_stop(enum ppp_reason reason)
 
 	modem_ppp_release(&ppp_module);
 
-	if (sm_cmux_is_started()) {
-		sm_cmux_release(CMUX_PPP_CHANNEL);
-	} else {
-		modem_pipe_close(ppp_pipe, K_SECONDS(CONFIG_SM_MODEM_PIPE_TIMEOUT));
-		ret = sm_uart_handler_enable();
-
-		if (ret) {
-			LOG_ERR("Failed to enable PPP UART handler (%d).", ret);
-		}
-		LOG_INF("Returned to AT command mode.");
+	if (!sm_ppp_keep_pipe_attached) {
+		/* Return the pipe back to AT host */
+		sm_at_host_attach(ppp_pipe);
+		ppp_pipe = NULL;
 	}
 
 	net_if_carrier_off(ppp_iface);
@@ -442,7 +430,6 @@ static int ppp_stop(enum ppp_reason reason)
 	close_ppp_sockets();
 
 	ppp_state = PPP_STATE_STOPPED;
-	ppp_pipe = NULL;
 	send_status_notification();
 
 	return 0;
@@ -845,4 +832,19 @@ static void ppp_data_passing_thread(void*, void*, void*)
 			}
 		}
 	}
+}
+
+void sm_ppp_attach(struct modem_pipe *pipe)
+{
+	if (pipe) {
+		modem_pipe_release(pipe);
+	}
+	ppp_pipe = pipe;
+	sm_ppp_keep_pipe_attached = true;
+}
+
+void sm_ppp_detach(void)
+{
+	ppp_pipe = NULL;
+	sm_ppp_keep_pipe_attached = false;
 }
