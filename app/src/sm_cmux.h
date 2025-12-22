@@ -21,6 +21,9 @@ enum cmux_channel {
 #if defined(CONFIG_SM_PPP)
 	CMUX_PPP_CHANNEL,
 #endif
+#if defined(CONFIG_NRF_MODEM_LIB_TRACE_BACKEND_CMUX)
+	CMUX_COREDUMP_CHANNEL,
+#endif
 #if defined(CONFIG_SM_GNSS_OUTPUT_NMEA_ON_CMUX_CHANNEL)
 	CMUX_GNSS_CHANNEL,
 #endif
@@ -28,5 +31,5 @@ enum cmux_channel {
 };
 struct modem_pipe *sm_cmux_reserve(enum cmux_channel);
 void sm_cmux_release(enum cmux_channel);
-
+bool sm_cmux_is_started(void);
 #endif
