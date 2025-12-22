@@ -792,8 +792,9 @@ static void ppp_data_passing_thread(void*, void*, void*)
 				continue;
 			}
 
-			const ssize_t len =
-				zsock_recv(fds[src].fd, ppp_data_buf, mtu, ZSOCK_MSG_DONTWAIT);
+			/* Networks can send packets larger than the MTU, so use the buffer size. */
+			const ssize_t len = zsock_recv(fds[src].fd, ppp_data_buf,
+						       sizeof(ppp_data_buf), ZSOCK_MSG_DONTWAIT);
 
 			if (len <= 0) {
 				if (len != -1 || (errno != EAGAIN && errno != EWOULDBLOCK)) {
