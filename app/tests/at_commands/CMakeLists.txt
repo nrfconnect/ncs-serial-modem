@@ -61,9 +61,11 @@ target_sources(app PRIVATE
   ../stubs/control_pin_stubs.c
   ../stubs/pm_stubs.c
   ../stubs/at_cmd_custom_stubs.c
+  ../stubs/sm_workq.c
   ../../src/sm_util.c
   ../../src/sm_at_commands.c
   ../../src/sm_at_host.c
+  ${ZEPHYR_BASE}/subsys/modem/modem_pipe.c
 )
 
 # Include directories - override headers first
@@ -72,11 +74,7 @@ set(includes
   "${PROJECT_SOURCE_DIR}/../../src"
   "${ZEPHYR_BASE}/../nrfxlib/nrf_modem/include"
   "${ZEPHYR_BASE}/include/"
+  "${PROJECT_SOURCE_DIR}/../stubs"
 )
 
 target_include_directories(app PRIVATE ${includes})
-
-# Link with wrap for sm_at_send to capture responses
-target_link_libraries(app PRIVATE
-  "-Wl,--wrap=sm_at_send"
-)

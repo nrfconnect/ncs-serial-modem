@@ -144,17 +144,7 @@ static int bootloader_mode_init(void)
 	}
 	LOG_INF("Bootloader mode initiated successfully");
 
-	ret = sm_at_host_bootloader_init();
-	if (ret) {
-		LOG_ERR("Failed to init at_host: %d", ret);
-		return ret;
-	}
-
-	ret = sm_at_send_str("Bootloader mode ready\r\n");
-	if (ret) {
-		LOG_ERR("Failed to send bootloader mode ready string: %d", ret);
-		return ret;
-	}
+	urc_send("Bootloader mode ready\r\n");
 
 	sm_bootloader_mode_enabled = true;
 
@@ -257,12 +247,6 @@ static int sm_main(void)
 		}
 	}
 
-	ret = sm_uart_handler_enable();
-	if (ret) {
-		LOG_ERR("Failed to enable UART handler (%d).", ret);
-		return ret;
-	}
-
 #if defined(CONFIG_SM_FULL_FOTA)
 	if (sm_modem_full_fota) {
 		sm_finish_modem_full_fota();
@@ -287,13 +271,9 @@ static int sm_main(void)
 	check_app_fota_status();
 
 	if (sm_init_failed) {
-		ret = sm_at_send_str(SM_SYNC_ERR_STR);
+		urc_send(SM_SYNC_ERR_STR);
 	} else {
-		ret = sm_at_send_str(SM_SYNC_STR);
-	}
-
-	if (ret) {
-		return ret;
+		urc_send(SM_SYNC_STR);
 	}
 
 	/* This is here and not earlier because in case of firmware

@@ -250,6 +250,15 @@ config SM_NRF_CLOUD
 	default y
 	select EXPERIMENTAL
 
+if SM_NRF_CLOUD
+config HEAP_MEM_POOL_ADD_SIZE_SM_NRF_CLOUD
+	int "Additional heap memory pool size for nRF Cloud support"
+	default 8192
+	help
+	  Some libraries used by nRF Cloud use System Heap (k_malloc() / k_free()) for
+	  dynamic memory allocation.
+endif # SM_NRF_CLOUD
+
 config SM_MQTTC
 	bool "MQTT client support"
 	default y
