@@ -408,15 +408,11 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 	return err;
 }
 
-int sm_at_fota_init(void)
+static int sm_at_fota_init(void)
 {
 	return fota_download_init(fota_dl_handler);
 }
-
-int sm_at_fota_uninit(void)
-{
-	return 0;
-}
+SYS_INIT(sm_at_fota_init, APPLICATION, 0);
 
 void sm_fota_init_state(void)
 {

@@ -302,7 +302,7 @@ static bool cmux_is_started(void)
 	return (cmux.uart_pipe != NULL);
 }
 
-void sm_cmux_init(void)
+static int sm_cmux_init(void)
 {
 	const struct modem_cmux_config cmux_config = {
 		.callback = cmux_event_handler,
@@ -327,9 +327,11 @@ void sm_cmux_init(void)
 
 	cmux.at_channel = 0;
 	cmux.requested_at_channel = UINT_MAX;
+	return 0;
 }
+SYS_INIT(sm_cmux_init, APPLICATION, 0);
 
-void sm_cmux_uninit(void)
+static void sm_cmux_uninit(void)
 {
 	if (cmux_is_started()) {
 		modem_cmux_release(&cmux.instance);

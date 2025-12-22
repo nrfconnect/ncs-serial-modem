@@ -1231,16 +1231,6 @@ int sm_at_host_init(void)
 		return err;
 	}
 
-	err = sm_at_init();
-	if (err) {
-		/* Send "INIT ERROR" string to indicate that AT host init failed */
-		err = sm_at_send_str(SM_SYNC_ERR_STR);
-		if (err) {
-			return err;
-		}
-		return -EFAULT;
-	}
-
 	if (!IS_ENABLED(CONFIG_SM_SKIP_READY_MSG)) {
 		/* Send Ready string to indicate that AT host is ready */
 		err = sm_at_send_str(SM_SYNC_STR);

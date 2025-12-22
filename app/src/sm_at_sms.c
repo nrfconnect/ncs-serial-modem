@@ -22,7 +22,7 @@ enum sm_sms_operation {
 	AT_SMS_SEND
 };
 
-static int sms_handle;
+static int sms_handle = -1;
 
 static void sms_callback(struct sms_data *const data, void *context)
 {
@@ -215,15 +215,6 @@ static int handle_at_sms(enum at_parser_cmd_type cmd_type, struct at_parser *par
 	}
 
 	return err;
-}
-
-/**@brief API to initialize SMS AT commands handler
- */
-int sm_at_sms_init(void)
-{
-	sms_handle = -1;
-
-	return 0;
 }
 
 /**@brief API to uninitialize SMS AT commands handler
