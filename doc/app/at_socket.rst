@@ -32,16 +32,16 @@ Syntax
 * The ``<op>`` parameter can accept one of the following values:
 
   * ``1`` - Open a socket for IP protocol family version 4.
-    Protocol family is ignored with ``<type>`` parameter value ``3``.
+    The protocol family is ignored with the ``<type>`` parameter value ``3``.
   * ``2`` - Open a socket for IP protocol family version 6.
-    Protocol family is ignored with ``<type>`` parameter value ``3``.
+    The protocol family is ignored with the ``<type>`` parameter value ``3``.
 
 * The ``<type>`` parameter can accept one of the following values:
 
   * ``1`` - Set ``SOCK_STREAM`` for the stream socket type using the TCP protocol.
   * ``2`` - Set ``SOCK_DGRAM`` for the datagram socket type using the UDP protocol.
   * ``3`` - Set ``SOCK_RAW`` for the raw socket type using a generic packet protocol.
-    The ``<op>`` parameter can be either ``1`` or ``2`` as raw socket ignores the protocol family.
+    The ``<op>`` parameter can be either ``1`` or ``2``, as the raw socket ignores the protocol family.
 
 * The ``<role>`` parameter can accept one of the following values:
 
@@ -211,8 +211,11 @@ Syntax
 
 * The ``<sec_tag>`` parameter is an integer.
   It indicates to the modem the credential of the security tag to be used for establishing a secure connection.
-  It is associated with a credential, that is, a certificate or PSK. The credential should be stored on the modem side beforehand.
-  Note that when ``<role>`` has a value of ``1``, ``<sec_tag>`` is not supported.
+  It is associated with a credential, that is, a certificate or PSK.
+  The credential must be stored on the modem side beforehand.
+
+  .. note::
+     When ``<role>`` has a value of ``1``, ``<sec_tag>`` is not supported.
 
 * The ``<peer_verify>`` parameter can accept one of the following values:
 
@@ -369,7 +372,7 @@ Response syntax
 * The ``<handle>`` value is an integer indicating the handle of the closed socket.
 
 * The ``<result>`` value indicates the result of closing the socket.
-  When ``0``, the socket closed successfully.
+  When ``0``, the socket was closed successfully.
 
 When closing all sockets (no handle parameter provided), multiple responses will be sent, one for each socket that was closed.
 
@@ -430,65 +433,65 @@ Syntax
 
 * The ``<name>`` parameter can accept one of the following values:
 
-  * ``2`` - :c:macro:`AT_SO_REUSEADDR` (set-only).
+  * ``2`` - ``AT_SO_REUSEADDR`` (set-only).
 
     * ``<value>`` is an integer that indicates whether the reuse of local addresses is enabled.
       It is ``0`` for disabled or ``1`` for enabled.
 
-  * ``20`` - :c:macro:`AT_SO_RCVTIMEO`.
+  * ``20`` - ``AT_SO_RCVTIMEO``.
 
     * ``<value>`` is an integer that indicates the receive timeout in seconds.
 
-  * ``21`` - :c:macro:`AT_SO_SNDTIMEO`.
+  * ``21`` - ``AT_SO_SNDTIMEO``.
 
     * ``<value>`` is an integer that indicates the send timeout in seconds.
 
-  * ``30`` - :c:macro:`AT_SO_SILENCE_ALL`.
+  * ``30`` - ``AT_SO_SILENCE_ALL``.
 
     * ``<value>`` is an integer that indicates whether ICMP echo replies for IPv4 and IPv6 are disabled.
       It is ``0`` for allowing ICMP echo replies or ``1`` for disabling them.
 
-  * ``31`` - :c:macro:`AT_SO_IP_ECHO_REPLY`.
+  * ``31`` - ``AT_SO_IP_ECHO_REPLY``.
 
     * ``<value>`` is an integer that indicates whether ICMP echo replies for IPv4 are enabled.
       It is ``0`` for disabled or ``1`` for enabled.
 
-  * ``32`` - :c:macro:`AT_SO_IPV6_ECHO_REPLY`.
+  * ``32`` - ``AT_SO_IPV6_ECHO_REPLY``.
 
     * ``<value>`` is an integer that indicates whether ICMP echo replies for IPv6 are enabled.
       It is ``0`` for disabled or ``1`` for enabled.
 
-  * ``40`` - :c:macro:`AT_SO_BINDTOPDN` (set-only).
+  * ``40`` - ``AT_SO_BINDTOPDN`` (set-only).
 
     * ``<value>`` is an integer that indicates the packet data network ID to bind to.
 
-  * ``61`` - :c:macro:`AT_SO_RAI` (set-only).
+  * ``61`` - ``AT_SO_RAI`` (set-only).
     Release Assistance Indication (RAI).
 
     * ``<value>`` The option accepts an integer, indicating the type of RAI.
       Accepted values for the option are:
 
-      * ``1`` - :c:macro:`RAI_NO_DATA`.
+      * ``1`` - ``RAI_NO_DATA``.
         Indicates that the application does not intend to send more data.
         This socket option applies immediately and lets the modem exit connected mode more quickly.
 
-      * ``2`` - :c:macro:`RAI_LAST`.
+      * ``2`` - ``RAI_LAST``.
         Indicates that the application does not intend to send more data after the next call to :c:func:`send` or :c:func:`sendto`.
         This lets the modem exit connected mode more quickly after sending the data.
 
-      * ``3`` - :c:macro:`RAI_ONE_RESP`.
+      * ``3`` - ``RAI_ONE_RESP``.
         Indicates that the application is expecting to receive just one data packet after the next call to :c:func:`send` or :c:func:`sendto`.
         This lets the modem exit connected mode more quickly after having received the data.
 
-      * ``4`` - :c:macro:`RAI_ONGOING`.
+      * ``4`` - ``RAI_ONGOING``.
         Indicates that the application is expecting to receive just one data packet after the next call to :c:func:`send` or :c:func:`sendto`.
         This lets the modem exit connected mode more quickly after having received the data.
 
-      * ``5`` - :c:macro:`RAI_WAIT_MORE`.
+      * ``5`` - ``RAI_WAIT_MORE``.
         Indicates that the socket is in active use by a server application.
         This lets the modem stay in connected mode longer.
 
-  * ``62`` - :c:macro:`AT_SO_IPV6_DELAYED_ADDR_REFRESH`.
+  * ``62`` - ``AT_SO_IPV6_DELAYED_ADDR_REFRESH``.
 
     * ``<value>`` is an integer that indicates whether delayed IPv6 address refresh is enabled.
       It is ``0`` for disabled or ``1`` for enabled.
@@ -570,61 +573,61 @@ Syntax
 
 * The ``<name>`` parameter can accept one of the following values:
 
-  * ``2`` - :c:macro:`AT_TLS_HOSTNAME`.
+  * ``2`` - ``AT_TLS_HOSTNAME``
 
     * ``<value>`` is a string that indicates the hostname to check against during TLS handshakes.
       It can be ``NULL`` to disable hostname verification.
 
-  * ``4`` - :c:macro:`AT_TLS_CIPHERSUITE_USED` (get-only).
-    The TLS cipher suite chosen during the TLS handshake.
-    This option is only supported with modem firmware 2.0.0 and newer.
+  * ``4`` - ``AT_TLS_CIPHERSUITE_USED`` (get-only).
+    The TLS cipher suite is chosen during the TLS handshake.
+    This option is only supported with modem firmware v2.0.0 and newer.
 
-  * ``5`` - :c:macro:`AT_TLS_PEER_VERIFY`.
+  * ``5`` - ``AT_TLS_PEER_VERIFY``.
 
-    * ``<value>`` is an integer that indicates what peer verification level should be used.
-      It is ``0`` for none, ``1`` for optional or ``2`` for required.
+    * ``<value>`` is an integer that indicates the peer verification level.
+      It is ``0`` for none, ``1`` for optional, or ``2`` for required.
 
-  * ``12`` - :c:macro:`AT_TLS_SESSION_CACHE`.
+  * ``12`` - ``AT_TLS_SESSION_CACHE``.
 
-    * ``<value>`` is an integer that indicates whether TLS session caching should be used.
+    * ``<value>`` is an integer that indicates whether to use TLS session caching.
       It is ``0`` for disabled or ``1`` for enabled.
 
-  * ``13`` - :c:macro:`AT_TLS_SESSION_CACHE_PURGE` (set-only).
-    Indicates that the TLS session cache should be deleted.
+  * ``13`` - ``AT_TLS_SESSION_CACHE_PURGE`` (set-only).
+    Indicates that the TLS session cache must be deleted.
 
     * ``<value>`` can be any integer value.
 
-  * ``14`` - :c:macro:`AT_TLS_DTLS_CID` (set-only).
+  * ``14`` - ``AT_TLS_DTLS_CID`` (set-only).
 
     * ``<value>`` is an integer that indicates the DTLS connection identifier setting.
       It can be one of the following values:
 
-      * ``0`` - :c:macro:`TLS_DTLS_CID_DISABLED`.
-      * ``1`` - :c:macro:`TLS_DTLS_CID_SUPPORTED`.
-      * ``2`` - :c:macro:`TLS_DTLS_CID_ENABLED`.
+      * ``0`` - ``TLS_DTLS_CID_DISABLED``.
+      * ``1`` - ``TLS_DTLS_CID_SUPPORTED``.
+      * ``2`` - ``TLS_DTLS_CID_ENABLED``.
 
-    This option is only supported with modem firmware 1.3.5 and newer.
+    This option is only supported with modem firmware v1.3.5 and newer.
     See `NRF_SO_SEC_DTLS_CID <nrfxlib_dtls_cid_settings_>`_ for more details regarding the allowed values.
 
-  * ``15`` - :c:macro:`AT_TLS_DTLS_CID_STATUS` (get-only).
+  * ``15`` - ``AT_TLS_DTLS_CID_STATUS`` (get-only).
     It is the DTLS connection identifier status.
     It can be retrieved after the DTLS handshake.
     This option is only supported with modem firmware 1.3.5 and newer.
     See `NRF_SO_SEC_DTLS_CID_STATUS <nrfxlib_dtls_cid_status_>`_ for more details regarding the returned values.
 
-  * ``18`` - :c:macro:`AT_TLS_DTLS_HANDSHAKE_TIMEO`.
+  * ``18`` - ``AT_TLS_DTLS_HANDSHAKE_TIMEO``.
 
     * ``<value>`` is an integer that indicates the DTLS handshake timeout in seconds.
       It can be one of the following values: ``1``, ``3``, ``7``, ``15``, ``31``, ``63``, ``123``.
 
-  * ``22`` - :c:macro:`AT_TLS_DTLS_FRAG_EXT`.
+  * ``22`` - ``AT_TLS_DTLS_FRAG_EXT``.
 
     * ``<value>`` is an integer that indicates the use of the DTLS fragmentation extension specified in RFC 6066.
       It can be one of the following values:
 
-      * ``0`` - :c:macro:`DTLS_FRAG_EXT_DISABLED`.
-      * ``1`` - :c:macro:`DTLS_FRAG_EXT_512_ENABLED`.
-      * ``2`` - :c:macro:`DTLS_FRAG_EXT_1024_ENABLED`.
+      * ``0`` - ``DTLS_FRAG_EXT_DISABLED``.
+      * ``1`` - ``DTLS_FRAG_EXT_512_ENABLED``.
+      * ``2`` - ``DTLS_FRAG_EXT_1024_ENABLED``.
 
       This is only supported by the following modem firmware:
 
@@ -681,7 +684,7 @@ Socket binding #XBIND
 
 The ``#XBIND`` command allows you to bind a socket with a local port.
 
-This command can be used with TCP and UDP and is needed for incoming UDP data, where the remote end targets a particular port.
+You can use this command with TCP and UDP, and it is needed for incoming UDP data, where the remote end targets a particular port.
 
 Set command
 -----------
@@ -808,7 +811,7 @@ Syntax
 
 ::
 
-   #XSEND=<handle>,<mode>,<flags>,<data> when ``<mode>``is ``0`` or ``1``
+   #XSEND=<handle>,<mode>,<flags>,<data> when ``<mode>`` is ``0`` or ``1``
 
    #XSEND=<handle>,<mode>,<flags>[,<data_len>] when ``<mode>`` is ``2``
 
@@ -816,19 +819,23 @@ Syntax
 
 * The ``<mode>`` parameter specifies the data sending mode:
 
-  * ``0`` - String mode. Data is provided directly in the command as the ``<data>`` parameter.
-  * ``1`` - Hex string mode. Data is provided as a hexadecimal string in the ``<data>`` parameter.
-  * ``2`` - Data mode. |SM| enters ``sm_data_mode`` for data input.
+  * ``0`` - String mode.
+    Data is provided directly in the command as the ``<data>`` parameter.
+  * ``1`` - Hex string mode.
+    Data is provided as a hexadecimal string in the ``<data>`` parameter.
+  * ``2`` - Data mode.
+    |SM| enters ``sm_data_mode`` for data input.
 
 * The ``<flags>`` parameter sets the sending behavior.
-  It can be set to one of the following values:
+  You can set it to one of the following values:
 
-  * ``0`` - No flags set. The request is complete when the data is pushed to the modem buffer.
-  * ``512`` - Blocks send operation until the request is acknowledged by network.
-    The request will not return until the data is pushed to the network, or acknowledged by network (for TCP), or the timeout given by the AT_SO_SNDTIMEO socket option, is reached.
+  * ``0`` - No flags set.
+    The request is complete when the data is pushed to the modem buffer.
+  * ``512`` - Blocks send operation until the request is acknowledged by the network.
+    The request will not return until the data is pushed to the network, or acknowledged by the network (for TCP), or the timeout given by the ``AT_SO_SNDTIMEO`` socket option is reached.
     Valid timeout values are 1 to 600 seconds.
-  * ``8192`` - Send unsolicited ``#XSENDNTF`` notification when the request is acknowledged by network.
-    Unsolicited notification will be sent when the data is pushed to the network, or acknowledged by network (for TCP), or the timeout given by the AT_SO_SNDTIMEO socket option, is reached.
+  * ``8192`` - Send unsolicited ``#XSENDNTF`` notification when the request is acknowledged by the network.
+    Unsolicited notification will be sent when the data is pushed to the network, or acknowledged by the network (for TCP), or the timeout given by the ``AT_SO_SNDTIMEO`` socket option is reached.
     Valid timeout values are 1 to 600 seconds.
     Further sends for the socket are blocked until the unsolicited notification is received.
 
@@ -841,20 +848,20 @@ Syntax
 
 * The ``<data_len>`` parameter is optional and only used when ``<mode>`` is ``2`` (data mode).
   It sets the number of bytes to send in data mode.
-  When required number of bytes are sent, the data mode is exited.
+  When the required number of bytes are sent, the data mode is exited.
   The termination command :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` is not used in this case.
 
 .. note::
 
-   UDP packets that exceed the Maximum Transmission Unit (MTU) of any network segment along their path may be dropped or fragmented, increasing the risk of packet loss.
+   UDP packets that exceed the Maximum Transmission Unit (MTU) of any network segment along their path might be dropped or fragmented, increasing the risk of packet loss.
    Ethernet networks have an MTU of 1500 bytes, which allows a maximum UDP payload of 1472 bytes for IPv4 and 1452 bytes for IPv6.
    With DTLS sockets, the usable payload size is further reduced due to encryption overhead.
 
-   The cellular network MTU can be queried with the ``AT+CGCONTRDP`` command, but some networks may still drop packets smaller than the reported MTU.
+   The cellular network MTU can be queried with the ``AT+CGCONTRDP`` command, but some networks might still drop packets smaller than the reported MTU.
 
-   A UDP payload size of 1200 bytes is commonly recommended, especially for IPv6, as it ensures the total packet size remains below the IPv6 minimum MTU of 1280 bytes, after accounting for headers and DTLS overhead.
+   A UDP payload size of 1200 bytes is commonly recommended, especially for IPv6, as it ensures the total packet size remains below the IPv6 minimum MTU of 1280 bytes after accounting for headers and DTLS overhead.
    Keeping UDP packet sizes well below the theoretical maximum increases the likelihood of successful transmission.
-   Even 1024 bytes could be used as a safe size for UDP packets.
+   You can even use 1024 bytes as a safe size for UDP packets.
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -885,7 +892,7 @@ For network acknowledged sends (when the ``8192`` flag is used), an unsolicited 
 
 * The ``<handle>`` value is an integer indicating the socket handle.
 
-* The ``<status>`` value is an integer indicating the status of the network acknowledged send.
+* The ``<status>`` value is an integer indicating the status of the send acknowledged by the network.
   It is ``0`` for success or ``-1`` for failure.
 
 * The ``<size>`` value is an integer indicating the size of the data sent.
@@ -950,7 +957,7 @@ Syntax
   * ``1`` - Hex string mode. Data is received as a hexadecimal string representation.
 
 * The ``<flags>`` parameter sets the receiving behavior based on the BSD socket definition.
-  It can be set to one of the following values:
+  You can set it to one of the following values:
 
   * ``0`` - No flags set.
   * ``2`` - Read data without removing it from the socket input queue.
@@ -1037,7 +1044,7 @@ Syntax
   * ``2`` - Data mode. |SM| enters ``sm_data_mode`` for data input.
 
 * The ``<flags>`` parameter sets the sending behavior.
-  It can be set to one of the following values:
+  You can set it to one of the following values:
 
   * ``0`` - No flags set. The request is complete when the data is pushed to the modem buffer.
   * ``512`` - Blocks send operation until the request is acknowledged by network.
@@ -1101,7 +1108,7 @@ Response syntax
   * ``1`` - Indicates that an unsolicited notification will be sent when the network acknowledged send is completed.
 
 * The ``<size>`` value is an integer.
-  It represents the actual number of bytes that has been sent.
+  It represents the actual number of bytes that have been sent.
 
 Unsolicited notification
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1114,7 +1121,7 @@ For network acknowledged sends (when the ``8192`` flag is used), an unsolicited 
 
 * The ``<handle>`` value is an integer indicating the socket handle.
 
-* The ``<status>`` value is an integer indicating the status of the network acknowledged send.
+* The ``<status>`` value is an integer indicating the status of the send acknowledged by the network.
   It is ``0`` for success or ``-1`` for failure.
 
 * The ``<size>`` value is an integer indicating the size of the data sent.
@@ -1169,11 +1176,13 @@ Syntax
 
 * The ``<mode>`` parameter specifies the receive mode:
 
-  * ``0`` - Binary mode. Data is received as binary data.
-  * ``1`` - Hex string mode. Data is received as a hexadecimal string representation.
+  * ``0`` - Binary mode.
+    Data is received as binary data.
+  * ``1`` - Hex string mode.
+    Data is received as a hexadecimal string representation.
 
 * The ``<flags>`` parameter sets the receiving behavior based on the BSD socket definition.
-  It can be set to one of the following values:
+  You can set it to one of the following values:
 
   * ``0`` - No flags set.
   * ``2`` - Read data without removing it from the socket input queue.
@@ -1200,7 +1209,7 @@ Response syntax
 * The ``<mode>`` value is an integer indicating the receive mode used.
 
 * The ``<size>`` value is an integer that represents the actual number of bytes received.
-  In case of hex string mode, it represents the number of bytes before conversion to hexadecimal format.
+  In the case of hex string mode, it represents the number of bytes before conversion to hexadecimal format.
 
 * The ``<ip_addr>`` value is a string that represents the IPv4 or IPv6 address of the remote peer.
 
@@ -1252,17 +1261,17 @@ Syntax
 
    #XAPOLL=[<handle>],<op>,[<events>]
 
-* The ``<handle>`` value sets the socket handle to poll.
+* The ``<handle>`` value is an integer that sets the socket handle to poll (optional).
   Handles are sent in the ``AT#XSOCKET`` or ``AT#XSSOCKET`` responses.
-  Handles can also be obtained with ``AT#XSOCKET?`` or ``AT#XSSOCKET?`` commands.
-  If handle is omitted, the operation applies to all open sockets and to any new sockets that are created.
+  Handles can also be obtained using the ``AT#XSOCKET?`` or ``AT#XSSOCKET?`` command.
+  If the handle is omitted, the operation applies to all open sockets and to any new sockets that are created.
 
 * The ``<op>`` value can accept one of the following values:
 
   * ``0`` - Stop asynchronous polling.
   * ``1`` - Start asynchronous polling.
 
-* The ``<events>`` value is an integer, which is interpreted as a bit field.
+* The ``<events>`` value is an optional integer, which is interpreted as a bit field.
   It represents the events to poll for, which can be a combination of ``POLLIN`` and ``POLLOUT``.
   Permanent error and closure events (``POLLERR``, ``POLLHUP``, and ``POLLNVAL``) are always polled.
   The value can be any combination of the following values summed up:
@@ -1542,6 +1551,7 @@ Syntax
   * ``0`` - No automatic data reception.
   * ``1`` - Automatic data reception in AT-command mode.
   * ``2`` - Automatic data reception in data mode.
+
 * The ``<hex_format>`` parameter is an integer that specifies the hex format for automatically received data.
   It applies only when automatic data reception is enabled.
   It can be one of the following values:
@@ -1700,6 +1710,7 @@ Response syntax
   * ``0`` - No automatic data reception.
   * ``1`` - Automatic data reception in AT-command mode.
   * ``2`` - Automatic data reception in data mode.
+
 * The ``<hex_format>`` parameter is an integer that specifies the hex format for automatically received data.
   It can be one of the following values:
 
@@ -1791,13 +1802,13 @@ Syntax
    #XGETADDRINFO=<hostname>[,<address_family>]
 
 * The ``<hostname>`` parameter is a string.
-* The ``<address_family>`` parameter is an integer that gives a hint for DNS query on address family.
+* The ``<address_family>`` parameter is an optional integer that gives a hint for DNS query on address family.
 
   * ``0`` means unspecified address family.
   * ``1`` means IPv4 address family.
   * ``2`` means IPv6 address family.
 
-  If ``<address_family>`` is not specified, there will be no hint given for DNS query.
+  If ``<address_family>`` is not specified, there will be no hint given for the DNS query.
 
 Response syntax
 ~~~~~~~~~~~~~~~
