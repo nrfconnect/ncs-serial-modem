@@ -19,13 +19,8 @@
 #include "sm_util.h"
 #include "sm_ctrl_pin.h"
 #include "sm_uart_handler.h"
-#include "sm_defines.h"
 
 LOG_MODULE_REGISTER(sm, CONFIG_SM_LOG_LEVEL);
-
-#define SM_WQ_STACK_SIZE	KB(4)
-#define SM_WQ_PRIORITY		K_LOWEST_APPLICATION_THREAD_PRIO
-static K_THREAD_STACK_DEFINE(sm_wq_stack_area, SM_WQ_STACK_SIZE);
 
 struct k_work_q sm_work_q;
 bool sm_init_failed = false;
@@ -149,10 +144,6 @@ static int bootloader_mode_init(void)
 	}
 	LOG_INF("Bootloader mode initiated successfully");
 
-	k_work_queue_start(&sm_work_q, sm_wq_stack_area,
-		K_THREAD_STACK_SIZEOF(sm_wq_stack_area),
-		SM_WQ_PRIORITY, NULL);
-
 	ret = sm_at_host_bootloader_init();
 	if (ret) {
 		LOG_ERR("Failed to init at_host: %d", ret);
@@ -232,40 +223,19 @@ int lte_auto_connect(void)
 	return err;
 }
 
-int start_execute(void)
+int main(void)
 {
-	int err;
+	static const struct k_work_queue_config cfg = {
+		.name = "sm_work_q",
+		.essential = true,
+	};
 
-	LOG_INF("Serial Modem");
-
-	k_work_queue_start(&sm_work_q, sm_wq_stack_area,
-		   K_THREAD_STACK_SIZEOF(sm_wq_stack_area),
-		   SM_WQ_PRIORITY, NULL);
-
-	if (!IS_ENABLED(CONFIG_SM_SKIP_READY_MSG)) {
-		/* Send Ready string to indicate that AT host is ready */
-		if (sm_init_failed) {
-			err = sm_at_send_str(SM_SYNC_ERR_STR);
-		} else {
-			err = sm_at_send_str(SM_SYNC_STR);
-		}
-
-		if (err) {
-			return err;
-		}
-	}
-
-	/* This is here and not earlier because in case of firmware
-	 * update it will send an AT response so the UART must be up.
-	 */
-	sm_fota_post_process();
-
-	(void)lte_auto_connect();
-
+	k_work_queue_init(&sm_work_q);
+	k_work_queue_run(&sm_work_q, &cfg);
 	return 0;
 }
 
-int main(void)
+static int sm_main(void)
 {
 	int ret;
 
@@ -285,14 +255,14 @@ int main(void)
 				LOG_ERR("Failed to initialize bootloader mode: %d", ret);
 				goto exit_reboot;
 			}
-			goto exit;
+			return ret;
 		}
 	}
 
 	ret = sm_uart_handler_enable();
 	if (ret) {
 		LOG_ERR("Failed to enable UART handler (%d).", ret);
-		goto exit;
+		return ret;
 	}
 
 #if defined(CONFIG_SM_FULL_FOTA)
@@ -307,7 +277,7 @@ int main(void)
 	if (ret) {
 		LOG_ERR("Modem library init failed, err: %d", ret);
 		if (ret != -EAGAIN && ret != -EIO) {
-			goto exit;
+			return ret;
 		} else if (ret == -EIO) {
 			LOG_ERR("Please program full modem firmware with the bootloader or "
 				"external tools");
@@ -325,14 +295,31 @@ int main(void)
 	}
 #endif
 
-	ret = start_execute();
-exit:
-	if (ret) {
-		LOG_ERR("Failed to start SM (%d). It's not operational!!!", ret);
+	if (!IS_ENABLED(CONFIG_SM_SKIP_READY_MSG)) {
+		if (sm_init_failed) {
+			ret = sm_at_send_str(SM_SYNC_ERR_STR);
+		} else {
+			ret = sm_at_send_str(SM_SYNC_STR);
+		}
+
+		if (ret) {
+			return ret;
+		}
 	}
+
+	/* This is here and not earlier because in case of firmware
+	 * update it will send an AT response so the UART must be up.
+	 */
+	sm_fota_post_process();
+
+	(void)lte_auto_connect();
+
+	LOG_INF("Serial Modem");
+
 	return ret;
 
 exit_reboot:
 	LOG_PANIC();
 	sys_reboot(SYS_REBOOT_COLD);
 }
+SYS_INIT(sm_main, APPLICATION, 100);
