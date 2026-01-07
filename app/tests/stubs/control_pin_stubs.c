@@ -22,3 +22,15 @@ void sm_ctrl_pin_enter_sleep(void)
 {
 	/* Stub - no-op for tests */
 }
+
+/* Stub for sm_ctrl_pin_ready */
+void sm_ctrl_pin_ready(void)
+{
+	/* Stub - no-op for tests */
+}
+
+/* Stub for sm_ctrl_pin_enter_shutdown */
+void sm_ctrl_pin_enter_shutdown(void)
+{
+	/* Stub - no-op for tests */
+}
