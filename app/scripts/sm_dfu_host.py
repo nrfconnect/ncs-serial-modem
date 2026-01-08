@@ -94,7 +94,7 @@ def wait_for_urc(timeout: float) -> tuple[int | None, str]:
                 for line in buffer.split("\n"):
                     if "#XDFU:" in line:
                         urc_line = line.strip()
-                        # Parse "#XDFU:<type>,<operation>,<status>"
+                        # Parse "#XDFU: <type>,<operation>,<status>"
                         try:
                             parts = line.split(":")[1].strip().split(",")
                             if len(parts) >= 3:
