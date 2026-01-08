@@ -207,7 +207,7 @@ static int xdfu_datamode_callback(uint8_t op, const uint8_t *data, int len, uint
 			xdfu_status = -EIO;
 		}
 
-		urc_send("#XDFU:%u,%u,%d\r\n",
+		urc_send("#XDFU: %u,%u,%d\r\n",
 			xdfu_current_image_type, DFU_OPERATION_DATA_WRITE,
 			xdfu_status ? -1 : 0);
 
@@ -518,7 +518,7 @@ static int handle_at_xdfu_apply(enum at_parser_cmd_type cmd_type, struct at_pars
 				}
 			}
 
-			urc_send("#XDFU:%u,%u,%d\r\n",
+			urc_send("#XDFU: %u,%u,%d\r\n",
 				DFU_TYPE_APP, DFU_OPERATION_APPLY_UPDATE, err ? -1 : 0);
 
 			LOG_INF("App firmware update scheduled");
@@ -535,7 +535,7 @@ static int handle_at_xdfu_apply(enum at_parser_cmd_type cmd_type, struct at_pars
 				}
 			}
 
-			urc_send("#XDFU:%u,%u,%d\r\n",
+			urc_send("#XDFU: %u,%u,%d\r\n",
 				DFU_TYPE_DELTA_MFW, DFU_OPERATION_APPLY_UPDATE, err ? -1 : 0);
 
 			LOG_INF("Delta modem firmware update scheduled");
@@ -568,7 +568,7 @@ static int handle_at_xdfu_apply(enum at_parser_cmd_type cmd_type, struct at_pars
 				}
 			}
 
-			urc_send("#XDFU:%u,%u,%d\r\n",
+			urc_send("#XDFU: %u,%u,%d\r\n",
 				DFU_TYPE_FULL_MFW, DFU_OPERATION_APPLY_UPDATE, err ? -1 : 0);
 
 			return 0;

@@ -15,6 +15,8 @@ These commands allow you to update the application firmware, delta modem firmwar
    The DFU commands use data mode to receive firmware data.
    See the :ref:`sm_data_mode` section for more information about data mode.
 
+.. _dfu_types:
+
 DFU types
 =========
 
@@ -46,12 +48,7 @@ Syntax
 
    #XDFUINIT=<type>[,<size>]
 
-* The ``<type>`` parameter is an integer indicating the DFU image type:
-
-  * ``0`` - Application firmware
-  * ``1`` - Delta modem firmware
-  * ``2`` - Full modem firmware
-
+* The ``<type>`` parameter is an integer indicating the DFU image type as specified in the :ref:`dfu_types` section.
 * The ``<size>`` parameter is an integer indicating the total firmware image size in bytes.
   It is required for application (type ``0``) and delta modem firmware (type ``1``) updates.
 
@@ -122,7 +119,7 @@ Syntax
 
    #XDFUWRITE=<type>,<addr>,<len>
 
-* The ``<type>`` parameter is an integer indicating the DFU image type (``0``, ``1``, or ``2``).
+* The ``<type>`` parameter is an integer indicating the DFU image type as specified in the :ref:`dfu_types` section.
 * The ``<addr>`` parameter is an integer indicating the address offset for the data.
 * The ``<len>`` parameter is an integer indicating the length of the data chunk to write.
 
@@ -137,6 +134,7 @@ Example
    AT#XDFUWRITE=0,0,4096
    OK
    // 4096 bytes of firmware data
+   #XDATAMODE: 0
    #XDFU: 0,1,0
 
 Read command
@@ -191,7 +189,7 @@ Syntax
 
    #XDFUAPPLY=<type>
 
-* The ``<type>`` parameter is an integer indicating the DFU image type (``0``, ``1``, or ``2``).
+* The ``<type>`` parameter is an integer indicating the DFU image type as specified in the :ref:`dfu_types` section.
 
 For application (type ``0``) and delta modem firmware (type ``1``), the update is scheduled and will be activated on the next reset, which can be done with the ``AT#XRESET`` command.
 For full modem firmware (type ``2``), the command applies the current segment (bootloader or firmware) and triggers a reboot if needed.
@@ -256,7 +254,7 @@ Unsolicited notification
 
    #XDFU: <type>,<operation>,<status>
 
-* The ``<type>`` value is an integer indicating the DFU image type (``0``, ``1``, or ``2``).
+* The ``<type>`` parameter is an integer indicating the DFU image type as specified in the :ref:`dfu_types` section.
 * The ``<operation>`` value is an integer indicating the operation:
 
   * ``1`` - Data write completed
@@ -284,12 +282,14 @@ The following example shows a complete application firmware update:
    AT#XDFUWRITE=0,0,4096
    OK
    // 4096 bytes of firmware data
+   #XDATAMODE: 0
    #XDFU: 0,1,0
 
    // Write second chunk (4096 bytes at offset 4096)
    AT#XDFUWRITE=0,4096,4096
    OK
    // 4096 bytes of firmware data
+   #XDATAMODE: 0
    #XDFU: 0,1,0
 
    // ... continue writing chunks ...
@@ -319,12 +319,14 @@ The following example shows a complete delta modem firmware update:
    AT#XDFUWRITE=1,0,4096
    OK
    // 4096 bytes of firmware data
+   #XDATAMODE: 0
    #XDFU: 1,1,0
 
    // Write second chunk (4096 bytes at offset 4096)
    AT#XDFUWRITE=1,4096,4096
    OK
    // 4096 bytes of firmware data
+   #XDATAMODE: 0
    #XDFU: 1,1,0
 
    // ... continue writing chunks ...
@@ -367,6 +369,7 @@ The full modem update consists of two phases:
    AT#XDFUWRITE=2,0,4096
    OK
    // 4096 bytes of bootloader data
+   #XDATAMODE: 0
    #XDFU: 2,1,0
 
    // ... continue writing bootloader chunks ...
@@ -381,6 +384,7 @@ The full modem update consists of two phases:
    AT#XDFUWRITE=2,0,4096
    OK
    // 4096 bytes of firmware data
+   #XDATAMODE: 0
    #XDFU: 2,1,0
 
    // ... continue writing firmware chunks ...
