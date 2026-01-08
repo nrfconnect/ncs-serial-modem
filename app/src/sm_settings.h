@@ -15,13 +15,6 @@
 #include "sm_trap_macros.h"
 
 /**
- * @brief Loads the Serial Modem settings from NVM.
- *
- * @retval 0 on success, nonzero otherwise.
- */
-int sm_settings_init(void);
-
-/**
  * @brief Saves the FOTA settings to NVM.
  *
  * @retval 0 on success, nonzero otherwise.

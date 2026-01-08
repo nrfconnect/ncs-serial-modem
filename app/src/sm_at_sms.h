@@ -14,14 +14,6 @@
  */
 
 /**
- * @brief Initialize SMS AT command parser.
- *
- * @retval 0 If the operation was successful.
- *           Otherwise, a (negative) error code is returned.
- */
-int sm_at_sms_init(void);
-
-/**
  * @brief Uninitialize SMS AT command parser.
  *
  * @retval 0 If the operation was successful.

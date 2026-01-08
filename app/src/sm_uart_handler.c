@@ -512,7 +512,14 @@ static int tx_write_nonblock(const uint8_t *data, size_t len)
 
 	k_mutex_unlock(&uc->mutex);
 
-	k_work_submit_to_queue(&sm_work_q, &tx_write_nonblock_work);
+	bool running = (sm_work_q.flags & K_WORK_QUEUE_STARTED) == K_WORK_QUEUE_STARTED;
+
+	if (running) {
+		k_work_submit_to_queue(&sm_work_q, &tx_write_nonblock_work);
+	} else {
+		/* Work queue not running yet, use system work queue. */
+		k_work_submit(&tx_write_nonblock_work);
+	}
 
 	return ret;
 }
@@ -521,8 +528,13 @@ static int sm_uart_tx_write(const uint8_t *data, size_t len, bool flush, bool ur
 {
 	int ret;
 
-	/* Send only from Serial Modem work queue to guarantee URC ordering. */
-	if (k_current_get() == &sm_work_q.thread && !urc) {
+	/* Send only from Serial Modem work queue to guarantee URC ordering.
+	 * But only if the work queue is running.
+	 * During statup, we need to use the system workqueue
+	 */
+	bool running = (sm_work_q.flags & K_WORK_QUEUE_STARTED) == K_WORK_QUEUE_STARTED;
+
+	if (running && k_current_get() == &sm_work_q.thread && !urc) {
 		ret = tx_write_block(data, &len, flush);
 	} else {
 		/* In other contexts, we buffer until Serial Modem work queue becomes available. */

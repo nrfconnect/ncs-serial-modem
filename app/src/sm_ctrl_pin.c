@@ -169,7 +169,7 @@ void sm_ctrl_pin_enter_shutdown(void)
 	assert(false);
 }
 
-void sm_ctrl_pin_init_gpios(void)
+static int sm_ctrl_pin_init_gpios(void)
 {
 #if SM_DTR_GPIOS
 	nrf_gpio_cfg_sense_set(dtr_gpio.pin, NRF_GPIO_PIN_SENSE_LOW);
@@ -189,7 +189,9 @@ void sm_ctrl_pin_init_gpios(void)
 	}
 	nrf_gpio_cfg_sense_set(mdm_pwr_gpio.pin, NRF_GPIO_PIN_SENSE_LOW);
 #endif
+	return 0;
 }
+SYS_INIT(sm_ctrl_pin_init_gpios, POST_KERNEL, CONFIG_APPLICATION_INIT_PRIORITY);
 
 
 #if SM_HAS_PWR_KEY
@@ -236,3 +238,4 @@ int sm_ctrl_pin_init(void)
 #endif
 	return 0;
 }
+SYS_INIT(sm_ctrl_pin_init, APPLICATION, 0);

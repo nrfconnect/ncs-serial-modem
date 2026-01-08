@@ -30,4 +30,12 @@ enum {
 #define SM_MAX_USERNAME     32   /** max size of username in login */
 #define SM_MAX_PASSWORD     32   /** max size of password in login */
 
+#define SM_SYNC_STR     "Ready\r\n"
+#define SM_SYNC_ERR_STR "INIT ERROR\r\n"
+#define OK_STR		 "\r\nOK\r\n"
+#define ERROR_STR	 "\r\nERROR\r\n"
+#define CRLF_STR	 "\r\n"
+#define CR		 '\r'
+#define LF		 '\n'
+
 #endif

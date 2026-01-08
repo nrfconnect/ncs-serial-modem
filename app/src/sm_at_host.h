@@ -84,14 +84,6 @@ int sm_at_send_str(const char *str);
 size_t sm_at_receive(const uint8_t *data, size_t len, bool *stop_at_receive);
 
 /**
- * @brief Initialize AT host for Serial Modem
- *
- * @retval 0 If the operation was successful.
- *           Otherwise, a (negative) error code is returned.
- */
-int sm_at_host_init(void);
-
-/**
  * @brief Initialize AT host for bootloader mode
  *
  * @retval 0 If the operation was successful.
