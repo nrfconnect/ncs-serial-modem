@@ -35,7 +35,6 @@ static void pgps_event_handler(struct nrf_cloud_pgps_event *event);
 
 #include "sm_util.h"
 #include "sm_at_host.h"
-#include "sm_at_gnss.h"
 
 LOG_MODULE_REGISTER(sm_gnss, CONFIG_SM_LOG_LEVEL);
 
@@ -845,7 +844,7 @@ static int handle_at_gnss_delete(enum at_parser_cmd_type cmd_type, struct at_par
 
 /**@brief API to initialize GNSS AT commands handler
  */
-int sm_at_gnss_init(void)
+static int sm_at_gnss_init(void)
 {
 	int err = 0;
 
@@ -881,10 +880,4 @@ int sm_at_gnss_init(void)
 
 	return err;
 }
-
-/**@brief API to uninitialize GNSS AT commands handler
- */
-int sm_at_gnss_uninit(void)
-{
-	return 0;
-}
+SYS_INIT(sm_at_gnss_init, APPLICATION, 0);

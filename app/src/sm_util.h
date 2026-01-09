@@ -19,6 +19,7 @@
 #include <zephyr/net/socket.h>
 #include <stdbool.h>
 #include <hal/nrf_gpio.h>
+#include <zephyr/modem/pipe.h>
 
 extern struct k_work_q sm_work_q; /* Serial Modem's work queue. */
 
@@ -242,6 +243,22 @@ struct sm_pdn_dynamic_info {
  * @return Zero on success or an error code on failure.
  */
 int sm_util_pdn_dynamic_info_get(uint8_t cid, struct sm_pdn_dynamic_info *pdn_info);
+
+#define Z_MODEM_PIPE_EVENT_OPENED_BIT        BIT(0)
+
+/**
+ * @brief Check whether a modem pipe is open
+ *
+ * @param pipe Modem pipe to check.
+ * @return true if pipe is open
+ * @return false if pipe is not open
+ */
+static inline bool sm_pipe_is_open(struct modem_pipe *pipe)
+{
+	return k_event_test(&pipe->event, Z_MODEM_PIPE_EVENT_OPENED_BIT) ==
+	       Z_MODEM_PIPE_EVENT_OPENED_BIT;
+}
+
 /** @} */
 
 #endif /* SM_UTIL_ */

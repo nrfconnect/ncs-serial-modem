@@ -14,6 +14,7 @@
 #include <net/nrf_cloud_pgps.h>
 #include <net/nrf_cloud_location.h>
 #include <modem/at_parser.h>
+#include <modem/nrf_modem_lib.h>
 #include "sm_util.h"
 #include "sm_at_host.h"
 #include "sm_at_nrfcloud.h"
@@ -25,6 +26,8 @@ LOG_MODULE_REGISTER(sm_nrfcloud, CONFIG_SM_LOG_LEVEL);
 
 static struct k_work cloud_cmd;
 static K_SEM_DEFINE(sem_date_time, 0, 1);
+uint8_t sm_at_buf[CONFIG_SM_AT_BUF_SIZE + 1];
+
 
 #if defined(CONFIG_NRF_CLOUD_LOCATION)
 
@@ -754,17 +757,23 @@ static int handle_at_nrf_cloud_pos(enum at_parser_cmd_type cmd_type,
 
 #endif /* CONFIG_NRF_CLOUD_LOCATION */
 
-int sm_at_nrfcloud_init(void)
+static void sm_at_nrfcloud_init(int ret, void *ctx)
 {
-	int err = 0;
+	static bool initialized;
+	int err;
 	struct nrf_cloud_init_param init_param = {
 		.event_handler = cloud_event_handler
 	};
 
+	if (initialized) {
+		return;
+	}
+	initialized = true;
+
 	err = nrf_cloud_init(&init_param);
 	if (err && err != -EACCES) {
 		LOG_ERR("Cloud could not be initialized, error: %d", err);
-		return err;
+		return;
 	}
 
 	k_work_init(&cloud_cmd, cloud_cmd_wk);
@@ -772,9 +781,8 @@ int sm_at_nrfcloud_init(void)
 	k_work_init(&nrfcloud_loc_req, loc_req_wk);
 #endif
 	nrf_cloud_client_id_get(nrfcloud_device_id, sizeof(nrfcloud_device_id));
-
-	return err;
 }
+NRF_MODEM_LIB_ON_INIT(sm_nrfcloud_init_hook, sm_at_nrfcloud_init, NULL);
 
 int sm_at_nrfcloud_uninit(void)
 {

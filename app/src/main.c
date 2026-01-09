@@ -16,15 +16,11 @@
 #include "sm_at_host.h"
 #include "sm_at_dfu.h"
 #include "sm_at_fota.h"
-#include "sm_settings.h"
 #include "sm_util.h"
 #include "sm_ctrl_pin.h"
+#include "sm_uart_handler.h"
 
 LOG_MODULE_REGISTER(sm, CONFIG_SM_LOG_LEVEL);
-
-#define SM_WQ_STACK_SIZE	KB(4)
-#define SM_WQ_PRIORITY		K_LOWEST_APPLICATION_THREAD_PRIO
-static K_THREAD_STACK_DEFINE(sm_wq_stack_area, SM_WQ_STACK_SIZE);
 
 struct k_work_q sm_work_q;
 
@@ -147,22 +143,6 @@ static int bootloader_mode_init(void)
 	}
 	LOG_INF("Bootloader mode initiated successfully");
 
-	ret = sm_ctrl_pin_init();
-	if (ret) {
-		LOG_ERR("Failed to init ctrl_pin: %d", ret);
-		return ret;
-	}
-
-	k_work_queue_start(&sm_work_q, sm_wq_stack_area,
-		K_THREAD_STACK_SIZEOF(sm_wq_stack_area),
-		SM_WQ_PRIORITY, NULL);
-
-	ret = sm_at_host_bootloader_init();
-	if (ret) {
-		LOG_ERR("Failed to init at_host: %d", ret);
-		return ret;
-	}
-
 	ret = sm_at_send_str("Bootloader mode ready\r\n");
 	if (ret) {
 		LOG_ERR("Failed to send bootloader mode ready string: %d", ret);
@@ -236,37 +216,19 @@ int lte_auto_connect(void)
 	return err;
 }
 
-int start_execute(void)
+int main(void)
 {
-	int err;
+	static const struct k_work_queue_config cfg = {
+		.name = "sm_work_q",
+		.essential = true,
+	};
 
-	LOG_INF("Serial Modem");
-
-	err = sm_ctrl_pin_init();
-	if (err) {
-		LOG_ERR("Failed to init ctrl_pin: %d", err);
-		return err;
-	}
-
-	k_work_queue_start(&sm_work_q, sm_wq_stack_area,
-		   K_THREAD_STACK_SIZEOF(sm_wq_stack_area),
-		   SM_WQ_PRIORITY, NULL);
-
-	/* This will send "READY" or "INIT ERROR" to UART so after this nothing
-	 * should be done that can fail
-	 */
-	err = sm_at_host_init();
-	if (err) {
-		LOG_ERR("Failed to init at_host: %d", err);
-		return err;
-	}
-
-	(void)lte_auto_connect();
-
+	k_work_queue_init(&sm_work_q);
+	k_work_queue_run(&sm_work_q, &cfg);
 	return 0;
 }
 
-int main(void)
+static int sm_main(void)
 {
 	int ret;
 
@@ -274,13 +236,6 @@ int main(void)
 
 	nrf_power_resetreas_clear(NRF_POWER_NS, 0x70017);
 	LOG_DBG("RR: 0x%08x", rr);
-
-	sm_ctrl_pin_init_gpios();
-
-	/* Init and load settings */
-	if (sm_settings_init() != 0) {
-		LOG_WRN("Failed to init sm settings");
-	}
 
 	if (sm_bootloader_mode_requested) {
 		/* Clear bootloader mode flag */
@@ -293,7 +248,7 @@ int main(void)
 				LOG_ERR("Failed to initialize bootloader mode: %d", ret);
 				goto exit_reboot;
 			}
-			goto exit;
+			return ret;
 		}
 	}
 
@@ -309,7 +264,7 @@ int main(void)
 	if (ret) {
 		LOG_ERR("Modem library init failed, err: %d", ret);
 		if (ret != -EAGAIN && ret != -EIO) {
-			goto exit;
+			return ret;
 		} else if (ret == -EIO) {
 			LOG_ERR("Please program full modem firmware with the bootloader or "
 				"external tools");
@@ -327,14 +282,27 @@ int main(void)
 	}
 #endif
 
-	ret = start_execute();
-exit:
-	if (ret) {
-		LOG_ERR("Failed to start SM (%d). It's not operational!!!", ret);
+	if (!IS_ENABLED(CONFIG_SM_SKIP_READY_MSG)) {
+		/* Send Ready string to indicate that AT host is ready */
+		ret = sm_at_send_str(SM_SYNC_STR);
+		if (ret) {
+			return ret;
+		}
 	}
+
+	/* This is here and not earlier because in case of firmware
+	 * update it will send an AT response so the UART must be up.
+	 */
+	sm_fota_post_process();
+
+	(void)lte_auto_connect();
+
+	LOG_INF("Serial Modem");
+
 	return ret;
 
 exit_reboot:
 	LOG_PANIC();
 	sys_reboot(SYS_REBOOT_COLD);
 }
+SYS_INIT(sm_main, APPLICATION, 100);
