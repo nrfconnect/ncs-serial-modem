@@ -161,7 +161,7 @@ Syntax
 
 ::
 
-   #XDATACTRL=<time_limit>
+   AT#XDATACTRL=<time_limit>
 
 * The ``<time_limit>`` parameter sets the timeout value in milliseconds.
   The default value is the minimum required value, based on the configured UART baud rate.
@@ -177,7 +177,7 @@ Syntax
 
 ::
 
-   #XDATACTRL?
+   AT#XDATACTRL?
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -196,7 +196,7 @@ Syntax
 
 ::
 
-   #XDATACTRL=?
+   AT#XDATACTRL=?
 
 Response syntax
 ~~~~~~~~~~~~~~~

@@ -35,7 +35,7 @@ Syntax
 
 ::
 
-   #XGNSS=<op>,<cloud_assistance>,<interval>[,<timeout>]
+   AT#XGNSS=<op>,<cloud_assistance>,<interval>[,<timeout>]
 
 * The ``<op>`` parameter can have the following integer values:
 
@@ -258,7 +258,7 @@ Syntax
 
 ::
 
-   #XGNSS?
+   AT#XGNSS?
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -288,7 +288,7 @@ Syntax
 
 ::
 
-   #XGNSS=?
+   AT#XGNSS=?
 
 Example
 ~~~~~~~
@@ -322,7 +322,7 @@ Syntax
 
 ::
 
-   #XGNSSDEL=<mask>
+   AT#XGNSSDEL=<mask>
 
 The ``<mask>`` parameter accepts an integer that is a bitwise ``OR`` of the following bitmasks:
 
@@ -367,7 +367,7 @@ Syntax
 
 ::
 
-   #XGNSSDEL=?
+   AT#XGNSSDEL=?
 
 Example
 ~~~~~~~

@@ -25,7 +25,7 @@ Syntax
 
 ::
 
-   #XSMS=<op>[,<number>,<text>]
+   AT#XSMS=<op>[,<number>,<text>]
 
 * The ``<op>`` parameter can accept one of the following values:
 
@@ -92,7 +92,7 @@ Syntax
 
 ::
 
-    #XSMS=?
+    AT#XSMS=?
 
 Response syntax
 ~~~~~~~~~~~~~~~

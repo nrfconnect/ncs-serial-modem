@@ -27,7 +27,7 @@ Syntax
 
 ::
 
-   #XSOCKET=<op>,<type>,<role>[,<cid>]
+   AT#XSOCKET=<op>,<type>,<role>[,<cid>]
 
 * The ``<op>`` parameter can accept one of the following values:
 
@@ -104,7 +104,7 @@ Syntax
 
 ::
 
-   #XSOCKET?
+   AT#XSOCKET?
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -156,7 +156,7 @@ Syntax
 
 ::
 
-   #XSOCKET=?
+   AT#XSOCKET=?
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -192,7 +192,7 @@ Syntax
 
 ::
 
-   #XSSOCKET=<op>,<type>,<role>,<sec_tag>[,<peer_verify>[,<cid>]]
+   AT#XSSOCKET=<op>,<type>,<role>,<sec_tag>[,<peer_verify>[,<cid>]]
 
 * The ``<op>`` parameter can accept one of the following values:
 
@@ -271,7 +271,7 @@ Syntax
 
 ::
 
-   #XSSOCKET?
+   AT#XSSOCKET?
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -323,7 +323,7 @@ Syntax
 
 ::
 
-   #XSSOCKET=?
+   AT#XSSOCKET=?
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -356,7 +356,7 @@ Syntax
 
 ::
 
-   #XCLOSE[=<handle>]
+   AT#XCLOSE[=<handle>]
 
 * The ``<handle>`` parameter is an optional integer that specifies the socket handle to close.
   This is the handle value returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
@@ -422,7 +422,7 @@ Syntax
 
 ::
 
-   #XSOCKETOPT=<handle>,<op>,<name>[,<value>]
+   AT#XSOCKETOPT=<handle>,<op>,<name>[,<value>]
 
 * The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
 
@@ -527,7 +527,7 @@ Syntax
 
 ::
 
-   #XSOCKETOPT=?
+   AT#XSOCKETOPT=?
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -562,7 +562,7 @@ Syntax
 
 ::
 
-   #XSSOCKETOPT=<handle>,<op>,<name>[,<value>]
+   AT#XSSOCKETOPT=<handle>,<op>,<name>[,<value>]
 
 * The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSSOCKET`` command.
 
@@ -660,7 +660,7 @@ Syntax
 
 ::
 
-   #XSSOCKETOPT=?
+   AT#XSSOCKETOPT=?
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -696,7 +696,7 @@ Syntax
 
 ::
 
-   #XBIND=<handle>,<port>
+   AT#XBIND=<handle>,<port>
 
 * The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
 
@@ -738,7 +738,7 @@ Syntax
 
 ::
 
-   #XCONNECT=<handle>,<url>,<port>
+   AT#XCONNECT=<handle>,<url>,<port>
 
 * The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
 
@@ -811,9 +811,9 @@ Syntax
 
 ::
 
-   #XSEND=<handle>,<mode>,<flags>,<data> when ``<mode>`` is ``0`` or ``1``
+   AT#XSEND=<handle>,<mode>,<flags>,<data> when ``<mode>`` is ``0`` or ``1``
 
-   #XSEND=<handle>,<mode>,<flags>[,<data_len>] when ``<mode>`` is ``2``
+   AT#XSEND=<handle>,<mode>,<flags>[,<data_len>] when ``<mode>`` is ``2``
 
 * The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
 
@@ -947,7 +947,7 @@ Syntax
 
 ::
 
-   #XRECV=<handle>,<mode>,<flags>,<timeout>[,<data_len>]
+   AT#XRECV=<handle>,<mode>,<flags>,<timeout>[,<data_len>]
 
 * The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
 
@@ -1031,9 +1031,9 @@ Syntax
 
 ::
 
-   #XSENDTO=<handle>,<mode>,<flags>,<url>,<port>,<data> when ``<mode>`` is ``0`` or ``1``
+   AT#XSENDTO=<handle>,<mode>,<flags>,<url>,<port>,<data> when ``<mode>`` is ``0`` or ``1``
 
-   #XSENDTO=<handle>,<mode>,<flags>,<url>,<port>[,<data_len>] when ``<mode>`` is ``2``
+   AT#XSENDTO=<handle>,<mode>,<flags>,<url>,<port>[,<data_len>] when ``<mode>`` is ``2``
 
 * The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
 
@@ -1170,7 +1170,7 @@ Syntax
 
 ::
 
-   #XRECVFROM=<handle>,<mode>,<flags>,<timeout>[,<data_len>]
+   AT#XRECVFROM=<handle>,<mode>,<flags>,<timeout>[,<data_len>]
 
 * The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
 
@@ -1259,7 +1259,7 @@ Syntax
 
 ::
 
-   #XAPOLL=[<handle>],<op>,[<events>]
+   AT#XAPOLL=[<handle>],<op>,[<events>]
 
 * The ``<handle>`` value is an integer that sets the socket handle to poll (optional).
   Handles are sent in the ``AT#XSOCKET`` or ``AT#XSSOCKET`` responses.
@@ -1408,7 +1408,7 @@ Syntax
 
 ::
 
-   #XAPOLL?
+   AT#XAPOLL?
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -1503,7 +1503,7 @@ Syntax
 
 ::
 
-   #XAPOLL=?
+   AT#XAPOLL=?
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -1694,7 +1694,7 @@ Syntax
 
 ::
 
-   #XRECVCFG?
+   AT#XRECVCFG?
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -1764,7 +1764,7 @@ Syntax
 
 ::
 
-   #XRECVCFG=?
+   AT#XRECVCFG=?
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -1799,7 +1799,7 @@ Syntax
 
 ::
 
-   #XGETADDRINFO=<hostname>[,<address_family>]
+   AT#XGETADDRINFO=<hostname>[,<address_family>]
 
 * The ``<hostname>`` parameter is a string.
 * The ``<address_family>`` parameter is an optional integer that gives a hint for DNS query on address family.

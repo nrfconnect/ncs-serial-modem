@@ -29,8 +29,8 @@ Syntax
 
 ::
 
-   E1 - Enable AT command echo.
-   E0 - Disable AT command echo (default).
+   ATE1 - Enable AT command echo.
+   ATE0 - Disable AT command echo (default).
 
 Example
 ~~~~~~~
@@ -78,7 +78,7 @@ Syntax
 
 ::
 
-   #XSMVER
+   AT#XSMVER
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -141,7 +141,7 @@ Syntax
 
 ::
 
-   #XCLAC
+   AT#XCLAC
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -209,7 +209,7 @@ Syntax
 
 ::
 
-   #XSLEEP=<sleep_mode>
+   AT#XSLEEP=<sleep_mode>
 
 The ``<sleep_mode>`` parameter accepts only the following integer values:
 
@@ -276,7 +276,7 @@ Syntax
 
 ::
 
-   #XSLEEP=?
+   AT#XSLEEP=?
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -290,6 +290,7 @@ Example
 
 ::
 
+   AT#XSLEEP=?
    #XSLEEP: (1,2)
    OK
 
@@ -308,7 +309,7 @@ Syntax
 
 ::
 
-   #XSHUTDOWN
+   AT#XSHUTDOWN
 
 .. note::
 
@@ -348,7 +349,7 @@ Syntax
 
 ::
 
-   #XRESET
+   AT#XRESET
 
 Example
 ~~~~~~~~
@@ -388,7 +389,7 @@ Syntax
 
 ::
 
-   #XMODEMRESET
+   AT#XMODEMRESET
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -442,7 +443,7 @@ Syntax
 
 ::
 
-   #XUUID
+   AT#XUUID
 
 Response syntax
 ~~~~~~~~~~~~~~~
