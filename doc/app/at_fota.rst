@@ -124,7 +124,7 @@ Unsolicited notification
 
    #XFOTA: <fota_stage>,<fota_status>[,<fota_info>]
 
-* The ``<fota_stage>`` value is an integer and can return one of the following values:
+* The ``<fota_stage>`` parameter is an integer and can return one of the following values:
 
   * ``0`` - Init
   * ``1`` - Download
@@ -133,28 +133,28 @@ Unsolicited notification
   * ``4`` - Downloaded, to be activated
   * ``5`` - Complete
 
-* The ``<fota_status>`` value is an integer and can return one of the following values:
+* The ``<fota_status>`` parameter is an integer and can return one of the following values:
 
   * ``0`` - OK
   * ``1`` - Error
   * ``2`` - Cancelled
   * ``3`` - Reverted (application FOTA only)
 
-* The ``<fota_info>`` value is an integer.
+* The ``<fota_info>`` parameter is an integer.
   Its value can have different meanings based on the values returned by ``<fota_stage>`` and ``<fota_status>``.
   See the following table:
 
-  +-------------------------+----------------------------+-------------------------------------------------------------------------------+
-  |``<fota_stage>`` value   |``<fota_status>`` value     | ``<fota_info>`` value                                                         |
-  +=========================+============================+===============================================================================+
-  |``1`` (namely *Download*)| ``0`` (namely *OK*)        | Percentage of the download                                                    |
-  +-------------------------+----------------------------+-------------------------------------------------------------------------------+
-  |``1`` (namely *Download*)| ``1`` (namely *ERROR*)     | Error Code                                                                    |
-  +-------------------------+----------------------------+-------------------------------------------------------------------------------+
-  |``1`` (namely *Download*)| ``2`` (namely *CANCELLED*) | ``0`` - Downloading is cancelled before completion                            |
-  +-------------------------+----------------------------+-------------------------------------------------------------------------------+
-  |``5`` (namely *Complete*)| ``1`` (namely *ERROR*)     | Error Code                                                                    |
-  +-------------------------+------------------------+---+-------------------------------------------------------------------------------+
+  +-------------------------+----------------------------+----------------------------------------------------+
+  |``<fota_stage>``         |``<fota_status>``           | ``<fota_info>``                                    |
+  +=========================+============================+====================================================+
+  |``1`` (namely *Download*)| ``0`` (namely *OK*)        | Percentage of the download                         |
+  +-------------------------+----------------------------+----------------------------------------------------+
+  |``1`` (namely *Download*)| ``1`` (namely *ERROR*)     | Error Code                                         |
+  +-------------------------+----------------------------+----------------------------------------------------+
+  |``1`` (namely *Download*)| ``2`` (namely *CANCELLED*) | ``0`` - Downloading is cancelled before completion |
+  +-------------------------+----------------------------+----------------------------------------------------+
+  |``5`` (namely *Complete*)| ``1`` (namely *ERROR*)     | Error Code                                         |
+  +-------------------------+------------------------+---+----------------------------------------------------+
 
   The error codes can be the following:
 

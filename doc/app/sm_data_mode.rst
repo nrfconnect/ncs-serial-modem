@@ -54,7 +54,7 @@ Sending data in data mode
 Any arbitrary data received from the MCU is sent to LTE network *as-is*.
 
 If the current sending function succeeds and :ref:`CONFIG_SM_DATAMODE_URC <CONFIG_SM_DATAMODE_URC>` is defined, the |SM| application reports back the total size as ``#XDATAMODE: <size>``.
-The ``<size>`` value is a positive integer.
+The ``<size>`` parameter is a positive integer.
 This Unsolicited Result Code (URC) can also be used to impose flow control on uplink sending.
 
 .. note::
@@ -217,8 +217,11 @@ Unsolicited notification
 
    #XDATAMODE: <status>
 
-* The ``<status>`` value is an integer that indicates the status of the data mode operation.
-  It is ``0`` for success or ``-1`` for failure.
+* The ``<status>`` parameter is an integer that indicates the status of the data mode operation.
+  It can have one of the following values:
+
+  * ``0`` - Success
+  * ``-1`` - Failure
 
 Example
 ~~~~~~~

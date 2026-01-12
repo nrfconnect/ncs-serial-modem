@@ -81,14 +81,14 @@ Unsolicited notification
 
    #XNRFCLOUD: <ready>,<send_location>
 
-* The ``<ready>`` value indicates whether the connection to nRF Cloud is established or not.
-* The ``<send_location>`` value indicates whether the device location will be sent to nRF Cloud or not.
+* The ``<ready>`` parameter indicates whether the connection to nRF Cloud is established or not.
+* The ``<send_location>`` parameter indicates whether the device location will be sent to nRF Cloud or not.
 
 ::
 
    #XNRFCLOUD: <message>
 
-* The ``<message>`` value indicates data received from nRF Cloud that is not a supported cloud2device appId.
+* The ``<message>`` parameter indicates data received from nRF Cloud that is not a supported cloud2device appId.
 
 Example
 ~~~~~~~
@@ -141,10 +141,10 @@ Response syntax
 
    #XNRFCLOUD: <ready>,<send_location>,<sec_tag>,<device_id>
 
-* The ``<ready>`` value indicates whether the connection to nRF Cloud is established or not.
-* The ``<send_location>`` value indicates whether the device location will be sent to nRF Cloud or not.
-* The ``<sec_tag>`` value indicates the ``sec_tag`` used for accessing nRF Cloud.
-* The ``<device_id>`` value indicates the device ID used for accessing nRF Cloud.
+* The ``<ready>`` parameter indicates whether the connection to nRF Cloud is established or not.
+* The ``<send_location>`` parameter indicates whether the device location will be sent to nRF Cloud or not.
+* The ``<sec_tag>`` parameter indicates the ``sec_tag`` used for accessing nRF Cloud.
+* The ``<device_id>`` parameter indicates the device ID used for accessing nRF Cloud.
 
 Example
 ~~~~~~~
@@ -242,7 +242,7 @@ Unsolicited notification
 This is emitted when the location request failed, either when sending it or receiving its response.
 No notification containing location data will be emitted.
 
-* The ``<error>`` value indicates the error that happened.
+* The ``<error>`` parameter indicates the error that happened.
   It is one of the :c:enum:`nrf_cloud_error` values.
 
 ::
@@ -251,15 +251,15 @@ No notification containing location data will be emitted.
 
 This is emitted when a successful response to a sent location request is received.
 
-* The ``<type>`` value indicates the service used to fulfill the location request.
+* The ``<type>`` parameter indicates the service used to fulfill the location request.
 
   * ``0`` (:c:enumerator:`LOCATION_TYPE_SINGLE_CELL`) - Single-cell cellular location.
   * ``1`` (:c:enumerator:`LOCATION_TYPE_MULTI_CELL`) - Multi-cell cellular location.
   * ``2`` (:c:enumerator:`LOCATION_TYPE_WIFI`) - Wi-Fi location.
 
-* The ``<latitude>`` value represents the latitude in degrees.
-* The ``<longitude>`` value represents the longitude in degrees.
-* The ``<uncertainty>`` value represents the radius of the uncertainty circle around the location in meters, also known as Horizontal Positioning Error (HPE).
+* The ``<latitude>`` parameter represents the latitude in degrees.
+* The ``<longitude>`` parameter represents the longitude in degrees.
+* The ``<uncertainty>`` parameter represents the radius of the uncertainty circle around the location in meters, also known as Horizontal Positioning Error (HPE).
 
 Example
 ~~~~~~~

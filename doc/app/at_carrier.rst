@@ -26,7 +26,7 @@ Syntax
 
    #XCARRIEREVT: <evt_type>,<param1>[,<param2>[,<param3>]..]
 
-The ``<evt_type>`` value is an integer indicating the type of the event, followed by a variable number of parameters depending on the event type.
+The ``<evt_type>`` parameter is an integer indicating the type of the event, followed by a variable number of parameters depending on the event type.
 These may be the following:
 
 * ``#XCARRIEREVT: 1,<status>``

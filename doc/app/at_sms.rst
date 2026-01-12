@@ -47,12 +47,12 @@ This is the notification syntax when an SMS message is received:
 
       #XSMS: <datetime>,<number>,<text>
 
-  * The ``<datetime>`` value is a string.
+  * The ``<datetime>`` parameter is a string.
     It represents the time when the SMS is received.
     It has a format of ``YY-MM-DD HH:MM:SS``.
-  * The ``<number>`` value is a string.
+  * The ``<number>`` parameter is a string.
     It represents the SMS sender's phone number.
-  * The ``<text>`` value is a string.
+  * The ``<text>`` parameter is a string.
     It represents the SMS text that has been received.
 
   When receiving concatenated SMS messages, there will be only one notification.
