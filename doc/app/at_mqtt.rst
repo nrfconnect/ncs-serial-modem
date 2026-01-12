@@ -163,14 +163,14 @@ Response syntax
 
    #XMQTTEVT=<evt_type>,<result>
 
-* The ``<evt_type>`` value is an integer indicating the type of the event.
+* The ``<evt_type>`` parameter is an integer indicating the type of the event.
   It can return the following values for the ``#XMQTTCON`` command:
 
   * ``0`` - Acknowledgment of connection request (CONNACK).
   * ``1`` - Disconnection notification (DISCONNECT).
     The MQTT client is disconnected from the MQTT broker once this event is notified.
 
-* The ``<result>`` value is an integer. It can return the following values:
+* The ``<result>`` parameter is an integer. It can return the following values:
 
   * ``0`` - Success.
   * *Negative value* - Error code indicating the reason for the failure.
@@ -182,11 +182,11 @@ Unsolicited notification
 ::
    #XMQTTEVT=<evt_type>,<result>
 
-* The ``<evt_type>`` value is an integer indicating the type of the event.
+* The ``<evt_type>`` parameter is an integer indicating the type of the event.
   After the connection is established, it can return ``9`` to indicate a ping response from the MQTT broker (PINGRESP).
   This is received when pinging (PINGREQ) the broker after the keep alive is reached.
 
-* The ``<result>`` value is an integer. It can return the following values:
+* The ``<result>`` parameter is an integer. It can return the following values:
 
   * ``0`` - Success.
   * *Negative value* - Error code indicating the reason for the failure.
@@ -231,19 +231,19 @@ Response syntax
 
    #XMQTTCON: <status>[,<client_id>,<url>,<port>[,<sec_tag>]]
 
-* The ``<status>`` value is an integer.
+* The ``<status>`` parameter is an integer.
   It can have one of the following values:
 
     * ``0`` - MQTT is not connected.
     * ``1`` - MQTT is connected.
 
-* The ``<url>`` value is a string.
+* The ``<url>`` parameter is a string.
   It indicates the MQTT broker hostname.
   Present only when ``<status>`` is ``1``.
-* The ``<port>`` value is an unsigned 16-bit integer (0 - 65535).
+* The ``<port>`` parameter is an unsigned 16-bit integer (0 - 65535).
   It indicates the MQTT broker port.
   Present only when ``<status>`` is ``1``.
-* The ``<sec_tag>`` value is an integer.
+* The ``<sec_tag>`` parameter is an integer.
   It indicates the credential of the security tag used for establishing a secure connection.
   Present only when ``<status>`` is ``1``.
 
@@ -321,12 +321,12 @@ Response syntax
 
    #XMQTTEVT: <evt_type>,<result>
 
-* The ``<evt_type>`` value is an integer.
+* The ``<evt_type>`` parameter is an integer.
   It can return the following values for the ``#XMQTTSUB`` command::
 
   * ``7`` - Acknowledgment of the subscribe request (SUBACK).
 
-* The ``<result>`` value is an integer. It can return the following values:
+* The ``<result>`` parameter is an integer. It can return the following values:
 
   * ``0`` - Success.
   * *Negative value* - Error code indicating the reason for the failure.
@@ -342,26 +342,26 @@ When the MQTT client has successfully subscribed to a topic and a message is pub
    <topic_received>
    <message>
 
-* The ``<topic_length>`` value is an integer.
+* The ``<topic_length>`` parameter is an integer.
   It indicates the length of the ``<topic_received>`` field.
 * The ``<message_length>`` parameter is an integer.
   It indicates the length of the ``<message>`` field.
-* The ``<topic_received>`` value is a string.
+* The ``<topic_received>`` parameter is a string.
   It indicates the topic that received the message.
-* The ``<message>`` value can be a string or a HEX.
+* The ``<message>`` parameter can be a string or a HEX.
   It contains the message received from the topic.
 
 ::
 
    #XMQTTEVT: <evt_type>,<result>
 
-* The ``<evt_type>`` value is an integer.
+* The ``<evt_type>`` parameter is an integer.
   It can return the following values for the ``#XMQTTSUB`` command:
 
   * ``2`` - Message received on a topic the client is subscribed to (PUBLISH).
   * ``5`` - Release of a published message with QoS 2 (PUBREL).
 
-* The ``<result>`` value is an integer. It can return the following values:
+* The ``<result>`` parameter is an integer. It can return the following values:
 
   * ``0`` - Success.
   * *Negative value* - Error code indicating the reason for the failure.
@@ -448,10 +448,10 @@ Response syntax
 
    #XMQTTEVT: <evt_type>,<result>
 
-* The ``<evt_type>`` value is an integer.
+* The ``<evt_type>`` parameter is an integer.
   It can return ``8`` for the ``#XMQTTUNSUB`` command to indicate an acknowledgment of the unsubscription request (UNSUBACK).
 
-* The ``<result>`` value is an integer. It can return the following values:
+* The ``<result>`` parameter is an integer. It can return the following values:
 
   * ``0`` - Success.
   * *Negative value* - Error code indicating the reason for the failure.
@@ -521,14 +521,14 @@ Response syntax
 
    #XMQTTEVT: <evt_type>,<result>
 
-* The ``<evt_type>`` value is an integer.
+* The ``<evt_type>`` parameter is an integer.
   It can return the following values for the ``#XMQTTPUB`` command:
 
   * ``3`` - Acknowledgment for the published message with QoS 1 (PUBACK).
   * ``4`` - Reception confirmation for the published message with QoS 2 (PUBREC).
   * ``6`` - Confirmation to a publish release message with QoS 2 (PUBCOMP).
 
-* The ``<result>`` value is an integer. It can return the following values:
+* The ``<result>`` parameter is an integer. It can return the following values:
 
   * ``0`` - Success.
   * *Negative value* - Error code indicating the reason for the failure.

@@ -59,18 +59,18 @@ Response syntax
 
    #XSOCKET: <handle>,<type>,<protocol>
 
-* The ``<handle>`` value is an integer and can be interpreted as follows:
+* The ``<handle>`` parameter is an integer and can be interpreted as follows:
 
   * Positive or ``0`` - The socket opened successfully.
   * Negative - The socket failed to open.
 
-* The ``<type>`` value can be one of the following integers:
+* The ``<type>`` parameter can be one of the following integers:
 
   * ``1`` - Set ``SOCK_STREAM`` for the stream socket type using the TCP protocol.
   * ``2`` - Set ``SOCK_DGRAM`` for the datagram socket type using the UDP protocol.
   * ``3`` - Set ``SOCK_RAW`` for the raw socket type using a generic IP protocol.
 
-* The ``<protocol>`` value can be one of the following integers:
+* The ``<protocol>`` parameter can be one of the following integers:
 
   * ``0`` - IPPROTO_IP.
   * ``6`` - IPPROTO_TCP.
@@ -113,22 +113,22 @@ Response syntax
 
    #XSOCKET: <handle>,<family>,<role>,<type>,<cid>
 
-* The ``<handle>`` value is an integer.
+* The ``<handle>`` parameter is an integer.
   When positive or ``0``, the socket is valid.
 
-* The ``<family>`` value is present only in the response to a request to open the socket.
+* The ``<family>`` parameter is present only in the response to a request to open the socket.
   It can return one of the following values:
 
   * ``1`` - IP protocol family version 4.
   * ``2`` - IP protocol family version 6.
   * ``3`` - Packet family.
 
-* The ``<role>`` value can be one of the following integers:
+* The ``<role>`` parameter can be one of the following integers:
 
   * ``0`` - Client.
   * ``1`` - Server.
 
-* The ``<type>`` value can be one of the following integers:
+* The ``<type>`` parameter can be one of the following integers:
 
   * ``1`` - Set ``SOCK_STREAM`` for the stream socket type using the TCP protocol.
   * ``2`` - Set ``SOCK_DGRAM`` for the datagram socket type using the UDP protocol.
@@ -234,17 +234,17 @@ Response syntax
 
    #XSSOCKET: <handle>,<type>,<protocol>
 
-* The ``<handle>`` value is an integer and can be interpreted as follows:
+* The ``<handle>`` parameter is an integer and can be interpreted as follows:
 
   * Positive or ``0`` - The socket opened successfully.
   * Negative - The socket failed to open.
 
-* The ``<type>`` value can be one of the following integers:
+* The ``<type>`` parameter can be one of the following integers:
 
   * ``1`` - ``SOCK_STREAM`` for the stream socket type using the TLS 1.2 protocol.
   * ``2`` - ``SOCK_DGRAM`` for the datagram socket type using the DTLS 1.2 protocol.
 
-* The ``<protocol>`` value can be one of the following integers:
+* The ``<protocol>`` parameter can be one of the following integers:
 
   * ``258`` - IPPROTO_TLS_1_2.
   * ``273`` - IPPROTO_DTLS_1_2.
@@ -280,28 +280,28 @@ Response syntax
 
    #XSSOCKET: <handle>,<family>,<role>,<type>,<sec_tag>,<cid>
 
-* The ``<handle>`` value is an integer.
+* The ``<handle>`` parameter is an integer.
   When positive or ``0``, the socket is valid.
 
-* The ``<family>`` value can be one of the following integers:
+* The ``<family>`` parameter can be one of the following integers:
 
   * ``1`` - IP protocol family version 4.
   * ``2`` - IP protocol family version 6.
 
-* The ``<role>`` value can be one of the following integers:
+* The ``<role>`` parameter can be one of the following integers:
 
   * ``0`` - Client
   * ``1`` - Server
 
-* The ``<type>`` value can be one of the following integers:
+* The ``<type>`` parameter can be one of the following integers:
 
   * ``1`` - ``SOCK_STREAM`` for the stream socket type using the TLS 1.2 protocol.
   * ``2`` - ``SOCK_DGRAM`` for the datagram socket type using the DTLS 1.2 protocol.
 
-* The ``<sec_tag>`` value is an integer.
+* The ``<sec_tag>`` parameter is an integer.
   It indicates to the modem the credential of the security tag to be used for establishing a secure connection.
 
-* The ``<cid>`` value is an integer indicating the used PDN connection.
+* The ``<cid>`` parameter is an integer indicating the used PDN connection.
   It represents ``cid`` in the ``+CGDCONT`` command.
 
 Example
@@ -369,9 +369,9 @@ Response syntax
 
    #XCLOSE: <handle>,<result>
 
-* The ``<handle>`` value is an integer indicating the handle of the closed socket.
+* The ``<handle>`` parameter is an integer indicating the handle of the closed socket.
 
-* The ``<result>`` value indicates the result of closing the socket.
+* The ``<result>`` parameter indicates the result of closing the socket.
   When ``0``, the socket was closed successfully.
 
 When closing all sockets (no handle parameter provided), multiple responses will be sent, one for each socket that was closed.
@@ -757,9 +757,9 @@ Response syntax
 
    #XCONNECT: <handle>,<status>
 
-* The ``<handle>`` value is an integer indicating the socket handle.
+* The ``<handle>`` parameter is an integer indicating the socket handle.
 
-* The ``<status>`` value is an integer.
+* The ``<status>`` parameter is an integer.
   It can return one of the following values:
 
   * ``1`` - Connected.
@@ -870,14 +870,14 @@ Response syntax
 
    #XSEND: <handle>,<result_type>,<size>
 
-* The ``<handle>`` value is an integer indicating the socket handle.
+* The ``<handle>`` parameter is an integer indicating the socket handle.
 
-* The ``<result_type>`` value is an integer indicating the type of result:
+* The ``<result_type>`` parameter is an integer indicating the type of result:
 
   * ``0`` - Indicates that there are no further notifications.
   * ``1`` - Indicates that an unsolicited notification will be sent when the network acknowledged send is completed.
 
-* The ``<size>`` value is an integer.
+* The ``<size>`` parameter is an integer.
   It represents the actual number of bytes that has been sent.
 
 
@@ -890,12 +890,15 @@ For network acknowledged sends (when the ``8192`` flag is used), an unsolicited 
 
    #XSENDNTF: <handle>,<status>,<size>
 
-* The ``<handle>`` value is an integer indicating the socket handle.
+* The ``<handle>`` parameter is an integer indicating the socket handle.
 
-* The ``<status>`` value is an integer indicating the status of the send acknowledged by the network.
-  It is ``0`` for success or ``-1`` for failure.
+* The ``<status>`` parameter is an integer indicating the status of the send acknowledged by the network.
+  It can have one of the following values:
 
-* The ``<size>`` value is an integer indicating the size of the data sent.
+  * ``0`` - Success
+  * ``-1`` - Failure
+
+* The ``<size>`` parameter is an integer indicating the size of the data sent.
 
 
 Example
@@ -980,14 +983,14 @@ Response syntax
    #XRECV: <handle>,<mode>,<size>
    <data>
 
-* The ``<handle>`` value is an integer indicating the socket handle.
+* The ``<handle>`` parameter is an integer indicating the socket handle.
 
-* The ``<mode>`` value is an integer indicating the receive mode used.
+* The ``<mode>`` parameter is an integer indicating the receive mode used.
 
-* The ``<size>`` value is an integer that represents the actual number of bytes received.
+* The ``<size>`` parameter is an integer that represents the actual number of bytes received.
   In case of hex string mode, it represents the number of bytes before conversion to hexadecimal format.
 
-* The ``<data>`` value is a string that contains the data being received.
+* The ``<data>`` parameter is a string that contains the data being received.
 
 .. sm_recv_response_end
 
@@ -1100,14 +1103,14 @@ Response syntax
 
    #XSENDTO: <handle>,<result_type>,<size>
 
-* The ``<handle>`` value is an integer indicating the socket handle.
+* The ``<handle>`` parameter is an integer indicating the socket handle.
 
-* The ``<result_type>`` value is an integer indicating the type of result:
+* The ``<result_type>`` parameter is an integer indicating the type of result:
 
   * ``0`` - Indicates that there are no further notifications.
   * ``1`` - Indicates that an unsolicited notification will be sent when the network acknowledged send is completed.
 
-* The ``<size>`` value is an integer.
+* The ``<size>`` parameter is an integer.
   It represents the actual number of bytes that have been sent.
 
 Unsolicited notification
@@ -1119,12 +1122,15 @@ For network acknowledged sends (when the ``8192`` flag is used), an unsolicited 
 
    #XSENDNTF: <handle>,<status>,<size>
 
-* The ``<handle>`` value is an integer indicating the socket handle.
+* The ``<handle>`` parameter is an integer indicating the socket handle.
 
-* The ``<status>`` value is an integer indicating the status of the send acknowledged by the network.
-  It is ``0`` for success or ``-1`` for failure.
+* The ``<status>`` parameter is an integer indicating the status of the send acknowledged by the network.
+  It can have one of the following values:
 
-* The ``<size>`` value is an integer indicating the size of the data sent.
+  * ``0`` - Success
+  * ``-1`` - Failure
+
+* The ``<size>`` parameter is an integer indicating the size of the data sent.
 
 Example
 ~~~~~~~
@@ -1204,18 +1210,18 @@ Response syntax
    #XRECVFROM: <handle>,<mode>,<size>,"<ip_addr>",<port>
    <data>
 
-* The ``<handle>`` value is an integer indicating the socket handle.
+* The ``<handle>`` parameter is an integer indicating the socket handle.
 
-* The ``<mode>`` value is an integer indicating the receive mode used.
+* The ``<mode>`` parameter is an integer indicating the receive mode used.
 
-* The ``<size>`` value is an integer that represents the actual number of bytes received.
+* The ``<size>`` parameter is an integer that represents the actual number of bytes received.
   In the case of hex string mode, it represents the number of bytes before conversion to hexadecimal format.
 
-* The ``<ip_addr>`` value is a string that represents the IPv4 or IPv6 address of the remote peer.
+* The ``<ip_addr>`` parameter is a string that represents the IPv4 or IPv6 address of the remote peer.
 
-* The ``<port>`` value is an integer that represents the UDP port of the remote peer.
+* The ``<port>`` parameter is an integer that represents the UDP port of the remote peer.
 
-* The ``<data>`` value is a string that contains the data being received.
+* The ``<data>`` parameter is a string that contains the data being received.
 
 .. sm_recvfrom_response_end
 
@@ -1261,17 +1267,17 @@ Syntax
 
    AT#XAPOLL=[<handle>],<op>,[<events>]
 
-* The ``<handle>`` value is an integer that sets the socket handle to poll (optional).
+* The ``<handle>`` parameter is an integer that sets the socket handle to poll (optional).
   Handles are sent in the ``AT#XSOCKET`` or ``AT#XSSOCKET`` responses.
   Handles can also be obtained using the ``AT#XSOCKET?`` or ``AT#XSSOCKET?`` command.
   If the handle is omitted, the operation applies to all open sockets and to any new sockets that are created.
 
-* The ``<op>`` value can accept one of the following values:
+* The ``<op>`` parameter can accept one of the following values:
 
   * ``0`` - Stop asynchronous polling.
   * ``1`` - Start asynchronous polling.
 
-* The ``<events>`` value is an optional integer, which is interpreted as a bit field.
+* The ``<events>`` parameter is an optional integer, which is interpreted as a bit field.
   It represents the events to poll for, which can be a combination of ``POLLIN`` and ``POLLOUT``.
   Permanent error and closure events (``POLLERR``, ``POLLHUP``, and ``POLLNVAL``) are always polled.
   The value can be any combination of the following values summed up:
@@ -1302,10 +1308,10 @@ When the asynchronous socket events are enabled, |SM| sends events as URC notifi
 
    #XAPOLL: <handle>,<revents>
 
-* The ``<handle>`` value is an integer.
+* The ``<handle>`` parameter is an integer.
   It is the handle of the socket that has events.
 
-* The ``<revents>`` value is an integer, which must be interpreted as a bit field.
+* The ``<revents>`` parameter is an integer, which must be interpreted as a bit field.
   It represents the returned events as a combination of ``POLLIN`` (1), ``POLLOUT`` (4), ``POLLERR`` (8), ``POLLHUP`` (16), and ``POLLNVAL`` (32) summed up.
   Hexadecimal representation is avoided to support AT command parsers that do not support hexadecimal values.
 
@@ -1417,10 +1423,10 @@ Response syntax
 
    #XAPOLL: <handle>,<events>
 
-* The ``<handle>`` value is an integer.
+* The ``<handle>`` parameter is an integer.
   It is the handle of the socket that is being polled.
 
-* The ``<events>`` value is an integer, which must be interpreted as a bit field.
+* The ``<events>`` parameter is an integer, which must be interpreted as a bit field.
   It represents the events that are being polled, which can be any combination of ``POLLIN`` and ``POLLOUT``.
   Permanent error and closure events (``POLLERR``, ``POLLHUP``, and ``POLLNVAL``) are always polled.
   The value can be any combination of the following values:
@@ -1817,7 +1823,7 @@ Response syntax
 
    #XGETADDRINFO: "<ip_addresses>"
 
-* The ``<ip_addresses>`` value is a string.
+* The ``<ip_addresses>`` parameter is a string.
   It indicates the IPv4 or IPv6 address of the resolved hostname.
 
 Example

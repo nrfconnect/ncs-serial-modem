@@ -255,12 +255,16 @@ Unsolicited notification
    #XDFU: <type>,<operation>,<status>
 
 * The ``<type>`` parameter is an integer indicating the DFU image type as specified in the :ref:`dfu_types` section.
-* The ``<operation>`` value is an integer indicating the operation:
+* The ``<operation>`` parameter is an integer indicating the operation:
 
   * ``1`` - Data write completed
   * ``2`` - Apply update completed
 
-* The ``<status>`` value is ``0`` for success or ``-1`` for failure.
+* The ``<status>`` parameter is an integer indicating the status of the DFU operation.
+  It can have one of the following values:
+
+  * ``0`` - Success
+  * ``-1`` - Failure
 
 Complete DFU examples
 =====================

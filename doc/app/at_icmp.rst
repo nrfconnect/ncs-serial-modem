@@ -49,7 +49,7 @@ Unsolicited notification
 
    #XPING: <response time> seconds
 
-The ``<response time>`` value is a *float*.
+The ``<response time>`` parameter is a *float*.
 It represents the elapsed time, in seconds, between the echo requests and the echo replies.
 
 Example
