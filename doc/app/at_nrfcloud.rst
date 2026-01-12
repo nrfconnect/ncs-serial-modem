@@ -32,7 +32,7 @@ Syntax
 
 ::
 
-   #XNRFCLOUD=<op>[,<send_location>]
+   AT#XNRFCLOUD=<op>[,<send_location>]
 
 The ``<op>`` parameter can have the following integer values:
 
@@ -132,7 +132,7 @@ Syntax
 
 ::
 
-   #XNRFCLOUD?
+   AT#XNRFCLOUD?
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -167,7 +167,7 @@ Syntax
 
 ::
 
-   #XNRFCLOUD=?
+   AT#XNRFCLOUD=?
 
 Example
 ~~~~~~~
@@ -204,7 +204,7 @@ Syntax
 
 ::
 
-   #XNRFCLOUDPOS=<cell_pos>,<wifi_pos>[,<MAC 1>[,<RSSI 1>],<MAC 2>[,<RSSI 2>][,<MAC 3>[...]]]
+   AT#XNRFCLOUDPOS=<cell_pos>,<wifi_pos>[,<MAC 1>[,<RSSI 1>],<MAC 2>[,<RSSI 2>][,<MAC 3>[...]]]
 
 The ``<cell_pos>`` parameter can have the following integer values:
 

@@ -39,7 +39,7 @@ Syntax
 
 ::
 
-   #XPPP=<op>[,<cid>]
+   AT#XPPP=<op>[,<cid>]
 
 * The ``<op>`` parameter can be the following:
 

@@ -102,7 +102,7 @@ Syntax
 
 ::
 
-   #XMQTTCFG=?
+   AT#XMQTTCFG=?
 
 Response syntax
 ~~~~~~~~~~~~~~~

@@ -185,7 +185,7 @@ Syntax
 
 ::
 
-   #XFOTA=?
+   AT#XFOTA=?
 
 Response syntax
 ~~~~~~~~~~~~~~~

@@ -24,7 +24,7 @@ Syntax
 
 ::
 
-   #XPING=<url>,<length>,<timeout>[,<count>[,<interval>[,<pdn>]]]
+   AT#XPING=<url>,<length>,<timeout>[,<count>[,<interval>[,<pdn>]]]
 
 * The ``<url>`` parameter is a string.
   It represents the hostname, the IPv4, or the IPv6 address of the target host.

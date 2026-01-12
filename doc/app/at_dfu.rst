@@ -46,7 +46,7 @@ Syntax
 
 .. code-block:: none
 
-   #XDFUINIT=<type>[,<size>]
+   AT#XDFUINIT=<type>[,<size>]
 
 * The ``<type>`` parameter is an integer indicating the DFU image type as specified in the :ref:`dfu_types` section.
 * The ``<size>`` parameter is an integer indicating the total firmware image size in bytes.
@@ -81,7 +81,7 @@ Syntax
 
 .. code-block:: none
 
-   #XDFUINIT=?
+   AT#XDFUINIT=?
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -117,7 +117,7 @@ Syntax
 
 .. code-block:: none
 
-   #XDFUWRITE=<type>,<addr>,<len>
+   AT#XDFUWRITE=<type>,<addr>,<len>
 
 * The ``<type>`` parameter is an integer indicating the DFU image type as specified in the :ref:`dfu_types` section.
 * The ``<addr>`` parameter is an integer indicating the address offset for the data.
@@ -152,7 +152,7 @@ Syntax
 
 .. code-block:: none
 
-   #XDFUWRITE=?
+   AT#XDFUWRITE=?
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -187,7 +187,7 @@ Syntax
 
 .. code-block:: none
 
-   #XDFUAPPLY=<type>
+   AT#XDFUAPPLY=<type>
 
 * The ``<type>`` parameter is an integer indicating the DFU image type as specified in the :ref:`dfu_types` section.
 
@@ -222,7 +222,7 @@ Syntax
 
 .. code-block:: none
 
-   #XDFUAPPLY=?
+   AT#XDFUAPPLY=?
 
 Response syntax
 ~~~~~~~~~~~~~~~
