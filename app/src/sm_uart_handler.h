@@ -29,38 +29,11 @@ extern uint32_t sm_uart_baudrate;
 typedef int (*sm_pipe_tx_t)(const uint8_t *data, size_t len, bool urc);
 
 /**
- * @brief Enable the UART handler.
+ * @brief Get the UART pipe instance.
  *
- * @retval 0 on success. Otherwise, a negative error code.
+ * @retval Pointer to the UART modem_pipe, or NULL if not initialized.
  */
-int sm_uart_handler_enable(void);
-
-/** @brief Disable the UART handler.
- *
- * @retval 0 on success. Otherwise, a negative error code.
- */
-int sm_uart_handler_disable(void);
-
-/**
- * @brief Write data to UART or to a modem pipe.
- *
- * @param data Data to write.
- * @param len Length of data to write.
- * @param flush Whether to flush the data immediately.
- * @param urc Whether this write is for URC purposes.
- *
- * @retval 0 on success. Otherwise, a negative error code.
- */
-int sm_tx_write(const uint8_t *data, size_t len, bool flush, bool urc);
-
-/**
- * @brief Initialize UART pipe for Serial Modem.
- *
- * @param pipe_tx Transmit callback for the pipe.
- *
- * @retval Pointer to the initialized pipe on success, NULL otherwise.
- */
-struct modem_pipe *sm_uart_pipe_init(sm_pipe_tx_t pipe_tx);
+struct modem_pipe *sm_uart_pipe_get(void);
 
 /** @} */
 

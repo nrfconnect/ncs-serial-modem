@@ -8,6 +8,9 @@
 	chosen {
 		ncs,sm-uart = &dtr_uart0;
 	};
+	buttons {
+		status = "okay";
+	};
 };
 
 /* DTR with DK */

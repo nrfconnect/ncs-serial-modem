@@ -8,14 +8,8 @@
 #include "sm_at_host.h"
 #include "sm_util.h"
 #include "sm_ctrl_pin.h"
-#if defined(CONFIG_SM_CMUX)
-#include "sm_cmux.h"
-#endif
 #include <modem/lte_lc.h>
 #include <zephyr/modem/ppp.h>
-#if !defined(CONFIG_SM_CMUX)
-#include <zephyr/modem/backend/uart.h>
-#endif
 #include <zephyr/net/ethernet.h>
 #include <zephyr/net/net_if.h>
 #include <zephyr/net/ppp.h>
@@ -33,12 +27,6 @@ LOG_MODULE_REGISTER(sm_ppp, CONFIG_SM_LOG_LEVEL);
  */
 bool sm_fwd_cgev_notifs;
 
-#if defined(CONFIG_SM_CMUX)
-BUILD_ASSERT(!DT_NODE_EXISTS(DT_CHOSEN(ncs_sm_ppp_uart)),
-	"When CMUX is enabled PPP is usable only through it so it cannot have its own UART.");
-#else
-static const struct device *ppp_uart_dev = DEVICE_DT_GET(DT_CHOSEN(ncs_sm_ppp_uart));
-#endif
 static struct net_if *ppp_iface;
 
 static uint8_t ppp_data_buf[1500];
@@ -344,10 +332,16 @@ static int ppp_start(void)
 		goto error;
 	}
 
-#if defined(CONFIG_SM_CMUX)
-	ppp_pipe = sm_cmux_reserve(CMUX_PPP_CHANNEL);
-	/* The pipe opening is managed by CMUX. */
-#endif
+	if (!ppp_pipe) {
+		struct modem_pipe *pipe = sm_at_host_get_current_pipe();
+		if (!pipe) {
+			LOG_ERR("No available pipe for PPP.");
+			ppp_start_failure();
+			ret = -ENODEV;
+			goto error;
+		}
+		ppp_pipe = pipe;
+	}
 
 	modem_ppp_attach(&ppp_module, ppp_pipe);
 
@@ -380,19 +374,28 @@ bool sm_ppp_is_stopped(void)
 
 static int ppp_stop(enum ppp_reason reason)
 {
+	bool restarting;
+
 	if (ppp_state == PPP_STATE_STOPPED) {
 		LOG_INF("PPP already stopped");
 		return 0;
 	}
+
 	ppp_state = PPP_STATE_STOPPING;
+
 
 	switch (reason) {
 	case PPP_REASON_PEER_DISCONNECTED:
 	case PPP_REASON_CMD:
-		at_monitor_pause(&sm_ppp_on_cgev);
+		restarting = false;
 		break;
 	default:
+		restarting = true;
 		break;
+	}
+
+	if (!restarting) {
+		at_monitor_pause(&sm_ppp_on_cgev);
 	}
 
 	/* Bring the interface down before releasing pipes and carrier.
@@ -404,15 +407,13 @@ static int ppp_stop(enum ppp_reason reason)
 		LOG_WRN("Failed to bring PPP interface down (%d).", ret);
 	}
 
-#if !defined(CONFIG_SM_CMUX)
-	modem_pipe_close(ppp_pipe, K_SECONDS(CONFIG_SM_MODEM_PIPE_TIMEOUT));
-#endif
-
 	modem_ppp_release(&ppp_module);
 
-#if defined(CONFIG_SM_CMUX)
-	sm_cmux_release(CMUX_PPP_CHANNEL);
-#endif
+	if (!restarting) {
+		/* Return the pipe back to AT host */
+		sm_at_host_attach(ppp_pipe);
+		ppp_pipe = NULL;
+	}
 
 	net_if_carrier_off(ppp_iface);
 
@@ -607,31 +608,6 @@ NET_MGMT_REGISTER_EVENT_HANDLER(sm_ppp_event_handler,
 
 static int sm_ppp_init(void)
 {
-#if !defined(CONFIG_SM_CMUX)
-	if (!device_is_ready(ppp_uart_dev)) {
-		return -EAGAIN;
-	}
-
-	{
-		static struct modem_backend_uart ppp_uart_backend;
-		static uint8_t ppp_uart_backend_receive_buf[sizeof(ppp_data_buf)]
-			__aligned(sizeof(void *));
-		static uint8_t ppp_uart_backend_transmit_buf[sizeof(ppp_data_buf)];
-
-		const struct modem_backend_uart_config uart_backend_config = {
-			.uart = ppp_uart_dev,
-			.receive_buf = ppp_uart_backend_receive_buf,
-			.receive_buf_size = sizeof(ppp_uart_backend_receive_buf),
-			.transmit_buf = ppp_uart_backend_transmit_buf,
-			.transmit_buf_size = sizeof(ppp_uart_backend_transmit_buf),
-		};
-
-		ppp_pipe = modem_backend_uart_init(&ppp_uart_backend, &uart_backend_config);
-		if (!ppp_pipe) {
-			return -ENOSYS;
-		}
-	}
-#endif
 	/* Initialize event message queue */
 	k_msgq_init(&ppp_work.queue, (char *)&ppp_work.queue_buf, sizeof(struct ppp_event),
 		    sizeof(ppp_work.queue_buf) / sizeof(struct ppp_event));
@@ -701,6 +677,33 @@ static int handle_at_ppp(enum at_parser_cmd_type cmd_type, struct at_parser *par
 		delegate_ppp_event(PPP_STOP, PPP_REASON_CMD);
 	}
 	return -SILENT_AT_COMMAND_RET;
+}
+SM_AT_CMD_CUSTOM(atd, "ATD*99", handle_atd);
+static int handle_atd(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+			 uint32_t param_count)
+{
+	uint8_t cid = 0;
+	uint8_t l2 = 1; /* Default to PPP */
+
+	if (sscanf(parser->cursor, "*99***%hhu*%hhu#", &cid, &l2) == 2 ||
+	    sscanf(parser->cursor, "*99***%hhu#", &cid) == 1 ||
+	    sscanf(parser->cursor, "*99**%hhu#", &l2) == 1 ||
+	    strcmp(parser->cursor, "*99#") == 0) {
+		LOG_INF("Parsed CID: %d L2: %d", cid, l2);
+	} else {
+		LOG_ERR("Failed to parse ATD command.");
+		return -EINVAL;
+	}
+	if (l2 != 1) {
+		LOG_ERR("Only PPP (L2=1) is supported.");
+		return -EINVAL;
+	}
+
+	// TODO: check if CID is valid
+
+	ppp_pdn_cid = cid;
+
+	return 0;
 }
 
 static void ppp_data_passing_thread(void*, void*, void*)
@@ -835,4 +838,12 @@ static void ppp_data_passing_thread(void*, void*, void*)
 			}
 		}
 	}
+}
+
+void sm_ppp_attach(struct modem_pipe *pipe)
+{
+	if (pipe) {
+		modem_pipe_release(pipe);
+	}
+	ppp_pipe = pipe;
 }

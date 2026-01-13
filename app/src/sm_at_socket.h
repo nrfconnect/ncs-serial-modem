@@ -14,14 +14,6 @@
  */
 
 /**
- * @brief Initialize socket AT command parser.
- *
- * @retval 0 If the operation was successful.
- *           Otherwise, a (negative) error code is returned.
- */
-int sm_at_socket_init(void);
-
-/**
  * @brief Uninitialize socket AT command parser.
  *
  * @retval 0 If the operation was successful.
