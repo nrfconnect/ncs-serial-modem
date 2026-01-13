@@ -119,5 +119,6 @@ tests:
       - thingy91x/nrf9151/ns
     integration_platforms:
       - nrf9151dk/nrf9151/ns
+      - thingy91x/nrf9151/ns
     extra_args:
       - app_SNIPPET=nrf91-modem-trace-uart

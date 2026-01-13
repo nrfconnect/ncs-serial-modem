@@ -10,6 +10,7 @@ on:
   schedule:
     # Run every day at 03:00 AM
     - cron: "00 3 * * *"
+  workflow_call:
 
 jobs:
   build-and-test-in-toolchain-bundle:
@@ -67,6 +68,27 @@ jobs:
           ./nrfutil toolchain-manager launch --chdir serial_modem -- west twister -T . -v --inline-logs --overflow-as-errors --integration
 
       - name: Build Serial Modem nightly
-        if: github.event_name == 'schedule'
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_call'
         run: |
           ./nrfutil toolchain-manager launch --chdir serial_modem -- west twister -T . -v --inline-logs --overflow-as-errors --all
+      - name: Rename binaries
+        if: github.event_name == 'workflow_call'
+        run: |
+          cd serial_modem
+          VERSION=$(git describe)
+          cd ..
+          mkdir -p artifacts
+          cp twister-out/thingy91x_nrf9151_ns/zephyr/ncs-serial-modem/app/serial_modem.modem_trace/merged.hex \
+            artifacts/thingy91x_serial_modem_${VERSION}.hex
+          cp twister-out/thingy91x_nrf9151_ns/zephyr/ncs-serial-modem/app/serial_modem.modem_trace/dfu_application.zip \
+            artifacts/thingy91x_serial_modem_${VERSION}_dfu.zip
+          cp twister-out/nrf9151dk_nrf9151_ns/zephyr/ncs-serial-modem/app/serial_modem.modem_trace/merged.hex \
+            artifacts/nrf9151dk_serial_modem_${VERSION}.hex
+          cp twister-out/nrf9151dk_nrf9151_ns/zephyr/ncs-serial-modem/app/serial_modem.modem_trace/dfu_application.zip \
+            artifacts/nrf9151dk_serial_modem_${VERSION}_dfu.zip
+      - name: Store binaries as artifacts
+        if: github.event_name == 'workflow_call'
+        uses: actions/upload-artifact@v4
+        with:
+          path: artifacts/*
+          name: serial_modem_fw
