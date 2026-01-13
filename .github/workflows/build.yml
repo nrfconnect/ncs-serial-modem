@@ -10,6 +10,13 @@ on:
   schedule:
     # Run every day at 03:00 AM
     - cron: "00 3 * * *"
+  workflow_call:
+    inputs:
+      trigger_source:
+        description: 'Trigger source'
+        required: true
+        type: string
+
 
 jobs:
   build-and-test-in-toolchain-bundle:
@@ -68,6 +75,37 @@ jobs:
           ./nrfutil toolchain-manager launch --chdir serial_modem -- west twister -T . -v --inline-logs --overflow-as-errors --integration
 
       - name: Build Serial Modem nightly
-        if: github.event_name == 'schedule'
+        if: ${{ github.event_name == 'schedule' || inputs.trigger_source == 'release-workflow' }}
         run: |
           ./nrfutil toolchain-manager launch --chdir serial_modem -- west twister -T . -v --inline-logs --overflow-as-errors --all
+
+      - name: Rename binaries
+        if: ${{ inputs.trigger_source == 'release-workflow' }}
+        working-directory: serial_modem
+        run: |
+          mkdir -p artifacts
+          VERSION=${{ github.event.release.tag_name || github.ref_name || 'unknown-version' }}
+          NRF9151DK_BUILD_DIR=twister-out/nrf9151dk_nrf9151_ns/zephyr/serial_modem/app
+          NRF54_BUILD_DIR=twister-out/nrf54l15dk_nrf54l15_cpuapp/zephyr/serial_modem/samples
+
+          # nRF9151 DK ext MCU builds
+          cp ${NRF9151DK_BUILD_DIR}/serial_modem.extmcu/merged.hex \
+            artifacts/serial_modem_${VERSION}_nrf9151dk_ext_mcu.hex
+          cp ${NRF9151DK_BUILD_DIR}/serial_modem.extmcu.mtrace/merged.hex \
+            artifacts/serial_modem_${VERSION}_nrf9151dk_ext_mcu_mtrace.hex
+
+          # nRF9151 DK ppp cmux builds
+          cp ${NRF9151DK_BUILD_DIR}/serial_modem.ppp_cmux_linux/merged.hex \
+            artifacts/serial_modem_${VERSION}_nrf9151dk_ppp_cmux.hex
+          cp ${NRF9151DK_BUILD_DIR}/serial_modem.ppp_cmux_linux.mtrace/merged.hex \
+            artifacts/serial_modem_${VERSION}_nrf9151dk_ppp_cmux_mtrace.hex
+
+          # nRF54L15 DK builds
+          cp ${NRF54_BUILD_DIR}/sm_at_client_shell/sample.cellular.sm_at_client_shell/merged.hex \
+            artifacts/sm_at_client_shell_${VERSION}_nrf54l15dk.hex
+
+      - name: Upload artifacts
+        if: ${{ inputs.trigger_source == 'release-workflow' }}
+        uses: actions/upload-artifact@v4
+        with:
+          path: serial_modem/artifacts/*
