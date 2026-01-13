@@ -19,6 +19,16 @@ tests:
       - nrf9151dk/nrf9151/ns
     integration_platforms:
       - nrf9151dk/nrf9151/ns
+  serial_modem.extmcu.mtrace:
+    sysbuild: true
+    build_only: true
+    extra_args:
+      - EXTRA_DTC_OVERLAY_FILE="overlay-external-mcu.overlay"
+      - app_SNIPPET=nrf91-modem-trace-uart
+    platform_allow:
+      - nrf9151dk/nrf9151/ns
+    integration_platforms:
+      - nrf9151dk/nrf9151/ns
   serial_modem.no_dtr:
     sysbuild: true
     build_only: true
@@ -44,6 +54,17 @@ tests:
     build_only: true
     extra_args:
       - EXTRA_CONF_FILE="overlay-cmux.conf;overlay-ppp.conf"
+    platform_allow:
+      - nrf9151dk/nrf9151/ns
+      - thingy91x/nrf9151/ns
+    integration_platforms:
+      - nrf9151dk/nrf9151/ns
+  serial_modem.ppp_cmux_linux.mtrace:
+    sysbuild: true
+    build_only: true
+    extra_args:
+      - EXTRA_CONF_FILE="overlay-cmux.conf;overlay-ppp.conf"
+      - app_SNIPPET=nrf91-modem-trace-uart
     platform_allow:
       - nrf9151dk/nrf9151/ns
       - thingy91x/nrf9151/ns
