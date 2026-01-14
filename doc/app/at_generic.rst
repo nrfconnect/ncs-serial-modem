@@ -182,6 +182,10 @@ Test command
 
 The test command is not supported.
 
+.. include:: sm_data_mode.rst
+   :start-after: sm_data_mode_at_cmd_start
+   :end-before: sm_data_mode_at_cmd_end
+
 Power saving #XSLEEP
 ====================
 
