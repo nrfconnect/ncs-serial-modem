@@ -14,10 +14,10 @@ Adding AT commands
 ******************
 
 If you want to implement a custom AT command in |SM|, you will need to follow the instructions in the `Custom AT commands`_ library documentation.
-Setting the AT command filter and callback with the :c:macro:`AT_CMD_CUSTOM` macro is enough for a custom AT command that does not require setup or teardown.
+Setting the AT command filter and callback with the ``AT_CMD_CUSTOM`` macro is enough for a custom AT command that does not require setup or teardown.
 
-As a preferred alternative to the :c:macro:`AT_CMD_CUSTOM` macro, |SM| defines the :c:macro:`SM_AT_CMD_CUSTOM` macro, which is a wrapper around the :c:macro:`AT_CMD_CUSTOM` macro.
-The :c:macro:`SM_AT_CMD_CUSTOM` macro pre-processes the AT command parameters for the AT command callback and sets the default ``OK`` response if the callback returns successfully.
+As a preferred alternative to the ``AT_CMD_CUSTOM`` macro, |SM| defines the ``SM_AT_CMD_CUSTOM`` macro, which is a wrapper around the ``AT_CMD_CUSTOM`` macro.
+The ``SM_AT_CMD_CUSTOM`` macro pre-processes the AT command parameters for the AT command callback and sets the default ``OK`` response if the callback returns successfully.
 
 If your custom AT command requires setup or teardown, you will need to perform the following steps:
 
@@ -30,7 +30,7 @@ If your custom AT command requires setup or teardown, you will need to perform t
 #. Create a corresponding :file:`.c` file in :file:`app/src/`.
    The file must implement the following functions:
 
-   * Your AT command callback, which is declared with the :c:macro:`AT_CMD_CUSTOM` macro.
+   * Your AT command callback, which is declared with the ``AT_CMD_CUSTOM`` macro.
    * ``*_init()`` - Your setup function for the custom AT command.
    * ``*_uninit()`` - Your teardown function for the custom AT command.
      Make sure that the teardown function exits successfully.

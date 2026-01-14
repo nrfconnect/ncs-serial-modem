@@ -74,7 +74,7 @@ Response syntax
 
 * The ``<size>`` integer gives the size of the modem DFU area in bytes.
 * The ``<offset>`` integer gives the offset of the firmware image in the modem DFU area.
-  It is ``0`` if no image is in the modem DFU area, and ``2621440`` (:c:macro:`NRF_MODEM_DELTA_DFU_OFFSET_DIRTY`) if the modem DFU area needs to be erased before a new firmware update can be received.
+  It is ``0`` if no image is in the modem DFU area, and ``2621440`` (``NRF_MODEM_DELTA_DFU_OFFSET_DIRTY``) if the modem DFU area needs to be erased before a new firmware update can be received.
 
 Example
 ~~~~~~~
@@ -164,11 +164,11 @@ Unsolicited notification
 
   For modem FOTA, the error codes can be the following:
 
-  * ``71303169`` (:c:macro:`NRF_MODEM_DFU_RESULT_INTERNAL_ERROR`) - The modem encountered a fatal internal error during firmware update.
-  * ``71303170`` (:c:macro:`NRF_MODEM_DFU_RESULT_HARDWARE_ERROR`) - The modem encountered a fatal hardware error during firmware update.
-  * ``71303171`` (:c:macro:`NRF_MODEM_DFU_RESULT_AUTH_ERROR`) - Modem firmware update failed due to an authentication error.
-  * ``71303172`` (:c:macro:`NRF_MODEM_DFU_RESULT_UUID_ERROR`) - Modem firmware update failed due to UUID mismatch.
-  * ``71303173`` (:c:macro:`NRF_MODEM_DFU_RESULT_VOLTAGE_LOW`) - Modem firmware update not executed due to low voltage. The modem will retry the update on reboot.
+  * ``71303169`` (``NRF_MODEM_DFU_RESULT_INTERNAL_ERROR``) - The modem encountered a fatal internal error during firmware update.
+  * ``71303170`` (``NRF_MODEM_DFU_RESULT_HARDWARE_ERROR``) - The modem encountered a fatal hardware error during firmware update.
+  * ``71303171`` (``NRF_MODEM_DFU_RESULT_AUTH_ERROR``) - Modem firmware update failed due to an authentication error.
+  * ``71303172`` (``NRF_MODEM_DFU_RESULT_UUID_ERROR``) - Modem firmware update failed due to UUID mismatch.
+  * ``71303173`` (``NRF_MODEM_DFU_RESULT_VOLTAGE_LOW``) - Modem firmware update not executed due to low voltage. The modem will retry the update on reboot.
 
 Read command
 ------------
