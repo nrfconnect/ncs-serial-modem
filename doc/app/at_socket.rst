@@ -580,7 +580,6 @@ Syntax
 
   * ``4`` - ``AT_TLS_CIPHERSUITE_USED`` (get-only).
     The TLS cipher suite is chosen during the TLS handshake.
-    This option is only supported with modem firmware v2.0.0 and newer.
 
   * ``5`` - ``AT_TLS_PEER_VERIFY``.
 
@@ -606,13 +605,11 @@ Syntax
       * ``1`` - ``TLS_DTLS_CID_SUPPORTED``.
       * ``2`` - ``TLS_DTLS_CID_ENABLED``.
 
-    This option is only supported with modem firmware v1.3.5 and newer.
     See `NRF_SO_SEC_DTLS_CID <nrfxlib_dtls_cid_settings_>`_ for more details regarding the allowed values.
 
   * ``15`` - ``AT_TLS_DTLS_CID_STATUS`` (get-only).
     It is the DTLS connection identifier status.
     It can be retrieved after the DTLS handshake.
-    This option is only supported with modem firmware 1.3.5 and newer.
     See `NRF_SO_SEC_DTLS_CID_STATUS <nrfxlib_dtls_cid_status_>`_ for more details regarding the returned values.
 
   * ``18`` - ``AT_TLS_DTLS_HANDSHAKE_TIMEO``.
