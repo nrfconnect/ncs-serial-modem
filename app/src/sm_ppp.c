@@ -521,19 +521,22 @@ AT_CMD_CUSTOM(at_cfun_set_interceptor, "AT+CFUN=", at_cfun_set_callback);
 static int at_cfun_set_callback(char *buf, size_t len, char *at_cmd)
 {
 	unsigned int mode;
-	const int ret = sm_util_at_cmd_no_intercept(buf, len, at_cmd);
+	int ret;
 
 	/* sscanf() doesn't match if this is a test command (it also gets intercepted). */
-	if (ret || sscanf(at_cmd, "AT+CFUN=%u", &mode) != 1) {
-		/* The functional mode cannot have changed. */
-		return ret;
+	if (sscanf(at_cmd, "AT+CFUN=%u", &mode) == 1) {
+		if (mode == LTE_LC_FUNC_MODE_NORMAL || mode == LTE_LC_FUNC_MODE_ACTIVATE_LTE) {
+			subscribe_cgev_notifications();
+		} else if (mode == LTE_LC_FUNC_MODE_POWER_OFF) {
+			/* Unsubscribe the user as would normally happen. */
+			sm_fwd_cgev_notifs = false;
+		}
 	}
 
-	if (mode == LTE_LC_FUNC_MODE_NORMAL || mode == LTE_LC_FUNC_MODE_ACTIVATE_LTE) {
-		subscribe_cgev_notifications();
-	} else if (mode == LTE_LC_FUNC_MODE_POWER_OFF) {
-		/* Unsubscribe the user as would normally happen. */
-		sm_fwd_cgev_notifs = false;
+	/* Forward AT+CFUN command to the modem. */
+	ret = sm_util_at_cmd_no_intercept(buf, len, at_cmd);
+	if (ret) {
+		return ret;
 	}
 	return 0;
 }
