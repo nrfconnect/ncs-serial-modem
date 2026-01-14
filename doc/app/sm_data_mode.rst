@@ -19,12 +19,13 @@ Overview
 ********
 
 You can manually switch between AT-command mode and data mode.
-However, the |SM| data mode is applied automatically while using the following modules:
+However, the |SM| data mode is applied automatically when any of the following AT commands are issued:
 
-* Socket ``send()`` and ``sendto()``
-* MQTT publish
-* GNSS nRF Cloud send message
-* LwM2M carrier library app data send
+* Socket ``AT#XSEND`` and ``AT#XSENDTO``
+* MQTT publish ``AT#XMQTTPUB``
+* nRF Cloud send message ``AT#XNRFCLOUD``
+* DFU write ``AT#XDFUWRITE``
+* LwM2M carrier library app data send ``AT#XCARRIER``
 
 Entering data mode
 ==================
@@ -44,6 +45,7 @@ Other examples:
 
 * ``AT#XMQTTPUB=<topic>,"",<qos>,<retain>``
 * ``AT#XNRFCLOUD=2``
+* ``AT#XDFUWRITE=0,0,4096``
 * ``AT#XCARRIER="app_data_set"``
 
 The |SM| application sends an *OK* response when it successfully enters data mode.
