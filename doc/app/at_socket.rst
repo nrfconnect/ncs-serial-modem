@@ -821,7 +821,7 @@ Syntax
   * ``1`` - Hex string mode.
     Data is provided as a hexadecimal string in the ``<data>`` parameter.
   * ``2`` - Data mode.
-    |SM| enters ``sm_data_mode`` for data input.
+    |SM| enters :ref:`sm_data_mode` for data input.
 
 * The ``<flags>`` parameter sets the sending behavior.
   You can set it to one of the following values:
@@ -1041,7 +1041,7 @@ Syntax
 
   * ``0`` - String mode. Data is provided directly in the command as the ``<data>`` parameter.
   * ``1`` - Hex string mode. Data is provided as a hexadecimal string in the ``<data>`` parameter.
-  * ``2`` - Data mode. |SM| enters ``sm_data_mode`` for data input.
+  * ``2`` - Data mode. |SM| enters :ref:`sm_data_mode` for data input.
 
 * The ``<flags>`` parameter sets the sending behavior.
   You can set it to one of the following values:

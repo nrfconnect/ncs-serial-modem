@@ -40,7 +40,7 @@ The ``<op>`` parameter can have the following integer values:
 * ``1`` - Connect to the nRF Cloud service.
 * ``2`` - Send a message in the JSON format to the nRF Cloud service.
 
-When ``<op>`` is ``2``, |SM| enters ``sm_data_mode``.
+When ``<op>`` is ``2``, |SM| enters :ref:`sm_data_mode`.
 
 The ``<send_location>`` parameter is used only when the value of ``<op>`` is ``1``.
 It can have the following integer values:
