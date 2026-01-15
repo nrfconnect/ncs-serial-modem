@@ -53,12 +53,8 @@ Sending data in data mode
 
 Any arbitrary data received from the MCU is sent to LTE network *as-is*.
 
-If the current sending function succeeds and :ref:`CONFIG_SM_DATAMODE_URC <CONFIG_SM_DATAMODE_URC>` is defined, the |SM| application reports back the total size as ``#XDATAMODE: <size>``.
-The ``<size>`` parameter is a positive integer.
-This Unsolicited Result Code (URC) can also be used to impose flow control on uplink sending.
-
 .. note::
-  If the sending operation fails due to a network problem while in data mode, the |SM| application moves to a state where the data received from UART is dropped until the MCU sends the termination command :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>`.
+   If the sending operation fails due to a network problem while in data mode, the |SM| application moves to a state where the data received from UART is dropped until the MCU sends the termination command :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>`.
 
 Exiting data mode
 =================
@@ -122,13 +118,6 @@ Check and configure the following configuration options for data mode:
 CONFIG_SM_DATAMODE_TERMINATOR - Pattern string to terminate data mode
    This option specifies a pattern string to terminate data mode.
    The default pattern string is ``+++``.
-
-.. _CONFIG_SM_DATAMODE_URC:
-
-CONFIG_SM_DATAMODE_URC - Send URC in data mode
-   This option reports the result of the previous data-sending operation while the |SM| application remains in data mode.
-   The MCU could use this URC for application-level uplink flow control.
-   It is not selected by default.
 
 .. _CONFIG_SM_DATAMODE_BUF_SIZE:
 

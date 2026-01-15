@@ -223,10 +223,6 @@ static void raw_send(uint8_t flags)
 				(void)ring_buf_get_finish(&data_rb, size_send + size_finish);
 			}
 			k_mutex_unlock(&mutex_mode);
-
-#if defined(CONFIG_SM_DATAMODE_URC)
-			rsp_send("\r\n#XDATAMODE: %d\r\n", size_finish);
-#endif
 		} else {
 			break;
 		}
