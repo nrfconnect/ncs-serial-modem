@@ -143,11 +143,6 @@ config SM_DATAMODE_TERMINATOR
 	help
 	  Use a pattern to terminate data mode
 
-config SM_DATAMODE_URC
-	bool "Send URC in data mode"
-	help
-	  Report result of data mode sending
-
 config SM_DATAMODE_BUF_SIZE
 	int "Buffer size for data mode"
 	range 1024 8192
