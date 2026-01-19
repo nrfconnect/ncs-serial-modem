@@ -24,6 +24,7 @@
 #include <zephyr/random/random.h>
 #include <zephyr/pm/device.h>
 #include <assert.h>
+#include <strings.h>
 
 LOG_MODULE_REGISTER(sm_ppp, CONFIG_SM_LOG_LEVEL);
 
@@ -433,13 +434,13 @@ AT_CMD_CUSTOM(at_cgerep_interceptor, "AT+CGEREP", at_cgerep_callback);
 static int at_cgerep_callback(char *buf, size_t len, char *at_cmd)
 {
 	int ret;
-	unsigned int subscribe;
-	const bool set_cmd = (sscanf(at_cmd, "AT+CGEREP=%u", &subscribe) == 1);
+	unsigned int subscribe = 0;
+	const bool set_cmd = (sscanf(at_cmd, "%*[^=]=%u", &subscribe) == 1);
 
 	/* The modem interprets AT+CGEREP and AT+CGEREP= as AT+CGEREP=0.
 	 * Prevent those forms, only allowing AT+CGEREP=0, for simplicty.
 	 */
-	if (!set_cmd && (!strcmp(at_cmd, "AT+CGEREP") || !strcmp(at_cmd, "AT+CGEREP="))) {
+	if (!set_cmd && (!strcasecmp(at_cmd, "AT+CGEREP") || !strcasecmp(at_cmd, "AT+CGEREP="))) {
 		LOG_ERR("The syntax %s is disallowed. Use AT+CGEREP=0 instead.", at_cmd);
 		return -EINVAL;
 	}
@@ -524,7 +525,7 @@ static int at_cfun_set_callback(char *buf, size_t len, char *at_cmd)
 	int ret;
 
 	/* sscanf() doesn't match if this is a test command (it also gets intercepted). */
-	if (sscanf(at_cmd, "AT+CFUN=%u", &mode) == 1) {
+	if (sscanf(at_cmd, "%*[^=]=%u", &mode) == 1) {
 		if (mode == LTE_LC_FUNC_MODE_NORMAL || mode == LTE_LC_FUNC_MODE_ACTIVATE_LTE) {
 			subscribe_cgev_notifications();
 		} else if (mode == LTE_LC_FUNC_MODE_POWER_OFF) {
