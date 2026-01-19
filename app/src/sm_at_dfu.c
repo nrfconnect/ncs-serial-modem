@@ -165,6 +165,8 @@ static int xdfu_datamode_callback(uint8_t op, const uint8_t *data, int len, uint
 					xdfu_status = err;
 					break;
 				}
+
+				xdfu_full_mfw_datamode_context.addr += len;
 			} else {
 				LOG_ERR("Invalid segment type: %d", full_mfw_dfu_segment_type);
 				xdfu_status = -EINVAL;
