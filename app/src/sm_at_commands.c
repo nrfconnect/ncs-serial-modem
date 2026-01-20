@@ -26,8 +26,6 @@
 #include "sm_ctrl_pin.h"
 #include "sm_settings.h"
 #include "sm_at_host.h"
-#include "sm_at_socket.h"
-#include "sm_at_sms.h"
 #include "sm_at_fota.h"
 #include "sm_version.h"
 #include "sm_at_nrfcloud.h"
@@ -353,26 +351,4 @@ static int handle_ate1(enum at_parser_cmd_type cmd_type, struct at_parser *, uin
 	sm_at_host_echo(true);
 
 	return 0;
-}
-
-void sm_at_uninit(void)
-{
-	int err;
-
-	err = sm_at_socket_uninit();
-	if (err) {
-		LOG_WRN("%s uninitialization failed (%d).", "Socket", err);
-	}
-	if (IS_ENABLED(CONFIG_SM_SMS)) {
-		err = sm_at_sms_uninit();
-		if (err) {
-			LOG_WRN("%s uninitialization failed (%d).", "SMS", err);
-		}
-	}
-	if (IS_ENABLED(CONFIG_SM_NRF_CLOUD)) {
-		err = sm_at_nrfcloud_uninit();
-		if (err) {
-			LOG_WRN("%s uninitialization failed (%d).", "nRF Cloud", err);
-		}
-	}
 }

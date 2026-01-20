@@ -216,14 +216,3 @@ static int handle_at_sms(enum at_parser_cmd_type cmd_type, struct at_parser *par
 
 	return err;
 }
-
-/**@brief API to uninitialize SMS AT commands handler
- */
-int sm_at_sms_uninit(void)
-{
-	if (sms_handle >= 0) {
-		sms_unregister_listener(sms_handle);
-	}
-
-	return 0;
-}
