@@ -161,7 +161,7 @@ Response syntax
 
 ::
 
-   #XMQTTEVT=<evt_type>,<result>
+   #XMQTTEVT: <evt_type>,<result>
 
 * The ``<evt_type>`` parameter is an integer indicating the type of the event.
   It can return the following values for the ``#XMQTTCON`` command:
@@ -180,6 +180,7 @@ Unsolicited notification
 ------------------------
 
 ::
+
    #XMQTTEVT=<evt_type>,<result>
 
 * The ``<evt_type>`` parameter is an integer indicating the type of the event.

@@ -411,6 +411,12 @@ Install dependencies:
 
    pip install -r app/scripts/requirements.txt
 
+.. note::
+
+   cbor2 5.8.0 does not work with the ``sm_dfu_host.py`` script due to a known bug introduced in that version.
+   Versions older and newer than that work.
+   See `cbor2 bug`_ for more information.
+
 Usage
 -----
 
