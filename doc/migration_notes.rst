@@ -75,7 +75,7 @@ Socket AT command changes
 The socket AT commands have been updated to use a handle-based approach instead of socket selection ``AT#XSOCKETSELECT``.
 This provides more flexibility and clearer socket management by directly referencing socket handles in all operations.
 There are also other changes to the socket AT commands to improve functionality and usability.
-Especially the ``#XSEND``/``#XSENDTO`` and ``#XRECV``/``#XRECV`` commands have been updated significantly.
+Especially the ``AT#XSEND``/``AT#XSENDTO`` and ``AT#XRECV``/``AT#XRECVFROM`` commands have been updated significantly.
 
 The following is the list of changes:
 
@@ -110,7 +110,7 @@ The following is the list of changes:
     * New response: ``#XSEND: <handle>,<result_type>,<size>``
 
   * A new ``#XSENDNTF`` notification will be sent when the network acknowledges the send operation.
-    This notification is requested with the ``<flags>`` parameter in the ``#XSEND`` or ``#XSENDTO`` commands.
+    This notification is requested with the ``<flags>`` parameter in the ``AT#XSEND`` or ``AT#XSENDTO`` commands.
 
     * Syntax: ``#XSENDNTF: <handle>,<status>,<size>``
 
@@ -404,7 +404,7 @@ If you need any of those features with this |SM|, please contact customer suppor
 
   * HTTP client functionality, including ``AT#XHTTPCCON`` and ``AT#XHTTPCREQ`` commands, and ``#XHTTPCRSP`` notification.
   * FTP and TFTP clients, including ``AT#XFTP`` and ``AT#XTFTP`` commands.
-  * The ``#XGPIO`` AT command.
+  * The ``AT#XGPIO`` AT command.
   * The ``AT#XPOLL`` command.
     Use ``AT#XAPOLL`` instead.
   * The ``CONFIG_SM_DATAMODE_URC`` Kconfig option.

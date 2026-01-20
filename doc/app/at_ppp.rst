@@ -198,6 +198,12 @@ For the process described here, |SM|'s UARTs must be connected to the Linux host
 
 .. note::
 
+   You might encounter a packet domain event (``+CGEV: IPV6 FAIL 0``) indicating a failure in obtaining an IPv6 address.
+   This is normal and can be ignored since the modem does not require an IPv6 address when PPP is used.
+   IPv6 addressing is handled by the host's IP stack.
+
+.. note::
+
    You might encounter some issues with DNS resolution.
    Edit the :file:`/etc/resolv.conf` file to work around these issues.
    You can add DNS servers that are reachable with your current network configuration.

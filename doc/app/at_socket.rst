@@ -97,7 +97,7 @@ Examples
 Read command
 ------------
 
-The read command allows you to check the socket handle.
+The read command allows you to list all sockets that have been opened.
 
 Syntax
 ~~~~~~
@@ -144,6 +144,8 @@ Example
 
    AT#XSOCKET?
    #XSOCKET: 0,1,0,1,0
+   #XSOCKET: 1,2,0,1,0
+   #XSOCKET: 4,1,0,2,1
    OK
 
 Test command

@@ -91,6 +91,7 @@
 .. _`github_release`: https://github.com/nrfconnect/ncs-serial-modem/releases
 .. _`sdk-nrfxlib`: https://github.com/nrfconnect/sdk-nrfxlib
 .. _`nrf_errno.h` : https://github.com/nrfconnect/sdk-nrfxlib/blob/main/nrf_modem/include/nrf_errno.h
+.. _`cbor2 bug` : https://github.com/agronholm/cbor2/issues/272
 
 .. ### others
 

@@ -18,7 +18,7 @@ Configuration options
 
 CONFIG_SM_CUSTOMER_VERSION - Customer version string
    Version string defined by the customer after customizing the application.
-   When defined, this version is reported with the baseline versions by the ``#XSMVER`` AT command.
+   When defined, this version is reported with the baseline versions by the ``AT#XSMVER`` AT command.
 
 .. _CONFIG_SM_AT_MAX_PARAM:
 
@@ -166,7 +166,7 @@ CONFIG_SM_PGPS_INJECT_FIX_DATA - Injects the data obtained when acquiring a fix.
 .. _CONFIG_SM_DFU_MODEM_FULL:
 
 CONFIG_SM_DFU_MODEM_FULL - Enable full modem DFU
-   This option enables support for full modem firmware updates using the ``#XDFUINIT``, ``#XDFUWRITE``, and ``#XDFUAPPLY`` commands.
+   This option enables support for full modem firmware updates using the ``AT#XDFUINIT``, ``AT#XDFUWRITE``, and ``AT#XDFUAPPLY`` commands.
    See the :ref:`DFU_AT_commands` for more information.
 
 .. _sm_config_files:
