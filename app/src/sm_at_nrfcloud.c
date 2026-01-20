@@ -782,13 +782,4 @@ static void sm_at_nrfcloud_init(int ret, void *ctx)
 }
 NRF_MODEM_LIB_ON_INIT(sm_nrfcloud_init_hook, sm_at_nrfcloud_init, NULL);
 
-int sm_at_nrfcloud_uninit(void)
-{
-	if (sm_nrf_cloud_ready) {
-		(void)nrf_cloud_disconnect();
-	}
-	(void)nrf_cloud_uninit();
-
-	return 0;
-}
 #endif /* CONFIG_SM_NRF_CLOUD */

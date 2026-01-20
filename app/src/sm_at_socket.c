@@ -16,7 +16,6 @@
 #include <zephyr/posix/sys/eventfd.h>
 #include "sm_util.h"
 #include "sm_at_host.h"
-#include "sm_at_socket.h"
 #include "sm_sockopt.h"
 
 LOG_MODULE_REGISTER(sm_sock, CONFIG_SM_LOG_LEVEL);
@@ -2252,17 +2251,3 @@ static int sm_at_socket_init(void)
 	return 0;
 }
 SYS_INIT(sm_at_socket_init, APPLICATION, 0);
-
-/**@brief API to uninitialize Socket AT commands handler
- */
-int sm_at_socket_uninit(void)
-{
-	for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
-		if (socks[i].fd != INVALID_SOCKET) {
-			do_socket_close(&socks[i]);
-		}
-	}
-	poll_ctx = (struct async_poll_ctx){0};
-
-	return 0;
-}

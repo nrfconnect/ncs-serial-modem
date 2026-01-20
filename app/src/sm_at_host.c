@@ -6,7 +6,6 @@
 
 #include "sm_at_host.h"
 #include "sm_at_fota.h"
-#include "sm_at_socket.h"
 #include "sm_uart_handler.h"
 #include "sm_util.h"
 #include "sm_ctrl_pin.h"
@@ -1227,8 +1226,6 @@ void sm_at_host_uninit(void)
 	}
 	datamode_handler = NULL;
 	k_mutex_unlock(&mutex_mode);
-
-	sm_at_uninit();
 
 	at_host_power_off(true);
 
