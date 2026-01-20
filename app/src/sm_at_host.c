@@ -372,7 +372,7 @@ static int cmd_grammar_check(const char *cmd, size_t length)
 
 	/* check AT (if not, no check) */
 	if (length < 2 || toupper((int)cmd[0]) != 'A' || toupper((int)cmd[1]) != 'T') {
-		return -EINVAL;
+		return -ENOENT;
 	}
 
 	/* check AT<NULL> */
@@ -609,8 +609,13 @@ static void cmd_send(uint8_t *buf, size_t cmd_length, size_t buf_size, bool *sto
 		offset++;
 	}
 
-	if (cmd_grammar_check(at_cmd, cmd_length) != 0) {
+	err = cmd_grammar_check(at_cmd, cmd_length);
+	if (err < 0) {
 		LOG_ERR("AT command syntax invalid: %s", at_cmd);
+		if (err == -ENOENT) {
+			/* Not an AT command, ignore silently. */
+			return;
+		}
 		rsp_send_error();
 		return;
 	}
