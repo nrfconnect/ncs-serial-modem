@@ -125,18 +125,18 @@
 			<text x="8.08" y="282.53" class="st11" v:langID="1044"><v:paragraph v:horizAlign="1"/><v:tabList/>DTR</text>		</g>
 		<g id="shape100-42" v:mID="100" v:groupContext="shape" transform="translate(256.118,-136.496)">
 			<title>Sheet.100</title>
-			<desc>RING</desc>
+			<desc>RI</desc>
 			<v:textBlock v:margins="rect(4,4,4,4)" v:tabSpace="42.5197"/>
 			<v:textRect cx="16.2992" cy="280.134" width="32.6" height="11.3386"/>
 			<rect x="0" y="274.465" width="32.5984" height="11.3386" class="st10"/>
-			<text x="6.3" y="282.53" class="st11" v:langID="1044"><v:paragraph v:horizAlign="1"/><v:tabList/>RING</text>		</g>
+			<text x="6.3" y="282.53" class="st11" v:langID="1044"><v:paragraph v:horizAlign="1"/><v:tabList/>RI</text>		</g>
 		<g id="shape101-45" v:mID="101" v:groupContext="shape" transform="translate(165.409,-136.496)">
 			<title>Sheet.101</title>
-			<desc>RING</desc>
+			<desc>RI</desc>
 			<v:textBlock v:margins="rect(4,4,4,4)" v:tabSpace="42.5197"/>
 			<v:textRect cx="16.2992" cy="280.134" width="32.6" height="11.3386"/>
 			<rect x="0" y="274.465" width="32.5984" height="11.3386" class="st10"/>
-			<text x="6.3" y="282.53" class="st11" v:langID="1044"><v:paragraph v:horizAlign="1"/><v:tabList/>RING</text>		</g>
+			<text x="6.3" y="282.53" class="st11" v:langID="1044"><v:paragraph v:horizAlign="1"/><v:tabList/>RI</text>		</g>
 		<g id="shape103-48" v:mID="103" v:groupContext="shape" v:layerMember="0"
 				transform="translate(130.101,-107.163) rotate(-13.1607)">
 			<title>Dotted line.103</title>

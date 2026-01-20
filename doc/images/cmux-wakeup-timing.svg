@@ -106,7 +106,7 @@
      x="30"
      y="70"
      class="signal-name"
-     id="text10">RING</text>
+     id="text10">RI</text>
   <text
      x="30"
      y="150"
@@ -223,7 +223,7 @@
      text-anchor="middle"
      class="timing-label"
      id="text44">t4</text>
-  <!-- RING signal (active low) -->
+  <!-- RI signal (active low) -->
   <!-- Inactive (high) before pulse -->
   <line
      x1="150"
@@ -266,7 +266,7 @@
      y2="60"
      class="high"
      id="line54" />
-  <!-- RING labels -->
+  <!-- RI labels -->
   <text
      x="200"
      y="55"
@@ -401,7 +401,7 @@
      class="signal-label"
      id="text94">Active</text>
   <!-- Timing annotations with arrows -->
-  <!-- RING pulse annotation -->
+  <!-- RI pulse annotation -->
   <text
      x="305.88928"
      y="98.316025"
