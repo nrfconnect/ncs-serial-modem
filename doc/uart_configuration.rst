@@ -38,11 +38,11 @@ The following UART signals are used:
    * - DTR
      - Host → Modem
      - *Data Terminal Ready* - Host signals UART is powered on
-   * - RING
+   * - RI
      - Modem → Host
      - *Ring Indicator* - Modem wakes host for incoming data
 
-The Data Terminal Ready (DTR) and Ring Indicator (RING) signals are the **control signals** used for UART power management, while TX/RX/RTS/CTS are the standard UART signals.
+The Data Terminal Ready (DTR) and Ring Indicator (RI) signals are the **control signals** used for UART power management, while TX/RX/RTS/CTS are the standard UART signals.
 
 
 Board-specific pin mapping
@@ -206,7 +206,7 @@ Host application
       UART1 is routed to VCOM1 on the interface chip.
       The VCOM1 is used for console/shell.
 
-      RING and DTR signals are located on the P1 connector.
+      RI and DTR signals are located on the P1 connector.
 
       .. note::
          Disable VCOM0 from `Board Configurator app`_ to release UART30 for |SM|.
@@ -259,8 +259,8 @@ No other GPIO control is required to utilize the PSM or eDRX modes.
 Incoming data wake-up
 =====================
 
-When the UART is powered down and there is incoming data, the |SM| application issues a pulse signal on the **RING** pin to notify the host.
-The RING signal is handled by the modem driver on the host, which powers up the UART device and asserts the DTR line, signaling the |SM| that the UART is powered on and ready to receive data.
+When the UART is powered down and there is incoming data, the |SM| application issues a pulse signal on the **RI** pin to notify the host.
+The RI signal is handled by the modem driver on the host, which powers up the UART device and asserts the DTR line, signaling the |SM| that the UART is powered on and ready to receive data.
 
 .. figure:: images/cmux-wakeup-timing.svg
    :alt: Modem waking up the host timing diagram
@@ -268,7 +268,7 @@ The RING signal is handled by the modem driver on the host, which powers up the 
    Sequence diagram showing the wake-up sequence when the UART is powered down
 
 This sequence diagram illustrates the wake-up sequence when the UART is powered down.
-The RING signal pulse triggers the host to power up its UART and assert DTR, which in turn signals the modem that the UART interface is ready.
+The RI signal pulse triggers the host to power up its UART and assert DTR, which in turn signals the modem that the UART interface is ready.
 This coordinated wake-up ensures both ends of the communication link are ready before data transmission begins.
 
 Host-initiated wake-up

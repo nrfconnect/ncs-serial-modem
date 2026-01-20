@@ -15,7 +15,7 @@
  *
  * UART0 located on the P0 connector is the "uart30" instance in the device tree.
  * UART1 is "uart20" in the device tree and it is routed to the VCOM1 on the interface chip.
- * RING and DTR signals are located on P1 connector.
+ * RI and DTR signals are located on P1 connector.
  */
 
 / {
