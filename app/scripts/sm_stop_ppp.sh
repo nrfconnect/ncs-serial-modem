@@ -18,5 +18,5 @@ fi
 if [ -f $PIDFILE ]; then
         echo "Waiting for Shutdown script to complete..."
         timeout 12s tail --pid=$(head -1 <$PIDFILE) -f /dev/null \
-        || echo "Timeout waiting for Shutdown script to stop"
+        || (echo "Timeout waiting for Shutdown script to stop"; exit 1)
 fi

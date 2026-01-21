@@ -121,3 +121,18 @@ tests:
       - nrf9151dk/nrf9151/ns
     extra_args:
       - app_SNIPPET=nrf91-modem-trace-uart
+  serial_modem.pytest:
+    slow: true
+    platform_allow:
+      - nrf9151dk/nrf9151/ns
+    tags:
+      - pytest
+    harness: pytest
+    harness_config:
+      pytest_dut_scope: module
+    integration_platforms:
+      - nrf9151dk/nrf9151/ns
+    extra_configs:
+      - CONFIG_SM_SKIP_READY_MSG=n
+    extra_args:
+      - EXTRA_CONF_FILE="overlay-cmux.conf;overlay-ppp.conf"
