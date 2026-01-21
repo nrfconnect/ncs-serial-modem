@@ -84,12 +84,13 @@ The following is the list of changes:
   * ``AT#XCLOSE`` - New command to close individual sockets or all sockets at once.
   * Syntax: ``AT#XCLOSE[=<handle>]`` (handle is optional - omit to close all sockets).
 
-* Updated socket creation:
+* Updated socket creation with ``AT#XSOCKET`` and ``AT#XSSOCKET``:
 
-  * ``AT#XSOCKET`` - No longer supports closing sockets (``op=0`` removed).
+  * No longer supports closing sockets (``op=0`` removed).
     Only creates sockets and returns a handle.
-  * ``AT#XSSOCKET`` - No longer supports closing sockets (``op=0`` removed).
-    Only creates secure sockets and returns a handle.
+  * The ``<op>`` parameter has been renamed to ``<family>`` since socket closing is no longer supported.
+  * In ``AT#XSOCKET``, a new value ``3`` has been added for the ``<family>`` parameter to represent the packet family to be used with raw sockets.
+    This value is not valid for secure sockets in ``AT#XSSOCKET``.
 
 * Removed commands:
 
