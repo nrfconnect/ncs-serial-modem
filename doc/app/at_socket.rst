@@ -27,21 +27,21 @@ Syntax
 
 ::
 
-   AT#XSOCKET=<op>,<type>,<role>[,<cid>]
+   AT#XSOCKET=<family>,<type>,<role>[,<cid>]
 
-* The ``<op>`` parameter can accept one of the following values:
+* The ``<family>`` parameter can accept one of the following values:
 
-  * ``1`` - Open a socket for IP protocol family version 4.
-    The protocol family is ignored with the ``<type>`` parameter value ``3``.
-  * ``2`` - Open a socket for IP protocol family version 6.
-    The protocol family is ignored with the ``<type>`` parameter value ``3``.
+  * ``1`` - IP protocol family version 4.
+  * ``2`` - IP protocol family version 6.
+  * ``3`` - Raw packet family.
+    The ``<type>`` parameter must be ``3`` and the ``<role>`` parameter must be ``0``.
 
 * The ``<type>`` parameter can accept one of the following values:
 
   * ``1`` - Set ``SOCK_STREAM`` for the stream socket type using the TCP protocol.
   * ``2`` - Set ``SOCK_DGRAM`` for the datagram socket type using the UDP protocol.
   * ``3`` - Set ``SOCK_RAW`` for the raw socket type using a generic packet protocol.
-    The ``<op>`` parameter can be either ``1`` or ``2``, as the raw socket ignores the protocol family.
+    The ``<family>`` parameter must be ``3`` and the ``<role>`` parameter must be ``0``.
 
 * The ``<role>`` parameter can accept one of the following values:
 
@@ -194,12 +194,12 @@ Syntax
 
 ::
 
-   AT#XSSOCKET=<op>,<type>,<role>,<sec_tag>[,<peer_verify>[,<cid>]]
+   AT#XSSOCKET=<family>,<type>,<role>,<sec_tag>[,<peer_verify>[,<cid>]]
 
-* The ``<op>`` parameter can accept one of the following values:
+* The ``<family>`` parameter can accept one of the following values:
 
-  * ``1`` - Open a socket for IP protocol family version 4.
-  * ``2`` - Open a socket for IP protocol family version 6.
+  * ``1`` - IP protocol family version 4.
+  * ``2`` - IP protocol family version 6.
 
 * The ``<type>`` parameter can accept one of the following values:
 

@@ -302,7 +302,7 @@ void test_xsocket_ipv6_tcp(void)
 
 /*
  * Test: Create RAW socket via AT command
- * - Command: AT#XSOCKET=1,3,0\r\n
+ * - Command: AT#XSOCKET=3,3,0\r\n
  * - Tests: RAW socket type
  */
 void test_xsocket_raw(void)
@@ -317,7 +317,7 @@ void test_xsocket_raw(void)
 	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
 
 	/* Send AT command: family=1(IPv4), type=3(RAW), role=0(client) */
-	send_at_command("AT#XSOCKET=1,3,0\r\n");
+	send_at_command("AT#XSOCKET=3,3,0\r\n");
 
 	/* Verify response contains socket handle and correct type/protocol */
 	response = get_captured_response();
@@ -329,6 +329,48 @@ void test_xsocket_raw(void)
 	/* Close socket */
 	__cmock_nrf_close_ExpectAndReturn(0, 0);
 	send_at_command("AT#XCLOSE=0\r\n");
+}
+
+/*
+ * Test: Attempt to create packet/raw socket with invalid family or type
+ * - Command: AT#XSOCKET=1,3,0\r\n
+ * - Command: AT#XSOCKET=3,1,0\r\n
+ * - Tests: Invalid socket family/type rejection
+ */
+void test_xsocket_raw_invalid_family_type(void)
+{
+	const char *response;
+
+	/* Send AT command with packet family but not raw type */
+	send_at_command("AT#XSOCKET=3,1,0\r\n");
+
+	/* Verify error response */
+	response = get_captured_response();
+	TEST_ASSERT_TRUE(strstr(response, "ERROR") != NULL);
+
+	/* Send AT command with raw type but not packet family */
+	send_at_command("AT#XSOCKET=1,3,0\r\n");
+
+	/* Verify error response */
+	response = get_captured_response();
+	TEST_ASSERT_TRUE(strstr(response, "ERROR") != NULL);
+}
+
+/*
+ * Test: Attempt to create socket with invalid family
+ * - Command: AT#XSOCKET=0,1,0\r\n
+ * - Tests: Invalid socket family rejection
+ */
+void test_xsocket_invalid_family(void)
+{
+	const char *response;
+
+	/* Send AT command with invalid socket family 0 */
+	send_at_command("AT#XSOCKET=0,1,0\r\n");
+
+	/* Verify error response */
+	response = get_captured_response();
+	TEST_ASSERT_TRUE(strstr(response, "ERROR") != NULL);
 }
 
 /*

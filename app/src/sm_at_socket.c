@@ -23,12 +23,6 @@ LOG_MODULE_REGISTER(sm_sock, CONFIG_SM_LOG_LEVEL);
 #define SM_FDS_COUNT CONFIG_POSIX_OPEN_MAX
 #define SM_MAX_SOCKET_COUNT (SM_FDS_COUNT - 1)
 
-/**@brief Socket operations. */
-enum sm_socket_operation {
-	AT_SOCKET_OPEN = 0x1,
-	AT_SOCKET_OPEN6
-};
-
 /**@brief Socketopt operations. */
 enum sm_socketopt_operation {
 	AT_SOCKETOPT_GET,
@@ -495,18 +489,33 @@ static int do_socket_open(struct sm_socket *sock)
 	int ret = 0;
 	int proto = IPPROTO_TCP;
 
+	if (sock->family != NRF_AF_INET && sock->family != NRF_AF_INET6 &&
+	    sock->family != NRF_AF_PACKET) {
+		LOG_ERR("Socket family %d not supported", sock->family);
+		return -ENOTSUP;
+	}
+
+	if (sock->type == NRF_SOCK_RAW || sock->family == NRF_AF_PACKET) {
+		if (sock->type != NRF_SOCK_RAW || sock->family != NRF_AF_PACKET)  {
+			LOG_ERR("Raw socket: Family and type must match");
+			return -EINVAL;
+		}
+	}
+
 	if (sock->type == NRF_SOCK_STREAM) {
 		ret = nrf_socket(sock->family, NRF_SOCK_STREAM, NRF_IPPROTO_TCP);
 	} else if (sock->type == NRF_SOCK_DGRAM) {
 		ret = nrf_socket(sock->family, NRF_SOCK_DGRAM, NRF_IPPROTO_UDP);
 		proto = NRF_IPPROTO_UDP;
 	} else if (sock->type == NRF_SOCK_RAW) {
-		sock->family = NRF_SOCK_RAW;
-		sock->role = NRF_SO_SEC_ROLE_CLIENT;
+		if (sock->role != NRF_SO_SEC_ROLE_CLIENT)  {
+			LOG_ERR("Raw socket: Role must be client");
+			return -EINVAL;
+		}
 		ret = nrf_socket(sock->family, NRF_SOCK_RAW, NRF_IPPROTO_RAW);
 		proto = NRF_IPPROTO_IP;
 	} else {
-		LOG_ERR("socket type %d not supported", sock->type);
+		LOG_ERR("Socket type %d not supported", sock->type);
 		return -ENOTSUP;
 	}
 	if (ret < 0) {
@@ -552,8 +561,13 @@ static int do_secure_socket_open(struct sm_socket *sock, int peer_verify)
 	int ret = 0;
 	int proto = sock->type == NRF_SOCK_STREAM ? NRF_SPROTO_TLS1v2 : NRF_SPROTO_DTLS1v2;
 
+	if (sock->family != NRF_AF_INET && sock->family != NRF_AF_INET6) {
+		LOG_ERR("Socket family %d not supported", sock->family);
+		return -ENOTSUP;
+	}
+
 	if (sock->type != NRF_SOCK_STREAM && sock->type != NRF_SOCK_DGRAM) {
-		LOG_ERR("socket type %d not supported", sock->type);
+		LOG_ERR("Socket type %d not supported", sock->type);
 		return -ENOTSUP;
 	}
 
@@ -1233,50 +1247,46 @@ STATIC int handle_at_socket(enum at_parser_cmd_type cmd_type, struct at_parser *
 			    uint32_t param_count)
 {
 	int err = -EINVAL;
-	uint16_t op;
 	struct sm_socket *sock = NULL;
 
 	switch (cmd_type) {
 	case AT_PARSER_CMD_TYPE_SET:
-		err = at_parser_num_get(parser, 1, &op);
-		if (err) {
-			return err;
+		sock = find_avail_socket();
+		if (sock == NULL) {
+			LOG_ERR("Max socket count reached");
+			err = -EINVAL;
+			goto error;
 		}
-		if (op == AT_SOCKET_OPEN || op == AT_SOCKET_OPEN6) {
-			sock = find_avail_socket();
-			if (sock == NULL) {
-				LOG_ERR("Max socket count reached");
+		init_socket(sock);
+
+		err = at_parser_num_get(parser, 1, &sock->family);
+		if (err) {
+			goto error;
+		}
+		err = at_parser_num_get(parser, 2, &sock->type);
+		if (err) {
+			goto error;
+		}
+		err = at_parser_num_get(parser, 3, &sock->role);
+		if (err) {
+			goto error;
+		}
+		if (param_count > 4) {
+			err = at_parser_num_get(parser, 4, &sock->cid);
+			if (err) {
+				goto error;
+			}
+			if (sock->cid > 10) {
 				err = -EINVAL;
 				goto error;
 			}
-			init_socket(sock);
-			err = at_parser_num_get(parser, 2, &sock->type);
-			if (err) {
-				goto error;
-			}
-			err = at_parser_num_get(parser, 3, &sock->role);
-			if (err) {
-				goto error;
-			}
-			sock->family = (op == AT_SOCKET_OPEN) ? NRF_AF_INET : NRF_AF_INET6;
-			if (param_count > 4) {
-				err = at_parser_num_get(parser, 4, &sock->cid);
-				if (err) {
-					goto error;
-				}
-				if (sock->cid > 10) {
-					err = -EINVAL;
-					goto error;
-				}
-			}
-			err = do_socket_open(sock);
-			if (err) {
-				LOG_ERR("do_socket_open() failed: %d", err);
-				goto error;
-			}
-		} else {
-			err = -EINVAL;
-		} break;
+		}
+		err = do_socket_open(sock);
+		if (err) {
+			LOG_ERR("do_socket_open() failed: %d", err);
+			goto error;
+		}
+		break;
 
 	case AT_PARSER_CMD_TYPE_READ:
 		for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
@@ -1291,8 +1301,8 @@ STATIC int handle_at_socket(enum at_parser_cmd_type cmd_type, struct at_parser *
 		break;
 
 	case AT_PARSER_CMD_TYPE_TEST:
-		rsp_send("\r\n#XSOCKET: <handle>,(%d,%d),(%d,%d,%d),(%d,%d),<cid>\r\n",
-			AT_SOCKET_OPEN, AT_SOCKET_OPEN6,
+		rsp_send("\r\n#XSOCKET: <handle>,(%d,%d,%d),(%d,%d,%d),(%d,%d),<cid>\r\n",
+			AF_INET, AF_INET6, AF_PACKET,
 			SOCK_STREAM, SOCK_DGRAM, SOCK_RAW,
 			AT_SOCKET_ROLE_CLIENT, AT_SOCKET_ROLE_SERVER);
 		err = 0;
@@ -1315,78 +1325,74 @@ STATIC int handle_at_secure_socket(enum at_parser_cmd_type cmd_type,
 				   struct at_parser *parser, uint32_t param_count)
 {
 	int err = -EINVAL;
-	uint16_t op;
 	struct sm_socket *sock = NULL;
 
 	switch (cmd_type) {
 	case AT_PARSER_CMD_TYPE_SET:
-		err = at_parser_num_get(parser, 1, &op);
-		if (err) {
-			return err;
+		sock = find_avail_socket();
+		if (sock == NULL) {
+			LOG_ERR("Max socket count reached");
+			err = -EINVAL;
+			goto error;
 		}
-		if (op == AT_SOCKET_OPEN || op == AT_SOCKET_OPEN6) {
-			/** Peer verification level for TLS connection.
-			 *    - 0 - none
-			 *    - 1 - optional
-			 *    - 2 - required
-			 * If not set, socket will use defaults (none for servers,
-			 * required for clients)
-			 */
-			uint16_t peer_verify;
+		init_socket(sock);
 
-			sock = find_avail_socket();
-			if (sock == NULL) {
-				LOG_ERR("Max socket count reached");
-				err = -EINVAL;
-				goto error;
-			}
-			init_socket(sock);
-			err = at_parser_num_get(parser, 2, &sock->type);
-			if (err) {
-				goto error;
-			}
-			err = at_parser_num_get(parser, 3, &sock->role);
-			if (err) {
-				goto error;
-			}
-			if (sock->role == AT_SOCKET_ROLE_SERVER) {
-				peer_verify = TLS_PEER_VERIFY_NONE;
-			} else if (sock->role == AT_SOCKET_ROLE_CLIENT) {
-				peer_verify = TLS_PEER_VERIFY_REQUIRED;
-			} else {
-				err = -EINVAL;
-				goto error;
-			}
-			sock->sec_tag = SEC_TAG_TLS_INVALID;
-			err = at_parser_num_get(parser, 4, &sock->sec_tag);
-			if (err) {
-				goto error;
-			}
-			if (param_count > 5) {
-				err = at_parser_num_get(parser, 5, &peer_verify);
-				if (err) {
-					goto error;
-				}
-			}
-			sock->family = (op == AT_SOCKET_OPEN) ? AF_INET : AF_INET6;
-			if (param_count > 6) {
-				err = at_parser_num_get(parser, 6, &sock->cid);
-				if (err) {
-					goto error;
-				}
-				if (sock->cid > 10) {
-					err = -EINVAL;
-					goto error;
-				}
-			}
-			err = do_secure_socket_open(sock, peer_verify);
-			if (err) {
-				LOG_ERR("do_secure_socket_open() failed: %d", err);
-				goto error;
-			}
+		err = at_parser_num_get(parser, 1, &sock->family);
+		if (err) {
+			goto error;
+		}
+		/** Peer verification level for TLS connection.
+		 *    - 0 - none
+		 *    - 1 - optional
+		 *    - 2 - required
+		 * If not set, socket will use defaults (none for servers,
+		 * required for clients)
+		 */
+		uint16_t peer_verify;
+
+		err = at_parser_num_get(parser, 2, &sock->type);
+		if (err) {
+			goto error;
+		}
+		err = at_parser_num_get(parser, 3, &sock->role);
+		if (err) {
+			goto error;
+		}
+		if (sock->role == AT_SOCKET_ROLE_SERVER) {
+			peer_verify = TLS_PEER_VERIFY_NONE;
+		} else if (sock->role == AT_SOCKET_ROLE_CLIENT) {
+			peer_verify = TLS_PEER_VERIFY_REQUIRED;
 		} else {
 			err = -EINVAL;
-		} break;
+			goto error;
+		}
+		sock->sec_tag = SEC_TAG_TLS_INVALID;
+		err = at_parser_num_get(parser, 4, &sock->sec_tag);
+		if (err) {
+			goto error;
+		}
+		if (param_count > 5) {
+			err = at_parser_num_get(parser, 5, &peer_verify);
+			if (err) {
+				goto error;
+			}
+		}
+		if (param_count > 6) {
+			err = at_parser_num_get(parser, 6, &sock->cid);
+			if (err) {
+				goto error;
+			}
+			if (sock->cid > 10) {
+				err = -EINVAL;
+				goto error;
+			}
+		}
+		err = do_secure_socket_open(sock, peer_verify);
+		if (err) {
+			LOG_ERR("do_secure_socket_open() failed: %d", err);
+			goto error;
+		}
+		break;
 
 	case AT_PARSER_CMD_TYPE_READ:
 		for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
@@ -1403,7 +1409,7 @@ STATIC int handle_at_secure_socket(enum at_parser_cmd_type cmd_type,
 	case AT_PARSER_CMD_TYPE_TEST:
 		rsp_send("\r\n#XSSOCKET: <handle>,(%d,%d),(%d,%d),(%d,%d),"
 			 "<sec_tag>,<peer_verify>,<cid>\r\n",
-			AT_SOCKET_OPEN, AT_SOCKET_OPEN6,
+			AF_INET, AF_INET6,
 			SOCK_STREAM, SOCK_DGRAM,
 			AT_SOCKET_ROLE_CLIENT, AT_SOCKET_ROLE_SERVER);
 		err = 0;
