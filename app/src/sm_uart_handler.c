@@ -534,7 +534,7 @@ static int sm_uart_tx_write(const uint8_t *data, size_t len, bool flush, bool ur
 	 */
 	bool running = (sm_work_q.flags & K_WORK_QUEUE_STARTED) == K_WORK_QUEUE_STARTED;
 
-	if (running && k_current_get() == &sm_work_q.thread && !urc) {
+	if (running && k_current_get() == k_work_queue_thread_get(&sm_work_q) && !urc) {
 		ret = tx_write_block(data, &len, flush);
 	} else {
 		/* In other contexts, we buffer until Serial Modem work queue becomes available. */

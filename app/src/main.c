@@ -223,6 +223,13 @@ int lte_auto_connect(void)
 	return err;
 }
 
+static int init_sm_work_q(void)
+{
+	k_work_queue_init(&sm_work_q);
+	return 0;
+}
+SYS_INIT(init_sm_work_q, PRE_KERNEL_1, 0);
+
 int main(void)
 {
 	static const struct k_work_queue_config cfg = {
@@ -230,7 +237,6 @@ int main(void)
 		.essential = true,
 	};
 
-	k_work_queue_init(&sm_work_q);
 	k_work_queue_run(&sm_work_q, &cfg);
 	return 0;
 }
