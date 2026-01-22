@@ -278,7 +278,7 @@ static int cmux_write_at_channel(const uint8_t *data, size_t len, bool urc)
 	/* To process, CMUX needs system work queue to be able to run.
 	 * Send only from Serial Modem work queue to guarantee URC ordering.
 	 */
-	if (k_current_get() == &sm_work_q.thread && !urc) {
+	if (k_current_get() == k_work_queue_thread_get(&sm_work_q) && !urc) {
 		ret = cmux_write_at_channel_block(data, &len);
 	} else {
 		/* In other contexts, we buffer until Serial Modem work queue becomes available. */
