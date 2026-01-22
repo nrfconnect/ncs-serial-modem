@@ -237,6 +237,7 @@ int main(void)
 		.essential = true,
 	};
 
+	k_thread_priority_set(k_current_get(), K_LOWEST_APPLICATION_THREAD_PRIO);
 	k_work_queue_run(&sm_work_q, &cfg);
 	return 0;
 }
