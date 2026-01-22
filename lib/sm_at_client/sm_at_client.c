@@ -580,34 +580,6 @@ static int uart_init(const struct device *uart_dev)
 	return err;
 }
 
-static int uart_power_state_action(enum pm_device_action action)
-{
-	enum pm_device_state state = PM_DEVICE_STATE_OFF;
-	int err = pm_device_state_get(uart_dev, &state);
-
-	if (err) {
-		LOG_ERR("Failed to get PM device state: %d", err);
-		return err;
-	}
-
-	if (action != PM_DEVICE_ACTION_RESUME && action != PM_DEVICE_ACTION_SUSPEND) {
-		return -EOPNOTSUPP;
-	}
-
-	if ((action == PM_DEVICE_ACTION_RESUME && state == PM_DEVICE_STATE_ACTIVE) ||
-	    (action == PM_DEVICE_ACTION_SUSPEND && state == PM_DEVICE_STATE_SUSPENDED)) {
-		return 0;
-	}
-
-	err = pm_device_action_run(uart_dev, action);
-	if (err) {
-		LOG_ERR("Action %d failed on UART device: %d", action, err);
-		return err;
-	}
-
-	return 0;
-}
-
 static int dtr_pin_set(bool level)
 {
 	int err;
@@ -651,17 +623,10 @@ static int dtr_uart_disable(void)
 	/* Optional: Wait for possible Serial Modem TX to complete. */
 	/* k_sleep(K_MSEC(100)); */
 
-	/* Disable RX. */
+	/* Disable RX: UART is automatically suspended. */
 	err = rx_disable();
 	if (err) {
 		LOG_ERR("RX disable failed (%d).", err);
-		return err;
-	}
-
-	/* Power off UART module */
-	err = uart_power_state_action(PM_DEVICE_ACTION_SUSPEND);
-	if (err) {
-		LOG_ERR("Failed to suspend UART (%d).", err);
 		return err;
 	}
 
@@ -690,14 +655,7 @@ static int dtr_uart_enable(void)
 	/* Set DTR state at beginning so that we have correct state when RI comes. */
 	dtr_config.active = true;
 
-	/* Power on UART module */
-	err = uart_power_state_action(PM_DEVICE_ACTION_RESUME);
-	if (err) {
-		LOG_ERR("Failed to resume UART (%d).", err);
-		return err;
-	}
-
-	/* Enable RX. */
+	/* Enable RX: UART is automatically resumed. */
 	atomic_clear_bit(&uart_state, SM_AT_CLIENT_RX_RECOVERY_DISABLED_BIT);
 	err = rx_enable();
 	if (err) {
