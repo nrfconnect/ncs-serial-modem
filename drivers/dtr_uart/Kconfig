@@ -10,7 +10,8 @@ config DTR_UART
 	select GPIO
 	select UART_ASYNC_API
 	select RING_BUFFER
-	select PM_DEVICE
+	depends on PM_DEVICE_RUNTIME
+	depends on !PM_DEVICE_RUNTIME_DEFAULT_ENABLE
 	help
 	  Data Terminal Ready (DTR) UART implements UART API and extends UART communication
 	  with DTR and Ring Indicator (RI) signals.
@@ -21,6 +22,15 @@ config DTR_UART
 	  peripheral and start the UART communication.
 
 	  RI signal is used by DCE to notify DTE that data is available to read.
+
+config DTR_UART_INIT_PRIORITY
+	int "DTR UART initialization priority"
+	default 81
+	help
+	  Initialization priority for the DTR UART driver (POST_KERNEL level).
+
+	  This must be higher than CONFIG_SPI_NOR_INIT_PRIORITY (default: 80)
+	  when RTT tracing is enabled. Otherwise RTT will not work correctly.
 
 if DTR_UART
 

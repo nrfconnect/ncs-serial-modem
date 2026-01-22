@@ -21,6 +21,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/pm/device.h>
+#include <zephyr/pm/device_runtime.h>
 #include <zephyr/sys/ring_buffer.h>
 #include <zephyr/logging/log_ctrl.h>
 #include <zephyr/sys/reboot.h>
@@ -1089,7 +1090,7 @@ static int at_host_power_off(bool shutting_down)
 		}
 	}
 
-	err = pm_device_action_run(sm_uart_dev, PM_DEVICE_ACTION_SUSPEND);
+	err = pm_device_runtime_put(sm_uart_dev);
 	if (err) {
 		LOG_WRN("Failed to suspend UART. (%d)", err);
 	}
@@ -1111,9 +1112,9 @@ int sm_at_host_power_off(void)
 
 int sm_at_host_power_on(void)
 {
-	const int err = pm_device_action_run(sm_uart_dev, PM_DEVICE_ACTION_RESUME);
+	const int err = pm_device_runtime_get(sm_uart_dev);
 
-	if (err && err != -EALREADY) {
+	if (err) {
 		LOG_ERR("Failed to resume UART. (%d)", err);
 		return err;
 	}
@@ -1216,6 +1217,14 @@ static int sm_at_host_init(void)
 	k_mutex_unlock(&mutex_mode);
 
 	k_work_init(&raw_send_scheduled_work, raw_send_scheduled);
+
+	int ret = pm_device_runtime_get(sm_uart_dev);
+
+	if (ret) {
+		LOG_ERR("Failed to get UART. (%d)", ret);
+		sm_init_failed = true;
+		return ret;
+	}
 
 	return 0;
 }

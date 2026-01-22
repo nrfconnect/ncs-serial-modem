@@ -70,7 +70,7 @@ static int sm_settings_init(void)
 		sm_init_failed = true;
 	}
 
-	return ret;
+	return 0;
 }
 /* Run before APPLICATION init functions, so modules can use settings that are load from
  * flash

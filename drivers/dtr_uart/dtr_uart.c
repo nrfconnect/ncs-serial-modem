@@ -9,6 +9,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/onoff.h>
 #include <zephyr/pm/device.h>
+#include <zephyr/pm/device_runtime.h>
 
 /*
  * DTR (Data Terminal Ready) Logic:
@@ -41,7 +42,6 @@ struct dtr_uart_data {
 	bool app_rx_enabled;		/* RX enabled by application */
 	bool rx_active;			/* RX currently active */
 	int32_t rx_timeout;
-	struct k_sem rx_disable_sync;	/* Semaphore for RX disable completion */
 
 	/* --- DTR (Data Terminal Ready) --- */
 	bool dtr_state;	/* 0 = deasserted (UART inactive), 1 = asserted (UART active) */
@@ -68,46 +68,6 @@ struct dtr_uart_config {
 };
 
 static void user_callback(const struct device *dev, struct uart_event *evt);
-
-/* --- Power Management --- */
-static void power_on_uart(struct dtr_uart_data *data)
-{
-	const struct dtr_uart_config *config = data->dev->config;
-	enum pm_device_state state = PM_DEVICE_STATE_OFF;
-	int err = pm_device_state_get(config->uart, &state);
-
-	if (err) {
-		LOG_ERR("Failed to get PM device state (%d).", err);
-	}
-	if (state != PM_DEVICE_STATE_ACTIVE) {
-		/* Power on UART module */
-		err = pm_device_action_run(config->uart, PM_DEVICE_ACTION_RESUME);
-		if (err) {
-			LOG_ERR("Failed to %s UART device (%d).", "resume", err);
-		}
-		LOG_DBG("UART powered on");
-	}
-}
-
-static void power_off_uart(struct dtr_uart_data *data)
-{
-	const struct dtr_uart_config *config = data->dev->config;
-	enum pm_device_state state = PM_DEVICE_STATE_OFF;
-	int err = pm_device_state_get(config->uart, &state);
-
-	if (err) {
-		LOG_ERR("Failed to get PM device state (%d).", err);
-		return;
-	}
-	if (state != PM_DEVICE_STATE_SUSPENDED) {
-		/* Power off UART module */
-		err = pm_device_action_run(config->uart, PM_DEVICE_ACTION_SUSPEND);
-		if (err) {
-			LOG_ERR("Failed to %s UART device (%d).", "suspend", err);
-		}
-		LOG_DBG("UART powered off");
-	}
-}
 
 /* --- TX/RX helpers --- */
 static void tx_complete(struct dtr_uart_data *data)
@@ -260,19 +220,13 @@ static void dtr_work_handler(struct k_work *work)
 		k_work_cancel_delayable(&data->ri_work);
 		gpio_pin_set_dt(&config->ri_gpio, 0);
 
-		/* Enable UART and RX/TX. */
-		power_on_uart(data);
+		/* Enable RX/TX: UART is powered on automatically. */
 		activate_rx(data);
 		activate_tx(data);
 	} else {
-		/* Disable TX. */
+		/* Disable TX/RX: UART is powered off automatically. */
 		deactivate_tx(data);
-
-		/* Wait for RX to be fully disabled, before powering UART down. */
-		k_sem_reset(&data->rx_disable_sync);
 		deactivate_rx(data);
-		k_sem_take(&data->rx_disable_sync, K_MSEC(100));
-		power_off_uart(data);
 	}
 exit:
 	k_mutex_unlock(&data->dtr_mutex);
@@ -326,11 +280,6 @@ static void uart_callback(const struct device *uart, struct uart_event *evt, voi
 		if (data->dtr_state && data->app_rx_enabled) {
 			data->app_rx_enabled = false;
 			user_callback(dev, evt);
-		}
-
-		if (!data->dtr_state) {
-			/* RX disabled because of DTR down. */
-			k_sem_give(&data->rx_disable_sync);
 		}
 		break;
 	}
@@ -553,6 +502,15 @@ static int dtr_uart_init(const struct device *dev)
 		return -ENODEV;
 	}
 
+	/* Enable runtime power management for UART device.
+	 * This is done in a delayed fashion to allow the RTT traces to work properly.
+	 */
+	err = pm_device_runtime_enable(config->uart);
+	if (err < 0) {
+		LOG_ERR("Failed to enable UART PM (%d).", err);
+		return err;
+	}
+
 	/* Check and configure DTR GPIO as input. */
 	if (!gpio_is_ready_dt(&config->dtr_gpio)) {
 		LOG_ERR("DTR GPIO not ready");
@@ -578,7 +536,6 @@ static int dtr_uart_init(const struct device *dev)
 	/* Initialize data structure. */
 	data->rx_timeout = SYS_FOREVER_US;
 	k_mutex_init(&data->dtr_mutex);
-	k_sem_init(&data->rx_disable_sync, 0, 1);
 	k_work_init_delayable(&data->dtr_work, dtr_work_handler);
 	k_work_init_delayable(&data->ri_work, ri_work_fn);
 
@@ -644,6 +601,7 @@ static const struct uart_driver_api dtr_uart_api = {
 	static struct dtr_uart_data dtr_uart_data_##n;                                             \
 	PM_DEVICE_DT_INST_DEFINE(n, dtr_uart_pm_action);                                           \
 	DEVICE_DT_INST_DEFINE(n, dtr_uart_init, PM_DEVICE_DT_INST_GET(n), &dtr_uart_data_##n,      \
-			      &dtr_uart_config_##n, POST_KERNEL, 51, &dtr_uart_api);
+			      &dtr_uart_config_##n, POST_KERNEL, CONFIG_DTR_UART_INIT_PRIORITY,    \
+			      &dtr_uart_api);
 
 DT_INST_FOREACH_STATUS_OKAY(DTR_UART_INIT)

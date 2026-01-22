@@ -116,6 +116,9 @@ int sm_at_fota_uninit(void)
 /* Bootloader mode flag - needed by sm_at_host.c after rebase */
 bool sm_bootloader_mode_enabled;
 
+/* Initialization failed flag - needed by sm_at_host_init */
+bool sm_init_failed;
+
 /* Stubs for DFU/bootloader functions - needed after rebase */
 int sm_at_handle_xdfu_init(char *buf, size_t len, char *at_cmd)
 {
