@@ -161,66 +161,57 @@ static int bootloader_mode_init(void)
 	return 0;
 }
 
-int lte_auto_connect(void)
+void lte_auto_connect(void)
 {
-	int err = 0;
 #if defined(CONFIG_SM_AUTO_CONNECT)
-	int ret;
+	int err;
 	int n;
 	int stat;
-	struct network_config {
-		/* Refer to AT command manual of %XSYSTEMMODE for system mode settings */
-		int lte_m_support;     /* 0 ~ 1 */
-		int nb_iot_support;    /* 0 ~ 1 */
-		int gnss_support;      /* 0 ~ 1 */
-		int lte_preference;    /* 0 ~ 4 */
-		/* Refer to AT command manual of +CGDCONT and +CGAUTH for PDN configuration */
-		bool pdp_config;       /* PDP context definition required or not */
-		char *pdn_fam;         /* PDP type: "IP", "IPV6", "IPV4V6", "Non-IP" */
-		char *pdn_apn;         /* Access point name */
-		int pdn_auth;          /* PDN authentication protocol 0(None), 1(PAP), 2(CHAP) */
-		char *pdn_username;    /* PDN connection authentication username */
-		char *pdn_password;    /* PDN connection authentication password */
-	};
-	const struct network_config cfg = {
-#include "sm_auto_connect.h"
-	};
 
-	ret = sm_util_at_scanf("AT+CEREG?", "+CEREG: %d,%d", &n, &stat);
-	if (ret != 2 || (stat == 1 || stat == 5)) {
-		return 0;
+	err = sm_util_at_scanf("AT+CEREG?", "+CEREG: %d,%d", &n, &stat);
+	if (err != 2 || (stat == 1 || stat == 5)) {
+		return;
 	}
 
 	LOG_INF("LTE auto connect");
-	err = sm_util_at_printf("AT%%XSYSTEMMODE=%d,%d,%d,%d", cfg.lte_m_support,
-				  cfg.nb_iot_support, cfg.gnss_support, cfg.lte_preference);
+	LOG_DBG("Configuring system mode: %s", CONFIG_SM_AUTO_CONNECT_SYSTEM_MODE);
+	err = sm_util_at_printf("AT%%XSYSTEMMODE=%s", CONFIG_SM_AUTO_CONNECT_SYSTEM_MODE);
 	if (err) {
-		LOG_ERR("Failed to configure system mode: %d", err);
-		return err;
+		LOG_ERR("Failed to configure system mode \"%s\": %d",
+			CONFIG_SM_AUTO_CONNECT_SYSTEM_MODE, err);
+		return;
 	}
-	if (cfg.pdp_config) {
-		err = sm_util_at_printf("AT+CGDCONT=0,%s,%s", cfg.pdn_fam, cfg.pdn_apn);
-		if (err) {
-			LOG_ERR("Failed to configure PDN: %d", err);
-			return err;
-		}
+
+#if defined(CONFIG_SM_AUTO_CONNECT_PDN_CONFIG)
+	err = sm_util_at_printf("AT+CGDCONT=0,%s,%s", CONFIG_SM_AUTO_CONNECT_PDN_FAMILY_STRING,
+				CONFIG_SM_AUTO_CONNECT_PDN_APN);
+	if (err) {
+		LOG_ERR("Failed to configure PDN: %d", err);
+		return;
 	}
-	if (cfg.pdp_config && cfg.pdn_auth != 0) {
-		err = sm_util_at_printf("AT+CGAUTH=0,%d,%s,%s", cfg.pdn_auth,
-					  cfg.pdn_username, cfg.pdn_password);
+	LOG_DBG("PDN configured: APN=\"%s\", PDN type=\"%s\"", CONFIG_SM_AUTO_CONNECT_PDN_APN,
+		CONFIG_SM_AUTO_CONNECT_PDN_FAMILY_STRING);
+
+	if (CONFIG_SM_AUTO_CONNECT_PDN_AUTH != 0) {
+		err = sm_util_at_printf("AT+CGAUTH=0,%d,%s,%s", CONFIG_SM_AUTO_CONNECT_PDN_AUTH,
+					CONFIG_SM_AUTO_CONNECT_PDN_USERNAME,
+					CONFIG_SM_AUTO_CONNECT_PDN_PASSWORD);
 		if (err) {
 			LOG_ERR("Failed to configure AUTH: %d", err);
-			return err;
+			return;
 		}
+		LOG_DBG("PDN AUTH configured: protocol=%d, username=\"%s\"",
+			CONFIG_SM_AUTO_CONNECT_PDN_AUTH, CONFIG_SM_AUTO_CONNECT_PDN_USERNAME);
 	}
+#endif /* CONFIG_SM_AUTO_CONNECT_PDN_CONFIG */
+
 	err = sm_util_at_printf("AT+CFUN=1");
 	if (err) {
 		LOG_ERR("Failed to turn on radio: %d", err);
-		return err;
+		return;
 	}
-#endif /* CONFIG_SM_AUTO_CONNECT */
 
-	return err;
+#endif /* CONFIG_SM_AUTO_CONNECT */
 }
 
 static int init_sm_work_q(void)
@@ -319,7 +310,7 @@ static int sm_main(void)
 	 */
 	sm_fota_post_process();
 
-	(void)lte_auto_connect();
+	lte_auto_connect();
 
 	LOG_INF("Serial Modem");
 

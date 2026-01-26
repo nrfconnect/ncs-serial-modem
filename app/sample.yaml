@@ -114,10 +114,24 @@ tests:
   serial_modem.modem_trace:
     sysbuild: true
     build_only: true
+    extra_args:
+      - app_SNIPPET=nrf91-modem-trace-uart
     platform_allow:
       - nrf9151dk/nrf9151/ns
       - thingy91x/nrf9151/ns
     integration_platforms:
       - nrf9151dk/nrf9151/ns
-    extra_args:
-      - app_SNIPPET=nrf91-modem-trace-uart
+  serial_modem.auto_connect:
+    sysbuild: true
+    build_only: true
+    extra_configs:
+      - CONFIG_SM_AUTO_CONNECT=y
+      - CONFIG_SM_AUTO_CONNECT_SYSTEM_MODE="1,0,0,0"
+      - CONFIG_SM_AUTO_CONNECT_PDN_CONFIG=y
+      - CONFIG_SM_AUTO_CONNECT_PDN_APN="internet"
+      - CONFIG_SM_AUTO_CONNECT_PDN_FAMILY_IP=y
+      - CONFIG_SM_AUTO_CONNECT_PDN_AUTH=1
+      - CONFIG_SM_AUTO_CONNECT_PDN_USERNAME="myuser"
+      - CONFIG_SM_AUTO_CONNECT_PDN_PASSWORD="mypassword"
+    platform_allow:
+      - nrf9151dk/nrf9151/ns

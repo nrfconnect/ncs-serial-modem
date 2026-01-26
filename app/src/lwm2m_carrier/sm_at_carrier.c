@@ -24,7 +24,7 @@ static void reconnect_wk(struct k_work *work);
 static K_WORK_DELAYABLE_DEFINE(reconnect_work, reconnect_wk);
 
 /* Global functions defined in different files. */
-int lte_auto_connect(void);
+void lte_auto_connect(void);
 
 static void print_err(const lwm2m_carrier_event_t *evt)
 {
@@ -141,7 +141,7 @@ static void on_event_app_data(const lwm2m_carrier_event_t *event)
 
 static void reconnect_wk(struct k_work *work)
 {
-	(void)lte_auto_connect();
+	lte_auto_connect();
 }
 
 int lwm2m_carrier_event_handler(const lwm2m_carrier_event_t *event)

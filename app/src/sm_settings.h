@@ -35,12 +35,5 @@ int sm_settings_bootloader_mode_save(void);
  */
 int sm_settings_full_mfw_dfu_segment_type_save(void);
 
-/**
- * @brief Saves the auto-connect settings to NVM.
- *
- * @retval 0 on success, nonzero otherwise.
- */
-int sm_settings_auto_connect_save(void);
-
 /** @} */
 #endif
