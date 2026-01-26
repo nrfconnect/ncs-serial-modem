@@ -19,7 +19,7 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(sm_uart_handler, CONFIG_SM_LOG_LEVEL);
 
-#define SM_PIPE CONFIG_SM_CMUX
+#define SM_PIPE (CONFIG_SM_CMUX || CONFIG_SM_PPP)
 
 #define UART_RX_TIMEOUT_US		2000
 #define UART_ERROR_DELAY_MS		500

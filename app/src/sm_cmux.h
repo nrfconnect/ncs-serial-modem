@@ -23,4 +23,13 @@ enum cmux_channel {
 struct modem_pipe *sm_cmux_reserve(enum cmux_channel);
 void sm_cmux_release(enum cmux_channel);
 
+#if CONFIG_SM_CMUX
+bool sm_cmux_is_started(void);
+#else
+static inline bool sm_cmux_is_started(void)
+{
+	return false;
+}
+#endif
+
 #endif
