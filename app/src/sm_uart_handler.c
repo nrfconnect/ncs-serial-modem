@@ -610,6 +610,8 @@ int sm_uart_handler_enable(void)
 		return -EFAULT;
 	}
 
+	sm_at_host_reset();
+
 	/* Flush possibly pending data in case Serial Modem was idle. */
 	tx_start();
 
@@ -625,6 +627,9 @@ int sm_uart_handler_disable(void)
 		LOG_ERR("TX disable failed (%d).", err);
 		return err;
 	}
+
+	sm_at_host_urc_ctx_release(urc_ctx, SM_URC_OWNER_AT);
+	urc_ctx = NULL;
 
 	err = rx_disable();
 	if (err) {

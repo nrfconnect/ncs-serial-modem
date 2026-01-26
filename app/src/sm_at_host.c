@@ -53,6 +53,10 @@ static size_t datamode_data_len; /* Expected data length in data mode. */
 
 uint8_t sm_at_buf[CONFIG_SM_AT_BUF_SIZE + 1];
 uint8_t sm_data_buf[SM_MAX_MESSAGE_SIZE];
+static bool inside_quotes;
+static size_t at_cmd_len;
+static size_t echo_len;
+static uint8_t prev_character;
 
 RING_BUF_DECLARE(data_rb, CONFIG_SM_DATAMODE_BUF_SIZE);
 static uint8_t quit_str_partial_match;
@@ -663,13 +667,16 @@ static void cmd_send(uint8_t *buf, size_t cmd_length, size_t buf_size, bool *sto
 static size_t cmd_rx_handler(const uint8_t *buf, const size_t len, bool *stop_at_receive)
 {
 	size_t processed;
-	static bool inside_quotes;
-	static size_t at_cmd_len;
-	static size_t echo_len;
-	static uint8_t prev_character;
 	bool send = false;
 
 	for (processed = 0; processed < len && send == false; processed++) {
+		/* Don't buffer anything until "AT" is received */
+		if ((at_cmd_len == 0 && toupper(buf[processed]) != 'A') ||
+		    (at_cmd_len == 1 && toupper(buf[processed]) != 'T')) {
+			inside_quotes = false;
+			at_cmd_len = 0;
+			continue;
+		}
 
 		/* Handle control characters */
 		switch (buf[processed]) {
@@ -1204,16 +1211,25 @@ void sm_at_host_urc_ctx_release(struct sm_urc_ctx *ctx, enum sm_urc_owner owner)
 	k_mutex_unlock(&ctx->mutex);
 }
 
+void sm_at_host_reset(void)
+{
+	k_mutex_lock(&mutex_mode, K_FOREVER);
+	sm_datamode_time_limit = 0;
+	datamode_handler = NULL;
+	at_mode = SM_AT_COMMAND_MODE;
+	inside_quotes = 0;
+	at_cmd_len = 0;
+	echo_len = 0;
+	prev_character = 0;
+	k_mutex_unlock(&mutex_mode);
+}
+
 static int sm_at_host_init(void)
 {
 	ring_buf_init(&urc_ctx.rb, sizeof(urc_ctx.buf), urc_ctx.buf);
 	k_mutex_init(&urc_ctx.mutex);
 
-	k_mutex_lock(&mutex_mode, K_FOREVER);
-	sm_datamode_time_limit = 0;
-	datamode_handler = NULL;
-	at_mode = SM_AT_COMMAND_MODE;
-	k_mutex_unlock(&mutex_mode);
+	sm_at_host_reset();
 
 	k_work_init(&raw_send_scheduled_work, raw_send_scheduled);
 

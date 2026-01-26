@@ -260,6 +260,11 @@ struct sm_urc_ctx *sm_at_host_urc_ctx_acquire(enum sm_urc_owner owner);
 void sm_at_host_urc_ctx_release(struct sm_urc_ctx *ctx, enum sm_urc_owner owner);
 
 /**
+ * @brief Reset AT parser input buffers and state.
+ */
+void sm_at_host_reset(void);
+
+/**
  * @brief Define a wrapper for a Serial Modem custom AT command callback.
  *
  * Wrapper will call the generic wrapper, which will call the actual AT command handler.
