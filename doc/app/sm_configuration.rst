@@ -58,23 +58,92 @@ CONFIG_SM_AUTO_CONNECT - Connect to the network at start-up or reset
    This option enables connecting to the network at start-up or reset using a defined PDN configuration.
    This option is enabled by the LwM2M Carrier overlay, but is otherwise disabled by default.
 
-   .. note::
-      This option requires network-specific configuration in the ``sm_auto_connect.h`` file.
+   When enabled, the following sub-options are available for configuration:
 
-   Here is a sample configuration for NIDD connection in the :file:`sm_auto_connect.h` file::
+   .. _CONFIG_SM_AUTO_CONNECT_SYSTEM_MODE:
 
-      /* Network-specific default system mode configured by %XSYSTEMMODE (refer to AT command manual) */
-      0,        /* LTE support */
-      1,        /* NB-IoT support */
-      0,        /* GNSS support, also define CONFIG_MODEM_ANTENNA if not Nordic DK */
-      0,        /* LTE preference */
-      /* Network-specific default PDN configured by +CGDCONT and +CGAUTH (refer to AT command manual) */
-      true,     /* PDP context definition required or not */
-      "Non-IP", /* PDP type: "IP", "IPV6", "IPV4V6", "Non-IP" */
-      "",       /* Access point name */
-      0,        /* PDP authentication protocol: 0(None), 1(PAP), 2(CHAP) */
-      "",       /* PDN connection authentication username */
-      ""        /* PDN connection authentication password */
+   CONFIG_SM_AUTO_CONNECT_SYSTEM_MODE - System mode for automatic network attach
+      This option defines the system mode to use for automatic network attach.
+      The format is a comma-separated string of four single-digit integers: ``"X,Y,Z,W"``
+
+      Where:
+
+      * ``X`` = LTE-M support (0=disabled, 1=enabled)
+      * ``Y`` = NB-IoT support (0=disabled, 1=enabled)
+      * ``Z`` = GNSS support (0=disabled, 1=enabled)
+      * ``W`` = LTE preference (0=no preference, 1=LTE-M, 2=NB-IoT, 3=network selection, 4=LTE-M then NB-IoT)
+
+      See the `%XSYSTEMMODE`_ command in the AT command Reference Guide for more details.
+      The default value is ``"1,1,1,0"`` (enable LTE-M, NB-IoT, and GNSS with no preference).
+
+   .. _CONFIG_SM_AUTO_CONNECT_PDN_CONFIG:
+
+   CONFIG_SM_AUTO_CONNECT_PDN_CONFIG - Enable PDN configuration
+      This option enables sending of PDN configuration commands during automatic network attach.
+      When enabled, the following sub-options become available:
+
+      .. _CONFIG_SM_AUTO_CONNECT_PDN_APN:
+
+      CONFIG_SM_AUTO_CONNECT_PDN_APN - Access Point Name (APN)
+         This option specifies the APN to use for automatic network attach.
+         If not set (default), the APN configured in the modem will be used.
+
+      .. _CONFIG_SM_AUTO_CONNECT_PDN_FAMILY:
+
+      CONFIG_SM_AUTO_CONNECT_PDN_FAMILY - PDN family (IP type)
+         This choice option selects the PDN family (IP address type) to use for automatic network attach.
+         See the `+CGDCONT`_ command in the AT command Reference Guide for more details.
+
+         Available options:
+
+         * ``CONFIG_SM_AUTO_CONNECT_PDN_FAMILY_IP`` - Use IPv4 only
+         * ``CONFIG_SM_AUTO_CONNECT_PDN_FAMILY_IPV6`` - Use IPv6 only
+         * ``CONFIG_SM_AUTO_CONNECT_PDN_FAMILY_IPV4V6`` - Use both IPv4 and IPv6 (dual stack, default)
+         * ``CONFIG_SM_AUTO_CONNECT_PDN_FAMILY_NON_IP`` - Use Non-IP PDN type for data transmission without IP headers
+
+      .. _CONFIG_SM_AUTO_CONNECT_PDN_AUTH:
+
+      CONFIG_SM_AUTO_CONNECT_PDN_AUTH - PDN authentication type
+         This option specifies the PDN authentication protocol to use for automatic network attach.
+         See the `+CGAUTH`_ command in the AT command Reference Guide for more details.
+
+         Valid values:
+
+         * ``0`` - None (no authentication, default)
+         * ``1`` - PAP (Password Authentication Protocol)
+         * ``2`` - CHAP (Challenge Handshake Authentication Protocol)
+
+      .. _CONFIG_SM_AUTO_CONNECT_PDN_USERNAME:
+
+      CONFIG_SM_AUTO_CONNECT_PDN_USERNAME - PDN authentication username
+         This option specifies the username to use for PDN authentication during automatic network attach.
+         Do not set the Kconfig option (default) if no username is required.
+         Use only when ``CONFIG_SM_AUTO_CONNECT_PDN_AUTH`` is set to 1 (PAP) or 2 (CHAP).
+
+      .. _CONFIG_SM_AUTO_CONNECT_PDN_PASSWORD:
+
+      CONFIG_SM_AUTO_CONNECT_PDN_PASSWORD - PDN authentication password
+         This option specifies the password to use for PDN authentication during automatic network attach.
+         Leave empty (default) if no password is required.
+         Use only when ``CONFIG_SM_AUTO_CONNECT_PDN_AUTH`` is set to 1 (PAP) or 2 (CHAP).
+
+   Example configuration overlay for NB-IoT with Non-IP PDN::
+
+      CONFIG_SM_AUTO_CONNECT=y
+      CONFIG_SM_AUTO_CONNECT_SYSTEM_MODE="0,1,0,0"
+      CONFIG_SM_AUTO_CONNECT_PDN_CONFIG=y
+      CONFIG_SM_AUTO_CONNECT_PDN_FAMILY_NON_IP=y
+
+   Example configuration overlay for LTE-M with custom APN and PAP authentication::
+
+      CONFIG_SM_AUTO_CONNECT=y
+      CONFIG_SM_AUTO_CONNECT_SYSTEM_MODE="1,0,0,0"
+      CONFIG_SM_AUTO_CONNECT_PDN_CONFIG=y
+      CONFIG_SM_AUTO_CONNECT_PDN_APN="internet"
+      CONFIG_SM_AUTO_CONNECT_PDN_FAMILY_IPV4V6=y
+      CONFIG_SM_AUTO_CONNECT_PDN_AUTH=1
+      CONFIG_SM_AUTO_CONNECT_PDN_USERNAME="myuser"
+      CONFIG_SM_AUTO_CONNECT_PDN_PASSWORD="mypass"
 
 .. _CONFIG_SM_CR_TERMINATION:
 

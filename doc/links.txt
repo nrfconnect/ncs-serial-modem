@@ -78,6 +78,10 @@
 .. _`Serial Terminal app`: https://docs.nordicsemi.com/bundle/nrf-connect-serial-terminal/page/index.html
 .. _`Board Configurator app`: https://docs.nordicsemi.com/bundle/nrf-connect-board-configurator/page/index.html
 
+.. _`%XSYSTEMMODE`: https://docs.nordicsemi.com/bundle/ref_at_commands_nrf91x1/page/REF/at_commands/mob_termination_ctrl_status/xsystemmode.html
+.. _`+CGDCONT`: https://docs.nordicsemi.com/bundle/ref_at_commands_nrf91x1/page/REF/at_commands/packet_domain/cgdcont.html
+.. _`+CGAUTH`: https://docs.nordicsemi.com/bundle/ref_at_commands_nrf91x1/page/REF/at_commands/packet_domain/cgauth.html
+
 .. ### docs.zephyrproject.org/
 
 .. _`Zephyr Networking`: https://docs.zephyrproject.org/latest/connectivity/networking/index.html
