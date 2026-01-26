@@ -11,6 +11,7 @@
 #include <zephyr/sys_clock.h>
 #include <date_time.h>
 #include <nrf_modem_gnss.h>
+#include <modem/nrf_modem_lib.h>
 
 #if defined(CONFIG_SM_NRF_CLOUD)
 #include <net/nrf_cloud.h>
@@ -843,18 +844,21 @@ static int handle_at_gnss_delete(enum at_parser_cmd_type cmd_type, struct at_par
 	return err;
 }
 
+static void sm_at_gnss_cb_init(int ret, void *ctx)
+{
+	int err = nrf_modem_gnss_event_handler_set(gnss_event_handler);
+
+	if (err) {
+		LOG_ERR("Could not set GNSS event handler, error: %d", err);
+		sm_init_failed = true;
+	}
+}
+NRF_MODEM_LIB_ON_INIT(sm_gnss_init_hook, sm_at_gnss_cb_init, NULL);
+
 /**@brief API to initialize GNSS AT commands handler
  */
 static int sm_at_gnss_init(void)
 {
-	int err = 0;
-
-	err = nrf_modem_gnss_event_handler_set(gnss_event_handler);
-	if (err) {
-		LOG_ERR("Could not set GNSS event handler, error: %d", err);
-		sm_init_failed = true;
-		return err;
-	}
 	k_work_init(&gnss_status_notify_work, gnss_status_notifier);
 
 #if defined(CONFIG_SM_NRF_CLOUD)
