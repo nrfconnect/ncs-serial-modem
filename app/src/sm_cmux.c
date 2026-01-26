@@ -297,7 +297,7 @@ static void close_pipe(struct modem_pipe **pipe)
 	}
 }
 
-static bool cmux_is_started(void)
+bool sm_cmux_is_started(void)
 {
 	return (cmux.uart_pipe != NULL);
 }
@@ -338,7 +338,7 @@ static void stop_work_fn(struct k_work *work)
 	ARG_UNUSED(work);
 
 	/* Will stop the UART when calling the close_pipe() function. */
-	if (cmux_is_started()) {
+	if (sm_cmux_is_started()) {
 		modem_cmux_release(&cmux.instance);
 
 		close_pipe(&cmux.uart_pipe);
@@ -402,7 +402,7 @@ static int cmux_start(void)
 {
 	int ret;
 
-	if (cmux_is_started()) {
+	if (sm_cmux_is_started()) {
 		ret = modem_pipe_open(cmux.uart_pipe, K_SECONDS(CONFIG_SM_MODEM_PIPE_TIMEOUT));
 		if (!ret) {
 			cmux.uart_pipe_open = true;
@@ -451,7 +451,7 @@ static int handle_at_cmux(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 		return -EINVAL;
 	}
 
-	if (param_count == 1 && cmux_is_started()) {
+	if (param_count == 1 && sm_cmux_is_started()) {
 		return -EALREADY;
 	}
 
@@ -468,7 +468,7 @@ static int handle_at_cmux(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 			return -ENOTSUP;
 		}
 #endif
-		if (cmux_is_started()) {
+		if (sm_cmux_is_started()) {
 			/* Update the AT channel after answering "OK" on the current DLCI. */
 			cmux.requested_at_channel = at_channel;
 			rsp_send_ok();
@@ -496,7 +496,7 @@ static int handle_at_cmuxcld(enum at_parser_cmd_type cmd_type, struct at_parser 
 		return -EINVAL;
 	}
 
-	if (!cmux_is_started() || !cmux.uart_pipe_open) {
+	if (!sm_cmux_is_started() || !cmux.uart_pipe_open) {
 		return -EALREADY;
 	}
 
