@@ -10,17 +10,21 @@
 
 struct modem_pipe;
 
-/* CMUX channels that are used by other modules. */
+/* CMUX channels. Does not include AT-channel. */
 enum cmux_channel {
 #if defined(CONFIG_SM_PPP)
 	CMUX_PPP_CHANNEL,
+#endif
+#if defined(CONFIG_SM_MODEM_TRACE_BACKEND_CMUX)
+	CMUX_MODEM_TRACE_CHANNEL,
 #endif
 #if defined(CONFIG_SM_GNSS_OUTPUT_NMEA_ON_CMUX_CHANNEL)
 	CMUX_GNSS_CHANNEL,
 #endif
 	CMUX_EXT_CHANNEL_COUNT
 };
-struct modem_pipe *sm_cmux_reserve(enum cmux_channel);
-void sm_cmux_release(enum cmux_channel);
+struct modem_pipe *sm_cmux_reserve(enum cmux_channel channel);
+void sm_cmux_release(enum cmux_channel channel);
+bool sm_cmux_dlci_is_open(enum cmux_channel channel);
 
 #endif

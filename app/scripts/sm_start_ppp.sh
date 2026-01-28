@@ -34,9 +34,13 @@ CHATOPT=""
 PPP_DEBUG=""
 PIDFILE="/var/run/nrf91-modem.pid"
 PPP_PIDFILE="/var/run/ppp-nrf91.pid"
+MODEM_TRACE_FILE="/var/log/nrf91-modem-trace.bin"
+TRACE_PID_FILE="/var/run/nrf91-modem-trace.pid"
+TRACE=0
 
 usage() {
-    echo "Usage: $0 [-s serial_port] [-b baud_rate] [-t timeout] [-a APN] [-f IP|IPV6|IPV4V6]"
+    echo "Usage: $0 [-s serial_port] [-b baud_rate] [-t timeout] [-a APN] [-f IP|IPV6|IPV4V6] \
+[-p PDN] [-T] [-v] [-h]"
     echo ""
     echo "  -s serial_port : Serial port where the modem is connected (default: $MODEM)"
     echo "  -b baud_rate   : Baud rate for serial communication (default: $BAUD)"
@@ -44,6 +48,7 @@ usage() {
     echo "  -a APN         : Access Point Name for cellular connection (default: $APN)"
     echo "  -f FAMILY      : PDP_type, one of IP, IPV6, IPV4V6 (default: $TYPE)"
     echo "  -p PDN         : PDN ID to use (default: $PDN), 0 means use default PDN"
+    echo "  -T             : Enable modem trace collection (file: $MODEM_TRACE_FILE)"
     echo "  -v             : Enable verbose output"
     echo "  -h             : Show this help message"
     echo ""
@@ -51,7 +56,7 @@ usage() {
 }
 
 # Parse command line parameters
-while getopts s:b:t:a::f:p:hv flag
+while getopts s:b:t:a::f:p:Thv flag
 do
     case "${flag}" in
 	s) MODEM=${OPTARG};;
@@ -60,6 +65,7 @@ do
 	a) APN=${OPTARG};;
 	p) PDN=${OPTARG};;
 	f) TYPE=${OPTARG};;
+	T) TRACE=1;;
 	v) VERBOSE=1; CHATOPT="-v"; PPP_DEBUG="debug";;
 	h|?) usage;;
     esac
@@ -185,7 +191,17 @@ PPP_CMUX=$(ls /dev/gsmtty* | sort -V | head -n 2 | tail -n 1)
 log_dbg "AT CMUX:  $AT_CMUX"
 log_dbg "PPP CMUX: $PPP_CMUX"
 
-sleep 1
+MT_CMUX=""
+if [ $TRACE -gt 0 ]; then
+	MT_CMUX=$(ls /dev/gsmtty* | sort -V | head -n 3 | tail -n 1)
+	log_dbg "Trace CMUX: $MT_CMUX"
+	echo "Trace file: $MODEM_TRACE_FILE"
+	stty -F $MT_CMUX raw clocal -icrnl -ixon -opost
+	dd if=$MT_CMUX of=$MODEM_TRACE_FILE bs=1024 &
+	echo $! > $TRACE_PID_FILE
+fi
+sleep 3
+
 stty -F $AT_CMUX clocal
 
 echo "Connect and wait for PPP link..."
@@ -248,4 +264,4 @@ for i in {1..5}; do
 done
 
 echo "Failed to start PPP link"
-exit 1
+cleanup
