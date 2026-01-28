@@ -72,9 +72,6 @@ You can even compile, flash and run the sample to verify proper operation of the
 Flashing and running
 ********************
 
-When built with the Zephyr-compatible modem configuration, and :file:`overlay-zephyr-modem-external-mcu.overlay` is used, |SM| will put the nRF91 Series SiP to deep sleep when powered on.
-Zephyr's cellular modem driver running on the controlling chip will take care of waking up the nRF91 Series SiP, so it is advised to first flash |SM| to the nRF91 Series SiP.
-
 However, before flashing the |SM| built with the Zephyr-compatible modem configuration, make sure that the nRF91 Series modem has been set to the desired system mode.
 For this, you will need a regular |SM| running in the nRF91 Series SiP to be able to run AT commands manually.
 To set the modem to the desired system mode, issue an ``AT%XSYSTEMMODE`` command followed by an ``AT+CFUN=0`` command so that the modem saves the system mode to NVM.
@@ -94,10 +91,6 @@ The logs output through UART can be seen by connecting to the appropriate UART w
 
 After both applications have been flashed to their respective chips and you are connected to receive logs, you can reset the controlling chip.
 When the Zephyr application starts up, the following happens:
-
-* If power management is enabled (the :file:`overlay-zephyr-modem-external-mcu.overlay` is included): when the application powers on the modem (by calling ``pm_device_action_run(<dev>, PM_DEVICE_ACTION_RESUME)`` as the sample does), the cellular modem driver will toggle the modem's power pin to wake it up.
-
-  If power management is not enabled, the cellular modem driver will automatically proceed and expect |SM| to already be started and in a pristine state.
 
 * The cellular modem driver will start sending AT commands to |SM|.
   It will enable the network status notifications, gather some information from the modem, enable CMUX, and set the modem to normal mode (with an ``AT+CFUN=1`` command).

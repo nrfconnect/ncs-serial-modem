@@ -295,13 +295,6 @@ static int sm_main(void)
 
 	check_app_fota_status();
 
-#if DT_HAS_CHOSEN(ncs_sm_power_key)
-	if (!(rr & NRF_POWER_RESETREAS_OFF_MASK)) { /* DETECT signal from GPIO */
-
-		sm_ctrl_pin_enter_sleep_no_uninit(true);
-	}
-#endif
-
 	if (!IS_ENABLED(CONFIG_SM_SKIP_READY_MSG)) {
 		if (sm_init_failed) {
 			ret = sm_at_send_str(SM_SYNC_ERR_STR);

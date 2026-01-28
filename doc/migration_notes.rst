@@ -407,7 +407,8 @@ If you need any of those features with this |SM|, please contact customer suppor
   * The ``AT#XGPIO`` AT command.
   * The ``AT#XPOLL`` command.
     Use ``AT#XAPOLL`` instead.
-  * The ``CONFIG_SM_DATAMODE_URC`` Kconfig option.
+  * The ``CONFIG_SLM_DATAMODE_URC`` Kconfig option.
+  * The ``CONFIG_SLM_START_SLEEP`` Kconfig option.
   * The :file:`overlay-zephyr-modem.conf` file as the default behavior of the |SM| application is compatible with the Zephyr modem driver.
   * The :file:`overlay-ppp-cmux-linux.conf` overlay file.
     Use the :file:`overlay-ppp.conf` and :file:`overlay-cmux.conf` files instead.
