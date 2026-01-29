@@ -394,6 +394,8 @@ void sm_cmux_release(enum cmux_channel channel)
 	 */
 	if (channel == CMUX_PPP_CHANNEL && cmux.at_channel != 0) {
 		cmux.at_channel = 0;
+		/* Don't start PPP anymore as the PPP channel have changed */
+		sm_ppp_set_auto_start(false);
 	}
 	modem_pipe_attach(dlci->pipe, dlci_pipe_event_handler, dlci);
 }
