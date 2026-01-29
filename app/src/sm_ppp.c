@@ -32,7 +32,7 @@ LOG_MODULE_REGISTER(sm_ppp, CONFIG_SM_LOG_LEVEL);
 bool sm_fwd_cgev_notifs;
 
 static struct net_if *ppp_iface;
-
+static bool sm_ppp_auto_start;
 static uint8_t ppp_data_buf[1500];
 static struct sockaddr_ll ppp_zephyr_dst_addr;
 
@@ -107,6 +107,11 @@ static const char *ppp_action_str(enum ppp_action action)
 	}
 
 	return "";
+}
+
+void sm_ppp_set_auto_start(bool enable)
+{
+	sm_ppp_auto_start = enable;
 }
 
 static bool open_ppp_sockets(void)
@@ -508,6 +513,11 @@ static void at_notif_on_cgev(const char *notify)
 	uint8_t cid;
 	char cgev_pdn_act[] = "+CGEV: ME PDN ACT";
 
+	if (!sm_ppp_auto_start) {
+		/* Auto-start disabled, ignore all notifications */
+		return;
+	}
+
 	/* +2 for space and a number */
 	if (strlen(cgev_pdn_act) + 2 > strlen(notify)) {
 		/* Ignore notifications that are not long enough to be what we are interested in */
@@ -691,11 +701,13 @@ static int handle_at_ppp(enum at_parser_cmd_type cmd_type, struct at_parser *par
 	/* Send "OK" first in case stopping PPP results in the CMUX AT channel switching. */
 	rsp_send_ok();
 	if (op == OP_START) {
+		sm_ppp_set_auto_start(true);
 		ppp_pdn_cid = 0;
 		/* Store PPP PDN if given */
 		at_parser_num_get(parser, 2, &ppp_pdn_cid);
 		delegate_ppp_event(PPP_START, PPP_REASON_CMD);
 	} else {
+		sm_ppp_set_auto_start(false);
 		delegate_ppp_event(PPP_STOP, PPP_REASON_CMD);
 	}
 	return -SILENT_AT_COMMAND_RET;

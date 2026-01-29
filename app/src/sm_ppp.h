@@ -12,5 +12,6 @@
 extern bool sm_fwd_cgev_notifs;
 
 bool sm_ppp_is_stopped(void);
+void sm_ppp_set_auto_start(bool enable);
 
 #endif

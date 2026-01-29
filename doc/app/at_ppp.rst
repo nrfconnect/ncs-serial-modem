@@ -22,7 +22,12 @@ Control PPP #XPPP
 Set command
 -----------
 
-The set command allows you to start and stop PPP, and optionally define the PDN connection used for PPP.
+The set command request activation or deactivation of PPP link, and optionally define the PDN connection used for PPP.
+PPP link is established on the second channel (DLC channel 2) when CMUX is used.
+If the PPP link is preferred on the first channel (DLC channel 1), you must use the ``AT#XCMUX=2`` command to switch the AT command channel to DLC channel 2 before starting PPP.
+
+If PPP is started without CMUX, the current UART switches to PPP mode.
+
 
 .. note::
 
@@ -31,7 +36,7 @@ The set command allows you to start and stop PPP, and optionally define the PDN 
 
 .. note::
 
-   When PPP is started without CMUX, the current UART switches to PPP mode and cannot be used for AT commands until PPP is stopped by LCP termination.
+   When PPP is started without CMUX, the current UART cannot be used for AT commands until PPP is stopped by LCP termination.
 
 Syntax
 ~~~~~~
@@ -80,7 +85,7 @@ PPP link termination behaves differently in various scenarios.
 
 When the PPP is started on the UART without CMUX, the PPP link termination always returns the channel back to AT command mode.
 
-When the PPP is started over CMUX, the behavior depends on the termination reason:
+When the PPP is started over CMUX, the behavior depends on the termination reason and channel configuration:
 
 .. list-table:: PPP link termination reason
    :header-rows: 1
@@ -88,17 +93,25 @@ When the PPP is started over CMUX, the behavior depends on the termination reaso
 
    * - Reason
      - Description
-   * - PDN connection lost
+   * - PDN connection lost when PPP is running on DLC channel 2
      - The PPP link is terminated using the LCP Terminate-Request message.
        The PPP module keeps waiting for the PDN connection to be re-established to restart PPP automatically.
        The Remote peer might wait for LCP Config-Requests to re-establish the link.
-   * - Peer disconnection
-     - The Remote peer disconnects the PPP link using the LCP Terminate-Request message.
-       The PPP module stops PPP and releases the CMUX channel. 
+   * - PDN connection lost when PPP is running on DLC channel 1
+     - The PPP link is terminated using the LCP Terminate-Request message.
+       The PPP module stops without trying to restart.
+       DLC channel 1 is returned to AT command mode.
+       Traffic on DLC channel 2 is ignored.
+   * - Peer disconnection using the LCP Terminate-Request
+     - The PPP module stops PPP and releases the CMUX channel.
        It does not attempt to restart.
    * - PPP stopped by AT command
-     - The PPP module stops PPP and releases the CMUX channel. 
+     - The PPP module stops PPP and releases the CMUX channel.
        It does not attempt to restart.
+
+As the ```AT#XPPP=1``` command is designed to restart the PPP connection automatically when the DLC channel used for PPP is the second channel (DLC channel 2).
+This is to allow the PPP connection to recover from temporary network losses without your intervention while still allowing you to stop PPP when needed.
+This behavior differs from the standard ``ATD*99#`` command, which is not implemented on |SM|.
 
 Examples
 --------
