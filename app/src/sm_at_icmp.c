@@ -31,9 +31,9 @@ static struct ping_argv_t {
 	struct zsock_addrinfo *src;
 	struct zsock_addrinfo *dest;
 	uint16_t len;
-	uint16_t waitms;
+	uint32_t waitms;
 	uint16_t count;
-	uint16_t interval;
+	uint32_t interval;
 	uint16_t pdn;
 } ping_argv;
 
@@ -545,6 +545,10 @@ STATIC int handle_at_icmp_ping(enum at_parser_cmd_type cmd_type, struct at_parse
 			if (err < 0) {
 				return err;
 			};
+			if (ping_argv.count == 0) {
+				LOG_ERR("Count must be greater than 0");
+				return -EINVAL;
+			}
 		}
 		ping_argv.interval = 1000; /* default 1s */
 		if (param_count > 5) {
