@@ -1109,9 +1109,7 @@ int sm_at_host_power_off(void)
 	const int err = at_host_power_off(false);
 
 	/* Write sync str to buffer so it is sent first when resuming, do not flush. */
-	if (!IS_ENABLED(CONFIG_SM_SKIP_READY_MSG)) {
-		sm_tx_write(SM_SYNC_STR, strlen(SM_SYNC_STR), false, false);
-	}
+	sm_tx_write(SM_SYNC_STR, strlen(SM_SYNC_STR), false, false);
 
 	return err;
 }

@@ -286,16 +286,14 @@ static int sm_main(void)
 
 	check_app_fota_status();
 
-	if (!IS_ENABLED(CONFIG_SM_SKIP_READY_MSG)) {
-		if (sm_init_failed) {
-			ret = sm_at_send_str(SM_SYNC_ERR_STR);
-		} else {
-			ret = sm_at_send_str(SM_SYNC_STR);
-		}
+	if (sm_init_failed) {
+		ret = sm_at_send_str(SM_SYNC_ERR_STR);
+	} else {
+		ret = sm_at_send_str(SM_SYNC_STR);
+	}
 
-		if (ret) {
-			return ret;
-		}
+	if (ret) {
+		return ret;
 	}
 
 	/* This is here and not earlier because in case of firmware

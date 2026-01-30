@@ -415,3 +415,5 @@ If you need any of those features with this |SM|, please contact customer suppor
     Use the :file:`overlay-ppp.conf` and :file:`overlay-cmux.conf` files instead.
   * The :file:`sm_auto_connect.h` header file.
     Use the ``CONFIG_SM_AUTO_CONNECT*`` Kconfig options to configure automatic network attach.
+  * The ``CONFIG_SM_SKIP_READY_MSG`` Kconfig option.
+    The ``Ready\r\n`` message is always sent when the |SM| application is ready to accept AT commands.

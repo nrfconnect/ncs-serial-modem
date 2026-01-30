@@ -24,11 +24,6 @@ config SM_AT_BUF_SIZE
 	help
 	  Size of the buffer for incoming AT commands and modem responses.
 
-config SM_SKIP_READY_MSG
-	bool "Skip ready message"
-	help
-	  Skip sending the ready message when the application is powered on.
-
 #
 # external XTAL for UART
 #
