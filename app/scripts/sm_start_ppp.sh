@@ -170,7 +170,7 @@ trap cleanup ERR
 stty -F $MODEM $BAUD pass8 raw crtscts clocal
 
 log_dbg "Wait modem to boot"
-if chat -t1 "" "AT" "OK" <$MODEM >$MODEM; then
+if chat -t1 "Ready--" "AT" "OK" <$MODEM >$MODEM; then
 	log_dbg "Modem is in AT mode"
 else
 	log_dbg "Modem not responding, try CMUX Close down..."
