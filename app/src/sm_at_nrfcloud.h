@@ -13,6 +13,7 @@
  * @{
  */
 #include <stdbool.h>
+#include <modem/lte_lc.h>
 
 /* Whether the connection to nRF Cloud is ready. */
 extern bool sm_nrf_cloud_ready;
@@ -21,13 +22,43 @@ extern bool sm_nrf_cloud_ready;
 extern bool sm_nrf_cloud_send_location;
 
 /**
- * @brief Get information about the current cell.
- * @param[out] cell_inf Cell information structure to be filled.
+ * @brief Callback invoked on completion of an async NCELLMEAS run.
  *
- * @retval 0 If the operation was successful.
- *           Otherwise, a (negative) error code is returned.
+ * Called from sm_work_q context. The callback takes ownership of @p cell_data
+ * and must release it with sm_at_nrfcloud_ncellmeas_cleanup() when done.
+ * @p cell_data may be NULL if allocation failed.
+ *
+ * @param[in] cell_data Measurement results, or NULL on allocation failure.
+ * @param[in] ctx       Opaque pointer passed to sm_at_nrfcloud_ncellmeas_start().
  */
-int get_single_cell_info(struct lte_lc_cell *const cell_inf);
+typedef void (*sm_at_nrfcloud_ncellmeas_done_cb_t)(struct lte_lc_cells_info *cell_data, void *ctx);
+
+/**
+ * @brief Start asynchronous cellular neighbor cell measurements.
+ *
+ * Issues the first AT%%NCELLMEAS command and returns immediately.
+ * Progress is URC-driven; @p cb is invoked from sm_work_q when all phases
+ * are complete.  Pass @p cb = NULL with @p send_loc_req = true to have the
+ * implementation submit the nRF Cloud location request automatically.
+ *
+ * @param[in] cell_count    Number of cells to search for.
+ * @param[in] send_loc_req  If true, submit the nRF Cloud location request on
+ *                          completion (cb is ignored).
+ * @param[in] cb            Completion callback (used when send_loc_req is false).
+ * @param[in] ctx           Opaque pointer forwarded to @p cb.
+ *
+ * @return 0 on success, negative errno on error.
+ */
+int sm_at_nrfcloud_ncellmeas_start(uint8_t cell_count, bool send_loc_req,
+				   sm_at_nrfcloud_ncellmeas_done_cb_t cb, void *ctx);
+
+/**
+ * @brief Cleanup the cellular neighbor cell measurement data.
+ *
+ * @param[in] cell_data Data to be cleaned up.
+ */
+void sm_at_nrfcloud_ncellmeas_cleanup(struct lte_lc_cells_info *cell_data);
+
+#endif /* SM_AT_NRFCLOUD_ */
 
 /** @} */
-#endif /* SM_AT_NRFCLOUD_ */

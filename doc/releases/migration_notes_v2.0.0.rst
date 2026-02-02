@@ -23,6 +23,20 @@ The following changes are mandatory to make your application work in the same wa
 * Full FOTA - When compiling, rename ``overlay-full_fota.conf`` to ``overlay-full-fota.conf`` and add ``overlay-full-fota.overlay`` to the build configuration.
   See :ref:`SM_AT_FOTA` for more information.
 
+* ``AT#XNRFCLOUDPOS``:
+
+  * Changed ``<cell_pos>`` parameter to ``<cell_count>``. The meaning changes from no cell positioning, single-cell or multi-cell to the number of cells to be included in the location request.
+    ``0`` means that cellular positioning is not requested at all.
+  * The ``AT#XNRFCLOUDPOS`` command has been updated to use the ``AT%NCELLMEAS`` command internally, so the host must not use it anymore.
+  * ``#XNRFCLOUDPOS`` notification now includes the status of the location request.
+    The syntax has changed from:
+    ::
+      #XNRFCLOUDPOS: <error>
+      #XNRFCLOUDPOS: <type>,<latitude>,<longitude>,<uncertainty>
+    to:
+    ::
+      #XNRFCLOUDPOS: <status>[,<type>,<latitude>,<longitude>,<uncertainty>]
+
 Custom static partition layout migration
 ----------------------------------------
 
@@ -50,5 +64,6 @@ The following changes are listed for informational purposes, and many hosts will
 
 * Ring Indication (RI) - Change RI from pulse (100 ms) to level triggered, meaning RI stays asserted until the host asserts DTR.
   After the Serial Modem has enabled UART, RI will be deasserted.
-* nRF Cloud transport has been changed from MQTT to CoAP.
 * HTTP client has been added and it's enabled by default. Use CONFIG_SM_HTTPC=n if you do not need it and want to save flash.
+* nRF Cloud transport has been changed from MQTT to CoAP.
+* ``CONFIG_SM_NRF_CLOUD_LOCATION`` is enabled by default whenever ``CONFIG_SM_NRF_CLOUD`` is enabled. Use ``CONFIG_SM_NRF_CLOUD_LOCATION=n`` if you do not need it and want to save flash.
