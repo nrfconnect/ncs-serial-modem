@@ -248,6 +248,9 @@ config SM_GNSS
 config SM_NRF_CLOUD
 	bool "nRF Cloud support"
 	default y
+	depends on NRF_CLOUD
+	depends on NRF_CLOUD_COAP
+	depends on DATE_TIME
 	select EXPERIMENTAL
 
 if SM_NRF_CLOUD
@@ -261,6 +264,7 @@ endif # SM_NRF_CLOUD
 
 config SM_NRF_CLOUD_LOCATION
 	bool "nRF Cloud Location support"
+	default y
 	depends on SM_NRF_CLOUD
 	help
 	  Enable the nRF Cloud Location service for cloud-assisted geolocation.
