@@ -13,6 +13,7 @@
  * @{
  */
 #include <stdbool.h>
+#include <modem/lte_lc.h>
 
 /* Whether the connection to nRF Cloud is ready. */
 extern bool sm_nrf_cloud_ready;
@@ -21,13 +22,22 @@ extern bool sm_nrf_cloud_ready;
 extern bool sm_nrf_cloud_send_location;
 
 /**
- * @brief Get information about the current cell.
- * @param[out] cell_inf Cell information structure to be filled.
+ * @brief Execute cellular neighbor cell measurements.
  *
- * @retval 0 If the operation was successful.
- *           Otherwise, a (negative) error code is returned.
+ * @param[in] cell_count Number of cells to search for.
+ * @param[in] send_log_req Whether to send a location request to cloud after neighbor measurements.
+ *
+ * @return Cell search results allocated from the heap and caller must release it with free().
  */
-int get_single_cell_info(struct lte_lc_cell *const cell_inf);
+ struct lte_lc_cells_info *sm_at_nrfcloud_ncellmeas(uint8_t cell_count, bool send_loc_req);
+
+/**
+ * @brief Cleanup the cellular neighbor cell measurement data.
+ *
+ * @param[in] cell_data Data to be cleaned up.
+ */
+void sm_at_nrfcloud_ncellmeas_cleanup(struct lte_lc_cells_info *cell_data);
+
+#endif /* SM_AT_NRFCLOUD_ */
 
 /** @} */
-#endif /* SM_AT_NRFCLOUD_ */

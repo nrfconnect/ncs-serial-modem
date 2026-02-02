@@ -322,8 +322,11 @@ static void agnss_requestor(struct k_work *)
 	int err;
 	struct nrf_modem_gnss_agnss_data_frame req;
 	struct nrf_cloud_coap_agnss_request request = {
-		NRF_CLOUD_COAP_AGNSS_REQ_CUSTOM,
-		&req,
+		.type = NRF_CLOUD_COAP_AGNSS_REQ_CUSTOM,
+		.agnss_req = &req,
+		.net_info = NULL,
+		.filtered = false,
+		.mask_angle = 0,
 	};
 	char *agnss_rest_data_buf = calloc(1, NRF_CLOUD_AGNSS_MAX_DATA_SIZE);
 
@@ -339,20 +342,30 @@ static void agnss_requestor(struct k_work *)
 	}
 
 	struct nrf_cloud_coap_agnss_result result = {
-		agnss_rest_data_buf,
-		NRF_CLOUD_AGNSS_MAX_DATA_SIZE,
-		0
+		.buf = agnss_rest_data_buf,
+		.buf_sz = NRF_CLOUD_AGNSS_MAX_DATA_SIZE,
+		.agnss_sz = 0,
 	};
-	struct lte_lc_cells_info net_info = {0};
 
-	err = get_single_cell_info(&net_info.current_cell);
-	if (err) {
-		LOG_ERR("Failed to obtain single-cell cellular network information (%d).", err);
-		goto cleanup;
+#if defined(CONFIG_SM_NRF_CLOUD_LOCATION)
+	struct lte_lc_cells_info *net_info = sm_at_nrfcloud_ncellmeas(1, false);
+
+	if (net_info != NULL && net_info->current_cell.id != LTE_LC_CELL_EUTRAN_ID_INVALID) {
+		request.net_info = net_info;
+	} else {
+		LOG_WRN("Requesting A-GNSS data without location assistance");
+		sm_at_nrfcloud_ncellmeas_cleanup(net_info);
+		net_info = NULL;
 	}
-	request.net_info = &net_info;
-
+#else
+	LOG_INF("Requesting A-GNSS data without location assistance "
+		"since CONFIG_SM_NRF_CLOUD_LOCATION is not defined");
+#endif
 	err = nrf_cloud_coap_agnss_data_get(&request, &result);
+#if defined(CONFIG_SM_NRF_CLOUD_LOCATION)
+	sm_at_nrfcloud_ncellmeas_cleanup(net_info);
+	net_info = NULL;
+#endif
 	if (err) {
 		LOG_ERR("Failed to request A-GNSS data via CoAP (%d).", err);
 		goto cleanup;
