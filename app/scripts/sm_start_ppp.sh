@@ -145,6 +145,21 @@ if [[ ! -c $MODEM ]]; then
 	exit 1
 fi
 
+# Remove stale PID files if processes are not running
+if [ -f "$PIDFILE" ]; then
+	if ! kill -0 $(cat "$PIDFILE" 2>/dev/null) 2>/dev/null; then
+		log_dbg "Removing stale PID file: $PIDFILE"
+		rm -f "$PIDFILE"
+	fi
+fi
+
+if [ -f "$TRACE_PID_FILE" ]; then
+	if ! kill -0 $(cat "$TRACE_PID_FILE" 2>/dev/null) 2>/dev/null; then
+		log_dbg "Removing stale trace PID file: $TRACE_PID_FILE"
+		rm -f "$TRACE_PID_FILE"
+	fi
+fi
+
 if find /dev -type c -name 'gsmtty*' | grep -q . ; then
 	echo "Error: existing CMUX devices found (/dev/gsmtty*)"
 	exit 1
