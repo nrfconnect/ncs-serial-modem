@@ -54,6 +54,11 @@ Syntax
   It represents ``cid`` in the ``+CGDCONT`` command.
   Its default value is ``0``, which represents the default PDN connection.
 
+  .. note::
+
+     Other sockets cannot use the same PDN connection.
+     See :ref:`SM_AT_SOCKET_RAW_SOCKET_LIMITATION` for more information.
+
 Unsolicited notification
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
