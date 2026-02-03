@@ -303,10 +303,12 @@ STATIC int handle_at_clac(enum at_parser_cmd_type cmd_type, struct at_parser *, 
 	rsp_send("\r\n");
 	for (size_t i = 0; i < cmd_custom_count; i++) {
 		const char *cmd = _nrf_modem_at_cmd_custom_list_start[i].cmd;
-		/* Modem AT comamands start with 'AT+' or AT%. Other commands are
+		/* Modem AT commands start with 'AT+' or AT%. Other commands are
 		 * Serial Modem specific'. Skip modem AT commands.
+		 * Exception: AT+IPR is implemented in Serial Modem.
 		 */
-		if (strncasecmp(cmd, "AT+", strlen("AT+")) == 0 ||
+		if ((strncasecmp(cmd, "AT+", strlen("AT+")) == 0 &&
+		     strncasecmp(cmd, "AT+IPR", strlen("AT+IPR")) != 0) ||
 		    strncasecmp(cmd, "AT%%", strlen("AT%%")) == 0) {
 			continue;
 		}

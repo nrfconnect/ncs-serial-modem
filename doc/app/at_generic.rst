@@ -9,6 +9,98 @@ Generic AT commands
 
 This page describes generic AT commands.
 
+UART baud rate AT+IPR
+=====================
+
+The ``AT+IPR`` command sets the UART baud rate.
+
+Set command
+-----------
+
+The set command sets the UART baud rate.
+|SM| does not support automatic baud rate detection.
+When the device resets, the baud rate is set to the default value set in the devicetree.
+
+Syntax
+~~~~~~
+
+::
+
+   AT+IPR=<baud_rate>
+
+The ``<baud_rate>`` parameter is an integer value specifying the desired baud rate.
+
+.. note::
+
+   The baud rate change takes effect after the modem responds with ``OK``.
+   The host must switch to the new baud rate to continue communication.
+
+Example
+~~~~~~~
+
+Set the baud rate to 115200.
+
+::
+
+   AT+IPR=115200
+   OK
+
+Read command
+------------
+
+The read command reads the current UART baud rate.
+
+Syntax
+~~~~~~
+
+::
+
+   AT+IPR?
+
+Response syntax
+~~~~~~~~~~~~~~~
+
+::
+
+   +IPR: <baud_rate>
+
+Example
+~~~~~~~
+
+::
+
+   AT+IPR?
+   +IPR: 115200
+   OK
+
+Test command
+------------
+
+The test command lists the supported baud rates.
+
+Syntax
+~~~~~~
+
+::
+
+   AT+IPR=?
+
+Response syntax
+~~~~~~~~~~~~~~~
+
+::
+
+   +IPR: (list of supported autodetectable baud rates)[,(list of fixed-only baud rates)]
+
+Example
+~~~~~~~
+
+::
+
+   AT+IPR=?
+   +IPR: (),(115200,230400,460800,921600,1000000)
+   OK
+
 |SM| echo E0/E1
 ===============
 

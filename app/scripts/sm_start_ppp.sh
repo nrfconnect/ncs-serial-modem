@@ -25,6 +25,7 @@
 #
 MODEM=/dev/ttyACM0
 BAUD=115200
+IPR_BAUD=0
 TIMEOUT=60
 APN="internet"
 TYPE="IPV4V6"
@@ -39,11 +40,15 @@ TRACE_PID_FILE="/var/run/nrf91-modem-trace.pid"
 TRACE=0
 
 usage() {
-    echo "Usage: $0 [-s serial_port] [-b baud_rate] [-t timeout] [-a APN] [-f IP|IPV6|IPV4V6] \
-[-p PDN] [-T] [-v] [-h]"
+    echo "Usage: $0 [-s serial_port] [-b baud_rate] [-B new_speed] [-t timeout] [-a APN]"
+    echo "          [-f IP|IPV6|IPV4V6] [-p PDN] [-T] [-v] [-h]"
     echo ""
     echo "  -s serial_port : Serial port where the modem is connected (default: $MODEM)"
-    echo "  -b baud_rate   : Baud rate for serial communication (default: $BAUD)"
+    echo "  -b baud_rate   : Current baud rate of Serial Modem (default: $BAUD)"
+    echo "  -B new_speed   : Use AT+IPR to change baud rate to <new_speed>"
+    echo "                   Start with current baud rate and switch to new_speed after modem is"
+    echo "                   responsive. If not set, baud rate will not be changed."
+    echo "                   When terminated, baud rate will be switched back to original."
     echo "  -t timeout     : Timeout for dialup commands in seconds (default: $TIMEOUT)"
     echo "  -a APN         : Access Point Name for cellular connection (default: $APN)"
     echo "  -f FAMILY      : PDP_type, one of IP, IPV6, IPV4V6 (default: $TYPE)"
@@ -56,11 +61,12 @@ usage() {
 }
 
 # Parse command line parameters
-while getopts s:b:t:a::f:p:Thv flag
+while getopts s:b:B:t:a::f:p:Thv flag
 do
     case "${flag}" in
 	s) MODEM=${OPTARG};;
 	b) BAUD=${OPTARG};;
+	B) IPR_BAUD=${OPTARG};;
 	t) TIMEOUT=${OPTARG};;
 	a) APN=${OPTARG};;
 	p) PDN=${OPTARG};;
@@ -199,6 +205,13 @@ else
 	cmux_close
 fi
 
+if [ $IPR_BAUD -ne 0 ]; then
+	log_dbg "Set baud rate on modem to $IPR_BAUD"
+	chat $CHATOPT -t1 '' "AT+IPR=$IPR_BAUD" "OK" >$MODEM <$MODEM
+	# Reconfigure serial port
+	stty -F $MODEM $IPR_BAUD pass8 raw crtscts clocal
+fi
+
 log_dbg "Attach CMUX channel to modem..."
 ldattach -c $'\rAT#XCMUX=1\r' GSM0710 $MODEM
 
@@ -235,6 +248,11 @@ shutdown_modem() {
 		cmux_close
 		chat $CHATOPT -t5 '' $SHUTDOWN_SCRIPT >$MODEM <$MODEM
 	fi
+	if [ $IPR_BAUD -ne 0 ]; then
+		# Restore baud rate on modem
+		chat $CHATOPT -t1 '' "AT+IPR=$BAUD" "OK" >$MODEM <$MODEM
+		stty -F $MODEM $BAUD
+	fi
 }
 
 ppp_start() {
@@ -259,6 +277,8 @@ export SHUTDOWN_SCRIPT
 export PPP_OPTIONS
 export PIDFILE
 export CHATOPT
+export BAUD
+export IPR_BAUD
 export TRACE_PID_FILE
 export -f ppp_start
 export -f shutdown_modem
