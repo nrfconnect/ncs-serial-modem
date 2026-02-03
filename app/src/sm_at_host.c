@@ -1176,7 +1176,11 @@ static void event_work_fn(struct k_work *work)
 		if (event_cb->events & events) {
 			LOG_DBG("Notify event cb: %p for events: %d", (void *)event_cb, events);
 			event_cb->cb(NULL);
+			event_cb->events &= ~events;
+		}
+		if (event_cb->events == 0) {
 			sys_slist_remove(&event_ctx.event_cbs, NULL, node);
+			LOG_DBG("Event cb: %p removed", (void *)event_cb);
 		}
 	}
 }
