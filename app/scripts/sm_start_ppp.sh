@@ -163,6 +163,7 @@ cmux_close() {
 
 cleanup() {
 	set +eu
+	start-stop-daemon --stop --pidfile $TRACE_PID_FILE --remove-pidfile --oknodo
 	pkill pppd
 	pkill ldattach
 	printf "\xF9\x03\xEF\x05\xC3\x01\xF2\xF9" > $MODEM
@@ -197,8 +198,6 @@ if [ $TRACE -gt 0 ]; then
 	log_dbg "Trace CMUX: $MT_CMUX"
 	echo "Trace file: $MODEM_TRACE_FILE"
 	stty -F $MT_CMUX raw clocal -icrnl -ixon -opost
-	dd if=$MT_CMUX of=$MODEM_TRACE_FILE bs=1024 &
-	echo $! > $TRACE_PID_FILE
 fi
 sleep 3
 
@@ -206,12 +205,15 @@ stty -F $AT_CMUX clocal
 
 echo "Connect and wait for PPP link..."
 test -c $AT_CMUX
+test $TRACE -gt 0 && start-stop-daemon --start --pidfile $TRACE_PID_FILE --make-pidfile --background --exec /bin/dd -- if=$MT_CMUX of=$MODEM_TRACE_FILE bs=1024
+
 chat $CHATOPT -t$TIMEOUT "${CHAT_SCRIPT[@]}" >$AT_CMUX <$AT_CMUX
 
 shutdown_modem() {
 	set +eu
 	chat $CHATOPT -t5 '' $SHUTDOWN_SCRIPT >$AT_CMUX <$AT_CMUX
 	CHAT_ERR=$?
+	start-stop-daemon --stop --pidfile $TRACE_PID_FILE --remove-pidfile --oknodo
 	pkill ldattach
 	sleep 1
 	if [ "$CHAT_ERR" -ne 0 ]; then
@@ -242,6 +244,7 @@ export SHUTDOWN_SCRIPT
 export PPP_OPTIONS
 export PIDFILE
 export CHATOPT
+export TRACE_PID_FILE
 export -f ppp_start
 export -f shutdown_modem
 export -f cmux_close
