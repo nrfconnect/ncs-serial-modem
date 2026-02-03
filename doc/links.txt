@@ -64,9 +64,9 @@
 .. _`Trusted Firmware-M`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/security/tfm/index.html
 .. _`Zephyr’s Cellular modem`: https://docs.nordicsemi.com/bundle/ncs-latest/page/zephyr/samples/net/cellular_modem/README.html
 .. _`Custom AT commands`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/modem/at_cmd_custom.html
-.. _`nrfxlib_nrf_sockets`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrfxlib/nrf_modem/doc/sockets.html#nrf-sockets
-.. _`nrfxlib_dtls_cid_settings`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrfxlib/nrf_modem/doc/sockets/socket_options_func.html#dtls-cid-setting
-.. _`nrfxlib_dtls_cid_status`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrfxlib/nrf_modem/doc/sockets/socket_options_func.html#dtls-cid-status
+.. _`nrfxlib_nrf_sockets`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrfxlib/nrf_modem/doc/sockets/socket_options_func.html
+.. _`nrfxlib_dtls_cid_settings`: https://docs.nordicsemi.com/bundle/nrfxlib-apis-latest/page/group_nrf_so_sec_dtls_cid_settings.html
+.. _`nrfxlib_dtls_cid_status`: https://docs.nordicsemi.com/bundle/nrfxlib-apis-latest/page/group_nrf_so_sec_dtls_cid_statuses.html
 
 .. _`nRF Cloud Preconnect onboarding`: https://docs.nordicsemi.com/bundle/nrf-cloud/page/Devices/Associations/Onboarding.html#preconnect-onboarding
 
