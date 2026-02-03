@@ -1,4 +1,5 @@
 .. _SM_AT_SOCKET:
+.. _SM_AT_SOCKET_RAW_SOCKET_LIMITATION:
 
 Socket AT commands
 ******************
@@ -11,6 +12,14 @@ This page describes socket-related AT commands.
 The application can open up to 8 sockets.
 
 For more information on the networking services, see the `Zephyr Network APIs`_.
+
+.. note::
+
+   A socket cannot be created on a PDN connection that is already in use by a raw socket.
+   A raw socket cannot be created on a PDN connection that is already in use by another socket.
+   The reason is that a raw socket cannot keep its data separate from the data of another IP socket when both are operating on the same PDN.
+   When a raw socket is active, it intercepts all downlink data intended for other sockets on the same PDN, which disrupts normal socket operations.
+   Raw sockets are used internally by the following AT commands: ``AT#XPPP`` and ``AT#XPING``.
 
 Socket #XSOCKET
 ===============
@@ -183,6 +192,11 @@ The ``#XSSOCKET`` command allows you to open a secure socket and to check the so
 
 .. note::
    TLS and DTLS servers are currently not supported.
+
+.. note::
+
+   A secure socket cannot be created on a PDN connection that is already in use by a raw socket.
+   See :ref:`SM_AT_SOCKET_RAW_SOCKET_LIMITATION` for more information.
 
 Set command
 -----------

@@ -131,6 +131,12 @@ Set command
 
 The set command allows you to connect to and disconnect from the MQTT broker.
 
+.. note::
+
+   The ``#XMQTTCON`` command uses default PDN connection with ID ``0``.
+   Raw sockets must not use the PDN connection at the same time.
+   See :ref:`SM_AT_SOCKET_RAW_SOCKET_LIMITATION` for more information.
+
 Syntax
 ~~~~~~
 

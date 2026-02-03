@@ -27,6 +27,12 @@ Set command
 
 The set command allows you to access the nRF Cloud service.
 
+.. note::
+
+   The ``#XNRFCLOUD`` command uses default PDN connection with ID ``0``.
+   Raw sockets must not use the PDN connection at the same time.
+   See :ref:`SM_AT_SOCKET_RAW_SOCKET_LIMITATION` for more information.
+
 Syntax
 ~~~~~~
 
