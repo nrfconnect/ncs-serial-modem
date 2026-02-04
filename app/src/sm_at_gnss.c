@@ -16,6 +16,7 @@
 #if defined(CONFIG_SM_NRF_CLOUD)
 #include <net/nrf_cloud.h>
 #include <net/nrf_cloud_codec.h>
+#include <net/nrf_cloud_coap.h>
 #include "sm_at_nrfcloud.h"
 
 #if defined(CONFIG_NRF_CLOUD_AGNSS)
@@ -60,6 +61,10 @@ static struct k_work agnss_req_work;
 #endif
 #if defined(CONFIG_NRF_CLOUD_PGPS)
 static struct k_work pgps_req_work;
+#if defined(CONFIG_NRF_CLOUD_COAP)
+static struct k_work pgps_coap_req_work;
+static struct gps_pgps_request pgps_coap_request;
+#endif
 #endif
 
 #endif /* CONFIG_SM_NRF_CLOUD */
@@ -321,7 +326,7 @@ static void agnss_requestor(struct k_work *)
 		LOG_ERR("Failed to read A-GNSS request (%d).", err);
 		return;
 	}
-
+#if defined(CONFIG_NRF_CLOUD_MQTT)
 	err = nrf_cloud_agnss_request(&req);
 	if (err) {
 		LOG_ERR("Failed to request A-GNSS data (%d).", err);
@@ -333,6 +338,38 @@ static void agnss_requestor(struct k_work *)
 		 * plays a role as A-GNSS expects P-GPS to process some of the data.
 		 */
 	}
+#endif
+#if defined(CONFIG_NRF_CLOUD_COAP)
+	static char agnss_rest_data_buf[NRF_CLOUD_AGNSS_MAX_DATA_SIZE];
+	struct nrf_cloud_rest_agnss_request request = {
+		NRF_CLOUD_REST_AGNSS_REQ_CUSTOM,
+		&req,
+	};
+
+	struct nrf_cloud_rest_agnss_result result = {agnss_rest_data_buf,
+						     sizeof(agnss_rest_data_buf), 0};
+	struct lte_lc_cells_info net_info = {0};
+
+	err = get_single_cell_info(&net_info.current_cell);
+	if (err) {
+		LOG_ERR("Failed to obtain single-cell cellular network information (%d).", err);
+		return;
+	}
+	request.net_info = &net_info;
+
+	err = nrf_cloud_coap_agnss_data_get(&request, &result);
+	if (err) {
+		LOG_ERR("Failed to request A-GNSS data via REST (%d).", err);
+		return;
+	}
+
+	err = nrf_cloud_agnss_process(result.buf, result.agnss_sz);
+	if (err) {
+		LOG_ERR("Failed to process A-GNSS data, error: %d", err);
+		return;
+	}
+	LOG_INF("A-GNSS data received via CoAP.");
+#endif
 }
 #endif /* CONFIG_NRF_CLOUD_AGNSS */
 
@@ -349,6 +386,49 @@ static void pgps_requestor(struct k_work *)
 		LOG_INF("P-GPS prediction notification requested.");
 	}
 }
+
+#if defined(CONFIG_NRF_CLOUD_COAP)
+static void pgps_coap_requestor(struct k_work *)
+{
+	int err;
+	struct nrf_cloud_rest_pgps_request request = {.pgps_req = &pgps_coap_request};
+	struct nrf_cloud_pgps_result file_location = {0};
+	static char host[64];
+	static char path[128];
+
+	LOG_INF("Getting P-GPS predictions from nRF Cloud...");
+
+	memset(host, 0, sizeof(host));
+	memset(path, 0, sizeof(path));
+
+	file_location.host = host;
+	file_location.host_sz = sizeof(host);
+	file_location.path = path;
+	file_location.path_sz = sizeof(path);
+
+	err = nrf_cloud_coap_pgps_url_get(&request, &file_location);
+	if (err) {
+		LOG_ERR("Failed to get P-GPS data, error: %d", err);
+		nrf_cloud_pgps_request_reset();
+		return;
+	}
+
+	err = nrf_cloud_pgps_update(&file_location);
+	if (err) {
+		LOG_ERR("Failed to process P-GPS response, error: %d", err);
+		nrf_cloud_pgps_request_reset();
+		return;
+	}
+
+	err = nrf_cloud_pgps_notify_prediction();
+	if (err) {
+		LOG_ERR("Failed to request current prediction, error: %d", err);
+		return;
+	}
+
+	LOG_INF("P-GPS predictions requested");
+}
+#endif
 
 static void pgps_event_handler(struct nrf_cloud_pgps_event *event)
 {
@@ -401,6 +481,10 @@ static void pgps_event_handler(struct nrf_cloud_pgps_event *event)
 		break;
 	case PGPS_EVT_REQUEST:
 		LOG_INF("PGPS_EVT_REQUEST");
+#if defined(CONFIG_NRF_CLOUD_COAP)
+		memcpy(&pgps_coap_request, event->request, sizeof(pgps_coap_request));
+		k_work_submit_to_queue(&sm_work_q, &pgps_coap_req_work);
+#endif
 		break;
 	}
 }
@@ -455,6 +539,8 @@ static void on_gnss_evt_pvt(void)
 static int do_cloud_send_obj(struct nrf_cloud_obj *const obj)
 {
 	int err;
+
+#if defined(CONFIG_NRF_CLOUD_MQTT)
 	struct nrf_cloud_tx_data msg = {
 		.obj = obj,
 		.topic_type = NRF_CLOUD_TOPIC_MESSAGE,
@@ -465,7 +551,13 @@ static int do_cloud_send_obj(struct nrf_cloud_obj *const obj)
 	if (err) {
 		LOG_ERR("nrf_cloud_send failed, error: %d", err);
 	}
-
+#endif
+#if defined(CONFIG_NRF_CLOUD_COAP)
+	err = nrf_cloud_coap_obj_send(obj, false);
+	if (err) {
+		LOG_ERR("nrf_cloud_send failed, error: %d", err);
+	}
+#endif
 	(void)nrf_cloud_obj_free(obj);
 
 	return err;
@@ -481,7 +573,6 @@ static void send_location(struct nrf_modem_gnss_pvt_data_frame * const pvt_data)
 		.mdm_pvt = pvt_data
 	};
 	NRF_CLOUD_OBJ_JSON_DEFINE(msg_obj);
-
 	/* On failure, NRF_CLOUD_NO_TIMESTAMP is used and the timestamp is omitted */
 	(void)date_time_now(&gnss.ts_ms);
 
@@ -812,7 +903,10 @@ static int sm_at_gnss_init(void)
 #endif
 #if defined(CONFIG_NRF_CLOUD_PGPS)
 	k_work_init(&pgps_req_work, pgps_requestor);
+#if defined(CONFIG_NRF_CLOUD_COAP)
+	k_work_init(&pgps_coap_req_work, pgps_coap_requestor);
 #endif
+#endif /* CONFIG_NRF_CLOUD_PGPS */
 #endif /* CONFIG_SM_NRF_CLOUD */
 	k_work_init(&gnss_fix_send_work, gnss_fix_sender);
 
