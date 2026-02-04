@@ -44,6 +44,8 @@ This section gives instructions on how to migrate from the |NCS| v3.1.x `SLM <Se
   * Functions and other symbols in the code have been renamed accordingly making automatic patching to likely fail.
 
 * Changed the default AT command terminator from ``\r\n`` (``CONFIG_SM_CR_LF_TERMINATION`` and ``CONFIG_SM_AT_CLIENT_CR_LF_TERMINATION``) to ``\r`` (``CONFIG_SM_CR_TERMINATION`` and ``CONFIG_SM_AT_CLIENT_CR_TERMINATION``).
+* Replaced the use of ``CONFIG_NRF_CLOUD_LOCATION`` to |SM|-specific new Kconfig option :ref:`CONFIG_SM_NRF_CLOUD_LOCATION <CONFIG_SM_NRF_CLOUD_LOCATION>`.
+  You can now use this option to enable the `nRF Cloud Location Services <nRF Cloud Location Services_>`_ for cloud-assisted geolocation, which supports cellular and Wi-Fi positioning.
 
 * Rename the following AT commands:
 
