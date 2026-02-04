@@ -250,6 +250,11 @@ config SM_NRF_CLOUD
 	default y
 	select EXPERIMENTAL
 
+config SM_NRF_CLOUD_LOCATION
+	bool "nRF Cloud Location support"
+	depends on SM_NRF_CLOUD
+	select NRF_CLOUD_LOCATION if NRF_CLOUD_MQTT
+
 config SM_MQTTC
 	bool "MQTT client support"
 	default y
