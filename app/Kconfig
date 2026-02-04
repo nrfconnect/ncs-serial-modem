@@ -259,6 +259,11 @@ config HEAP_MEM_POOL_ADD_SIZE_SM_NRF_CLOUD
 	  dynamic memory allocation.
 endif # SM_NRF_CLOUD
 
+config SM_NRF_CLOUD_LOCATION
+	bool "nRF Cloud Location support"
+	depends on SM_NRF_CLOUD
+	select NRF_CLOUD_LOCATION if NRF_CLOUD_MQTT
+
 config SM_MQTTC
 	bool "MQTT client support"
 	default y

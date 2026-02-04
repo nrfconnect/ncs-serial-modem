@@ -202,7 +202,7 @@ The request uses information from the cellular network, Wi-Fi® access points, o
    To use ``#XNRFCLOUDPOS``, the following preconditions apply:
 
    * The device must be connected to nRF Cloud using :ref:`#XNRFCLOUD <SM_AT_NRFCLOUD>`.
-   * The ``CONFIG_NRF_CLOUD_LOCATION`` Kconfig option must be enabled.
+   * The ``CONFIG_SM_NRF_CLOUD_LOCATION`` Kconfig option must be enabled.
 
 Set command
 -----------
