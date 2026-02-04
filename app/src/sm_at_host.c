@@ -45,11 +45,14 @@ enum sm_operation_mode {
 	SM_NULL_MODE			/* Discard incoming until next command */
 };
 static enum sm_operation_mode at_mode;
-static sm_datamode_handler_t datamode_handler;
-static int datamode_handler_result;
-uint16_t sm_datamode_time_limit; /* Send trigger by time in data mode */
 K_MUTEX_DEFINE(mutex_mode); /* Protects the operation mode variables. */
-static size_t datamode_data_len; /* Expected data length in data mode. */
+
+static struct data_mode {
+	sm_datamode_handler_t handler;
+	int handler_result;
+	uint16_t time_limit; /* Time limit for idle period before sending in ms. */
+	size_t data_len; /* Expected data length in data mode. */
+} data_mode;
 
 uint8_t sm_at_buf[CONFIG_SM_AT_BUF_SIZE + 1];
 uint8_t sm_data_buf[SM_MAX_MESSAGE_SIZE];
@@ -150,27 +153,27 @@ static bool exit_datamode(void)
 	k_mutex_lock(&mutex_mode, K_FOREVER);
 
 	if (set_sm_mode(SM_AT_COMMAND_MODE)) {
-		if (datamode_handler) {
-			(void)datamode_handler(DATAMODE_EXIT, NULL, 0, SM_DATAMODE_FLAGS_NONE);
+		if (data_mode.handler) {
+			(void)data_mode.handler(DATAMODE_EXIT, NULL, 0, SM_DATAMODE_FLAGS_NONE);
 		}
-		datamode_handler = NULL;
-		datamode_data_len = 0;
+		data_mode.handler = NULL;
+		data_mode.data_len = 0;
 		quit_str_partial_match = 0;
 
 		k_mutex_lock(&mutex_data, K_FOREVER);
 		ring_buf_reset(&data_rb);
 		k_mutex_unlock(&mutex_data);
 
-		if (datamode_handler_result) {
-			LOG_ERR("Datamode handler error: %d", datamode_handler_result);
-			datamode_handler_result = -1;
+		if (data_mode.handler_result) {
+			LOG_ERR("Data mode handler error: %d", data_mode.handler_result);
+			data_mode.handler_result = -1;
 		}
-		rsp_send("\r\n#XDATAMODE: %d\r\n", datamode_handler_result);
-		datamode_handler_result = 0;
+		rsp_send("\r\n#XDATAMODE: %d\r\n", data_mode.handler_result);
+		data_mode.handler_result = 0;
 
 		sm_at_host_event_notify(SM_EVENT_AT_MODE);
 
-		LOG_INF("Exit datamode");
+		LOG_INF("Exit data mode");
 		ret = true;
 	}
 
@@ -185,43 +188,54 @@ static bool exit_datamode(void)
 /* Lock mutex_data, before calling. */
 static void raw_send(uint8_t flags)
 {
-	uint8_t *data = NULL;
-	int size_send, size_sent, size_all, size_finish;
+	uint8_t *data;
+	int claim;
+	int ret;
+	bool retry = true;
 
-	/* NOTE ring_buf_get_claim() might not return full size */
 	do {
-		size_all = ring_buf_size_get(&data_rb);
-		size_send = ring_buf_get_claim(&data_rb, &data, CONFIG_SM_DATAMODE_BUF_SIZE);
-		if (size_all != size_send) {
-			flags |= SM_DATAMODE_FLAGS_MORE_DATA;
-		}
-		LOG_INF("Raw send: size_send: %d, data %p", size_send, (void *)data);
-		if (data != NULL && size_send > 0) {
+		/* ring_buf_get_claim() might not return full size.
+		 * If we have more data in the buffer, set the MORE_DATA flag.
+		 */
+		uint8_t send_flags = flags;
 
-			/* Raw data sending */
-			size_finish = 0;
-
-			LOG_HEXDUMP_DBG(data, MIN(size_send, HEXDUMP_LIMIT), "RX");
-			k_mutex_lock(&mutex_mode, K_FOREVER);
-			if (datamode_handler && size_send > 0) {
-				size_sent = datamode_handler(DATAMODE_SEND, data, size_send, flags);
-				if (size_sent > 0) {
-					size_finish += size_sent;
-				} else if (size_sent == 0) {
-					size_finish += size_send;
-				} else {
-					LOG_WRN("Raw send failed, %d dropped", size_send);
-					size_finish += size_send;
-				}
-				(void)ring_buf_get_finish(&data_rb, size_finish);
-			} else {
-				LOG_WRN("no handler, %d dropped", size_send);
-				(void)ring_buf_get_finish(&data_rb, size_send + size_finish);
-			}
-			k_mutex_unlock(&mutex_mode);
-		} else {
+		ret = ring_buf_size_get(&data_rb);
+		claim = ring_buf_get_claim(&data_rb, &data, CONFIG_SM_DATAMODE_BUF_SIZE);
+		if (claim <= 0) {
 			break;
 		}
+		if (claim != ret) {
+			send_flags |= SM_DATAMODE_FLAGS_MORE_DATA;
+		}
+
+		/* Send received data onward. */
+		LOG_HEXDUMP_DBG(data, MIN(claim, HEXDUMP_LIMIT), "RX");
+		LOG_INF("Send: %d bytes, Data: %p", claim, (void *)data);
+
+		/* Lock the mutex for handler. */
+		k_mutex_lock(&mutex_mode, K_FOREVER);
+		if (data_mode.handler) {
+			ret = data_mode.handler(DATAMODE_SEND, data, claim, send_flags);
+			if (ret < 0 || (ret == 0 && !retry)) {
+				/* Exit data mode on send failure. Further data is dropped. */
+				LOG_ERR("Send failed: %d, Dropped: %d bytes", ret, claim);
+				exit_datamode_handler(ret ? ret : -EAGAIN);
+				ret = claim;
+			} else if (ret == 0 && retry) {
+				retry = false;
+				LOG_WRN("Send returned 0, retrying once");
+			} else {
+				LOG_DBG("Sent %d bytes", ret);
+				retry = true;
+			}
+			ring_buf_get_finish(&data_rb, ret);
+		} else {
+			LOG_ERR("No handler. Dropped %d bytes", claim);
+			ring_buf_get_finish(&data_rb, claim);
+		}
+
+		k_mutex_unlock(&mutex_mode);
+
 	} while (true);
 }
 
@@ -292,12 +306,12 @@ static size_t raw_rx_handler(const uint8_t *buf, const size_t len)
 	/* If <data_len> is set in datamode, skip searching for quit_str. Just send data until
 	 * length is reached.
 	 */
-	if (datamode_data_len > 0) {
-		for (processed = 0; processed < len && datamode_data_len > 0; processed++) {
+	if (data_mode.data_len > 0) {
+		for (processed = 0; processed < len && data_mode.data_len > 0; processed++) {
 			write_data_buf(&buf[processed], 1);
-			datamode_data_len--;
+			data_mode.data_len--;
 		}
-		if (datamode_data_len == 0) {
+		if (data_mode.data_len == 0) {
 			raw_send(SM_DATAMODE_FLAGS_NONE);
 			(void)exit_datamode();
 		}
@@ -810,7 +824,7 @@ static size_t null_handler(const uint8_t *buf, const size_t len)
 	bool match = false;
 
 	if (dropped_count == 0) {
-		LOG_WRN("Data pipe broken. Dropping data until datamode is terminated.");
+		LOG_WRN("Data pipe broken. Dropping data until data mode is terminated.");
 	}
 
 	for (processed = 0; processed < len && match == false; processed++) {
@@ -828,7 +842,7 @@ static size_t null_handler(const uint8_t *buf, const size_t len)
 	if (match) {
 		dropped_count -= strlen(quit_str);
 		dropped_count += ring_buf_size_get(&data_rb);
-		LOG_WRN("Terminating datamode, %d dropped", dropped_count);
+		LOG_WRN("Terminating data mode. Dropped %d bytes", dropped_count);
 		(void)exit_datamode();
 
 		match_count = 0;
@@ -866,7 +880,7 @@ size_t sm_at_receive(const uint8_t *buf, size_t len, bool *stop_at_receive)
 
 	/* start inactivity timer in datamode */
 	if (get_sm_mode() == SM_DATA_MODE) {
-		k_timer_start(&inactivity_timer, K_MSEC(sm_datamode_time_limit), K_NO_WAIT);
+		k_timer_start(&inactivity_timer, K_MSEC(data_mode.time_limit), K_NO_WAIT);
 	}
 
 	return ret;
@@ -935,12 +949,34 @@ void data_send(const uint8_t *data, size_t len)
 	sm_at_send_internal(data, len, false, SM_DEBUG_PRINT_SHORT);
 }
 
+static uint16_t get_min_data_mode_idle_timeout_ms(void)
+{
+	uint16_t min_time_limit;
+
+	if (sm_uart_baudrate == 0) {
+		LOG_ERR("Baudrate not set");
+		return 1000;
+	}
+
+	/* Calculate minimum time limit based on UART RX buffer size and baudrate.
+	 * Each byte consists of 8 data bits, 1 start bit and 1 stop bit.
+	 * We will wait this amount of time before emptying data mode buffer.
+	 * This ensures that a possible datagram is not split into multiple sends due to
+	 * inactivity timeout.
+	 */
+	min_time_limit =
+		(uint32_t)CONFIG_SM_UART_RX_BUF_SIZE * (8 + 1 + 1) * 1000 / sm_uart_baudrate;
+	min_time_limit += UART_RX_MARGIN_MS;
+
+	return min_time_limit;
+}
+
 int enter_datamode(sm_datamode_handler_t handler, size_t data_len)
 {
 	k_mutex_lock(&mutex_mode, K_FOREVER);
 
-	if (handler == NULL || datamode_handler != NULL || set_sm_mode(SM_DATA_MODE) == false) {
-		LOG_INF("Invalid, not enter datamode");
+	if (handler == NULL || data_mode.handler != NULL || set_sm_mode(SM_DATA_MODE) == false) {
+		LOG_ERR("Failed to enter data mode");
 		k_mutex_unlock(&mutex_mode);
 		return -EINVAL;
 	}
@@ -949,19 +985,12 @@ int enter_datamode(sm_datamode_handler_t handler, size_t data_len)
 	ring_buf_reset(&data_rb);
 	k_mutex_unlock(&mutex_data);
 
-	datamode_handler = handler;
-	datamode_data_len = data_len;
-	if (sm_datamode_time_limit == 0) {
-		if (sm_uart_baudrate > 0) {
-			sm_datamode_time_limit = CONFIG_SM_UART_RX_BUF_SIZE * (8 + 1 + 1) * 1000 /
-					      sm_uart_baudrate;
-			sm_datamode_time_limit += UART_RX_MARGIN_MS;
-		} else {
-			LOG_WRN("Baudrate not set");
-			sm_datamode_time_limit = 1000;
-		}
+	data_mode.handler = handler;
+	data_mode.data_len = data_len;
+	if (data_mode.time_limit == 0) {
+		data_mode.time_limit = get_min_data_mode_idle_timeout_ms();
 	}
-	LOG_INF("Enter datamode");
+	LOG_INF("Enter data mode");
 
 	k_mutex_unlock(&mutex_mode);
 
@@ -978,49 +1007,20 @@ bool in_at_mode(void)
 	return (get_sm_mode() == SM_AT_COMMAND_MODE);
 }
 
-bool exit_datamode_handler(int result)
+void exit_datamode_handler(int result)
 {
-	bool ret = false;
-
 	k_mutex_lock(&mutex_mode, K_FOREVER);
 
 	if (set_sm_mode(SM_NULL_MODE)) {
-		if (datamode_handler) {
-			datamode_handler(DATAMODE_EXIT, NULL, 0, SM_DATAMODE_FLAGS_EXIT_HANDLER);
+		if (data_mode.handler) {
+			data_mode.handler(DATAMODE_EXIT, NULL, 0, SM_DATAMODE_FLAGS_EXIT_HANDLER);
 		}
-		datamode_handler = NULL;
-		datamode_handler_result = result;
-		datamode_data_len = 0;
-		ret = true;
+		data_mode.handler = NULL;
+		data_mode.handler_result = result;
+		data_mode.data_len = 0;
 	}
 
 	k_mutex_unlock(&mutex_mode);
-
-	return ret;
-}
-
-bool verify_datamode_control(uint16_t time_limit, uint16_t *min_time_limit)
-{
-	int min_time;
-
-	if (sm_uart_baudrate == 0) {
-		LOG_ERR("Baudrate not set");
-		return false;
-	}
-
-	min_time = CONFIG_SM_UART_RX_BUF_SIZE * (8 + 1 + 1) * 1000 / sm_uart_baudrate;
-	min_time += UART_RX_MARGIN_MS;
-
-	if (time_limit > 0 && min_time > time_limit) {
-		LOG_ERR("Invalid time_limit: %d, min: %d", time_limit, min_time);
-		return false;
-	}
-
-	if (min_time_limit) {
-		*min_time_limit = min_time;
-	}
-
-	return true;
 }
 
 int sm_at_cb_wrapper(char *buf, size_t len, char *at_cmd, sm_at_callback *cb)
@@ -1216,8 +1216,8 @@ void sm_at_host_urc_ctx_release(struct sm_urc_ctx *ctx, enum sm_urc_owner owner)
 void sm_at_host_reset(void)
 {
 	k_mutex_lock(&mutex_mode, K_FOREVER);
-	sm_datamode_time_limit = 0;
-	datamode_handler = NULL;
+	data_mode.time_limit = 0;
+	data_mode.handler = NULL;
 	at_mode = SM_AT_COMMAND_MODE;
 	inside_quotes = 0;
 	at_cmd_len = 0;
@@ -1247,7 +1247,7 @@ void sm_at_host_uninit(void)
 	if (at_mode == SM_DATA_MODE) {
 		k_timer_stop(&inactivity_timer);
 	}
-	datamode_handler = NULL;
+	data_mode.handler = NULL;
 	k_mutex_unlock(&mutex_mode);
 
 	at_host_power_off(true);
@@ -1263,8 +1263,8 @@ int sm_at_host_bootloader_init(void)
 	k_mutex_init(&urc_ctx.mutex);
 
 	k_mutex_lock(&mutex_mode, K_FOREVER);
-	sm_datamode_time_limit = 0;
-	datamode_handler = NULL;
+	data_mode.time_limit = 0;
+	data_mode.handler = NULL;
 	at_mode = SM_AT_COMMAND_MODE;
 	k_mutex_unlock(&mutex_mode);
 
@@ -1277,4 +1277,40 @@ int sm_at_host_bootloader_init(void)
 
 	LOG_INF("at_host bootloader init done");
 	return 0;
+}
+
+SM_AT_CMD_CUSTOM(xdatactrl, "AT#XDATACTRL", handle_at_datactrl);
+STATIC int handle_at_datactrl(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+			      uint32_t)
+{
+	int ret = 0;
+	uint16_t min_time_limit = get_min_data_mode_idle_timeout_ms();
+	uint16_t time_limit;
+
+	switch (cmd_type) {
+	case AT_PARSER_CMD_TYPE_SET:
+		ret = at_parser_num_get(parser, 1, &time_limit);
+		if (ret) {
+			return ret;
+		}
+		if (time_limit < min_time_limit) {
+			LOG_ERR("Invalid time_limit: %d, min: %d", time_limit, min_time_limit);
+			return -EINVAL;
+		}
+		data_mode.time_limit = time_limit;
+		break;
+
+	case AT_PARSER_CMD_TYPE_READ:
+		rsp_send("\r\n#XDATACTRL: %d,%d\r\n", data_mode.time_limit, min_time_limit);
+		break;
+
+	case AT_PARSER_CMD_TYPE_TEST:
+		rsp_send("\r\n#XDATACTRL=<time_limit>\r\n");
+		break;
+
+	default:
+		break;
+	}
+
+	return ret;
 }

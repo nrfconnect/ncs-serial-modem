@@ -47,8 +47,6 @@ static struct {
 	.work = Z_WORK_DELAYABLE_INITIALIZER(go_sleep_wk),
 };
 
-bool verify_datamode_control(uint16_t time_limit, uint16_t *time_limit_min);
-
 bool sm_is_modem_functional_mode(enum lte_lc_func_mode mode)
 {
 	int cfun;
@@ -244,42 +242,6 @@ STATIC int handle_at_uuid(enum at_parser_cmd_type cmd_type, struct at_parser *, 
 		LOG_ERR("Get device UUID error: %d", ret);
 	} else {
 		rsp_send("\r\n#XUUID: %s\r\n", dev.str);
-	}
-
-	return ret;
-}
-
-SM_AT_CMD_CUSTOM(xdatactrl, "AT#XDATACTRL", handle_at_datactrl);
-STATIC int handle_at_datactrl(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
-			      uint32_t)
-{
-	int ret = 0;
-	uint16_t time_limit, time_limit_min;
-
-	switch (cmd_type) {
-	case AT_PARSER_CMD_TYPE_SET:
-		ret = at_parser_num_get(parser, 1, &time_limit);
-		if (ret) {
-			return ret;
-		}
-		if (time_limit > 0 && verify_datamode_control(time_limit, NULL)) {
-			sm_datamode_time_limit = time_limit;
-		} else {
-			return -EINVAL;
-		}
-		break;
-
-	case AT_PARSER_CMD_TYPE_READ:
-		(void)verify_datamode_control(sm_datamode_time_limit, &time_limit_min);
-		rsp_send("\r\n#XDATACTRL: %d,%d\r\n", sm_datamode_time_limit, time_limit_min);
-		break;
-
-	case AT_PARSER_CMD_TYPE_TEST:
-		rsp_send("\r\n#XDATACTRL=<time_limit>\r\n");
-		break;
-
-	default:
-		break;
 	}
 
 	return ret;

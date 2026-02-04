@@ -38,8 +38,6 @@
 extern uint8_t sm_data_buf[SM_MAX_MESSAGE_SIZE];  /* For socket data. */
 extern uint8_t sm_at_buf[CONFIG_SM_AT_BUF_SIZE + 1]; /* AT command buffer. */
 
-extern uint16_t sm_datamode_time_limit; /* Send trigger by time in data mode. */
-
 enum sm_urc_owner {
 	SM_URC_OWNER_NONE,
 	SM_URC_OWNER_AT,
@@ -60,11 +58,17 @@ enum sm_datamode_operation {
 	DATAMODE_EXIT   /* Exit data mode */
 };
 
-/** @brief Data mode sending handler type.
+/** @brief Data mode handler callback function type.
  *
- * @retval 0 means all data is sent successfully.
- *         Positive value means the actual size of bytes that has been sent.
- *         Negative value means error occurrs in sending.
+ * This callback is invoked to handle data mode operations (send data or exit).
+ *
+ * @param op Operation type: DATAMODE_SEND to send data, DATAMODE_EXIT to exit data mode.
+ * @param data Data buffer to send (used when op is DATAMODE_SEND).
+ * @param len Length of data in bytes (used when op is DATAMODE_SEND).
+ * @param flags Operation flags (e.g., SM_DATAMODE_FLAGS_MORE_DATA, SM_DATAMODE_FLAGS_EXIT_HANDLER).
+ *
+ * @retval >=0 Number of bytes successfully sent.
+ * @retval <0 Error, a negative errno code.
  */
 typedef int (*sm_datamode_handler_t)(uint8_t op, const uint8_t *data, int len, uint8_t flags);
 
@@ -185,11 +189,8 @@ bool in_at_mode(void);
  * the data mode is exited.
  *
  * @param result Result of sending in data mode.
- *
- * @retval true If handler has closed successfully.
- *         false If not in data mode.
  */
-bool exit_datamode_handler(int result);
+void exit_datamode_handler(int result);
 
 /** @brief Serial Modem AT command callback type. */
 typedef int sm_at_callback(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
