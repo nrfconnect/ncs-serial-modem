@@ -271,15 +271,18 @@ static int carrier_datamode_callback(uint8_t op, const uint8_t *data, int len, u
 		uint8_t path_len = 3;
 
 		ret = lwm2m_carrier_app_data_set(path, path_len, sm_data_buf, size);
-		LOG_INF("datamode send: %d", ret);
 		if (ret < 0) {
-			exit_datamode_handler(ret);
+			LOG_ERR("Send failed: %d", ret);
+			return ret;
 		}
+		/* Return the amount of data sent. */
+		return len;
+
 	} else if (op == DATAMODE_EXIT) {
 		LOG_DBG("datamode exit");
 	}
 
-	return ret;
+	return 0;
 }
 
 /* AT#XCARRIER="app_data_create",<obj_inst_id>,<res_inst_id> */

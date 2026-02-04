@@ -1209,29 +1209,24 @@ static int socket_datamode_callback(uint8_t op, const uint8_t *data, int len, ui
 	if (op == DATAMODE_SEND) {
 		if (datamode_sock->type == SOCK_DGRAM &&
 		    (flags & SM_DATAMODE_FLAGS_MORE_DATA) != 0) {
-			LOG_ERR("Datamode buffer overflow");
+			LOG_ERR("Data mode buffer overflow");
 			exit_datamode_handler(-EOVERFLOW);
 			return -EOVERFLOW;
-		} else {
-			if (strlen(udp_url) > 0) {
-				ret = do_sendto(datamode_sock, udp_url, udp_port, data, len,
-						datamode_sock->send_flags);
-			} else {
-				ret = do_send(datamode_sock, data, len, datamode_sock->send_flags);
-			}
-			if (ret == -EAGAIN || ret == -ETIMEDOUT) {
-				LOG_WRN("Send failed: %d", ret);
-				return ret;
-			} else if (ret < 0) {
-				LOG_ERR("Send failed: %d", ret);
-				exit_datamode_handler(ret);
-				return ret;
-			} else {
-				LOG_DBG("Sent %d bytes", ret);
-			}
 		}
+		if (strlen(udp_url) > 0) {
+			ret = do_sendto(datamode_sock, udp_url, udp_port, data, len,
+					datamode_sock->send_flags);
+		} else {
+			ret = do_send(datamode_sock, data, len, datamode_sock->send_flags);
+		}
+		if (ret < 0) {
+			LOG_ERR("Send failed: %d", ret);
+		}
+		/* Return the amount of data sent or an error code. */
+		return ret;
+
 	} else if (op == DATAMODE_EXIT) {
-		LOG_DBG("datamode exit");
+		LOG_DBG("Data mode exit");
 		memset(udp_url, 0, sizeof(udp_url));
 		if ((flags & SM_DATAMODE_FLAGS_EXIT_HANDLER) != 0) {
 			/* Datamode exited unexpectedly. */
@@ -1240,7 +1235,7 @@ static int socket_datamode_callback(uint8_t op, const uint8_t *data, int len, ui
 		datamode_sock = NULL;
 	}
 
-	return ret;
+	return 0;
 }
 
 SM_AT_CMD_CUSTOM(xsocket, "AT#XSOCKET", handle_at_socket);
