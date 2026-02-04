@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Simple diagram styled to match doc/images/cellular-serial-setup.svg palette -->
+
+<svg
+   width="720"
+   height="260"
+   viewBox="0 0 720 260"
+   xml:space="preserve"
+   version="1.1"
+   id="svg42"
+   sodipodi:docname="dialup-ppp-cmux.svg"
+   inkscape:version="1.2.2 (b0a8486541, 2022-12-01)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"><defs
+   id="defs46" /><sodipodi:namedview
+   id="namedview44"
+   pagecolor="#ffffff"
+   bordercolor="#999999"
+   borderopacity="1"
+   inkscape:showpageshadow="0"
+   inkscape:pageopacity="0"
+   inkscape:pagecheckerboard="0"
+   inkscape:deskcolor="#d1d1d1"
+   showgrid="false"
+   inkscape:zoom="1.7972222"
+   inkscape:cx="270.13911"
+   inkscape:cy="83.183927"
+   inkscape:window-width="3790"
+   inkscape:window-height="2094"
+   inkscape:window-x="0"
+   inkscape:window-y="0"
+   inkscape:window-maximized="1"
+   inkscape:current-layer="svg42" />
+  <style
+   type="text/css"
+   id="style2"><![CDATA[
+    .stHost { fill:#6ad1e3; stroke:none; }
+    .stBlue { fill:#0032a0; stroke:none; }
+    .stGrey { fill:#768692; stroke:none; }
+    .stStroke { fill:none; stroke:#000000; stroke-width:2; }
+    .stText { fill:#000000; font-family:Arial; font-size:16px; }
+    .stTextSmall { fill:#000000; font-family:Arial; font-size:13px; }
+    .stTextInv { fill:#ffffff; font-family:Arial; font-size:14px; }
+    .stTextInvSmall { fill:#ffffff; font-family:Arial; font-size:12px; }
+  ]]></style>
+
+  <!-- Host device -->
+  <rect
+   x="30"
+   y="30"
+   width="210"
+   height="200"
+   rx="10"
+   class="stHost"
+   id="rect4" />
+  <text
+   x="135"
+   y="60"
+   text-anchor="middle"
+   class="stText"
+   id="text6">Host</text>
+  <text
+   x="135"
+   y="84"
+   text-anchor="middle"
+   class="stTextSmall"
+   id="text8">(Linux or RTOS)</text>
+  <rect
+   x="55.686989"
+   y="168.89467"
+   width="160"
+   height="38.662868"
+   rx="6"
+   class="stBlue"
+   id="rect10"
+   style="stroke-width:0.743186" />
+  <text
+   x="135.05125"
+   y="191.84573"
+   text-anchor="middle"
+   class="stTextInv"
+   id="text12">PPP peer</text>
+  <!-- Serial Modem device -->
+  <rect
+   x="480"
+   y="30"
+   width="210"
+   height="200"
+   rx="10"
+   class="stHost"
+   id="rect16" />
+  <text
+   x="585"
+   y="60"
+   text-anchor="middle"
+   class="stText"
+   id="text18">nRF91 Series SiP</text>
+  <text
+   x="585"
+   y="84"
+   text-anchor="middle"
+   class="stTextSmall"
+   id="text20">Serial Modem</text>
+  <rect
+   x="505"
+   y="120"
+   width="160"
+   height="70"
+   rx="6"
+   class="stBlue"
+   id="rect22" />
+  <text
+   x="585"
+   y="150"
+   text-anchor="middle"
+   class="stTextInv"
+   id="text24">Serial Modem</text>
+  <text
+   x="585"
+   y="172"
+   text-anchor="middle"
+   class="stTextInvSmall"
+   id="text26">CMUX + PPP + AT</text>
+
+  <!-- Link and CMUX box -->
+  <line
+   x1="240"
+   y1="130"
+   x2="480"
+   y2="130"
+   class="stStroke"
+   id="line28" />
+
+  <rect
+   x="270"
+   y="80"
+   width="180"
+   height="100"
+   rx="10"
+   class="stGrey"
+   id="rect30" />
+  <text
+   x="360"
+   y="104"
+   text-anchor="middle"
+   class="stTextInv"
+   id="text32">CMUX (GSM 07.10)</text>
+
+  <rect
+   x="288"
+   y="116"
+   width="144"
+   height="26"
+   rx="6"
+   class="stBlue"
+   id="rect34" />
+  <text
+   x="360"
+   y="134"
+   text-anchor="middle"
+   class="stTextInvSmall"
+   id="text36">DLC1: AT</text>
+
+  <rect
+   x="288"
+   y="146"
+   width="144"
+   height="26"
+   rx="6"
+   class="stBlue"
+   id="rect38" />
+  <text
+   x="360"
+   y="164"
+   text-anchor="middle"
+   class="stTextInvSmall"
+   id="text40">DLC2: PPP</text>
+<rect
+   x="54.313011"
+   y="114.46258"
+   width="160"
+   height="38.662868"
+   rx="6"
+   class="stBlue"
+   id="rect1222"
+   style="stroke-width:0.743186" /><text
+   x="134.59329"
+   y="137.49908"
+   text-anchor="middle"
+   class="stTextInv"
+   id="text1224"><tspan
+     sodipodi:role="line"
+     id="tspan1280"
+     x="134.59329"
+     y="137.49908">AT parser / Chat scripts</tspan></text><g
+   id="g1392"
+   transform="rotate(180,297.01434,249.36066)"><rect
+     x="347.27853"
+     y="340.27582"
+     width="24.538734"
+     height="52.465706"
+     rx="1.363263"
+     class="stGrey"
+     id="rect1334"
+     style="stroke-width:0.267441" /><text
+     x="-366.91882"
+     y="364.47321"
+     text-anchor="middle"
+     class="stTextInv"
+     id="text1388"
+     transform="rotate(-90)">UART</text></g><g
+   id="g1398"
+   transform="rotate(180,422.06735,248.44236)"><rect
+     x="347.27853"
+     y="340.27582"
+     width="24.538734"
+     height="52.465706"
+     rx="1.363263"
+     class="stGrey"
+     id="rect1394"
+     style="stroke-width:0.267441" /><text
+     x="-366.91882"
+     y="364.47321"
+     text-anchor="middle"
+     class="stTextInv"
+     id="text1396"
+     transform="rotate(-90)">UART</text></g></svg>

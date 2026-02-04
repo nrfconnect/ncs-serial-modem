@@ -37,9 +37,76 @@ Modem traces
 To send modem traces over UART on an nRF91 Series DK, configuration must be added for the UART device in the devicetree and Kconfig.
 This is done by adding the `modem trace UART snippet`_ when building and programming.
 
-It is also possible to send modem traces over CMUX channel.
-See the :ref:`sm_modem_trace_cmux` documentation for more information.
-
 Use the `Cellular Monitor app`_ for capturing and analyzing modem traces.
 
 TF-M logging must use the same UART as the application. For more details, see `shared TF-M logging`_.
+
+.. _sm_modem_trace_cmux:
+
+Collecting modem traces through CMUX backend
+********************************************
+
+The |SM| application supports collecting modem traces through the CMUX multiplexer.
+When enabled, modem traces are sent through a dedicated CMUX channel, allowing simultaneous AT commands, PPP data, and trace collection over the same serial port.
+The trace CMUX channel is the first channel after the AT command channel and the PPP channel.
+
+Configuration
+=============
+
+To use the CMUX trace backend, build the |SM| application with the trace backend configuration overlay in addition to the PPP and CMUX overlays:
+
+.. code-block:: console
+
+   west build -p -b nrf9151dk/nrf9151/ns -- -DEXTRA_CONF_FILE="overlay-ppp.conf;overlay-cmux.conf;overlay-trace-backend-cmux.conf"
+
+For optimal throughput and to minimize trace data loss, configure the UART to run at maximum speed:
+
+1. Set the UART speed in your device tree configuration (for example, 1000000 baud).
+#. Use the ``-b`` parameter with the script to match this speed (for example, ``-b 1000000``).
+
+.. note::
+   Some trace data will be dropped.
+   The amount depends on the UART speed, ongoing modem operations, and the trace level set with ``AT%XMODEMTRACE``.
+
+Setting trace level
+===================
+
+Configure the modem trace level using the `AT%XMODEMTRACE <xmodemtrace_>`_ command.
+
+The modem trace subsystem automatically sends the ``AT%XMODEMTRACE=1,2`` command at startup.
+This provides the most trace data and includes the crash dump collection.
+Depending on the drop rate you observe, you might need to select a different ``<set_id>`` to reduce the amount of trace data generated.
+
+Collecting traces through CMUX on Linux
+=======================================
+
+The :file:`sm_start_ppp.sh` script for Linux host includes support for collecting modem traces.
+Use the ``-T`` flag to enable trace collection.
+Traces are saved to the :file:`/var/log/nrf91-modem-trace.bin` file.
+The trace collection starts after the CMUX channel is established and continues until you stop the connection with the :file:`sm_stop_ppp.sh` script.
+
+The stop script automatically terminates trace collection and preserves the trace file for later analysis.
+
+.. code-block:: console
+
+   # Start PPP connection with trace collection with baud rate matching the device tree setting
+   $ sudo scripts/sm_start_ppp.sh -b 1000000 -T
+   Trace file: /var/log/nrf91-modem-trace.bin
+   Connect and wait for PPP link...
+   PPP link started
+
+   # Check that the trace is being collected
+   $ ls -la /var/log/nrf91-modem-trace.bin
+   -rw-r--r-- 1 root root 3467306 Jan 16 12:13 /var/log/nrf91-modem-trace.bin
+
+   # Stop PPP connection (also stops trace collection)
+   $ sudo scripts/sm_stop_ppp.sh
+   Stopping PPP link...
+   Waiting for Shutdown script to complete...
+   Stopping trace collection...
+
+
+You can open the :file:`/var/log/nrf91-modem-trace.bin` file using the `Cellular Monitor app`_ for analysis.
+This allows you to see the AT commands, network, and IP-level details of the communication between the modem and the cellular network.
+
+If the modem crashes and the crash dump collection was enabled, you can send the trace file to Nordic Semiconductor support for further analysis.
