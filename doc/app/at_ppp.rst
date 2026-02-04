@@ -9,10 +9,6 @@ PPP AT commands
 
 This page describes AT commands related to the Point-to-Point Protocol (PPP).
 
-.. note::
-
-   To use the nRF91 Series SiP as a standalone modem in Zephyr, see the :ref:`sm_as_zephyr_modem` documentation.
-
 PPP is enabled in |SM| by compiling it with the appropriate configuration files, depending on your use case (with or without CMUX).
 See the :ref:`sm_config_files` section for more information.
 
@@ -228,7 +224,7 @@ Testing on Linux
 
 You can test |SM|'s PPP on Linux by using the ``pppd`` command.
 This section describes a configuration without CMUX.
-If you are using CMUX, see :ref:`sm_as_linux_modem` for more information on setting it up.
+If you are using CMUX, see :ref:`sm_cellular_modem` for more information on setting it up.
 
 For the process described here, |SM|'s UARTs must be connected to the Linux host.
 

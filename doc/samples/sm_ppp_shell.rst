@@ -99,7 +99,7 @@ The sample provides:
 * CMUX (GSM 07.10) multiplexing support.
 * Power management with runtime power saving.
 
-For more information about using the nRF91 Series SiP as a Zephyr-compatible modem, see :ref:`sm_as_zephyr_modem`.
+For more information about using the nRF91 Series SiP as a Zephyr-compatible modem, see :ref:`sm_cellular_modem`.
 
 Configuration
 *************
@@ -245,7 +245,7 @@ The sample enables the following key features:
 References
 **********
 
-* :ref:`sm_as_zephyr_modem`
+* :ref:`sm_cellular_modem`
 * :ref:`serial_modem_app`
 * `Zephyr Networking`_
 * `Zephyr Network APIs`_

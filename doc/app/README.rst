@@ -67,8 +67,7 @@ See the subpages for how to use the application, how to extend it, and informati
    sm_build_and_run
    sm_logging
    sm_configuration
-   nRF91_as_Zephyr_modem
-   PPP_linux
+   sm_cellular_modem
    sm_data_mode
    sm_extending
    sm_testing

@@ -16,8 +16,7 @@ The maximum length of the information field in UIH frames is configurable using 
 
 .. note::
 
-   To use the nRF91 Series SiP as a standalone modem in Zephyr, see :ref:`sm_as_zephyr_modem`.
-   To use the nRF91 Series SiP as a modem for a Linux device, see :ref:`sm_as_linux_modem`.
+   To use the nRF91 Series SiP as a cellular dial-up PPP modem, see :ref:`sm_cellular_modem`.
 
 CMUX is enabled in |SM| by compiling it with the appropriate configuration files, depending on your use case.
 See the :ref:`sm_config_files` section for more information.
