@@ -417,3 +417,5 @@ If you need any of those features with this |SM|, please contact customer suppor
     Use the ``CONFIG_SM_AUTO_CONNECT*`` Kconfig options to configure automatic network attach.
   * The ``CONFIG_SM_SKIP_READY_MSG`` Kconfig option.
     The ``Ready\r\n`` message is always sent when the |SM| application is ready to accept AT commands.
+  * The ``CONFIG_SM_AT_MAX_PARAM`` Kconfig option.
+    This Kconfig option has not been relevant in the latest versions of |NCS| SLM, as the AT parser library is now used.

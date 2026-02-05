@@ -55,15 +55,14 @@ static struct k_work nrfcloud_loc_req;
  * [,<n_earfcn>2, <n_phys_cell_id>2, <n_rsrp>2, <n_rsrq>2,<time_diff>2] ...
  * [,<n_earfcn>17, <n_phys_cell_id>17, <n_rsrp>17, <n_rsrq>17,<time_diff>17
  *
- * Max 17 ncell, but align with CONFIG_SM_AT_MAX_PARAM
+ * Max 17 ncell
  * 11 number of parameters for current cell (including "%NCELLMEAS")
  * 5  number of parameters for one neighboring cell
  */
 #define MAX_PARAM_CELL   11
 #define MAX_PARAM_NCELL  5
-/* Must support at least all params for current cell plus one ncell */
-#define NCELL_CNT ((CONFIG_SM_AT_MAX_PARAM - MAX_PARAM_CELL) / MAX_PARAM_NCELL)
-BUILD_ASSERT(NCELL_CNT > 0, "CONFIG_SM_AT_MAX_PARAM too small");
+/* Neighbor cells are not very useful for positioning so we don't need to support 10 or 17 */
+#define NCELL_CNT 5
 
 /* Neighboring cell measurements. */
 static struct lte_lc_ncell nrfcloud_ncells[NCELL_CNT];
@@ -76,8 +75,6 @@ static struct lte_lc_cells_info nrfcloud_cell_data = {
 static bool nrfcloud_ncellmeas_done;
 
 #define WIFI_APS_BEGIN_IDX 3
-BUILD_ASSERT(WIFI_APS_BEGIN_IDX + NRF_CLOUD_LOCATION_WIFI_AP_CNT_MIN
-	< CONFIG_SM_AT_MAX_PARAM, "CONFIG_SM_AT_MAX_PARAM too small");
 
 /* nRF Cloud location request Wi-Fi data. */
 static struct wifi_scan_info nrfcloud_wifi_data;
@@ -201,6 +198,12 @@ static void ncell_meas_mon(const char *notify)
 	ncells_count = (param_count - MAX_PARAM_CELL) / MAX_PARAM_NCELL;
 	for (unsigned int i = 0; i != ncells_count; ++i) {
 		const unsigned int offset = MAX_PARAM_CELL + i * MAX_PARAM_NCELL;
+
+		if (i >= NCELL_CNT) {
+			LOG_INF("Too many neighboring cells (%d) for allocated buffer (%d)",
+				i, NCELL_CNT);
+			break;
+		}
 
 		/* parse n_earfcn */
 		err = at_parser_num_get(&parser, offset, &nrfcloud_ncells[i].earfcn);
