@@ -40,9 +40,6 @@ static void pgps_event_handler(struct nrf_cloud_pgps_event *event);
 
 LOG_MODULE_REGISTER(sm_gnss, CONFIG_SM_LOG_LEVEL);
 
-/* Subscribe to NMEA messages also when debugging to troubleshoot fix acquisition. */
-#define RECEIVE_NMEA CONFIG_SM_LOG_LEVEL_DBG
-
 #define LOCATION_REPORT_MS 5000
 
 /* (6.1.1980 UTC - 1.1.1970 UTC) */
@@ -242,7 +239,7 @@ static int gnss_startup(void)
 
 #endif /* CONFIG_SM_NRF_CLOUD */
 
-#if RECEIVE_NMEA
+#if defined(CONFIG_SM_LOG_LEVEL_DBG)
 	uint16_t nmea_mask = NRF_MODEM_GNSS_NMEA_GGA_MASK
 			     | NRF_MODEM_GNSS_NMEA_GLL_MASK
 			     | NRF_MODEM_GNSS_NMEA_RMC_MASK;
@@ -260,8 +257,7 @@ static int gnss_startup(void)
 		LOG_ERR("Failed to set NMEA mask. (%d)", ret);
 		return ret;
 	}
-
-#endif /* RECEIVE_NMEA */
+#endif /* CONFIG_SM_LOG_LEVEL_DBG */
 
 	ret = nrf_modem_gnss_start();
 	if (ret) {
@@ -412,7 +408,7 @@ static void pgps_event_handler(struct nrf_cloud_pgps_event *event)
 
 #endif /* CONFIG_SM_NRF_CLOUD */
 
-#if RECEIVE_NMEA
+#if defined(CONFIG_SM_LOG_LEVEL_DBG)
 static void on_gnss_evt_nmea(void)
 {
 	int err;
@@ -427,16 +423,12 @@ static void on_gnss_evt_nmea(void)
 	nmea_str = nmea.nmea_str;
 	len = strlen(nmea_str);
 
-#if CONFIG_SM_LOG_LEVEL_DBG
 	assert(len >= 2);
 	len -= 2;
 	assert(!strcmp(nmea_str + len, "\r\n"));
 	LOG_DBG("%.*s", len, nmea_str);
-#endif
 }
-#endif /* RECEIVE_NMEA */
 
-#if defined(CONFIG_SM_LOG_LEVEL_DBG)
 static void on_gnss_evt_pvt(void)
 {
 	struct nrf_modem_gnss_pvt_data_frame pvt;
@@ -602,8 +594,6 @@ static void gnss_event_handler(int event)
 	case NRF_MODEM_GNSS_EVT_PVT:
 		on_gnss_evt_pvt();
 		break;
-#endif
-#if RECEIVE_NMEA
 	case NRF_MODEM_GNSS_EVT_NMEA:
 		on_gnss_evt_nmea();
 		break;
