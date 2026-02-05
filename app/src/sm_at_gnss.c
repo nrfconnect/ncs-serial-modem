@@ -40,17 +40,8 @@ static void pgps_event_handler(struct nrf_cloud_pgps_event *event);
 
 LOG_MODULE_REGISTER(sm_gnss, CONFIG_SM_LOG_LEVEL);
 
-#if defined(CONFIG_SM_GNSS_OUTPUT_NMEA_ON_CMUX_CHANNEL)
-#include "sm_cmux.h"
-#include <zephyr/modem/cmux.h>
-#include <zephyr/sys/ring_buffer.h>
-static struct ring_buf gnss_nmea_rb;
-static struct k_work gnss_nmea_send_work;
-static struct modem_pipe *gnss_pipe;
-#endif
-
 /* Subscribe to NMEA messages also when debugging to troubleshoot fix acquisition. */
-#define RECEIVE_NMEA (CONFIG_SM_LOG_LEVEL_DBG || CONFIG_SM_GNSS_OUTPUT_NMEA_ON_CMUX_CHANNEL)
+#define RECEIVE_NMEA CONFIG_SM_LOG_LEVEL_DBG
 
 #define LOCATION_REPORT_MS 5000
 
@@ -277,9 +268,6 @@ static int gnss_startup(void)
 		LOG_ERR("Failed to start GNSS. (%d)", ret);
 		return ret;
 	}
-#if CONFIG_SM_GNSS_OUTPUT_NMEA_ON_CMUX_CHANNEL
-	gnss_pipe = sm_cmux_reserve(CMUX_GNSS_CHANNEL);
-#endif
 	gnss_running = true;
 	gnss_ttff_start = k_uptime_get();
 	gnss_status_set(GNSS_STATUS_STARTED);
@@ -302,10 +290,6 @@ static int gnss_shutdown(void)
 	gnss_status_set(GNSS_STATUS_STOPPED);
 	gnss_running = false;
 
-#if CONFIG_SM_GNSS_OUTPUT_NMEA_ON_CMUX_CHANNEL
-	sm_cmux_release(CMUX_GNSS_CHANNEL);
-	gnss_pipe = NULL;
-#endif
 	return 0;
 }
 
@@ -428,24 +412,6 @@ static void pgps_event_handler(struct nrf_cloud_pgps_event *event)
 
 #endif /* CONFIG_SM_NRF_CLOUD */
 
-#if CONFIG_SM_GNSS_OUTPUT_NMEA_ON_CMUX_CHANNEL
-static void gnss_nmea_sender(struct k_work *)
-{
-	int ret;
-	size_t size;
-	uint8_t *data;
-
-	while ((size = ring_buf_get_claim(&gnss_nmea_rb, &data, UINT32_MAX))) {
-		ret = modem_pipe_transmit(gnss_pipe, data, size);
-		ring_buf_get_finish(&gnss_nmea_rb, MAX(0, ret));
-		if (ret < 0) {
-			LOG_ERR("Failed to send NMEA data. (%d)", ret);
-			break;
-		}
-	}
-}
-#endif
-
 #if RECEIVE_NMEA
 static void on_gnss_evt_nmea(void)
 {
@@ -460,17 +426,6 @@ static void on_gnss_evt_nmea(void)
 	}
 	nmea_str = nmea.nmea_str;
 	len = strlen(nmea_str);
-
-#if CONFIG_SM_GNSS_OUTPUT_NMEA_ON_CMUX_CHANNEL
-	const size_t space = ring_buf_space_get(&gnss_nmea_rb);
-
-	if (space < len) {
-		LOG_ERR("NMEA buffer full. Dropping %zu bytes.", ring_buf_size_get(&gnss_nmea_rb));
-		ring_buf_reset(&gnss_nmea_rb);
-	}
-	ring_buf_put(&gnss_nmea_rb, nmea_str, len);
-	k_work_submit_to_queue(&sm_work_q, &gnss_nmea_send_work);
-#endif
 
 #if CONFIG_SM_LOG_LEVEL_DBG
 	assert(len >= 2);
@@ -870,19 +825,6 @@ static int sm_at_gnss_init(void)
 #endif
 #endif /* CONFIG_SM_NRF_CLOUD */
 	k_work_init(&gnss_fix_send_work, gnss_fix_sender);
-
-#if defined(CONFIG_SM_GNSS_OUTPUT_NMEA_ON_CMUX_CHANNEL)
-	{
-		/* NMEA GSV messages contain up to 4 satellites.
-		 * Reserve space for them when we receive satellite data.
-		 */
-		static char gnss_nmea_buf[256 + IS_ENABLED(CONFIG_SM_GNSS_OUTPUT_NMEA_SATELLITES) ?
-			(NRF_MODEM_GNSS_NUM_GPS_SATELLITES / 4) * NRF_MODEM_GNSS_NMEA_MAX_LEN : 0];
-
-		ring_buf_init(&gnss_nmea_rb, sizeof(gnss_nmea_buf), gnss_nmea_buf);
-	}
-	k_work_init(&gnss_nmea_send_work, gnss_nmea_sender);
-#endif
 
 	return 0;
 }

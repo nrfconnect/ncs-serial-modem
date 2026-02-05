@@ -372,11 +372,6 @@ static struct cmux_dlci *cmux_get_dlci(enum cmux_channel channel)
 		return &cmux.dlcis[CMUX_MODEM_TRACE_CHANNEL + 1];
 	}
 #endif
-#if defined(CONFIG_SM_GNSS_OUTPUT_NMEA_ON_CMUX_CHANNEL)
-	if (channel == CMUX_GNSS_CHANNEL) {
-		return &cmux.dlcis[CMUX_GNSS_CHANNEL + 1];
-	}
-#endif
 	assert(false);
 }
 
