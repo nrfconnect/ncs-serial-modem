@@ -92,6 +92,21 @@ tests:
       - nrf9151dk/nrf9151/ns
     integration_platforms:
       - nrf9151dk/nrf9151/ns
+  serial_modem.pgps_agnss:
+    sysbuild: true
+    build_only: true
+    extra_configs:
+      - CONFIG_NRF_CLOUD_PGPS=y
+    platform_allow:
+      - nrf9151dk/nrf9151/ns
+  serial_modem.pgps_no_agnss:
+    sysbuild: true
+    build_only: true
+    extra_configs:
+      - CONFIG_NRF_CLOUD_PGPS=y
+      - CONFIG_NRF_CLOUD_AGNSS=n
+    platform_allow:
+      - nrf9151dk/nrf9151/ns
   serial_modem.lwm2m_carrier:
     sysbuild: true
     build_only: true
@@ -119,11 +134,14 @@ tests:
       - nrf9151dk/nrf9151/ns
     integration_platforms:
       - nrf9151dk/nrf9151/ns
-  serial_modem.modem_trace:
+  serial_modem.modem_trace_app_log_dbg:
     sysbuild: true
     build_only: true
     extra_args:
       - app_SNIPPET=nrf91-modem-trace-uart
+    extra_configs:
+      - CONFIG_SM_LOG_LEVEL_DBG=y
+      - CONFIG_DTR_UART_LOG_LEVEL_DBG=y
     platform_allow:
       - nrf9151dk/nrf9151/ns
       - thingy91x/nrf9151/ns
