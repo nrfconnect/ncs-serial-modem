@@ -215,7 +215,7 @@ Using the LwM2M carrier library
 The application supports the |NCS| `LwM2M carrier`_ library that you can use to connect to the operator's device management platform.
 See the library's documentation for more information and configuration options.
 
-To enable the LwM2M carrier library, add the parameter ``-DOVERLAY_CONFIG=overlay-carrier.conf`` to your build command.
+To enable the LwM2M carrier library, add the parameter ``-DEXTRA_CONF_FILE=overlay-carrier.conf`` to your build command.
 
 The CA root certificates that are needed for modem FOTA are not provisioned in the |SM| application.
 You can flash the `Cellular: LwM2M carrier`_ sample to write the certificates to modem before flashing the |SM| application, or use the `Cellular: AT Client`_ sample as explained in `preparing the Cellular: LwM2M Client sample for production <lwm2m_client_provisioning_>`_.
