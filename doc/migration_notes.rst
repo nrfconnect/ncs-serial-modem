@@ -419,3 +419,5 @@ If you need any of those features with this |SM|, please contact customer suppor
     The ``Ready\r\n`` message is always sent when the |SM| application is ready to accept AT commands.
   * The ``CONFIG_SM_AT_MAX_PARAM`` Kconfig option.
     This Kconfig option has not been relevant in the latest versions of |NCS| SLM, as the AT parser library is now used.
+  * The ``CONFIG_SM_GNSS_OUTPUT_NMEA_ON_CMUX_CHANNEL`` Kconfig option.
+    You can see the NMEA messages in debug logs with the ``CONFIG_SM_GNSS_OUTPUT_NMEA_SATELLITES`` Kconfig option, which is enabled by default if the ``CONFIG_SM_LOG_LEVEL_DBG`` Kconfig option is set.
