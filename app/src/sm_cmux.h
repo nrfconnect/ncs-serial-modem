@@ -18,9 +18,6 @@ enum cmux_channel {
 #if defined(CONFIG_SM_MODEM_TRACE_BACKEND_CMUX)
 	CMUX_MODEM_TRACE_CHANNEL,
 #endif
-#if defined(CONFIG_SM_GNSS_OUTPUT_NMEA_ON_CMUX_CHANNEL)
-	CMUX_GNSS_CHANNEL,
-#endif
 	CMUX_EXT_CHANNEL_COUNT
 };
 struct modem_pipe *sm_cmux_reserve(enum cmux_channel channel);

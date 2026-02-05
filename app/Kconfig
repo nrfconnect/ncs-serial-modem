@@ -300,14 +300,10 @@ endif # SM_MQTTC
 
 if SM_GNSS
 
-config SM_GNSS_OUTPUT_NMEA_ON_CMUX_CHANNEL
-	bool "Output NMEA messages on a dedicated CMUX channel"
-	depends on SM_CMUX
-
 config SM_GNSS_OUTPUT_NMEA_SATELLITES
 	bool "Output NMEA satellite messages (GSV, GSA)"
 	default y if SM_LOG_LEVEL_DBG
-	depends on SM_LOG_LEVEL_DBG || SM_GNSS_OUTPUT_NMEA_ON_CMUX_CHANNEL
+	depends on SM_LOG_LEVEL_DBG
 	help
 	  If enabled, NMEA messages that pertain to the satellites will be output
 	  along with the other NMEA messages. Those are output in debug logs, and
