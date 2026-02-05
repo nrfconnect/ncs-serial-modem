@@ -203,6 +203,14 @@ CONFIG_SM_UART_TX_BUF_SIZE - Send buffer size for UART.
    This option defines the size of the buffer for sending (TX) UART traffic.
    The default value is 256.
 
+.. _CONFIG_SM_URC_BUFFER_SIZE:
+
+CONFIG_SM_URC_BUFFER_SIZE - URC buffer size.
+   Buffer, in which unsolicited result codes (URC) are stored before being sent to the host.
+   The buffer has to be large enough to hold the largest URC that can be sent by the modem.
+   Result codes longer than this size will get dropped.
+   The default value is 4096.
+
 .. _CONFIG_SM_PPP_FALLBACK_MTU:
 
 CONFIG_SM_PPP_FALLBACK_MTU - Control the MTU used by PPP.

@@ -70,6 +70,10 @@ Complete the following steps for building and running:
 
       west build -p -b nrf9151dk/nrf9151/ns
 
+   To build the application with Kconfig and DTC overlays and extra Kconfig options, the following command gives an example of how they are passed as build arguments::
+
+      west build -p -b nrf9151dk/nrf9151/ns -- -DEXTRA_CONF_FILE="overlay-ppp.conf;overlay-cmux.conf" -DEXTRA_DTC_OVERLAY_FILE="overlay-external-mcu.overlay" -DCONFIG_SM_LOG_LEVEL_DBG=y
+
 #. To program the application, run the following command::
 
       west flash
