@@ -248,10 +248,12 @@ config SM_GNSS
 config SM_NRF_CLOUD
 	bool "nRF Cloud support"
 	default y
+	select EXPERIMENTAL
 
 config SM_MQTTC
 	bool "MQTT client support"
 	default y
+	select EXPERIMENTAL
 	select MQTT_LIB
 	select MQTT_LIB_TLS
 
