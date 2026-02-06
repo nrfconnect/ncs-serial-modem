@@ -32,6 +32,7 @@
 .. _`create_application_types_freestanding`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/create_application.html#create-application-types-freestanding
 .. _`sysbuild_enabled_ncs_configuring`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/config_and_build/sysbuild/sysbuild_configuring_west.html#sysbuild-enabled-ncs-configuring
 .. _`cmake_options`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/app_dev/config_and_build/cmake/index.html#cmake-options
+.. _`Software maturity levels`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/releases_and_maturity/software_maturity.html
 
 .. _`ug_tfm_security_by_separation`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/security/tfm/processing_environments.html#ug-tfm-security-by-separation
 .. _`ug_tfm`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/security/tfm/index.html#ug-tfm
