@@ -1019,7 +1019,7 @@ Example
 
    AT#XRECV=0,1,0,10
    #XRECV: 0,1,5
-   74205A6F63
+   74205a6f63
    OK
 
 Read command
@@ -1250,7 +1250,7 @@ Example
 
    AT#XRECVFROM=0,1,0,10
    #XRECVFROM: 0,1,7,"192.168.1.100",24210
-   54657374205A4D
+   54657374205a4d
    OK
 
 Read command
