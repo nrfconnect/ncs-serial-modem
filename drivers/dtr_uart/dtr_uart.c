@@ -215,7 +215,7 @@ static void ri_work_fn(struct k_work *work)
 		CONTAINER_OF(delayed_work, struct dtr_uart_data, ri_work);
 	const struct dtr_uart_config *config = data->dev->config;
 
-	LOG_DBG("RI: Stop");
+	LOG_INF("RI: Stop");
 	gpio_pin_set_dt(&config->ri_gpio, 0);
 }
 
@@ -223,7 +223,7 @@ static void ri_start(struct dtr_uart_data *data)
 {
 	const struct dtr_uart_config *config = data->dev->config;
 
-	LOG_DBG("RI: Start");
+	LOG_INF("RI: Start");
 	gpio_pin_set_dt(&config->ri_gpio, 1);
 	k_work_schedule(&data->ri_work, K_MSEC(100));
 }
@@ -248,11 +248,11 @@ static void dtr_work_handler(struct k_work *work)
 	bool asserted = gpio_pin_get_dt(&config->dtr_gpio) && !data->pm_suspended;
 
 	if (data->dtr_state == asserted) {
-		LOG_INF("DTR is already %s, ignoring event", asserted ? "asserted" : "deasserted");
+		LOG_DBG("DTR is already %s, ignoring event", asserted ? "asserted" : "deasserted");
 		goto exit;
 	}
 
-	LOG_DBG("DTR %s", asserted ? "asserted" : "deasserted");
+	LOG_INF("DTR %s", asserted ? "asserted" : "deasserted");
 	data->dtr_state = asserted;
 
 	if (asserted) {
