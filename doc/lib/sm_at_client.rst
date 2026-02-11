@@ -55,58 +55,30 @@ The library sends the termination character automatically after an AT command.
 
 The application must configure the devicetree nodes for the UART, UART pins, and DTR GPIOs.
 
-Below is an example overlay for configuring UART and DTR/RI GPIOs:
+Below is an example overlay for configuring UART and DTR/RI GPIOs with the `nrf54l15dk`_:
 
 .. code-block:: devicetree
 
   / {
     chosen {
-      ncs,sm-uart = &uart2;
+      ncs,sm-uart = &uart30;
     };
   };
 
   /* Serial Modem AT Client <-> Serial Modem UART */
-  &uart2 {
+  &uart30 {
     compatible = "nordic,nrf-uarte";
     current-speed = <115200>;
     status = "okay";
     hw-flow-control;
-    pinctrl-0 = <&uart2_default>;
-    pinctrl-1 = <&uart2_sleep>;
-    pinctrl-names = "default", "sleep";
   };
 
-  /* UART pin configuration */
-  &pinctrl {
-    uart2_default: uart2_default {
-      group1 {
-        psels = <NRF_PSEL(UART_TX, 1, 4)>,
-          <NRF_PSEL(UART_RTS, 1, 6)>;
-      };
-      group2 {
-        psels = <NRF_PSEL(UART_RX, 1, 5)>,
-          <NRF_PSEL(UART_CTS, 1, 7)>;
-        bias-pull-up;
-      };
-    };
-
-    uart2_sleep: uart2_sleep {
-      group1 {
-        psels = <NRF_PSEL(UART_TX, 1, 4)>,
-          <NRF_PSEL(UART_RX, 1, 5)>,
-          <NRF_PSEL(UART_RTS, 1, 6)>,
-          <NRF_PSEL(UART_CTS, 1, 7)>;
-        low-power-enable;
-      };
-    };
-  };
-
-  /* DTR gpios for uart2 */
+  /* DTR gpios for uart30 */
   / {
     dte_dtr: dte_dtr {
       compatible = "nordic,dte-dtr";
-      dtr-gpios = <&gpio0 26 GPIO_ACTIVE_LOW>;
-      ri-gpios = <&gpio0 25 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+      dtr-gpios = <&gpio1 11 GPIO_ACTIVE_LOW>;
+      ri-gpios = <&gpio1 12 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
     };
   };
 

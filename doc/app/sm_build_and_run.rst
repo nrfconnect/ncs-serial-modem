@@ -97,22 +97,22 @@ If you use a different setup, you can customize the :file:`overlay-external-mcu.
    &pinctrl {
       uart2_default_alt: uart2_default_alt {
          group1 {
-            psels = <NRF_PSEL(UART_RX, **0, 11**)>,
-                    <NRF_PSEL(UART_CTS, **0, 13**)>;
+            psels = <NRF_PSEL(UART_RX, **0, 3**)>,
+                    <NRF_PSEL(UART_CTS, **0, 7**)>;
             bias-pull-up;
          };
          group2 {
-            psels = <NRF_PSEL(UART_TX, **0, 10**)>,
-                    <NRF_PSEL(UART_RTS, **0, 12**)>;
+            psels = <NRF_PSEL(UART_TX, **0, 2**)>,
+                    <NRF_PSEL(UART_RTS, **0, 6**)>;
          };
       };
 
       uart2_sleep_alt: uart2_sleep_alt {
          group1 {
-            psels = <NRF_PSEL(UART_TX, **0, 10**)>,
-                    <NRF_PSEL(UART_RX, **0, 11**)>,
-                    <NRF_PSEL(UART_RTS, **0, 12**)>,
-                    <NRF_PSEL(UART_CTS, **0, 13**)>;
+            psels = <NRF_PSEL(UART_TX, **0, 2**)>,
+                    <NRF_PSEL(UART_RX, **0, 3**)>,
+                    <NRF_PSEL(UART_RTS, **0, 6**)>,
+                    <NRF_PSEL(UART_CTS, **0, 7**)>;
             low-power-enable;
          };
       };
@@ -126,13 +126,13 @@ The following table shows how to connect selected development kit to an nRF91 Se
    * - nRF54L15 DK
      - nRF91 Series DK
    * - UART TX P0.00
-     - UART RX P0.11
+     - UART RX P0.03
    * - UART RX P0.01
-     - UART TX P0.10
+     - UART TX P0.02
    * - UART CTS P0.03
-     - UART RTS P0.12
+     - UART RTS P0.06
    * - UART RTS P0.02
-     - UART CTS P0.13
+     - UART CTS P0.07
    * - DTR OUT P1.11
      - DTR IN P0.31
    * - RI IN P1.12
