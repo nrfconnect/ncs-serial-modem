@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Simple diagram styled to match doc/images/dialup-ppp-cmux.svg palette -->
+<svg
+  width="720"
+  height="742"
+  viewBox="0 0 720 742"
+  version="1.1"
+  xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style type="text/css"><![CDATA[
+      .stHost { fill:#6AD1E3; stroke:none; }
+      .stBlue { fill:#0077C8; stroke:none; }
+      .stGrey { fill:#D9E1E2; stroke:none; }
+      .stStroke { fill:none; stroke:none; }
+      .stDivider { fill:none; stroke:#000000; stroke-width:2; stroke-dasharray:6,4; }
+      .stText { fill:#000000; font-family:Arial; font-size:16px; }
+      .stTextSmall { fill:#000000; font-family:Arial; font-size:13px; }
+      .stTextInv { fill:#ffffff; font-family:Arial; font-size:16px; }
+      .stTextInvSmall { fill:#ffffff; font-family:Arial; font-size:13px; }
+      .stTextDark { fill:#000000; font-family:Arial; font-size:13px; }
+      .stMono { fill:#000000; font-family:"Courier New", Courier, monospace; font-size:14px; }
+      .stMonoSmall { fill:#000000; font-family:"Courier New", Courier, monospace; font-size:12px; }
+      .stMonoInv { fill:#ffffff; font-family:"Courier New", Courier, monospace; font-size:14px; }
+      .stMonoDark { fill:#333F48; font-family:"Courier New", Courier, monospace; font-size:14px; }
+      .stMonoSmallDark { fill:#333F48; font-family:"Courier New", Courier, monospace; font-size:12px; }
+    ]]></style>
+
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L8,3 z" fill="#000000" />
+    </marker>
+  </defs>
+
+  <!-- Timeline arrow -->
+  <line x1="90" y1="30" x2="90" y2="700" stroke="#000000" stroke-width="3" marker-end="url(#arrow)"/>
+  <text x="90" y="732" text-anchor="middle" class="stTextSmall">Time</text>
+
+  <!-- Outer container -->
+  <rect x="140" y="30" width="520" height="670" class="stStroke"/>
+
+  <!-- UART header -->
+  <rect x="140" y="30" width="520" height="44" class="stBlue"/>
+  <text x="400" y="58" text-anchor="middle" class="stTextInv">UART (AT command mode)</text>
+
+  <!-- Pre-CMUX: single AT channel -->
+  <rect x="140" y="74" width="520" height="68" class="stGrey"/>
+
+  <text x="160" y="104" class="stMonoDark">AT#XCMUX=1</text>
+  <text x="360" y="104" class="stMonoSmallDark">// Enter CMUX mode</text>
+  <text x="160" y="132" class="stMonoDark">OK</text>
+
+  <!-- CMUX switch banner -->
+  <line x1="140" y1="142" x2="660" y2="142" class="stDivider"/>
+  <rect x="140" y="142" width="520" height="36" class="stBlue"/>
+  <text x="400" y="166" text-anchor="middle" class="stTextInvSmall">UART enters CMUX mode (GSM 07.10)</text>
+
+  <!-- Split headers -->
+  <rect x="140" y="178" width="260" height="34" class="stBlue"/>
+  <rect x="400" y="178" width="260" height="34" class="stBlue"/>
+  <text x="270" y="200" text-anchor="middle" class="stTextInvSmall">DLC1 (AT command mode)</text>
+  <text x="530" y="200" text-anchor="middle" class="stTextInvSmall">DLC2 (PPP)</text>
+
+  <!-- Split bodies -->
+  <!-- DLC1: AT commands -->
+  <rect x="140" y="212" width="260" height="488" class="stGrey"/>
+
+  <!-- DLC2: starts idle, then becomes PPP mode -->
+  <rect x="400" y="212" width="260" height="140" class="stGrey"/>
+  <rect x="400" y="352" width="260" height="280" class="stHost"/>
+  <rect x="400" y="632" width="260" height="36" class="stBlue"/>
+  <rect x="400" y="668" width="260" height="32" class="stGrey"/>
+
+  <!-- Divider line between DLCs -->
+  <line x1="400" y1="178" x2="400" y2="700" stroke="#000000" stroke-width="2"/>
+
+  <!-- DLC1 content -->
+  <text x="156" y="240" class="stMonoDark">AT#XPPP=1</text>
+  <text x="156" y="268" class="stMonoDark">OK</text>
+
+  <text x="156" y="300" class="stMonoDark">AT+CFUN=1</text>
+  <text x="156" y="328" class="stMonoDark">OK</text>
+
+  <text x="156" y="363" class="stMonoDark">#XPPP: 1,0,0</text>
+
+  <!-- DLC2 content -->
+  <text x="530" y="240" text-anchor="middle" class="stTextInvSmall">CMUX channel unused</text>
+
+
+  <!-- PPP switch marker on DLC2 -->
+  <line x1="400" y1="352" x2="660" y2="352" class="stDivider"/>
+  <rect x="400" y="352" width="260" height="26" class="stBlue"/>
+  <text x="530" y="370" text-anchor="middle" class="stTextInvSmall">DLC2 enters PPP data mode</text>
+
+  <text x="416" y="402" class="stMono">sent [LCP ConfReq ..]</text>
+  <text x="416" y="421" class="stMonoSmall">...</text>
+  <text x="416" y="440" class="stMono">rcvd [LCP ConfAck ...]</text>
+  <text x="416" y="459" class="stMono">sent [IPCP ConfReq ...]</text>
+  <text x="416" y="478" class="stMonoSmall">...</text>
+  <text x="416" y="497" class="stMono">rcvd [IPCP ConfAck ...]</text>
+
+  <text x="416" y="536" class="stMonoSmall">// ... IP data traffic</text>
+
+  <text x="416" y="580" class="stMonoSmall">// PPP termination</text>
+  <text x="416" y="599" class="stMono">sent [LCP TermReq ...]</text>
+  <text x="416" y="618" class="stMono">rcvd [LCP TermAck ...]</text>
+
+  <line x1="400" y1="632" x2="660" y2="632" class="stDivider"/>
+  <text x="530" y="656" text-anchor="middle" class="stTextInvSmall">DLC2 is detach from PPP</text>
+
+  <text x="156" y="675" class="stMonoDark">#XPPP: 0,0,0</text>
+
+  <line x1="400" y1="668" x2="660" y2="668" class="stDivider"/>
+  <text x="530" y="688" text-anchor="middle" class="stTextInvSmall">CMUX channel unused</text>
+
+  <text x="156" y="495" class="stMonoDark">#XPPP: 1,1,0</text>
+</svg>
