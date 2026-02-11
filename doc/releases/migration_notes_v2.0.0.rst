@@ -26,3 +26,4 @@ The following changes are listed for informational purposes, and many hosts will
 * Ring Indication (RI) - Change RI from pulse (100 ms) to level triggered, meaning RI stays asserted until the host asserts DTR.
   After the Serial Modem has enabled UART, RI will be deasserted.
 * nRF Cloud transport has been changed from MQTT to CoAP.
+* HTTP client has been added and it's enabled by default. Use CONFIG_SM_HTTPC=n if you do not need it and want to save flash.

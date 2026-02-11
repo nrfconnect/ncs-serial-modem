@@ -18,6 +18,7 @@
 #include "sm_at_socket.h"
 #include "sm_at_host.h"
 #include "sm_sockopt.h"
+#include "sm_at_httpc.h"
 
 LOG_MODULE_REGISTER(sm_sock, CONFIG_SM_LOG_LEVEL);
 
@@ -129,7 +130,7 @@ static void init_socket(struct sm_socket *socket)
 	socket->pipe = sm_at_host_get_current_pipe();
 }
 
-static struct sm_socket *find_socket(int fd)
+struct sm_socket *find_socket(int fd)
 {
 	for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
 		if (socks[i].fd == fd) {
@@ -366,12 +367,27 @@ void sm_at_socket_poll_work_handler(struct k_work *work)
 		/* Send #XAPOLL URC for poll events. */
 		if (!data_mode) {
 			uint8_t xapoll_events = revents & (sock->async_poll.xapoll_events);
+			bool http_needs_rearm = false;
 
 			/* Do not send URC for the same events twice, unless send/recv is done. */
 			sock->async_poll.xapoll_events &= ~xapoll_events;
 			if (xapoll_events) {
 				urc_send_to(pipe, "\r\n#XAPOLL: %d,%d\r\n", sock->fd,
 					    xapoll_events);
+				/* Notify HTTP client if it's using this socket */
+#if defined(CONFIG_SM_HTTPC)
+				http_needs_rearm = sm_at_httpc_poll_event(sock->fd, xapoll_events);
+#endif
+			}
+
+			/* If HTTP client requests POLLIN re-arm, restore it before clearing */
+			if (http_needs_rearm && (revents & NRF_POLLIN)) {
+				sock->async_poll.xapoll_events |= NRF_POLLIN;
+				sock->async_poll.events |= NRF_POLLIN;  /* MUST also restore */
+				/* Clear POLLIN from revents to prevent line 374 from clearing it
+				 * from events
+				 */
+				revents &= ~NRF_POLLIN;
 			}
 		}
 
@@ -2226,7 +2242,8 @@ STATIC int handle_at_getaddrinfo(enum at_parser_cmd_type cmd_type, struct at_par
 	return err;
 }
 
-static void xapoll_stop(struct sm_socket *sock)
+/* Exported for HTTP client use */
+void xapoll_stop(struct sm_socket *sock)
 {
 	if (sock) {
 		/* Stop events for a specific socket. */
@@ -2261,7 +2278,8 @@ static void xapoll_read_response(void)
 	}
 }
 
-static int set_xapoll_events(struct sm_socket *sock, uint8_t events)
+/* Exported for HTTP client use */
+int set_xapoll_events(struct sm_socket *sock, uint8_t events)
 {
 	int ret;
 	struct modem_pipe *pipe = sm_at_host_get_current_pipe();

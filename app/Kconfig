@@ -352,6 +352,28 @@ config SM_PGPS_INJECT_FIX_DATA
 
 endif # SM_GNSS
 
+config SM_HTTPC
+	bool "HTTP client support"
+	default y
+	select EXPERIMENTAL
+	help
+	  Enable HTTP client AT commands for making HTTP/HTTPS requests.
+	  Uses non-blocking socket API with XAPOLL for asynchronous
+	  event-driven I/O.
+
+if SM_HTTPC
+
+config SM_HTTPC_RESPONSE_TIMEOUT_MS
+	int "HTTP client idle timeout (ms)"
+	range 1000 300000
+	default 30000
+	help
+	  Idle timeout for an active HTTP request in milliseconds.
+	  The timeout is extended when data is received; if no activity occurs
+	  before it expires, the request is aborted and reported as an error.
+
+endif # SM_HTTPC
+
 if NRF_MODEM_LIB_TRACE
 
 choice NRF_MODEM_LIB_TRACE_BACKEND
