@@ -1422,8 +1422,8 @@ void test_xrecv_hex_string(void)
 	response = get_captured_response();
 	TEST_ASSERT_TRUE(strstr(response, "#XRECV:") != NULL);
 	TEST_ASSERT_TRUE(strstr(response, "1,1,5") != NULL); /* handle=1, mode=1, received=5 */
-	TEST_ASSERT_TRUE(strstr(response, "48656C6C6F") !=
-			 NULL); /* Hex data in response (uppercase) */
+	TEST_ASSERT_TRUE(strstr(response, "48656c6c6f") !=
+			 NULL); /* Hex data in response (lowercase) */
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
@@ -1704,7 +1704,7 @@ void test_xrecvfrom_hex_string(void)
 	TEST_ASSERT_TRUE(strstr(response, "1,1,5") != NULL); /* handle=1, mode=1, received=5 */
 	TEST_ASSERT_TRUE(strstr(response, "10.0.0.1") != NULL); /* Source IP */
 	TEST_ASSERT_TRUE(strstr(response, "9000") != NULL); /* Source port */
-	TEST_ASSERT_TRUE(strstr(response, "48656C6C6F") != NULL); /* Hex data (uppercase) */
+	TEST_ASSERT_TRUE(strstr(response, "48656c6c6f") != NULL); /* Hex data (lowercase) */
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */

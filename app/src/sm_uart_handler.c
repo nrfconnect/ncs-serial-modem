@@ -15,6 +15,7 @@
 #include "sm_uart_handler.h"
 #include "sm_at_host.h"
 #include "sm_util.h"
+#include "sm_cmux.h"
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(sm_uart_handler, CONFIG_SM_LOG_LEVEL);
@@ -552,6 +553,66 @@ int sm_tx_write(const uint8_t *data, size_t len, bool flush, bool urc)
 	}
 #endif
 	return sm_uart_tx_write(data, len, flush, urc);
+}
+
+SM_AT_CMD_CUSTOM(xppp, "AT+IPR", handle_at_ipr);
+static int handle_at_ipr(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+			 uint32_t param_count)
+{
+	int err;
+	struct uart_config cfg;
+
+	err = uart_config_get(sm_uart_dev, &cfg);
+	if (err) {
+		LOG_ERR("uart_config_get: %d", err);
+		return err;
+	}
+
+	if (cmd_type == AT_PARSER_CMD_TYPE_READ) {
+		rsp_send("\r\n+IPR: %u\r\n", cfg.baudrate);
+		return 0;
+	}
+
+	if (cmd_type == AT_PARSER_CMD_TYPE_TEST) {
+		rsp_send("\r\n+IPR: (),(%u,%u,%u,%u,%u)\r\n",
+			 115200, 230400, 460800, 921600, 1000000);
+		return 0;
+	}
+
+	if (cmd_type != AT_PARSER_CMD_TYPE_SET || param_count != 2) {
+		return -EINVAL;
+	}
+
+	if (sm_cmux_is_started()) {
+		LOG_ERR("Cannot change baudrate while CMUX is active.");
+		return -EBUSY;
+	}
+
+	err = at_parser_num_get(parser, 1, &cfg.baudrate);
+	if (err) {
+		return err;
+	}
+
+	if ((cfg.baudrate != 115200) &&
+	    (cfg.baudrate != 230400) &&
+	    (cfg.baudrate != 460800) &&
+	    (cfg.baudrate != 921600) &&
+	    (cfg.baudrate != 1000000)) {
+		LOG_ERR("Unsupported baudrate: %u", cfg.baudrate);
+		return -EINVAL;
+	}
+
+	rsp_send_ok();
+
+	sm_uart_handler_disable();
+	err = uart_configure(sm_uart_dev, &cfg);
+	if (err) {
+		LOG_ERR("uart_configure: %d", err);
+		return err;
+	}
+	sm_uart_handler_enable();
+
+	return -SILENT_AT_COMMAND_RET;
 }
 
 int sm_uart_handler_enable(void)

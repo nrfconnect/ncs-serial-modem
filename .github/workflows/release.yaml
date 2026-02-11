@@ -1,0 +1,34 @@
+# Workflow that attaches additional assets to github release.
+name: Attach Release Assets
+
+permissions:
+  contents: write
+  actions: write
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+    permissions:
+      contents: write
+      pull-requests: write
+    secrets: inherit
+    with:
+      trigger_source: 'release-workflow'
+
+  attach-assets:
+    runs-on: ubuntu-24.04
+    needs: [build]
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+
+      - name: Deploy release to github
+        uses: softprops/action-gh-release@v2
+        with:
+          fail_on_unmatched_files: true
+          files: |
+              artifact/*

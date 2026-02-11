@@ -182,63 +182,6 @@ bool sm_util_casecmp(const char *str1, const char *str2)
 	return true;
 }
 
-bool sm_util_hexstr_check(const uint8_t *data, uint16_t data_len)
-{
-	for (int i = 0; i < data_len; i++) {
-		char ch = *(data + i);
-
-		if ((ch < '0' || ch > '9') &&
-		    (ch < 'A' || ch > 'F') &&
-		    (ch < 'a' || ch > 'f')) {
-			return false;
-		}
-	}
-
-	return true;
-}
-
-int sm_util_htoa(const uint8_t *hex, uint16_t hex_len, char *ascii, uint16_t ascii_len)
-{
-	if (hex == NULL || ascii == NULL) {
-		return -EINVAL;
-	}
-	if (ascii_len < (hex_len * 2)) {
-		return -EINVAL;
-	}
-
-	for (int i = 0; i < hex_len; i++) {
-		sprintf(ascii + (i * 2), "%02X", *(hex + i));
-	}
-
-	return (hex_len * 2);
-}
-
-int sm_util_atoh(const char *ascii, uint16_t ascii_len, uint8_t *hex, uint16_t hex_len)
-{
-	char hex_str[3];
-
-	if (hex == NULL || ascii == NULL) {
-		return -EINVAL;
-	}
-	if ((ascii_len % 2) > 0) {
-		return -EINVAL;
-	}
-	if (ascii_len > (hex_len * 2)) {
-		return -EINVAL;
-	}
-	if (!sm_util_hexstr_check(ascii, ascii_len)) {
-		return -EINVAL;
-	}
-
-	hex_str[2] = '\0';
-	for (int i = 0; (i * 2) < ascii_len; i++) {
-		strncpy(&hex_str[0], ascii + (i * 2), 2);
-		*(hex + i) = (uint8_t)strtoul(hex_str, NULL, 16);
-	}
-
-	return (ascii_len / 2);
-}
-
 int util_string_get(struct at_parser *parser, size_t index, char *value, size_t *len)
 {
 	int ret;

@@ -51,6 +51,11 @@ Syntax
   It represents the Packet Data Network (PDN) ID that can be used instead of the default PDN for downloading.
   It can be provided to the start operations.
 
+  .. note::
+
+     Raw sockets must not use the PDN connection at the same time.
+     See :ref:`SM_AT_SOCKET_RAW_SOCKET_LIMITATION` for more information.
+
 .. note::
 
    During a delta update to the modem, the modem DFU area is automatically erased as needed as part of the update process. Erasing this area manually is optional.

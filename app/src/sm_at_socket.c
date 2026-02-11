@@ -91,7 +91,7 @@ static struct sm_socket {
 } socks[SM_MAX_SOCKET_COUNT];
 
 static struct sm_socket *datamode_sock; /* Socket for data mode */
-static char hex_data[1400 + 1]; /* Buffer for hex data conversion */
+static uint8_t bin_data[1400]; /* Buffer for hex2bin data conversion */
 
 static struct async_poll_ctx {
 	struct k_work poll_work;         /* Work to send poll URCs. */
@@ -1017,17 +1017,18 @@ static int do_send(struct sm_socket *sock, const uint8_t *data, int len, int fla
 
 static int data_send_hex(struct sm_socket *sock, const uint8_t *buf, int recv_len)
 {
-	int consumed = 0;
-	char hex_buf[256] = {0};
-	uint16_t data_len = recv_len < (sizeof(hex_buf) / 2) ? recv_len : (sizeof(hex_buf) / 2);
+	size_t consumed = 0;
+	char hex_buf[257] = {0};
+	uint16_t data_len =
+		recv_len < (sizeof(hex_buf) - 1) / 2 ? recv_len : (sizeof(hex_buf) - 1) / 2;
 
 	/* For hex string mode, convert the received data to hex string */
 	while (consumed < recv_len) {
-		int size = sm_util_htoa(buf + consumed, data_len, hex_buf, sizeof(hex_buf));
+		size_t size = bin2hex(buf + consumed, data_len, hex_buf, sizeof(hex_buf));
 
-		if (size < 0) {
+		if (size == 0) {
 			LOG_ERR("Failed to convert binary data to hex string");
-			return size;
+			return -EINVAL;
 		}
 		data_send(hex_buf, size);
 		consumed += size / 2; /* size is in hex string length */
@@ -1208,29 +1209,24 @@ static int socket_datamode_callback(uint8_t op, const uint8_t *data, int len, ui
 	if (op == DATAMODE_SEND) {
 		if (datamode_sock->type == SOCK_DGRAM &&
 		    (flags & SM_DATAMODE_FLAGS_MORE_DATA) != 0) {
-			LOG_ERR("Datamode buffer overflow");
+			LOG_ERR("Data mode buffer overflow");
 			exit_datamode_handler(-EOVERFLOW);
 			return -EOVERFLOW;
-		} else {
-			if (strlen(udp_url) > 0) {
-				ret = do_sendto(datamode_sock, udp_url, udp_port, data, len,
-						datamode_sock->send_flags);
-			} else {
-				ret = do_send(datamode_sock, data, len, datamode_sock->send_flags);
-			}
-			if (ret == -EAGAIN || ret == -ETIMEDOUT) {
-				LOG_WRN("Send failed: %d", ret);
-				return ret;
-			} else if (ret < 0) {
-				LOG_ERR("Send failed: %d", ret);
-				exit_datamode_handler(ret);
-				return ret;
-			} else {
-				LOG_DBG("Sent %d bytes", ret);
-			}
 		}
+		if (strlen(udp_url) > 0) {
+			ret = do_sendto(datamode_sock, udp_url, udp_port, data, len,
+					datamode_sock->send_flags);
+		} else {
+			ret = do_send(datamode_sock, data, len, datamode_sock->send_flags);
+		}
+		if (ret < 0) {
+			LOG_ERR("Send failed: %d", ret);
+		}
+		/* Return the amount of data sent or an error code. */
+		return ret;
+
 	} else if (op == DATAMODE_EXIT) {
-		LOG_DBG("datamode exit");
+		LOG_DBG("Data mode exit");
 		memset(udp_url, 0, sizeof(udp_url));
 		if ((flags & SM_DATAMODE_FLAGS_EXIT_HANDLER) != 0) {
 			/* Datamode exited unexpectedly. */
@@ -1239,7 +1235,7 @@ static int socket_datamode_callback(uint8_t op, const uint8_t *data, int len, ui
 		datamode_sock = NULL;
 	}
 
-	return ret;
+	return 0;
 }
 
 SM_AT_CMD_CUSTOM(xsocket, "AT#XSOCKET", handle_at_socket);
@@ -1680,7 +1676,7 @@ STATIC int handle_at_send(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 	int err = -EINVAL;
 	int fd;
 	uint16_t mode;
-	int size;
+	size_t size;
 	struct sm_socket *sock = NULL;
 	const char *str_ptr;
 	int data_len = 0;
@@ -1715,17 +1711,16 @@ STATIC int handle_at_send(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 
 			/* Convert hex string to binary data */
 			if (mode == AT_SOCKET_MODE_HEX) {
-				err = sm_util_atoh(str_ptr, size, hex_data, sizeof(hex_data));
-				if (err < 0) {
+				size = hex2bin(str_ptr, size, bin_data, sizeof(bin_data));
+				if (size == 0) {
 					LOG_ERR("Failed to convert hex string to binary data");
-					return err;
+					return -EINVAL;
 				}
-				str_ptr = hex_data;
-				size = err;
+				str_ptr = (const char *)bin_data;
 			}
 
-			err = do_send(sock, str_ptr, size, sock->send_flags);
-			if (err == size) {
+			err = do_send(sock, (uint8_t *)str_ptr, (int)size, sock->send_flags);
+			if (err == (int)size) {
 				err = 0;
 			} else {
 				err = err < 0 ? err : -EAGAIN;
@@ -1819,7 +1814,7 @@ STATIC int handle_at_sendto(enum at_parser_cmd_type cmd_type, struct at_parser *
 	int err = -EINVAL;
 	int fd;
 	uint16_t mode;
-	int size;
+	size_t size;
 	struct sm_socket *sock = NULL;
 	const char *str_ptr;
 	int data_len = 0;
@@ -1863,17 +1858,17 @@ STATIC int handle_at_sendto(enum at_parser_cmd_type cmd_type, struct at_parser *
 
 			/* Convert hex string to binary data */
 			if (mode == AT_SOCKET_MODE_HEX) {
-				err = sm_util_atoh(str_ptr, size, hex_data, sizeof(hex_data));
-				if (err < 0) {
+				size = hex2bin(str_ptr, size, bin_data, sizeof(bin_data));
+				if (size == 0) {
 					LOG_ERR("Failed to convert hex string to binary data");
-					return err;
+					return -EINVAL;
 				}
-				str_ptr = hex_data;
-				size = err;
+				str_ptr = (const char *)bin_data;
 			}
 
-			err = do_sendto(sock, udp_url, udp_port, str_ptr, size, sock->send_flags);
-			if (err == size) {
+			err = do_sendto(sock, udp_url, udp_port, (const uint8_t *)str_ptr,
+					(int)size, sock->send_flags);
+			if (err == (int)size) {
 				err = 0;
 			} else {
 				err = err < 0 ? err : -EAGAIN;

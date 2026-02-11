@@ -182,7 +182,8 @@ static int xdfu_datamode_callback(uint8_t op, const uint8_t *data, int len, uint
 			xdfu_bytes_written += len;
 		}
 
-		return 0;
+		/* Return the amount of data sent. */
+		return len;
 
 	case DATAMODE_EXIT: {
 		size_t expected_bytes_written;
@@ -220,7 +221,7 @@ static int xdfu_datamode_callback(uint8_t op, const uint8_t *data, int len, uint
 		return 0;
 	}
 	default:
-		LOG_WRN("Unexpected datamode op: %u (flags=0x%02x)", op, flags);
+		LOG_WRN("Unexpected data mode op: %u (flags=0x%02x)", op, flags);
 		return 0;
 	}
 }

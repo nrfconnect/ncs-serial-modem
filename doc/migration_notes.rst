@@ -67,7 +67,7 @@ The |SM| application uses DTR (Data Terminal Ready) and RI (Ring Indicator) pins
   * RI pin, which is a pulse-based output that is configured in the devicetree with the ``ri-gpios`` property.
 
 See :ref:`uart_configuration` for more information on how DTR and RI pins work in the |SM| application.
-See :ref:`sm_as_zephyr_modem` for information on how to configure DTR and RI pins when using the |SM| application as a Zephyr modem.
+See :ref:`sm_cellular_modem` for information on how to configure DTR and RI pins when using the |SM| application as a Zephyr modem.
 
 Socket AT command changes
 -------------------------
@@ -417,3 +417,7 @@ If you need any of those features with this |SM|, please contact customer suppor
     Use the ``CONFIG_SM_AUTO_CONNECT*`` Kconfig options to configure automatic network attach.
   * The ``CONFIG_SM_SKIP_READY_MSG`` Kconfig option.
     The ``Ready\r\n`` message is always sent when the |SM| application is ready to accept AT commands.
+  * The ``CONFIG_SM_AT_MAX_PARAM`` Kconfig option.
+    This Kconfig option has not been relevant in the latest versions of |NCS| SLM, as the AT parser library is now used.
+  * The ``CONFIG_SM_GNSS_OUTPUT_NMEA_ON_CMUX_CHANNEL`` Kconfig option.
+    You can see the NMEA messages in debug logs with the ``CONFIG_SM_GNSS_OUTPUT_NMEA_SATELLITES`` Kconfig option, which is enabled by default if the ``CONFIG_SM_LOG_LEVEL_DBG`` Kconfig option is set.

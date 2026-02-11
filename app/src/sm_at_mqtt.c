@@ -637,17 +637,23 @@ static int mqtt_datamode_callback(uint8_t op, const uint8_t *data, int len, uint
 
 	if (op == DATAMODE_SEND) {
 		if ((flags & SM_DATAMODE_FLAGS_MORE_DATA) != 0) {
-			LOG_ERR("Datamode buffer overflow");
+			LOG_ERR("Data mode buffer overflow");
 			exit_datamode_handler(-EOVERFLOW);
 			return -EOVERFLOW;
 		}
 		ret = do_mqtt_publish((uint8_t *)data, len);
-		LOG_INF("datamode send: %d", ret);
+		if (ret < 0) {
+			LOG_ERR("Send failed: %d", ret);
+			return ret;
+		}
+		/* Return the amount of data sent. */
+		return len;
+
 	} else if (op == DATAMODE_EXIT) {
-		LOG_DBG("MQTT datamode exit");
+		LOG_DBG("MQTT data mode exit");
 	}
 
-	return ret;
+	return 0;
 }
 
 SM_AT_CMD_CUSTOM(xmqttpub, "AT#XMQTTPUB", handle_at_mqtt_publish);

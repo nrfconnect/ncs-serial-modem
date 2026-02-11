@@ -61,42 +61,6 @@ int sm_util_at_cmd_no_intercept(char *buf, size_t len, const char *at_cmd);
 bool sm_util_casecmp(const char *str1, const char *str2);
 
 /**
- * @brief Detect hexdecimal string data type
- *
- * @param[in] data Hexdecimal string arrary to be checked
- * @param[in] data_len Length of array
- *
- * @return true if the input is hexdecimal string array, otherwise false
- */
-bool sm_util_hexstr_check(const uint8_t *data, uint16_t data_len);
-
-/**
- * @brief Encode hex array to hexdecimal string (ASCII text)
- *
- * @param[in]  hex Hex arrary to be encoded
- * @param[in]  hex_len Length of hex array
- * @param[out] ascii encoded hexdecimal string
- * @param[in]  ascii_len reserved buffer size
- *
- * @return actual size of ascii string if the operation was successful.
- *           Otherwise, a (negative) error code is returned.
- */
-int sm_util_htoa(const uint8_t *hex, uint16_t hex_len, char *ascii, uint16_t ascii_len);
-
-/**
- * @brief Decode hexdecimal string (ASCII text) to hex array
- *
- * @param[in]  ascii encoded hexdecimal string
- * @param[in]  ascii_len size of hexdecimal string
- * @param[out] hex decoded hex arrary
- * @param[in]  hex_len reserved size of hex array
- *
- * @return actual size of hex array if the operation was successful.
- *           Otherwise, a (negative) error code is returned.
- */
-int sm_util_atoh(const char *ascii, uint16_t ascii_len, uint8_t *hex, uint16_t hex_len);
-
-/**
  * @brief Get string value from AT command with length check.
  *
  * @p len must be bigger than the string length, or an error is returned.

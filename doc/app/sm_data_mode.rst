@@ -75,7 +75,7 @@ After exiting the data mode, the |SM| application returns to the AT command mode
 .. note::
    The |SM| application sends the termination string :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` and moves to a state where the data received on the UART is dropped in the following scenarios:
 
-   * The socket in data mode encounters an unrecoverable error.
+   * The socket in data mode encounters an error.
 
    For |SM| to stop dropping the data received from UART and move to AT-command mode, the MCU needs to send the termination command :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` back to the |SM| application.
 
