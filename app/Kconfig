@@ -327,6 +327,12 @@ config SM_PGPS_INJECT_FIX_DATA
 
 endif # SM_GNSS
 
+config SM_HTTPC
+	bool "HTTP client support"
+	help
+	  Enable HTTP client AT commands for making HTTP/HTTPS requests.
+	  Uses non-blocking socket API with XAPOLL for asynchronous
+	  event-driven I/O.
 if NRF_MODEM_LIB_TRACE
 
 choice NRF_MODEM_LIB_TRACE_BACKEND
