@@ -45,19 +45,13 @@ This also means that no more AT notifications are delivered over that UART while
 Example
 -------
 
-Start PPP on the current UART:
+Switching UART from AT mode to PPP mode and back:
 
-::
+.. figure:: ../images/ppp-uart-sequence.svg
+   :alt: PPP session without CMUX.
+   :align: center
 
-  // Enable PPP.
-  AT#XPPP=1
-  OK
-
-  AT+CFUN=1
-  OK
-
-  #XPPP: 1,0,0
-  // PPP is started, After this, the UART is in PPP data mode
+   PPP session without CMUX.
 
 PPP with CMUX
 =============
@@ -70,32 +64,14 @@ If you want PPP on DLC channel 1, start CMUX with ``AT#XCMUX=2`` before starting
 Example
 -------
 
-Change the UART to CMUX mode.
+Start CMUX, then start PPP on DLC channel 2 while keeping AT on DLC channel 1:
 
-::
+.. figure:: ../images/ppp-cmux-sequence.svg
+    :alt: PPP session with CMUX showing split into DLC1 (AT) and DLC2 (PPP).
+    :align: center
 
-  AT#XCMUX=1
-  OK
+    PPP session with CMUX.
 
-UART is now in multiplexing mode.
-Host should start the CMUX driver and initiate the handshake to establish the CMUX channels.
-
-Next AT commands should be issued on DLC channel 1.
-Open the AT channel (DLC channel 1) on the host side and start PPP on the second CMUX channel (DLC channel 2):
-
-::
-
-  // Enable PPP
-  AT#XPPP=1
-  OK
-
-  AT+CFUN=1
-  OK
-
-  // PPP is started on the second CMUX channel.
-  #XPPP: 1,0,0
-
-Now DLC channel 2 is in PPP data mode and accepting PPP LCP handshake, while DLC channel 1 is still available for AT commands.
 
 Use case: Linux host
 ********************
@@ -216,6 +192,19 @@ The controlling chip runs a Zephyr application, which uses Zephyr's native IP st
    * Power saving feature requires UART with DTR and RI pins connected between the controlling chip and the SiP.
      See :ref:`uart_configuration` for more information.
    * System mode is not configured. See the `%XSYSTEMMODE`_ command in the AT command Reference Guide for more details.
+   * The Zephyr cellular modem driver is written with the expectation that the PPP session starts on the DLC channel used for AT commands, which is DLC channel 1 by default.
+
+Example
+=======
+
+The Zephyr modem driver requires the AT channel and PPP channel to be switched so that the PPP starts at DLC channel 1, while the AT channel is moved to DLC channel 2.
+This is achieved by starting CMUX with ``AT#XCMUX=2`` before the network is attached and starting the PPP.
+
+.. figure:: ../images/ppp-zephyr-sequence.svg
+    :alt: PPP session with CMUX showing Zephyr host control.
+    :align: center
+
+    The Zephyr modem driver does extra DLC channel switching when starting the PPP session.
 
 Configuration
 =============
