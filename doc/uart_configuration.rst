@@ -69,13 +69,13 @@ The following tables shows how to connect the UART pins to the corresponding pin
          * - UART Signal
            - nRF9151 Pin
          * - TX
-           - P0.00
+           - P0.27
          * - RX
-           - P0.11
+           - P0.26
          * - RTS
-           - P0.02
+           - P0.14
          * - CTS
-           - P0.03
+           - P0.15
          * - DTR
            - P0.08 (Button 1, pull-up, active high)
          * - RI
@@ -101,13 +101,13 @@ The following tables shows how to connect the UART pins to the corresponding pin
          * - UART Signal
            - nRF9151 Pin
          * - TX
-           - P0.10
+           - P0.02
          * - RX
-           - P0.11
+           - P0.03
          * - RTS
-           - P0.12
+           - P0.06
          * - CTS
-           - P0.13
+           - P0.07
          * - DTR
            - P0.31 (active low, pull-up)
          * - RI
@@ -117,7 +117,7 @@ The following tables shows how to connect the UART pins to the corresponding pin
       * Baud rate: 115200
       * Hardware flow control: Enabled
 
-      All UART pins are in the P4 connector on the DK board.
+      On the `nrf9151dk`_ board, UART data and flow control pins (TX, RX, RTS, CTS) are on the **P4** connector, while control signals (DTR, RI) are on the **P3** connector.
 
       The DTR pin defaults to pull-up, so the external MCU must assert DTR to power on the UART.
       When UART power management is not used, the DTR pin should be pulled to active state.
@@ -126,6 +126,10 @@ The following tables shows how to connect the UART pins to the corresponding pin
 
       This setup is provided in the :file:`app/overlay-external-mcu.overlay` overlay file.
 
+      .. note::
+
+         DTR and RI pins use the P0.31 and P0.30 pins, which are shared with the i2c2 instance on the `nrf9151dk`_ board.
+         i2c2 must stay disabled to use these pins for DTR and RI signals.
 
    .. group-tab:: Thingy:91 X with PC host
 
@@ -137,7 +141,7 @@ The following tables shows how to connect the UART pins to the corresponding pin
          * - TX
            - P0.00
          * - RX
-           - P0.11
+           - P0.01
          * - DTR
            - P0.26 (Button 0, pull-up, active high)
          * - RI

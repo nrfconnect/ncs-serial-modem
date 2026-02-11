@@ -29,6 +29,10 @@
 	sense-edge-mask = <0x00000100>;
 };
 
+/* Disable I2C2.
+ * - Enabling IO expander causes ~20uA to be consumed while DTR is deasserted.
+ * - We use P0.31 and P0.30 pins for DTR and RI signals with external MCU.
+ */
 &i2c2 {
 	status = "disabled";
 };

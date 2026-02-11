@@ -53,13 +53,13 @@ When using the nRF54L15 DK as the controlling device, connect the DK pins to the
    * - nRF54L15 DK
      - nRF91 Series DK
    * - UART TX P0.00
-     - UART RX P0.11
+     - UART RX P0.03
    * - UART RX P0.01
-     - UART TX P0.10
+     - UART TX P0.02
    * - UART CTS P0.03
-     - UART RTS P0.12
+     - UART RTS P0.06
    * - UART RTS P0.02
-     - UART CTS P0.13
+     - UART CTS P0.07
    * - DTR OUT P1.11
      - DTR IN P0.31
    * - RI IN P1.12
