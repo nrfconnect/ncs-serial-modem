@@ -70,6 +70,10 @@ Complete the following steps for building and running:
 
       west build -p -b nrf9151dk/nrf9151/ns
 
+   To build the application with Kconfig and DTC overlays and extra Kconfig options, the following command gives an example of how they are passed as build arguments::
+
+      west build -p -b nrf9151dk/nrf9151/ns -- -DEXTRA_CONF_FILE="overlay-ppp.conf;overlay-cmux.conf" -DEXTRA_DTC_OVERLAY_FILE="overlay-external-mcu.overlay" -DCONFIG_SM_LOG_LEVEL_DBG=y
+
 #. To program the application, run the following command::
 
       west flash
@@ -90,3 +94,33 @@ The default baud rate is 115200.
    To set the manifest path for |SM|, run the following command::
 
       west config manifest.path ncs-serial-modem
+
+Documentation
+*************
+
+You only need to build the documentation if you modify the documentation source files, and want to provide the documentation to others.
+
+A minimal documentation setup is provided for Doxygen and Sphinx.
+Before continuing, check if you have Doxygen installed.
+It is recommended to use the same Doxygen version used in [CI](.github/workflows/doc-build-pr.yml).
+
+Complete the following steps for building the documentation:
+
+#. Change to the ``doc`` folder::
+
+      cd doc
+
+#. To install Sphinx, make sure you have a Python installation in place and run::
+
+      pip install -r requirements.txt
+
+#. Build API documentation::
+
+      doxygen
+
+#. Build HTML documentation::
+
+      make html
+
+The output will be stored in the ``doc/_build_sphinx/html/index.html`` file.
+You may check for other output formats other than HTML by running ``make help``.

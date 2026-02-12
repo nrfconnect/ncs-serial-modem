@@ -31,20 +31,45 @@ To switch to ``UART0`` output for application logs, change the following options
    CONFIG_LOG_BACKEND_RTT=n
    CONFIG_LOG_BACKEND_UART=y
 
+The default logging level for the |SM| is ``CONFIG_SM_LOG_LEVEL_INF``.
+You can get more verbose logs by setting the ``CONFIG_SM_LOG_LEVEL_DBG`` Kconfig option.
+
+TF-M logging must use the same UART as the application. For more details, see `shared TF-M logging`_.
+
 Modem traces
 ************
 
 To send modem traces over UART on an nRF91 Series DK, configuration must be added for the UART device in the devicetree and Kconfig.
-This is done by adding the `modem trace UART snippet`_ when building and programming.
+This is done by adding the `modem trace UART snippet`_ (``-Dapp_SNIPPET=nrf91-modem-trace-uart``) when building and programming.
 
 Use the `Cellular Monitor app`_ for capturing and analyzing modem traces.
 
-TF-M logging must use the same UART as the application. For more details, see `shared TF-M logging`_.
+.. note::
+
+   Modem traces captured through UART are corrupted if application logs through RTT are simultaneously captured.
+   When capturing modem traces through UART with the `Cellular Monitor app`_ and simultaneously capturing RTT logs, for example, with J-Link RTT Viewer, the modem trace misses packets, and captured packets might have incorrect information.
+
+   If you need to capture modem traces and RTT logs at the same time, enable HW flow control for modem trace UART.
+   This can be done for the `nRF9151 DK <nrf9151dk_>`_ by adding the following change to :file:`app/boards/nrf9151dk_nrf9151_ns.overlay`:
+
+   .. parsed-literal::
+      :class: highlight
+
+      &uart1 {
+       hw-flow-control;
+      };
+
+   Otherwise, you can choose not to capture RTT logs.
+   Having only RTT logs enabled does not cause this issue.
+
+   HW flow control prevents the trace UART from sending, when there is no reader for the data.
+   This in turn prevents the trace UART from suspending as it cannot empty it's buffers.
+   This increases the overall power consumption by ~700uA even when |SM| is in sleep mode.
 
 .. _sm_modem_trace_cmux:
 
-Collecting modem traces through CMUX backend
-********************************************
+Modem traces through CMUX
+*************************
 
 The |SM| application supports collecting modem traces through the CMUX multiplexer.
 When enabled, modem traces are sent through a dedicated CMUX channel, allowing simultaneous AT commands, PPP data, and trace collection over the same serial port.
