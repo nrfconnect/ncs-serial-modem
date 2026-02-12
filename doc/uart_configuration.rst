@@ -128,8 +128,8 @@ The following tables shows how to connect the UART pins to the corresponding pin
 
       .. note::
 
-         DTR and RI pins use the P0.31 and P0.30 pins, which are shared with the i2c2 instance on the `nrf9151dk`_ board.
-         i2c2 must stay disabled to use these pins for DTR and RI signals.
+         DTR and RI pins use the **P0.31** and **P0.30** pins, which are shared with the I2C2 instance on the `nrf9151dk`_ board.
+         I2C2 must stay disabled to use these pins for DTR and RI signals.
 
    .. group-tab:: Thingy:91 X with PC host
 
