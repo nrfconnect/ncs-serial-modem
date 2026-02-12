@@ -20,7 +20,7 @@
 
 LOG_MODULE_REGISTER(sm_sock, CONFIG_SM_LOG_LEVEL);
 
-#define SM_FDS_COUNT CONFIG_POSIX_OPEN_MAX
+#define SM_FDS_COUNT 8
 #define SM_MAX_SOCKET_COUNT (SM_FDS_COUNT - 1)
 
 /**@brief Socketopt operations. */
