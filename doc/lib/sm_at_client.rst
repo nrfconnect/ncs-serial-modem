@@ -55,7 +55,7 @@ The library sends the termination character automatically after an AT command.
 
 The application must configure the devicetree nodes for the UART, UART pins, and DTR GPIOs.
 
-Below is an example overlay for configuring UART and DTR/RI GPIOs with the `nrf54l15dk`_:
+The following is an example overlay for configuring UART and DTR/RI GPIOs with the `nrf54l15dk`_:
 
 .. code-block:: devicetree
 
