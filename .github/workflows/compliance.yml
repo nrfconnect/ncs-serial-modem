@@ -58,7 +58,8 @@ jobs:
             -e KconfigBasicNoModules \
             -e ClangFormat \
             -e Ruff \
-            -e SysbuildKconfigBasicNoModules
+            -e SysbuildKconfigBasicNoModules \
+            -e LicenseAndCopyrightCheck
 
       - name: Process Compliance Results
         working-directory: serial_modem
