@@ -5,6 +5,10 @@ nRF Cloud AT commands
    :local:
    :depth: 2
 
+.. note::
+
+   These AT commands are `Experimental <Software maturity levels_>`_.
+
 The page describes nRF Cloud-related AT commands.
 
 .. _SM_AT_NRFCLOUD:
