@@ -12,6 +12,7 @@
 #include <zephyr/net/net_ip.h>
 #include <nrf_errno.h>
 #include <nrf_modem_at.h>
+#include <modem/modem_info.h>
 #include "sm_util.h"
 
 LOG_MODULE_REGISTER(sm_util, CONFIG_SM_LOG_LEVEL);
@@ -459,6 +460,30 @@ int sm_util_pdn_dynamic_info_get(uint8_t cid, struct sm_pdn_dynamic_info *pdn_in
 	}
 
 	pdn_dynamic_info_dns_addr_fill(pdn_info, mtu, dns_addr_str_primary, dns_addr_str_secondary);
+
+	return 0;
+}
+
+int get_single_cell_info(struct lte_lc_cell *const cell_inf)
+{
+	int err;
+	struct modem_param_info modem_inf;
+
+	err = modem_info_params_init(&modem_inf);
+	if (err) {
+		LOG_ERR("Could not initialize modem info module, error: %d", err);
+		return err;
+	}
+	err = modem_info_params_get(&modem_inf);
+	if (err) {
+		LOG_ERR("Could not obtain information from modem, error: %d", err);
+		return err;
+	}
+	cell_inf->mcc = modem_inf.network.mcc.value;
+	cell_inf->mnc = modem_inf.network.mnc.value;
+	cell_inf->tac = modem_inf.network.area_code.value;
+	cell_inf->id = modem_inf.network.cellid_dec;
+	cell_inf->rsrp = modem_inf.network.rsrp.value;
 
 	return 0;
 }

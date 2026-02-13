@@ -208,4 +208,13 @@ struct sm_pdn_dynamic_info {
 int sm_util_pdn_dynamic_info_get(uint8_t cid, struct sm_pdn_dynamic_info *pdn_info);
 /** @} */
 
+/**
+ * @brief Get information about the current cell.
+ * @param[out] cell_inf Cell information structure to be filled.
+ *
+ * @retval 0 If the operation was successful.
+ *           Otherwise, a (negative) error code is returned.
+ */
+int get_single_cell_info(struct lte_lc_cell *const cell_inf);
+
 #endif /* SM_UTIL_ */

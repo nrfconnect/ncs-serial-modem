@@ -174,6 +174,12 @@ CONFIG_SM_GNSS - GNSS support in |SM|
 CONFIG_SM_NRF_CLOUD - nRF Cloud support in |SM|
    This option enables additional AT commands for using the nRF Cloud service.
 
+.. _CONFIG_SM_NRF_CLOUD_LOCATION:
+
+CONFIG_SM_NRF_CLOUD_LOCATION - Send GNSS location to nRF Cloud
+   This option enables automatic sending of GNSS location data to nRF Cloud when a fix is acquired.
+   This requires :ref:`CONFIG_SM_NRF_CLOUD <CONFIG_SM_NRF_CLOUD>` to be enabled.
+
 .. _CONFIG_SM_MQTTC:
 
 CONFIG_SM_MQTTC - MQTT client support in |SM|
@@ -268,6 +274,10 @@ The following configuration files are provided:
 * :file:`overlay-carrier-lgu.conf` - This configuration file adds LG U+ configurations needed by the carrier library.
   Used in conjunction with :file:`overlay-carrier.conf`.
   For more information, see the `Carrier-specific dependencies`_ section of the `LwM2M carrier`_ documentation.
+
+* :file:`overlay-nrf_cloud-coap.conf` - Configuration file that enables nRF Cloud support using CoAP instead of MQTT.
+  This overlay configures the application to use the CoAP transport for nRF Cloud services, including A-GNSS, P-GPS, and location reporting.
+  See :ref:`CONFIG_SM_NRF_CLOUD <CONFIG_SM_NRF_CLOUD>` for more information.
 
 * :file:`overlay-full_fota.conf` - Configuration file that adds full modem FOTA support.
   See :ref:`SM_AT_FOTA` for more information on how to use full modem FOTA functionality.
