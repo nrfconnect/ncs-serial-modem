@@ -466,72 +466,6 @@ static int cmd_grammar_check(const char *cmd, size_t length)
 	return 0;
 }
 
-static char *strrstr(const char *str1, const char *str2)
-{
-	size_t len1;
-	size_t len2;
-
-	if (str1 == NULL || str2 == NULL) {
-		return NULL;
-	}
-
-	len1 = strlen(str1);
-	len2 = strlen(str2);
-
-	if (len2 > len1 || len1 == 0 || len2 == 0) {
-		return NULL;
-	}
-
-	for (int i = len1 - len2; i >= 0; i--) {
-		if (strncmp(str1 + i, str2, len2) == 0) {
-			return (char *)str1 + i;
-		}
-	}
-
-	return NULL;
-}
-
-static void format_final_result(char *buf, size_t buf_len, size_t buf_max_len)
-{
-	static const char ok_str[] = "OK\r\n";
-	static const char error_str[] = "ERROR\r\n";
-	static const char cme_error_str[] = "+CME ERROR:";
-	static const char cms_error_str[] = "+CMS ERROR:";
-	char *result = NULL;
-
-	result = strrstr(buf, ok_str);
-	if (result == NULL) {
-		result = strrstr(buf, error_str);
-	}
-
-	if (result == NULL) {
-		result = strrstr(buf, cme_error_str);
-	}
-
-	if (result == NULL) {
-		result = strrstr(buf, cms_error_str);
-	}
-
-	if (result == NULL) {
-		LOG_WRN("Final result not found");
-		return;
-	}
-
-	/* insert CRLF before final result if there is information response before it */
-	if (result != buf + strlen(CRLF_STR)) {
-		if (buf_len + strlen(CRLF_STR) < buf_max_len) {
-			memmove((void *)(result + strlen(CRLF_STR)), (void *)result,
-				strlen(result));
-			result[0] = CR;
-			result[1] = LF;
-			buf_len += strlen(CRLF_STR);
-			buf[buf_len] = '\0';
-		} else {
-			LOG_WRN("No room to insert CRLF");
-		}
-	}
-}
-
 static int sm_at_send_internal(const uint8_t *data, size_t len, bool urc,
 			       enum sm_debug_print print_debug)
 {
@@ -669,12 +603,9 @@ static void cmd_send(uint8_t *buf, size_t cmd_length, size_t buf_size, bool *sto
 	 */
 	buf[0] = CR;
 	buf[1] = LF;
-	if (strlen(buf) > strlen(CRLF_STR)) {
-		format_final_result(buf, strlen(buf), buf_size);
-		err = sm_at_send_str(buf);
-		if (err) {
-			LOG_ERR("AT command response failed: %d", err);
-		}
+	err = sm_at_send_str(buf);
+	if (err) {
+		LOG_ERR("AT command response failed: %d", err);
 	}
 }
 
