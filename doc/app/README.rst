@@ -21,14 +21,17 @@ The application supports the following development kits:
      - PCA
      - Board name
      - Board target
+     - SW maturity level
    * - `nRF9151 DK <nRF91 DK_>`_
      - PCA10171
      - `nrf9151dk`_
      - ``nrf9151dk/nrf9151/ns``
+     - `Supported <Software maturity levels_>`_
    * - `Thingy:91 X <Thingy91X_>`_
      - PCA20065
      - `thingy91x <Thingy91X_>`_
      - ``thingy91x/nrf9151/ns``
+     - `Experimental <Software maturity levels_>`_
 
 For more security, the application must use the ``*/ns`` `variant <app_boards_names_>`_ of the board target, which is required when using the nRF91 Series `Modem library`_.
 When built for this variant, the sample is configured to compile and run as a non-secure application using `security by separation <ug_tfm_security_by_separation_>`_.
