@@ -31,7 +31,14 @@ LOG_MODULE_REGISTER(sm_at_client, CONFIG_SM_AT_CLIENT_LOG_LEVEL);
 
 static const struct device *uart_dev = DEVICE_DT_GET(DT_CHOSEN(ncs_sm_uart));
 
-static struct k_work_delayable rx_process_work;
+static void rx_process(struct k_work *work);
+static void dtr_uart_enable_work_fn(struct k_work *work);
+static void dtr_uart_disable_work_fn(struct k_work *work);
+
+K_WORK_DELAYABLE_DEFINE(rx_process_work, rx_process);
+K_WORK_DEFINE(dtr_uart_enable_work, dtr_uart_enable_work_fn);
+K_WORK_DELAYABLE_DEFINE(dtr_uart_disable_work, dtr_uart_disable_work_fn);
+
 struct rx_buf_t {
 	atomic_t ref_counter;
 	uint8_t buf[CONFIG_SM_AT_CLIENT_UART_RX_BUF_SIZE];
@@ -73,6 +80,7 @@ static K_SEM_DEFINE(at_rsp, 0, 1);
 
 static sm_data_handler_t data_handler;
 static enum at_cmd_state sm_at_state;
+static bool initialized;
 
 #if defined(CONFIG_SM_AT_CLIENT_SHELL)
 static const struct shell *global_shell;
@@ -97,10 +105,6 @@ struct dtr_config {
 
 	/* Current DTR state. */
 	bool active;
-
-	/* Work items for enabling and disabling DTR UART. */
-	struct k_work dtr_uart_enable_work;
-	struct k_work_delayable dtr_uart_disable_work;
 };
 
 static struct dtr_config dtr_config = {
@@ -446,10 +450,10 @@ static void reschedule_disable(void)
 {
 	if (dtr_config.active && dtr_config.automatic) {
 		/* Restart the inactivity timer. */
-		k_work_reschedule(&dtr_config.dtr_uart_disable_work, dtr_config.inactivity);
+		k_work_reschedule(&dtr_uart_disable_work, dtr_config.inactivity);
 	} else {
 		/* Stop the inactivity timer. */
-		k_work_cancel_delayable(&dtr_config.dtr_uart_disable_work);
+		k_work_cancel_delayable(&dtr_uart_disable_work);
 	}
 }
 
@@ -713,7 +717,7 @@ static void gpio_cb_func(const struct device *dev, struct gpio_callback *gpio_cb
 
 	if (dtr_config.automatic && !dtr_config.active) {
 		/* Wake up the application */
-		k_work_submit(&dtr_config.dtr_uart_enable_work);
+		k_work_submit(&dtr_uart_enable_work);
 	}
 
 	if (ri_handler) {
@@ -787,7 +791,6 @@ static int gpio_init(void)
 int sm_at_client_init(sm_data_handler_t handler, bool automatic, k_timeout_t inactivity)
 {
 	int err;
-	static bool initialized;
 
 	if (initialized) {
 		return -EALREADY;
@@ -809,11 +812,6 @@ int sm_at_client_init(sm_data_handler_t handler, bool automatic, k_timeout_t ina
 		LOG_ERR("UART init (%d)", err);
 		return -EFAULT;
 	}
-
-	k_work_init_delayable(&rx_process_work, rx_process);
-
-	k_work_init(&dtr_config.dtr_uart_enable_work, dtr_uart_enable_work_fn);
-	k_work_init_delayable(&dtr_config.dtr_uart_disable_work, dtr_uart_disable_work_fn);
 
 	/* Initialize shell pointer so it's available for printing in callbacks */
 #if defined(CONFIG_SHELL_BACKEND_SERIAL)
@@ -848,6 +846,7 @@ int sm_at_client_uninit(void)
 	data_handler = NULL;
 	ri_handler = NULL;
 	sm_at_state = AT_CMD_OK;
+	initialized = false;
 
 	return 0;
 }
@@ -867,6 +866,11 @@ int sm_at_client_register_ri_handler(sm_ri_handler_t handler)
 int sm_at_client_send_cmd(const char *const command, uint32_t timeout)
 {
 	int ret;
+
+	if (!initialized) {
+		LOG_ERR("AT client not initialized");
+		return -EPERM;
+	}
 
 	sm_at_state = AT_CMD_PENDING;
 	ret = tx_write(command, strlen(command), false);
@@ -900,17 +904,27 @@ int sm_at_client_send_cmd(const char *const command, uint32_t timeout)
 
 int sm_at_client_send_data(const uint8_t *const data, size_t datalen)
 {
+	if (!initialized) {
+		LOG_ERR("AT client not initialized");
+		return -EPERM;
+	}
+
 	return tx_write(data, datalen, true);
 }
 
 void sm_at_client_configure_dtr_uart(bool automatic, k_timeout_t inactivity)
 {
+	if (!initialized) {
+		LOG_ERR("AT client not initialized");
+		return;
+	}
+
 	dtr_config.automatic = automatic;
 	dtr_config.inactivity = inactivity;
 
 	if (dtr_config.automatic && !dtr_config.active && !ring_buf_is_empty(&tx_buf)) {
 		/* If automatic DTR UART is enabled and there is data to send, enable DTR UART. */
-		k_work_submit(&dtr_config.dtr_uart_enable_work);
+		k_work_submit(&dtr_uart_enable_work);
 	} else {
 		reschedule_disable();
 	}
@@ -918,14 +932,24 @@ void sm_at_client_configure_dtr_uart(bool automatic, k_timeout_t inactivity)
 
 void sm_at_client_disable_dtr_uart(void)
 {
+	if (!initialized) {
+		LOG_ERR("AT client not initialized");
+		return;
+	}
+
 	sm_at_client_configure_dtr_uart(false, K_NO_WAIT);
-	k_work_reschedule(&dtr_config.dtr_uart_disable_work, K_NO_WAIT);
+	k_work_reschedule(&dtr_uart_disable_work, K_NO_WAIT);
 }
 
 void sm_at_client_enable_dtr_uart(void)
 {
+	if (!initialized) {
+		LOG_ERR("AT client not initialized");
+		return;
+	}
+
 	sm_at_client_configure_dtr_uart(false, K_NO_WAIT);
-	k_work_submit(&dtr_config.dtr_uart_enable_work);
+	k_work_submit(&dtr_uart_enable_work);
 }
 
 #if defined(CONFIG_SM_AT_CLIENT_SHELL)

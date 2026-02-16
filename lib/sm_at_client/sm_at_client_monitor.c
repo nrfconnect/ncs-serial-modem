@@ -39,42 +39,76 @@ void sm_monitor_dispatch(const char *notif, size_t len)
 	struct at_notif_fifo *at_notif;
 	size_t sz_needed;
 	size_t notif_len = 0;
-	char *match = NULL;
+	const char *current = notif;
+	const char *end = notif + len;
+	bool queued_any = false;
 
 	/* TODO:
-	 * To reliably separate AT notifications from AT commands, data and other
-	 * AT notifications would require that the AT notifications are separated with control
-	 * characters or possibly sent with a separate CMUX channel.
+	 * - Not called if URC comes immediately after sending an AT command.
+	 *   ATE1 should be used, and echoed AT-command should be matched to received data to
+	 *   deduct the start of the AT response.
+	 * - Cannot handle the case where URC is split over multiple UART RX buffers.
+	 * - Cannot separate URC from data mode data which may also contain \r\n\ sequences.
 	 */
-	STRUCT_SECTION_FOREACH(sm_monitor_entry, e) {
-		if (!is_paused(e)) {
-			match = strnstr(notif, e->filter, len);
-			if (match) {
-				notif_len = len - (size_t)(match - notif);
+
+	while (current < end) {
+		/* Process each notification in the buffer.
+		 * Notifications are delimited by \r\n\r\n (end of one + start of next).
+		 */
+		const char *next_delim = strnstr(current, "\r\n\r\n", end - current);
+		bool has_monitor_match = false;
+
+		if (next_delim) {
+			/* Include the trailing \r\n in this notification */
+			notif_len = (next_delim - current) + 2;
+		} else {
+			/* Last notification in buffer */
+			notif_len = end - current;
+		}
+
+		if (notif_len == 0) {
+			break;
+		}
+
+		/* Check if any monitor is interested in this notification. */
+		STRUCT_SECTION_FOREACH(sm_monitor_entry, e) {
+			if (!is_paused(e)) {
+				if (e->filter == MON_ANY) {
+					has_monitor_match = true;
+					break;
+				}
+				if (strnstr(current, e->filter, notif_len)) {
+					has_monitor_match = true;
+					break;
+				}
+			}
+		}
+
+		if (has_monitor_match) {
+			sz_needed = sizeof(struct at_notif_fifo) + notif_len + sizeof(char);
+			at_notif = k_heap_alloc(&at_monitor_heap, sz_needed, K_NO_WAIT);
+			if (!at_notif) {
+				LOG_WRN("No heap space for incoming notification");
+				/* Submit work for already queued notifications and stop. */
 				break;
 			}
+			strncpy(at_notif->data, current, notif_len);
+			at_notif->data[notif_len] = '\0';
+			k_fifo_put(&at_monitor_fifo, at_notif);
+			queued_any = true;
+		}
+
+		/* Move to next notification (skip the \r\n\ delimiter from the current). */
+		if (next_delim) {
+			current = next_delim + 2;
+		} else {
+			break;
 		}
 	}
 
-	if (!match) {
-		/* Only copy monitored notifications to save heap */
-		return;
+	if (queued_any) {
+		k_work_submit(&at_monitor_work);
 	}
-
-	sz_needed = sizeof(struct at_notif_fifo) + notif_len + sizeof(char);
-
-	at_notif = k_heap_alloc(&at_monitor_heap, sz_needed, K_NO_WAIT);
-	if (!at_notif) {
-		LOG_WRN("No heap space for incoming notification: %s",
-			notif);
-		return;
-	}
-
-	strncpy(at_notif->data, match, notif_len);
-	at_notif->data[notif_len] = '\0';
-
-	k_fifo_put(&at_monitor_fifo, at_notif);
-	k_work_submit(&at_monitor_work);
 }
 
 static void sm_monitor_task(struct k_work *work)
