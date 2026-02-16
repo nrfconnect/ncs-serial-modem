@@ -64,12 +64,53 @@ static char hostname[URI_HOST_MAX];
 static uint8_t fmfu_buf[FMFU_BUF_SIZE];
 
 /* External flash device for full modem firmware storage */
+#if !defined(CONFIG_DFU_TARGET_FULL_MODEM_USE_EXT_PARTITION)
 #define FLASH_NODE DT_COMPAT_GET_ANY_STATUS_OKAY(jedec_spi_nor)
 static const struct device *flash_dev = DEVICE_DT_GET(FLASH_NODE);
+#endif
 
 /* dfu_target specific configurations */
 static struct dfu_target_fmfu_fdev fdev;
 static struct dfu_target_full_modem_params full_modem_fota_params;
+
+/* Setup full modem FOTA configuration */
+static int setup_full_modem_fota_config(void)
+{
+	int err;
+
+	full_modem_fota_params.buf = fmfu_buf;
+	full_modem_fota_params.len = sizeof(fmfu_buf);
+	full_modem_fota_params.dev = &fdev;
+
+#if defined(CONFIG_DFU_TARGET_FULL_MODEM_USE_EXT_PARTITION)
+	fdev.dev = NULL;
+	fdev.offset = 0;
+	fdev.size = 0;
+#else
+	fdev.dev = flash_dev;
+	fdev.offset = 0;
+	fdev.size = DT_PROP(FLASH_NODE, size) / 8;
+
+	if (!device_is_ready(flash_dev)) {
+		LOG_ERR("Flash device %s not ready", flash_dev->name);
+		return -ENXIO;
+	}
+#endif
+
+	err = dfu_target_full_modem_cfg(&full_modem_fota_params);
+	if (err != 0 && err != -EALREADY) {
+		LOG_ERR("dfu_target_full_modem_cfg failed: %d", err);
+		return err;
+	}
+
+	err = dfu_target_full_modem_fdev_get(&fdev);
+	if (err != 0) {
+		LOG_ERR("dfu_target_full_modem_fdev_get failed: %d", err);
+		return err;
+	}
+
+	return 0;
+}
 #endif
 
 static int do_fota_mfw_read(void)
@@ -334,24 +375,11 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 				type = DFU_TARGET_IMAGE_TYPE_MCUBOOT;
 			}
 #if defined(CONFIG_SM_FULL_FOTA)
-			else if (op == SM_FOTA_START_FULL_FOTA)  {
-				fdev.dev = flash_dev;
-				fdev.size = DT_PROP(FLASH_NODE, size) / 8;
-				full_modem_fota_params.buf = fmfu_buf;
-				full_modem_fota_params.len = sizeof(fmfu_buf);
-				full_modem_fota_params.dev = &fdev;
-
-				if (!device_is_ready(flash_dev)) {
-					LOG_ERR("Flash device %s not ready", flash_dev->name);
-					return -ENXIO;
-				}
-
-				err = dfu_target_full_modem_cfg(&full_modem_fota_params);
-				if (err != 0 && err != -EALREADY) {
-					LOG_ERR("dfu_target_full_modem_cfg failed: %d", err);
+			else if (op == SM_FOTA_START_FULL_FOTA) {
+				err = setup_full_modem_fota_config();
+				if (err != 0) {
 					return err;
 				}
-
 				type = DFU_TARGET_IMAGE_TYPE_FULL_MODEM;
 			}
 #endif
@@ -516,8 +544,13 @@ void sm_finish_modem_full_fota(void)
 		handle_full_fota_activation_fail(err);
 	}
 
-	/* Loading data from external flash to modem's flash. */
-	err = fmfu_fdev_load(fmfu_buf, sizeof(fmfu_buf), flash_dev, 0);
+	/* Re-establish dfu_target configuration after reboot */
+	err = setup_full_modem_fota_config();
+	if (err != 0) {
+		handle_full_fota_activation_fail(err);
+	}
+
+	err = fmfu_fdev_load(fmfu_buf, sizeof(fmfu_buf), fdev.dev, fdev.offset);
 	if (err != 0) {
 		LOG_ERR("fmfu_fdev_load failed: %d", err);
 		handle_full_fota_activation_fail(err);
@@ -529,16 +562,9 @@ void sm_finish_modem_full_fota(void)
 		handle_full_fota_activation_fail(err);
 	}
 
-	/* Reset dfu_target to a pristine state, otherwise it has been observed to
-	 * fail when attempting a second full MFW update without application reset.
-	 */
-	err = fota_download_util_image_reset(DFU_TARGET_IMAGE_TYPE_FULL_MODEM);
-	if (err) {
-		LOG_ERR("fota_download_util_image_reset() failed: %d\n", err);
-	}
-
 	sm_fota_status = FOTA_STATUS_OK;
 	sm_fota_info = 0;
+
 	LOG_INF("Full modem firmware update complete.");
 }
 
