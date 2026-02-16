@@ -7,6 +7,7 @@
 / {
 	chosen {
 		ncs,sm-uart = &dtr_uart0;
+		nordic,pm-ext-flash = &gd25wb256;
 	};
 };
 
