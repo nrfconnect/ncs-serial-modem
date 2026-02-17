@@ -89,20 +89,24 @@ jobs:
           NRF54_BUILD_DIR=twister-out/nrf54l15dk_nrf54l15_cpuapp/zephyr/serial_modem/samples
 
           # nRF9151 DK ext MCU builds
-          cp ${NRF9151DK_BUILD_DIR}/serial_modem.extmcu/merged.hex \
-            artifacts/serial_modem_${VERSION}_nrf9151dk_ext_mcu.hex
-          cp ${NRF9151DK_BUILD_DIR}/serial_modem.extmcu.mtrace/merged.hex \
-            artifacts/serial_modem_${VERSION}_nrf9151dk_ext_mcu_mtrace.hex
+          cp ${NRF9151DK_BUILD_DIR}/serial_modem.ppp_cmux_with_extmcu/merged.hex \
+            artifacts/serial_modem_${VERSION}_nrf9151dk_extmcu.hex
+          cp ${NRF9151DK_BUILD_DIR}/serial_modem.ppp_cmux_with_extmcu.mtrace/merged.hex \
+            artifacts/serial_modem_${VERSION}_nrf9151dk_extmcu_mtrace.hex
 
-          # nRF9151 DK ppp cmux builds
-          cp ${NRF9151DK_BUILD_DIR}/serial_modem.ppp_cmux_linux/merged.hex \
-            artifacts/serial_modem_${VERSION}_nrf9151dk_ppp_cmux.hex
-          cp ${NRF9151DK_BUILD_DIR}/serial_modem.ppp_cmux_linux.mtrace/merged.hex \
-            artifacts/serial_modem_${VERSION}_nrf9151dk_ppp_cmux_mtrace.hex
+          # nRF9151 DK normal builds
+          cp ${NRF9151DK_BUILD_DIR}/serial_modem.ppp_cmux/merged.hex \
+            artifacts/serial_modem_${VERSION}_nrf9151dk_normal.hex
+          cp ${NRF9151DK_BUILD_DIR}/serial_modem.ppp_cmux.mtrace/merged.hex \
+            artifacts/serial_modem_${VERSION}_nrf9151dk_normal_mtrace.hex
 
-          # nRF54L15 DK builds
-          cp ${NRF54_BUILD_DIR}/sm_at_client_shell/sample.cellular.sm_at_client_shell/merged.hex \
+          # nRF54L15 DK AT client shell build
+          cp ${NRF54_BUILD_DIR}/sm_at_client_shell/sample.sm_at_client_shell/merged.hex \
             artifacts/sm_at_client_shell_${VERSION}_nrf54l15dk.hex
+
+          # nRF54L15 DK PPP shell build
+          cp ${NRF54_BUILD_DIR}/sm_ppp_shell/sample.sm_ppp_shell/merged.hex \
+            artifacts/sm_ppp_shell_${VERSION}_nrf54l15dk.hex
 
       - name: Upload artifacts
         if: ${{ inputs.trigger_source == 'release-workflow' }}

@@ -59,12 +59,15 @@ tests:
       - thingy91x/nrf9151/ns
     integration_platforms:
       - nrf9151dk/nrf9151/ns
-  serial_modem.ppp_cmux_linux.mtrace:
+  serial_modem.ppp_cmux.mtrace:
     sysbuild: true
     build_only: true
     extra_args:
       - EXTRA_CONF_FILE="overlay-cmux.conf;overlay-ppp.conf"
+      - EXTRA_DTC_OVERLAY_FILE="overlay-uart1-hwfc.overlay"
       - app_SNIPPET=nrf91-modem-trace-uart
+    extra_configs:
+      - CONFIG_SM_LOG_LEVEL_DBG=y
     platform_allow:
       - nrf9151dk/nrf9151/ns
       - thingy91x/nrf9151/ns
@@ -76,6 +79,19 @@ tests:
     extra_args:
       - EXTRA_CONF_FILE="overlay-cmux.conf;overlay-ppp.conf"
       - EXTRA_DTC_OVERLAY_FILE="overlay-external-mcu.overlay"
+    platform_allow:
+      - nrf9151dk/nrf9151/ns
+    integration_platforms:
+      - nrf9151dk/nrf9151/ns
+  serial_modem.ppp_cmux_with_extmcu.mtrace:
+    sysbuild: true
+    build_only: true
+    extra_args:
+      - EXTRA_CONF_FILE="overlay-cmux.conf;overlay-ppp.conf"
+      - EXTRA_DTC_OVERLAY_FILE="overlay-external-mcu.overlay;overlay-uart1-hwfc.overlay"
+      - app_SNIPPET=nrf91-modem-trace-uart
+    extra_configs:
+      - CONFIG_SM_LOG_LEVEL_DBG=y
     platform_allow:
       - nrf9151dk/nrf9151/ns
     integration_platforms:
@@ -160,6 +176,7 @@ tests:
     build_only: true
     extra_args:
       - app_SNIPPET=nrf91-modem-trace-uart
+      - EXTRA_DTC_OVERLAY_FILE="overlay-uart1-hwfc.overlay"
     extra_configs:
       - CONFIG_SM_LOG_LEVEL_DBG=y
       - CONFIG_DTR_UART_LOG_LEVEL_DBG=y
