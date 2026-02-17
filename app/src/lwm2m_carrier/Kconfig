@@ -6,6 +6,7 @@
 config SM_CARRIER
 	bool "LwM2M Carrier support"
 	depends on LWM2M_CARRIER
+	select EXPERIMENTAL
 
 if SM_CARRIER
 

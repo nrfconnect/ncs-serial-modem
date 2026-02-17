@@ -273,6 +273,7 @@ The following configuration files are provided:
 * :file:`overlay-carrier-softbank.conf` and :file:`sysbuild-softbank.conf` - Configuration files that add SoftBank configurations needed by the carrier library.
   Used in conjunction with :file:`overlay-carrier.conf`.
   For more information, see the `Carrier-specific dependencies`_ section of the `LwM2M carrier`_ documentation.
+
 * :file:`overlay-carrier-lgu.conf` - This configuration file adds LG U+ configurations needed by the carrier library.
   Used in conjunction with :file:`overlay-carrier.conf`.
   For more information, see the `Carrier-specific dependencies`_ section of the `LwM2M carrier`_ documentation.
@@ -293,6 +294,10 @@ The following configuration files are provided:
 
 * :file:`overlay-memfault.conf` - Configuration file that enables `Memfault`_.
   For more information about Memfault features in |NCS|, see the `Memfault library`_ docs.
+
+  .. note::
+
+     The use of Memfault features in |SM| are `Experimental <Software maturity levels_>`_.
 
 * :file:`overlay-disable-dtr.overlay` - Devicetree overlay that disables the DTR and RI pins and related functionality.
   This overlay can be used if your setup does not have the need or means for managing the power externally.

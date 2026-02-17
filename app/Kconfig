@@ -253,9 +253,9 @@ config SM_NRF_CLOUD
 config SM_MQTTC
 	bool "MQTT client support"
 	default y
-	select EXPERIMENTAL
 	select MQTT_LIB
 	select MQTT_LIB_TLS
+	select EXPERIMENTAL
 
 config SM_FULL_FOTA
 	bool "Full modem FOTA support"
@@ -308,8 +308,7 @@ config SM_GNSS_OUTPUT_NMEA_SATELLITES
 	depends on SM_LOG_LEVEL_DBG
 	help
 	  If enabled, NMEA messages that pertain to the satellites will be output
-	  along with the other NMEA messages. Those are output in debug logs, and
-	  can also be output to a dedicated CMUX channel.
+	  along with the other NMEA messages. Those are output in debug logs.
 
 config SM_PGPS_INJECT_FIX_DATA
 	bool "Inject the data obtained when acquiring a fix"
