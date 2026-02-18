@@ -298,5 +298,9 @@ The following configuration files are provided:
   This overlay can be used if your setup does not have the need or means for managing the power externally.
   Modify the overlay to fit your configuration.
 
+* :file:`overlay-uart1-hwfc.overlay` - Devicetree overlay that enables hardware flow control on UART 1.
+  This is needed when capturing modem traces and application debug logs simultaneously.
+  See the :ref:`sm_logging` documentation for more information.
+
 The board-specific devicetree overlays (:file:`boards/*.overlay`) set up configurations that are specific to each supported development kit.
 All of them configure the DTR to be deasserted from a button and RI to blink an LED.
