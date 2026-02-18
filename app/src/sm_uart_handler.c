@@ -555,7 +555,7 @@ int sm_tx_write(const uint8_t *data, size_t len, bool flush, bool urc)
 	return sm_uart_tx_write(data, len, flush, urc);
 }
 
-SM_AT_CMD_CUSTOM(xppp, "AT+IPR", handle_at_ipr);
+SM_AT_CMD_CUSTOM(ipr, "AT+IPR", handle_at_ipr);
 static int handle_at_ipr(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			 uint32_t param_count)
 {
