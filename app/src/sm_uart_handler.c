@@ -227,7 +227,7 @@ static void rx_process(struct k_work *work)
 		} else {
 			rx_event.len -= processed;
 			rx_event.buf += processed;
-			err = k_msgq_put_front(&rx_event_queue, &rx_event, K_NO_WAIT);
+			err = k_msgq_put_front(&rx_event_queue, &rx_event);
 			if (err) {
 				LOG_ERR("RX event queue full, dropped %zu bytes", rx_event.len);
 				rx_buf_unref(rx_event.buf);
@@ -802,7 +802,7 @@ static int pipe_receive(void *data, uint8_t *buf, size_t size)
 		} else {
 			rx_event.len -= copy_size;
 			rx_event.buf += copy_size;
-			err = k_msgq_put_front(&rx_event_queue, &rx_event, K_NO_WAIT);
+			err = k_msgq_put_front(&rx_event_queue, &rx_event);
 			if (err) {
 				LOG_ERR("RX event queue full, dropped %zu bytes", rx_event.len);
 				rx_buf_unref(rx_event.buf);
