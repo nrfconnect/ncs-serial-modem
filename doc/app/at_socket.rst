@@ -481,6 +481,11 @@ Syntax
 
     * ``<value>`` is an integer that indicates the packet data network ID to bind to.
 
+  * ``55`` - ``AT_SO_TCP_SRV_SESSTIMEO``.
+
+    * ``<value>`` is an integer that indicates the TCP server session inactivity timeout for a socket.
+      It accepts values from the range ``0`` to ``135``, where ``0`` is no timeout and ``135`` is 2 hours, 15 minutes.
+
   * ``61`` - ``AT_SO_RAI`` (set-only).
     Release Assistance Indication (RAI).
 
@@ -715,6 +720,7 @@ Syntax
 
 * The ``<port>`` parameter is an unsigned 16-bit integer (0 - 65535).
   It represents the specific port to use for binding the socket.
+  ``0`` is a special value that indicates that the modem should choose the port automatically.
 
 Example
 ~~~~~~~
@@ -1866,3 +1872,245 @@ Test command
 ------------
 
 The test command is not supported.
+
+Socket listen #XLISTEN
+=======================
+
+The ``#XLISTEN`` command allows you to put a TCP server socket in listening mode to accept incoming connections.
+
+The socket must be a stream socket (TCP) that has been bound to a non-zero local port using the ``#XBIND`` command before it can be put in listening mode.
+
+.. note::
+
+   The nRF91 modem does not support TLS server sockets, so you cannot use the ``#XLISTEN`` command with TLS sockets created with the ``#XSSOCKET`` command.
+
+Set command
+-----------
+
+The set command allows you to put a socket in listening mode.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XLISTEN=<handle>
+
+* The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSOCKET`` command.
+  The socket must be a stream socket (TCP) that has been bound to a non-zero local port with ``#XBIND``.
+
+Example
+~~~~~~~
+
+::
+
+   AT#XLISTEN=0
+   OK
+
+Read command
+------------
+
+The read command allows you to list all sockets that are in listening mode.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XLISTEN?
+
+Response syntax
+~~~~~~~~~~~~~~~
+
+::
+
+   #XLISTEN: <handle>,<cid>,<local_port>
+
+* The ``<handle>`` parameter is an integer indicating the socket handle.
+
+* The ``<cid>`` parameter is an integer indicating the PDN connection ID.
+
+* The ``<local_port>`` parameter is an unsigned 16-bit integer (0 - 65535).
+  It represents the local port the socket is bound to and listening on.
+
+Example
+~~~~~~~
+
+::
+
+   AT#XLISTEN?
+   #XLISTEN: 0,0,1000
+
+   OK
+
+Test command
+------------
+
+The test command tests the existence of the command and provides information about the type of its subparameters.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XLISTEN=?
+
+Response syntax
+~~~~~~~~~~~~~~~
+
+::
+
+   #XLISTEN: <handle>
+
+Example
+~~~~~~~
+
+::
+
+   AT#XLISTEN=?
+   #XLISTEN: <handle>
+   OK
+
+Socket accept #XACCEPT
+=======================
+
+The ``#XACCEPT`` command allows you to accept an incoming connection on a listening socket.
+
+This command is used with TCP server sockets that have been put in listening mode with the ``#XLISTEN`` command.
+When a connection is accepted, a new socket is created to handle the connection, and the original listening socket continues to listen for additional connections.
+
+.. note::
+
+   The listening socket is set to non-blocking mode when the ``#XLISTEN`` command is executed.
+   If there are no incoming connections when the ``#XACCEPT`` command is executed, it returns an error.
+   You can use the ``#XAPOLL`` command to receive asynchronous notifications (``POLLIN``) for incoming connections on the listening socket.
+
+
+Set command
+-----------
+
+The set command allows you to accept an incoming connection on a listening socket.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XACCEPT=<handle>
+
+* The ``<handle>`` parameter is an integer that specifies the socket handle that was used for the ``AT#XLISTEN`` command.
+
+Response syntax
+~~~~~~~~~~~~~~~
+
+::
+
+   #XACCEPT: <handle>,<cid>,"<peer_addr>",<peer_port>
+
+* The ``<handle>`` parameter is an integer indicating the new socket handle created for the accepted connection.
+  You can use this new socket to send and receive data with the connected client.
+
+* The ``<cid>`` parameter is an integer indicating the PDN connection ID.
+
+* The ``<peer_addr>`` parameter is a string containing the IP address of the remote peer that connected.
+  It supports both IPv4 and IPv6 addresses.
+
+* The ``<peer_port>`` parameter is an unsigned 16-bit integer (0 - 65535).
+  It represents the port number of the remote peer.
+
+Example
+~~~~~~~
+
+::
+
+   AT#XSOCKET=2,1,0
+   #XSOCKET: 0,1,6
+
+   OK
+
+   // Enable asynchronous polling for all the sockets with POLLIN event.
+   AT#XAPOLL=,1,1
+   OK
+
+   AT#XBIND=0,1000
+   OK
+
+   AT#XLISTEN=0
+   OK
+
+   // POLLIN for listening socket is received when a client connects.
+   #XAPOLL: 0,1
+
+   // Accept the incoming connection.
+   AT#XACCEPT=0
+   #XACCEPT: 1,0,"1111:2222:3333:4444::1",1234
+
+   OK
+
+   // Once the connection is accepted, data can be received and sent with the new socket handle.
+   #XAPOLL: 1,1
+
+   AT#XRECV=1,0,0,1
+   #XRECV: 1,0,17
+   Hello from client
+   OK
+
+   AT#XSEND=1,0,0,"Hello from server"
+   #XSEND: 1,0,17
+
+   OK
+
+   #XAPOLL: 1,1
+
+   AT#XRECV=1,0,0,1
+   #XRECV: 1,0,15
+   Bye from client
+   OK
+
+   // Client closes the connection. POLLIN event is always received with POLLHUP, if POLLIN is enabled for polling.
+   #XAPOLL: 1,17
+   AT#XRECV=1,0,0,1
+   OK
+
+   AT#XCLOSE=1
+   #XCLOSE: 1,0
+
+   OK
+
+   AT#XCLOSE
+   #XCLOSE: 0,0
+
+   OK
+
+Read command
+------------
+
+The read command is not supported.
+
+Test command
+------------
+
+The test command tests the existence of the command and provides information about the type of its subparameters.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XACCEPT=?
+
+Response syntax
+~~~~~~~~~~~~~~~
+
+::
+
+   #XACCEPT: <handle>
+
+Example
+~~~~~~~
+
+::
+
+   AT#XACCEPT=?
+   #XACCEPT: <handle>
+   OK
