@@ -86,9 +86,11 @@ static struct sm_socket {
 	int family;                      /* Socket address family */
 	int fd;                          /* Socket descriptor. */
 	uint16_t cid;                    /* PDP Context ID, 0: primary; 1~10: secondary */
+	uint16_t local_port;             /* Explicitly bound local port. */
 	int send_flags;                  /* Send flags */
 	bool send_cb_set: 1;             /* Send callback set */
 	bool connected: 1;               /* Connected flag. */
+	bool listen: 1;                  /* Listen flag for TCP server sockets. */
 	struct sm_async_poll async_poll; /* Async poll info. */
 	struct sm_send_ntf send_ntf;     /* Send notification info. */
 	struct modem_pipe *pipe;	 /* AT pipe associated with this socket */
@@ -117,9 +119,11 @@ static void init_socket(struct sm_socket *socket)
 	socket->family = NRF_AF_UNSPEC;
 	socket->fd = INVALID_SOCKET;
 	socket->cid = 0;
+	socket->local_port = 0;
 	socket->send_flags = 0;
 	socket->send_cb_set = false;
 	socket->connected = false;
+	socket->listen = false;
 	socket->send_ntf = (struct sm_send_ntf){0};
 	socket->async_poll = (struct sm_async_poll){0};
 	socket->pipe = sm_at_host_get_current_pipe();
@@ -233,6 +237,10 @@ static void auto_reception(struct sm_socket *sock)
 	if (sock == NULL) {
 		return;
 	}
+	if (sock->listen) {
+		return;
+	}
+
 	if (sock->connected || sock->type == NRF_SOCK_RAW) {
 		err = do_recv(sock, 0, NRF_MSG_DONTWAIT,
 			      sock->async_poll.adr_hex ? AT_SOCKET_MODE_HEX
@@ -541,10 +549,6 @@ static int do_socket_open(struct sm_socket *sock)
 		ret = nrf_socket(sock->family, NRF_SOCK_DGRAM, NRF_IPPROTO_UDP);
 		proto = NRF_IPPROTO_UDP;
 	} else if (sock->type == NRF_SOCK_RAW) {
-		if (sock->role != NRF_SO_SEC_ROLE_CLIENT)  {
-			LOG_ERR("Raw socket: Role must be client");
-			return -EINVAL;
-		}
 		ret = nrf_socket(sock->family, NRF_SOCK_RAW, NRF_IPPROTO_RAW);
 		proto = NRF_IPPROTO_IP;
 	} else {
@@ -649,18 +653,6 @@ static int do_secure_socket_open(struct sm_socket *sock, int peer_verify)
 		ret = -errno;
 		goto error;
 	}
-	/* Set up (D)TLS server role if applicable */
-	if (sock->role == AT_SOCKET_ROLE_SERVER) {
-		int tls_role = NRF_SO_SEC_ROLE_SERVER;
-
-		ret = nrf_setsockopt(sock->fd, NRF_SOL_SECURE, NRF_SO_SEC_ROLE, &tls_role,
-				     sizeof(int));
-		if (ret) {
-			LOG_ERR("nrf_setsockopt(%d) error: %d", NRF_SO_SEC_ROLE, -errno);
-			ret = -errno;
-			goto error;
-		}
-	}
 
 	rsp_send("\r\n#XSSOCKET: %d,%d,%d\r\n", sock->fd, sock->type, proto);
 
@@ -744,6 +736,10 @@ static int at_sockopt_to_sockopt(enum at_sockopt at_option, int *level, int *opt
 	case AT_SO_RAI:
 		*level = NRF_SOL_SOCKET;
 		*option = NRF_SO_RAI;
+		break;
+	case AT_SO_TCP_SRV_SESSTIMEO:
+		*level = NRF_IPPROTO_TCP;
+		*option = NRF_SO_TCP_SRV_SESSTIMEO;
 		break;
 
 	default:
@@ -922,7 +918,7 @@ static int sec_sockopt_get(struct sm_socket *sock, enum at_sec_sockopt at_option
 	return ret;
 }
 
-int bind_to_local_addr(struct sm_socket *sock, uint16_t port)
+static int bind_to_local_addr(struct sm_socket *sock, uint16_t port)
 {
 	int ret;
 
@@ -981,6 +977,7 @@ int bind_to_local_addr(struct sm_socket *sock, uint16_t port)
 		return -EINVAL;
 	}
 
+	sock->local_port = port;
 	return 0;
 }
 
@@ -1385,15 +1382,6 @@ STATIC int handle_at_secure_socket(enum at_parser_cmd_type cmd_type,
 		if (err) {
 			goto error;
 		}
-		/** Peer verification level for TLS connection.
-		 *    - 0 - none
-		 *    - 1 - optional
-		 *    - 2 - required
-		 * If not set, socket will use defaults (none for servers,
-		 * required for clients)
-		 */
-		uint16_t peer_verify;
-
 		err = at_parser_num_get(parser, 2, &sock->type);
 		if (err) {
 			goto error;
@@ -1402,19 +1390,14 @@ STATIC int handle_at_secure_socket(enum at_parser_cmd_type cmd_type,
 		if (err) {
 			goto error;
 		}
-		if (sock->role == AT_SOCKET_ROLE_SERVER) {
-			peer_verify = ZSOCK_TLS_PEER_VERIFY_NONE;
-		} else if (sock->role == AT_SOCKET_ROLE_CLIENT) {
-			peer_verify = ZSOCK_TLS_PEER_VERIFY_REQUIRED;
-		} else {
-			err = -EINVAL;
-			goto error;
-		}
 		sock->sec_tag = SEC_TAG_TLS_INVALID;
 		err = at_parser_num_get(parser, 4, &sock->sec_tag);
 		if (err) {
 			goto error;
 		}
+
+		uint16_t peer_verify = ZSOCK_TLS_PEER_VERIFY_REQUIRED;
+
 		if (param_count > 5) {
 			err = at_parser_num_get(parser, 5, &peer_verify);
 			if (err) {
@@ -1694,10 +1677,6 @@ STATIC int handle_at_connect(enum at_parser_cmd_type cmd_type, struct at_parser 
 		sock = find_socket(fd);
 		if (sock == NULL) {
 			return -EINVAL;
-		}
-		if (sock->role != AT_SOCKET_ROLE_CLIENT) {
-			LOG_ERR("Invalid role");
-			return -EOPNOTSUPP;
 		}
 		err = util_string_get(parser, 2, url, &size);
 		if (err) {
@@ -2003,6 +1982,161 @@ STATIC int handle_at_recvfrom(enum at_parser_cmd_type cmd_type, struct at_parser
 		}
 		sock->pipe = sm_at_host_get_current_pipe();
 		err = do_recvfrom(sock, timeout, flags, mode, data_len);
+		break;
+
+	default:
+		break;
+	}
+
+	return err;
+}
+
+static int do_listen(struct sm_socket *sock)
+{
+	int ret;
+
+	if (sock->type != NRF_SOCK_STREAM || sock->local_port == 0 ||
+	    sock->sec_tag != SEC_TAG_TLS_INVALID) {
+		return -EOPNOTSUPP;
+	}
+
+	/* Set the socket to non-blocking mode, so accept() won't block. */
+	ret = nrf_fcntl(sock->fd, NRF_F_SETFL, NRF_O_NONBLOCK);
+	if (ret) {
+		LOG_ERR("nrf_fcntl() failed: %d", -errno);
+		return -errno;
+	}
+
+	/* nRF modem ignores the backlog parameter. Backlog in modem is fixed to 2. */
+	ret = nrf_listen(sock->fd, 2);
+	if (ret) {
+		LOG_ERR("nrf_listen() failed: %d", -errno);
+		return -errno;
+	}
+
+	sock->listen = true;
+
+	return 0;
+}
+
+SM_AT_CMD_CUSTOM(xlisten, "AT#XLISTEN", handle_at_listen);
+STATIC int handle_at_listen(enum at_parser_cmd_type cmd_type, struct at_parser *parser, uint32_t)
+{
+	int err = -EINVAL;
+	int fd;
+
+	struct sm_socket *sock = NULL;
+
+	switch (cmd_type) {
+	case AT_PARSER_CMD_TYPE_SET:
+		err = at_parser_num_get(parser, 1, &fd);
+		if (err) {
+			return err;
+		}
+		sock = find_socket(fd);
+		if (sock == NULL) {
+			return -EINVAL;
+		}
+		err = do_listen(sock);
+		break;
+
+	case AT_PARSER_CMD_TYPE_READ:
+		for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
+			if (socks[i].fd != INVALID_SOCKET && socks[i].listen) {
+				rsp_send("\r\n#XLISTEN: %d,%d,%d\r\n", socks[i].fd, socks[i].cid,
+					 socks[i].local_port);
+			}
+		}
+		err = 0;
+		break;
+
+	case AT_PARSER_CMD_TYPE_TEST:
+		rsp_send("\r\n#XLISTEN: <handle>\r\n");
+		err = 0;
+		break;
+
+	default:
+		break;
+	}
+
+	return err;
+}
+
+static int do_accept(struct sm_socket *sock)
+{
+	int ret;
+	struct net_sockaddr remote;
+	net_socklen_t addrlen = sizeof(struct net_sockaddr);
+	char peer_addr[NRF_INET6_ADDRSTRLEN] = {0};
+	uint16_t peer_port = 0;
+	struct async_poll_ctx *poll_ctx = poll_ctx_from_sock(sock);
+
+	if (sock->type != NRF_SOCK_STREAM || !sock->listen) {
+		return -EOPNOTSUPP;
+	}
+
+	ret = nrf_accept(sock->fd, (struct nrf_sockaddr *)&remote, (nrf_socklen_t *)&addrlen);
+	if (ret < 0) {
+		LOG_ERR("nrf_accept() failed: %d", -errno);
+		return -errno;
+	}
+
+	struct sm_socket *new_sock = find_avail_socket();
+	if (new_sock == NULL) {
+		LOG_ERR("Max socket count reached, closing accepted socket");
+		nrf_close(ret);
+		return -EINVAL;
+	}
+	init_socket(new_sock);
+	new_sock->fd = ret;
+	new_sock->family = remote.sa_family;
+	new_sock->type = NRF_SOCK_STREAM;
+	new_sock->role = AT_SOCKET_ROLE_CLIENT;
+	new_sock->cid = sock->cid;
+	new_sock->connected = true;
+
+	util_get_peer_addr(&remote, peer_addr, &peer_port);
+	rsp_send("\r\n#XACCEPT: %d,%d,\"%s\",%d\r\n", new_sock->fd, new_sock->cid, peer_addr,
+		 peer_port);
+
+ 	/* Update poll events for xapoll and automatic data reception */
+	new_sock->async_poll.adr_flags = poll_ctx->adr_flags;
+	new_sock->async_poll.adr_hex = poll_ctx->adr_hex;
+	new_sock->async_poll.xapoll_events_requested = poll_ctx->xapoll_events_requested;
+	update_poll_events(new_sock,
+			   NRF_POLLIN | NRF_POLLOUT | NRF_POLLERR | NRF_POLLHUP | NRF_POLLNVAL,
+			   true);
+
+	/* Restore POLLIN for listening socket. */
+	update_poll_events(sock, NRF_POLLIN, true);
+
+	return 0;
+}
+
+SM_AT_CMD_CUSTOM(xaccept, "AT#XACCEPT", handle_at_accept);
+STATIC int handle_at_accept(enum at_parser_cmd_type cmd_type, struct at_parser *parser, uint32_t)
+{
+	int err = -EINVAL;
+	int fd;
+
+	struct sm_socket *sock = NULL;
+
+	switch (cmd_type) {
+	case AT_PARSER_CMD_TYPE_SET:
+		err = at_parser_num_get(parser, 1, &fd);
+		if (err) {
+			return err;
+		}
+		sock = find_socket(fd);
+		if (sock == NULL) {
+			return -EINVAL;
+		}
+		err = do_accept(sock);
+		break;
+
+	case AT_PARSER_CMD_TYPE_TEST:
+		rsp_send("\r\n#XACCEPT: <handle>\r\n");
+		err = 0;
 		break;
 
 	default:

@@ -175,15 +175,32 @@ The following is the list of changes:
     * ``AT#XBIND=<handle>,<port>`` (handle parameter added)
     * ``AT#XCONNECT=<handle>,<url>,<port>`` (handle parameter added)
 
-  * Response format changes:
+* ``AT#XLISTEN`` parameter changes:
 
-    * ``AT#XSOCKETOPT`` - Response to get options now includes socket handle: ``#XSOCKETOPT: <handle>,<value>`` (previously just ``#XSOCKETOPT: <value>``)
-    * ``AT#XSSOCKETOPT`` - Response to get options now includes socket handle: ``#XSSOCKETOPT: <handle>,<value>`` (previously just ``#XSSOCKETOPT: <value>``)
-    * ``AT#XCONNECT`` - Response now includes socket handle: ``#XCONNECT: <handle>,<status>`` (previously just ``#XCONNECT: <status>``)
-    * ``AT#XSEND`` - Response now includes socket handle: ``#XSEND: <handle>,<size>`` (previously just ``#XSEND: <size>``)
-    * ``AT#XRECV`` - Response now includes socket handle and mode: ``#XRECV: <handle>,<mode>,<size>`` (previously just ``#XRECV: <size>``)
-    * ``AT#XSENDTO`` - Response now includes socket handle: ``#XSENDTO: <handle>,<size>`` (previously just ``#XSENDTO: <size>``)
-    * ``AT#XRECVFROM`` - Response now includes socket handle and mode: ``#XRECVFROM: <handle>,<mode>,<size>,"<ip_addr>",<port>`` (previously just ``#XRECVFROM: <size>,"<ip_addr>",<port>``)
+  * Added ``<handle>`` parameter to the ``AT#XLISTEN`` command.
+
+    * Old syntax: ``AT#XLISTEN``
+    * New syntax: ``AT#XLISTEN=<handle>``
+
+* ``AT#XACCEPT`` parameter changes:
+
+  * Removed ``<timeout>`` parameter and added ``<handle>`` parameter to the ``AT#XACCEPT`` command.
+    The command is now non-blocking and returns immediately with an error if there is no incoming connection to accept.
+
+    * Old syntax: ``AT#XACCEPT=<timeout>``
+    * New syntax: ``AT#XACCEPT=<handle>``
+
+  * Response format now includes CID and port: ``#XACCEPT: <handle>,<cid>,"<peer_addr>",<peer_port>`` (previously ``#XACCEPT: <handle>,"<ip_addr>"``)
+
+* Response format changes:
+
+  * ``AT#XSOCKETOPT`` - Response to get options now includes socket handle: ``#XSOCKETOPT: <handle>,<value>`` (previously just ``#XSOCKETOPT: <value>``)
+  * ``AT#XSSOCKETOPT`` - Response to get options now includes socket handle: ``#XSSOCKETOPT: <handle>,<value>`` (previously just ``#XSSOCKETOPT: <value>``)
+  * ``AT#XCONNECT`` - Response now includes socket handle: ``#XCONNECT: <handle>,<status>`` (previously just ``#XCONNECT: <status>``)
+  * ``AT#XSEND`` - Response now includes socket handle: ``#XSEND: <handle>,<size>`` (previously just ``#XSEND: <size>``)
+  * ``AT#XRECV`` - Response now includes socket handle and mode: ``#XRECV: <handle>,<mode>,<size>`` (previously just ``#XRECV: <size>``)
+  * ``AT#XSENDTO`` - Response now includes socket handle: ``#XSENDTO: <handle>,<size>`` (previously just ``#XSENDTO: <size>``)
+  * ``AT#XRECVFROM`` - Response now includes socket handle and mode: ``#XRECVFROM: <handle>,<mode>,<size>,"<ip_addr>",<port>`` (previously just ``#XRECVFROM: <size>,"<ip_addr>",<port>``)
 
 Migration example:
 
@@ -392,16 +409,183 @@ If you need any of those features with this |SM|, please contact customer suppor
     You can set the parameters such as ``<hostname_verify>`` and ``<use_dtls_cid>`` using the ``AT#XSSOCKETOPT`` command.
 
   * TCP and UDP servers.
-    This includes the removal of the following AT commands:
+    The following AT commands have been removed:
 
     * ``AT#XTCPSVR``
     * ``AT#XTCPHANGUP``
     * ``AT#XUDPSVR``
-    * ``AT#XLISTEN``
-    * ``AT#XACCEPT``
 
-    There is no direct replacement for these commands.
-    In addition, the ``AT_SO_TCP_SRV_SESSTIMEO`` socket option has been removed.
+    The ``AT#XLISTEN`` and ``AT#XACCEPT`` commands have been reintroduced and you can use them to implement TCP server functionality using the socket AT commands.
+    However, there is no support for TLS or DTLS servers, as the nRF91 modem does not support TLS server sockets.
+
+    You can replace this functionality by using the socket AT commands.
+
+    Migration examples:
+
+    * TCP IPv4 server
+
+      |NCS| SLM approach:
+
+      .. code-block::
+
+         AT#XTCPSVR=1,1000
+
+         #XTCPSVR: 0,"started"
+
+         OK
+
+         #XTCPSVR: "192.0.2.1","connected"
+
+         #XTCPDATA: 9
+         echo this
+
+         AT#XTCPSEND="echo this"
+
+         #XTCPSEND: 9
+
+         OK
+
+         AT#XTCPSVR?
+
+         #XTCPSVR: 0,2,1
+
+         OK
+
+         AT#XTCPHANGUP=2
+
+         #XTCPSVR: 0,"disconnected"
+
+         OK
+
+         AT#XTCPSVR=0
+
+         #XTCPSVR: 0,"stopped"
+
+         OK
+
+
+      |SM| approach:
+
+      .. code-block::
+
+         AT#XSOCKET=1,1,0
+
+         #XSOCKET: 0,1,6
+
+         OK
+
+         AT#XAPOLL=,1,1
+
+         OK
+
+         AT#XBIND=0,1000
+
+         OK
+
+         AT#XLISTEN=0
+
+         OK
+
+         #XAPOLL: 0,1
+
+         AT#XACCEPT=0
+
+         #XACCEPT: 1,0,"192.0.2.1",54321
+
+         OK
+
+         #XAPOLL: 1,1
+
+         AT#XRECV=1,0,0,1
+
+         #XRECV: 1,0,9
+         echo this
+
+         OK
+
+         AT#XSEND=1,0,0,"echo this"
+
+         #XSEND: 1,0,9
+
+         OK
+
+         AT#XCLOSE=1
+
+         #XCLOSE: 1,0
+
+         OK
+
+         AT#XCLOSE=0
+
+         #XCLOSE: 0,0
+
+         OK
+
+    * UDP IPv6 server
+
+      |NCS| SLM approach:
+
+      .. code-block::
+
+         AT#XUDPSVR=2,1235
+
+         #XUDPSVR: 0,"started"
+
+         OK
+
+         #XUDPDATA: 9,"2001:db8::1",54321
+         echo this
+
+         AT#XUDPSEND="echo this"
+
+         #XUDPSEND: 9
+
+         OK
+
+         AT#XUDPSVR=0
+
+         #XUDPSVR: 0,"stopped"
+
+         OK
+
+      |SM| approach:
+
+      .. code-block::
+
+         AT#XSOCKET=2,2,0
+
+         #XSOCKET: 0,2,17
+
+         OK
+
+         AT#XAPOLL=0,1,1
+
+         OK
+
+         AT#XBIND=0,1235
+
+         OK
+
+         #XAPOLL: 0,1
+
+         AT#XRECVFROM=0,0,0,1
+
+         #XRECVFROM: 0,0,9,"2001:db8::1",54321
+         echo this
+
+         OK
+
+         AT#XSENDTO=0,0,0,"2001:db8::1",54321,"echo this"
+
+         #XSENDTO: 0,9
+
+         OK
+
+         AT#XCLOSE=0
+
+         #XCLOSE: 0,0
+
+         OK
 
   * HTTP client functionality, including ``AT#XHTTPCCON`` and ``AT#XHTTPCREQ`` commands, and ``#XHTTPCRSP`` notification.
   * FTP and TFTP clients, including ``AT#XFTP`` and ``AT#XTFTP`` commands.
