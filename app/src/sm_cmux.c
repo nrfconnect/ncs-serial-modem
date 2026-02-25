@@ -10,6 +10,7 @@
 #endif
 #include "sm_util.h"
 #include "sm_uart_handler.h"
+#include "sm_trace_backend_cmux.h"
 #include <zephyr/logging/log.h>
 #include <zephyr/modem/cmux.h>
 #include <zephyr/modem/pipe.h>
@@ -339,6 +340,9 @@ static void stop_work_fn(struct k_work *work)
 
 	/* Will stop the UART when calling the close_pipe() function. */
 	if (sm_cmux_is_started()) {
+#if defined(CONFIG_SM_MODEM_TRACE_BACKEND_CMUX)
+		sm_trace_backend_detach();
+#endif
 		modem_cmux_release(&cmux.instance);
 
 		close_pipe(&cmux.uart_pipe);
@@ -436,6 +440,10 @@ static int cmux_start(void)
 	if (ret) {
 		return ret;
 	}
+
+#if defined(CONFIG_SM_MODEM_TRACE_BACKEND_CMUX)
+	sm_trace_backend_attach(sm_cmux_reserve(CMUX_MODEM_TRACE_CHANNEL));
+#endif
 
 	ret = modem_pipe_open(cmux.uart_pipe, K_SECONDS(CONFIG_SM_MODEM_PIPE_TIMEOUT));
 	if (!ret) {
