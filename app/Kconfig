@@ -262,7 +262,9 @@ endif # SM_NRF_CLOUD
 config SM_NRF_CLOUD_LOCATION
 	bool "nRF Cloud Location support"
 	depends on SM_NRF_CLOUD
-	select NRF_CLOUD_LOCATION if NRF_CLOUD_MQTT
+	help
+	  Enable the nRF Cloud Location service for cloud-assisted geolocation.
+	  Supports cellular and Wi-Fi positioning.
 
 config SM_MQTTC
 	bool "MQTT client support"
