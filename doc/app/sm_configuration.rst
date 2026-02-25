@@ -176,8 +176,9 @@ CONFIG_SM_NRF_CLOUD - nRF Cloud support in |SM|
 
 .. _CONFIG_SM_NRF_CLOUD_LOCATION:
 
-CONFIG_SM_NRF_CLOUD_LOCATION - Send GNSS location to nRF Cloud
-   This option enables automatic sending of GNSS location data to nRF Cloud when a fix is acquired.
+CONFIG_SM_NRF_CLOUD_LOCATION - nRF Cloud Location support
+   This option enables the nRF Cloud Location service for cloud-assisted geolocation.
+   Supports A-GNSS, P-GPS, and Wi-Fi positioning.
    This requires :ref:`CONFIG_SM_NRF_CLOUD <CONFIG_SM_NRF_CLOUD>` to be enabled.
 
 .. _CONFIG_SM_MQTTC:
