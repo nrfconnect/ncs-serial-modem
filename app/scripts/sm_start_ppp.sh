@@ -203,6 +203,11 @@ if chat -t1 "Ready--" "AT" "OK" <$MODEM >$MODEM; then
 else
 	log_dbg "Modem not responding, try CMUX Close down..."
 	cmux_close
+	sleep 1
+	if ! chat -t1 "" "AT" "OK" <$MODEM >$MODEM; then
+		echo "Error: Modem not responding"
+		exit 1
+	fi
 fi
 
 if [ $IPR_BAUD -ne 0 ]; then
@@ -230,18 +235,22 @@ fi
 sleep 3
 
 stty -F $AT_CMUX clocal
-
-echo "Connect and wait for PPP link..."
 test -c $AT_CMUX
-test $TRACE -gt 0 && start-stop-daemon --start --pidfile $TRACE_PID_FILE --make-pidfile --background --exec /bin/dd -- if=$MT_CMUX of=$MODEM_TRACE_FILE bs=1024
+
+if [ $TRACE -gt 0 ]; then
+	echo "Starting trace collection..."
+	start-stop-daemon --start --pidfile $TRACE_PID_FILE --make-pidfile \
+	 --background --exec /bin/dd -- if=$MT_CMUX of=$MODEM_TRACE_FILE bs=1024
+fi
+echo "Connect and wait for PPP link..."
 
 chat $CHATOPT -t$TIMEOUT "${CHAT_SCRIPT[@]}" >$AT_CMUX <$AT_CMUX
 
 shutdown_modem() {
 	set +eu
+	start-stop-daemon --stop --pidfile $TRACE_PID_FILE --remove-pidfile --oknodo --retry 1
 	chat $CHATOPT -t5 '' $SHUTDOWN_SCRIPT >$AT_CMUX <$AT_CMUX
 	CHAT_ERR=$?
-	start-stop-daemon --stop --pidfile $TRACE_PID_FILE --remove-pidfile --oknodo
 	pkill ldattach
 	sleep 1
 	if [ "$CHAT_ERR" -ne 0 ]; then
