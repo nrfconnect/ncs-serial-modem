@@ -342,10 +342,10 @@ static void uart_callback(const struct device *dev, struct uart_event *evt, void
 		     !atomic_test_bit(&uart_state, SM_UART_STATE_TX_ENABLED_BIT))) {
 			/* TX buffer is empty or we aborted due to TX being disabled. */
 			k_sem_give(&tx_done_sem);
-			uart_callback_notify_pipe_transmit_idle();
 		} else {
 			tx_start();
 		}
+		uart_callback_notify_pipe_transmit_idle();
 		break;
 	case UART_RX_RDY:
 		rx_buf_ref(evt->data.rx.buf);
