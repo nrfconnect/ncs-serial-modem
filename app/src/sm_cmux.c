@@ -5,9 +5,8 @@
  */
 #include "sm_cmux.h"
 #include "sm_at_host.h"
-#if defined(CONFIG_SM_PPP)
 #include "sm_ppp.h"
-#endif
+#include "sm_trace_backend_cmux.h"
 #include "sm_util.h"
 #include "sm_uart_handler.h"
 #include <zephyr/logging/log.h>
@@ -123,12 +122,16 @@ static void stop_work_fn(struct k_work *work)
 	ARG_UNUSED(work);
 
 	if (sm_cmux_is_started()) {
-		modem_cmux_release(&cmux.instance);
-
-		cmux.at_channel = 0;
 		if (IS_ENABLED(CONFIG_SM_PPP)) {
 			sm_ppp_detach();
 		}
+
+		if (IS_ENABLED(CONFIG_SM_MODEM_TRACE_BACKEND_CMUX)) {
+			sm_trace_backend_detach();
+		}
+
+		modem_cmux_release(&cmux.instance);
+		cmux.at_channel = 0;
 
 		/* Return AT host to UART pipe */
 		sm_at_host_set_pipe(sm_at_host_get_urc_ctx(), cmux.uart_pipe);
@@ -188,6 +191,15 @@ static int cmux_start(void)
 		LOG_DBG("Reserving CMUX PPP channel pipe %p for PPP module", (void *)ppp_pipe);
 		sm_at_host_release(sm_at_host_get_ctx_from(ppp_pipe));
 		sm_ppp_attach(ppp_pipe);
+	}
+	if (IS_ENABLED(CONFIG_SM_MODEM_TRACE_BACKEND_CMUX)) {
+		/* Reserve trace channel pipe for trace backend */
+		struct modem_pipe *trace_pipe = sm_cmux_get_dlci(CMUX_MODEM_TRACE_CHANNEL);
+
+		LOG_DBG("Reserving CMUX trace channel pipe %p for trace backend",
+			(void *)trace_pipe);
+		sm_at_host_release(sm_at_host_get_ctx_from(trace_pipe));
+		sm_trace_backend_attach(trace_pipe);
 	}
 
 	/* Attach CMUX to UART pipe (AT host will be detached by transition) */

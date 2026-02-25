@@ -349,7 +349,18 @@ config SM_MODEM_TRACE_BACKEND_CMUX
 
 endchoice # NRF_MODEM_LIB_TRACE_BACKEND
 
-endif
+if SM_MODEM_TRACE_BACKEND_CMUX
+
+config SM_MODEM_TRACE_DROP_ON_TIMEOUT
+	bool "Drop modem trace data if the CMUX trace channel is slow"
+	default y
+
+config SM_MODEM_TRACE_CMUX_TX_TIMEOUT_MS
+	int "Timeout for sending modem trace data over CMUX in milliseconds"
+	default 100
+
+endif # SM_MODEM_TRACE_BACKEND_CMUX
+endif # NRF_MODEM_LIB_TRACE
 
 #
 # Hardware RX byte counting for UART
