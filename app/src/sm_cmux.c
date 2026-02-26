@@ -265,8 +265,8 @@ static int cmux_start(void)
 	return 0;
 }
 
-SM_AT_CMD_CUSTOM(xcmux, "AT#XCMUX", handle_at_cmux);
-static int handle_at_cmux(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+SM_AT_CMD_CUSTOM(xcmux, "AT#XCMUX", handle_at_xcmux);
+static int handle_at_xcmux(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			  uint32_t param_count)
 {
 	unsigned int at_dlci;
@@ -321,8 +321,8 @@ static int handle_at_cmux(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 	return ret;
 }
 
-SM_AT_CMD_CUSTOM(xcmuxcld, "AT#XCMUXCLD", handle_at_cmuxcld);
-static int handle_at_cmuxcld(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+SM_AT_CMD_CUSTOM(xcmuxcld, "AT#XCMUXCLD", handle_at_xcmuxcld);
+static int handle_at_xcmuxcld(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			     uint32_t param_count)
 {
 	if (cmd_type != AT_PARSER_CMD_TYPE_SET || param_count != 1) {
@@ -339,4 +339,68 @@ static int handle_at_cmuxcld(enum at_parser_cmd_type cmd_type, struct at_parser 
 	k_work_reschedule_for_queue(&sm_work_q, &cmux.stop_work, STOP_DELAY);
 
 	return -SILENT_AT_COMMAND_RET;
+}
+
+SM_AT_CMD_CUSTOM(atcmux, "AT+CMUX", handle_at_cmux);
+static int handle_at_cmux(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+			  uint32_t param_count)
+{
+	/* AT+CMUX follows the 3GPP TS 27.010 specification.
+	 *
+	 * Only following commands are supported:
+	 * AT+CMUX=0       (basic mode)
+	 * AT+CMUX=0,0     (basic mode, subset 0)
+	 * AT+CMUX?        (read current configuration)
+	 * AT+CMUX=?       (list supported parameter ranges)
+	 * All other parameter combinations are rejected with an error response.
+	 */
+	unsigned int mode;
+	unsigned int subset;
+	int ret;
+
+	switch (cmd_type) {
+	case AT_PARSER_CMD_TYPE_TEST:
+		/* Report supported ranges: only mode 0, subset 0 */
+		rsp_send("\r\n+CMUX: (0),(0)\r\n");
+		return 0;
+
+	case AT_PARSER_CMD_TYPE_READ:
+		/* Report current (and only) configuration */
+		rsp_send("\r\n+CMUX: 0,0\r\n");
+		return 0;
+
+	case AT_PARSER_CMD_TYPE_SET:
+		if (param_count < 2 || param_count > 3) {
+			return -EINVAL;
+		}
+
+		ret = at_parser_num_get(parser, 1, &mode);
+		if (ret || mode != 0) {
+			return -EINVAL;
+		}
+
+		if (param_count == 3) {
+			ret = at_parser_num_get(parser, 2, &subset);
+			if (ret || subset != 0) {
+				return -EINVAL;
+			}
+		}
+
+		if (sm_cmux_is_started()) {
+			return -EALREADY;
+		}
+
+		/* Respond before starting CMUX. */
+		rsp_send_ok();
+		ret = cmux_start();
+		if (ret) {
+			LOG_ERR("Failed to start CMUX. (%d)", ret);
+		} else {
+			ret = -SILENT_AT_COMMAND_RET;
+		}
+		return ret;
+
+	default:
+		return -EINVAL;
+	}
 }

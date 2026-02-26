@@ -23,13 +23,101 @@ See the :ref:`sm_config_files` section for more information.
 
 .. note::
 
-   |SM| does not have an equivalent to the ``AT+CMUX`` command described in `3GPP TS 27.007`_.
-   Here is how |SM|'s implementation of CMUX relates to the standard command's parameters:
-
    * Only basic mode (mode 0) is supported.
    * Only UIH frames are used.
    * The speed used is the configured baud rate of |SM|'s UART.
    * No system parameters (N1, T1, T2, T3, k, m) are configurable.
+
+CMUX setup +CMUX
+================
+
+The ``AT+CMUX`` command starts the CMUX multiplexer.
+It is defined in `3GPP TS 27.007`_ (section 5.7) and the underlying protocol is specified in `3GPP TS 27.010`_.
+
+Only basic mode (``<mode>=0``) with subset ``0`` is supported.
+All other parameter values are rejected.
+
+Set command
+-----------
+
+The set command allows you to start the CMUX multiplexer.
+
+An ``OK`` response is sent before CMUX is started, after which only CMUX framing is accepted on the serial link.
+
+Syntax
+~~~~~~
+
+::
+
+   AT+CMUX=<mode>[,<subset>]
+
+* The ``<mode>`` parameter selects the operation mode. Only ``0`` (basic mode) is supported.
+* The ``<subset>`` parameter selects the subset of mode 0. Only ``0`` is supported. Default value is ``0``.
+
+Read command
+------------
+
+The read command returns the current multiplexer configuration.
+
+Syntax
+~~~~~~
+
+::
+
+   AT+CMUX?
+
+Response syntax
+~~~~~~~~~~~~~~~
+
+::
+
+   +CMUX: <mode>,<subset>
+
+* The ``<mode>`` parameter is always ``0`` (basic mode).
+* The ``<subset>`` parameter is always ``0``.
+
+Test command
+------------
+
+The test command returns the supported parameter ranges.
+
+Syntax
+~~~~~~
+
+::
+
+   AT+CMUX=?
+
+Response syntax
+~~~~~~~~~~~~~~~
+
+::
+
+   +CMUX: (0),(0)
+
+Example
+-------
+
+::
+
+   AT+CMUX=?
+
+   +CMUX: (0),(0)
+
+   OK
+   AT+CMUX?
+
+   +CMUX: 0,0
+
+   OK
+   AT+CMUX=0
+
+   OK
+   // CMUX is now started. Open the CMUX channels to continue communication.
+   AT+CMUX=0,0
+
+   OK
+   // Equivalent to AT+CMUX=0.
 
 CMUX setup #XCMUX
 =================
