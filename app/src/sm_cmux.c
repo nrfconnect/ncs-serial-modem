@@ -18,8 +18,6 @@
 /* This makes use of part of the Zephyr modem subsystem which has a CMUX module. */
 LOG_MODULE_REGISTER(sm_cmux, CONFIG_SM_LOG_LEVEL);
 
-#define CHANNEL_COUNT (1 + CMUX_EXT_CHANNEL_COUNT)
-
 #define RECV_BUF_LEN     SM_AT_MAX_CMD_LEN
 /* The CMUX module reserves some spare buffer bytes. To achieve a maximum
  * response length of SM_AT_MAX_RSP_LEN (comprising the "OK" or "ERROR"
@@ -50,7 +48,7 @@ static struct {
 		struct modem_pipe *pipe;
 		uint8_t receive_buf[RECV_BUF_LEN];
 		struct k_work open_work;
-	} dlcis[CHANNEL_COUNT];
+	} dlcis[CONFIG_SM_CMUX_CHANNEL_COUNT];
 	/* Index of the DLCI used for AT communication; defaults to 0. */
 	unsigned int at_channel;
 
@@ -157,6 +155,75 @@ struct modem_pipe *sm_cmux_get_dlci(uint8_t address)
 	return cmux.dlcis[i].pipe;
 }
 
+static void assign_default_channels(void)
+{
+	/*
+	 * Assign default channels as previously done
+	 * with proprietary AT#XCMUX command.
+	 *
+	 */
+	if (IS_ENABLED(CONFIG_SM_PPP)) {
+		/* Reserve PPP channel pipe for PPP module */
+		struct modem_pipe *ppp_pipe = cmux.at_channel == 0
+						      ? sm_cmux_get_dlci(CMUX_PPP_CHANNEL)
+						      : cmux.dlcis[!cmux.at_channel].pipe;
+
+		LOG_DBG("Reserving CMUX PPP channel pipe %p for PPP module", (void *)ppp_pipe);
+		sm_at_host_release(sm_at_host_get_ctx_from(ppp_pipe));
+		sm_ppp_attach(ppp_pipe);
+	}
+	if (IS_ENABLED(CONFIG_SM_MODEM_TRACE_BACKEND_CMUX)) {
+		/* Reserve trace channel pipe for trace backend */
+		struct modem_pipe *trace_pipe = sm_cmux_get_dlci(CMUX_MODEM_TRACE_CHANNEL);
+
+		LOG_DBG("Reserving CMUX trace channel pipe %p for trace backend",
+			(void *)trace_pipe);
+		sm_at_host_release(sm_at_host_get_ctx_from(trace_pipe));
+		sm_trace_backend_attach(trace_pipe);
+	}
+}
+
+static int do_at_and_ppp_channel_switch(int new_at_channel)
+{
+	/*
+	 * This is the legacy behavior of AT#XCMUX=2 that was implemented
+	 * to allow |SM| to be used with Zephyr modem driver that expects
+	 * ATD*99# command to switch current channel to PPP data mode.
+	 * When we did not have a such command, we emulated it with sequence of
+	 *  AT#XPPP=1
+	 *  AT+CFUN=1
+	 *  AT#XCMUX=2
+	 * And if that was executed before network is attached, it succeeded
+	 * to switch the PPP pipe and AT pipe before the PPP module started.
+	 *
+	 * However, it was problematic if re-attaching of PPP was required.
+	 * All 3GPP compliant modems set the channel back to AT mode when PPP
+	 * stops, so Zephyr expected that it can just re-run the dial script on DCL1
+	 * to re-attach PPP, but our AT channel was already switched to DCL2.
+	 */
+
+	/* Update the AT channel after answering "OK" on the current DLCI. */
+	rsp_send_ok();
+	struct sm_at_host_ctx *ctx = sm_at_host_get_current();
+
+	cmux.at_channel = new_at_channel;
+	int ret = sm_at_host_set_pipe(ctx, cmux.dlcis[cmux.at_channel].pipe);
+
+	if (ret) {
+		LOG_ERR("Failed to switch AT host to CMUX DLCI pipe. (%d)", ret);
+		return ret;
+	}
+	if (IS_ENABLED(CONFIG_SM_PPP)) {
+		/* Switch PPP pipe to where AT channel was earlier */
+		struct modem_pipe *ppp_pipe = cmux.dlcis[!cmux.at_channel].pipe;
+
+		LOG_DBG("Switching CMUX PPP channel to %d", !cmux.at_channel + 1);
+		sm_at_host_release(sm_at_host_get_ctx_from(ppp_pipe));
+		sm_ppp_attach(ppp_pipe);
+	}
+	return -SILENT_AT_COMMAND_RET;
+}
+
 static int cmux_start(void)
 {
 	int ret;
@@ -185,24 +252,6 @@ static int cmux_start(void)
 		return ret;
 	}
 
-	if (IS_ENABLED(CONFIG_SM_PPP)) {
-		/* Reserve PPP channel pipe for PPP module */
-		struct modem_pipe *ppp_pipe = sm_cmux_get_dlci(CMUX_PPP_CHANNEL);
-
-		LOG_DBG("Reserving CMUX PPP channel pipe %p for PPP module", (void *)ppp_pipe);
-		sm_at_host_release(sm_at_host_get_ctx_from(ppp_pipe));
-		sm_ppp_attach(ppp_pipe);
-	}
-	if (IS_ENABLED(CONFIG_SM_MODEM_TRACE_BACKEND_CMUX)) {
-		/* Reserve trace channel pipe for trace backend */
-		struct modem_pipe *trace_pipe = sm_cmux_get_dlci(CMUX_MODEM_TRACE_CHANNEL);
-
-		LOG_DBG("Reserving CMUX trace channel pipe %p for trace backend",
-			(void *)trace_pipe);
-		sm_at_host_release(sm_at_host_get_ctx_from(trace_pipe));
-		sm_trace_backend_attach(trace_pipe);
-	}
-
 	/* Attach CMUX to UART pipe (AT host will be detached by transition) */
 	ret = modem_cmux_attach(&cmux.instance, cmux.uart_pipe);
 	if (ret) {
@@ -224,7 +273,8 @@ static int handle_at_cmux(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 	int ret;
 
 	if (cmd_type == AT_PARSER_CMD_TYPE_READ) {
-		rsp_send("\r\n#XCMUX: %u,%u\r\n", cmux.at_channel + 1, CHANNEL_COUNT);
+		rsp_send("\r\n#XCMUX: %u,%u\r\n", cmux.at_channel + 1,
+			 CONFIG_SM_CMUX_CHANNEL_COUNT);
 		return 0;
 	}
 	if (cmd_type != AT_PARSER_CMD_TYPE_SET || param_count > 2) {
@@ -250,36 +300,15 @@ static int handle_at_cmux(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 			}
 		}
 		if (sm_cmux_is_started()) {
-			/* Update the AT channel after answering "OK" on the current DLCI. */
-			rsp_send_ok();
-			struct sm_at_host_ctx *ctx = sm_at_host_get_current();
-
-			cmux.at_channel = at_channel;
-			ret = sm_at_host_set_pipe(ctx, cmux.dlcis[cmux.at_channel].pipe);
-			if (ret) {
-				LOG_ERR("Failed to switch AT host to CMUX DLCI pipe. (%d)", ret);
-				return ret;
+			if (at_channel == cmux.at_channel) {
+				/* No channel change requested and CMUX is already running */
+				return -EALREADY;
 			}
-			if (IS_ENABLED(CONFIG_SM_PPP)) {
-				/* Reserve PPP channel pipe for PPP module */
-				struct modem_pipe *ppp_pipe =
-					sm_cmux_get_dlci(CMUX_PPP_CHANNEL);
-
-				LOG_DBG("Reserving CMUX PPP channel pipe %p for PPP module",
-					(void *)ppp_pipe);
-				sm_at_host_release(sm_at_host_get_ctx_from(ppp_pipe));
-				sm_ppp_attach(ppp_pipe);
-				/* Emulate legacy behavior: auto-start PPP when AT channel is 0 */
-				if (cmux.at_channel == 0) {
-					sm_ppp_set_auto_start(true);
-				} else {
-					sm_ppp_set_auto_start(false);
-				}
-			}
-			return -SILENT_AT_COMMAND_RET;
+			return do_at_and_ppp_channel_switch(at_channel);
 		}
 		cmux.at_channel = at_channel;
 	}
+	assign_default_channels();
 
 	/* Respond before starting CMUX. */
 	rsp_send_ok();

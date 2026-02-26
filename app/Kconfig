@@ -278,6 +278,15 @@ config SM_PPP
 config SM_CMUX
 	bool "CMUX support"
 
+config SM_CMUX_CHANNEL_COUNT
+	int "Number of CMUX channels"
+	depends on SM_CMUX
+	default 2
+	range 1 63
+	help
+	  Number of channels to be used by the CMUX implementation.
+	  Each channel adds about 4 kB of RAM usage for buffers.
+
 if SM_PPP
 
 config SM_PPP_FALLBACK_MTU
@@ -342,7 +351,7 @@ choice NRF_MODEM_LIB_TRACE_BACKEND
 
 config SM_MODEM_TRACE_BACKEND_CMUX
 	bool "CMUX modem trace backend"
-	depends on SM_CMUX
+	depends on SM_CMUX_CHANNEL_COUNT > 2
 	help
 	  When CMUX is enabled, modem traces are transmitted on a dedicated CMUX channel.
 	  The trace channel is the first channel after the AT command channel and the PPP channel.
