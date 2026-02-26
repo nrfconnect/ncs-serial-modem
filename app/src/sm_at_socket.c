@@ -802,6 +802,12 @@ static int at_sec_sockopt_to_sockopt(enum at_sec_sockopt at_option, int *level, 
 	case AT_TLS_DTLS_FRAG_EXT:
 		*option = NRF_SO_SEC_DTLS_FRAG_EXT;
 		break;
+	case AT_TLS_DTLS_CONN_SAVE:
+		*option = NRF_SO_SEC_DTLS_CONN_SAVE;
+		break;
+	case AT_TLS_DTLS_CONN_LOAD:
+		*option = NRF_SO_SEC_DTLS_CONN_LOAD;
+		break;
 	default:
 		LOG_WRN("Unsupported option: %d", at_option);
 		return -ENOTSUP;
