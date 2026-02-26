@@ -1024,6 +1024,7 @@ static int sm_at_send_internal(struct sm_at_host_ctx *ctx, const uint8_t *data, 
 	}
 
 	if (urc) {
+		LOG_DBG("URC: %s", (const char *)data);
 		ret = ring_buf_put(&urc_buf, data, len);
 		if (ret < len) {
 			LOG_ERR("URC buffer full, dropped %d bytes", len - ret);

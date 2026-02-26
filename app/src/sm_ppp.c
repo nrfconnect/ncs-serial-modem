@@ -33,6 +33,7 @@ bool sm_fwd_cgev_notifs;
 
 static struct net_if *ppp_iface;
 static bool sm_ppp_auto_start;
+static bool sm_ppp_detach_at_pipe;
 static bool sm_ppp_keep_pipe_attached;
 static uint8_t ppp_data_buf[1500];
 static struct sockaddr_ll ppp_zephyr_dst_addr;
@@ -247,7 +248,7 @@ static bool ppp_is_running(void)
 
 static void send_status_notification(void)
 {
-	rsp_send("\r\n#XPPP: %u,%u,%u\r\n", !sm_ppp_is_stopped(), ppp_peer_connected, ppp_pdn_cid);
+	urc_send("\r\n#XPPP: %u,%u,%u\r\n", !sm_ppp_is_stopped(), ppp_peer_connected, ppp_pdn_cid);
 }
 
 static void ppp_start_failure(void)
@@ -344,18 +345,9 @@ static int ppp_start(void)
 	}
 
 	send_status_notification();
-	if (!ppp_pipe) {
-		struct sm_at_host_ctx *ctx = sm_at_host_get_current();
-		struct modem_pipe *pipe = ctx ? sm_at_host_get_pipe(ctx) : NULL;
 
-		if (!ctx || !pipe) {
-			LOG_ERR("No pipe available for PPP.");
-			ppp_start_failure();
-			ret = -ENODEV;
-			goto error;
-		}
-		ppp_pipe = pipe;
-		sm_at_host_release(ctx);
+	if (sm_ppp_detach_at_pipe) {
+		sm_at_host_release(sm_at_host_get_ctx_from(ppp_pipe));
 	}
 
 	modem_ppp_attach(&ppp_module, ppp_pipe);
@@ -423,6 +415,7 @@ static int ppp_stop(enum ppp_reason reason)
 		/* Return the pipe back to AT host */
 		sm_at_host_attach(ppp_pipe);
 		ppp_pipe = NULL;
+		sm_ppp_detach_at_pipe = false;
 	}
 
 	net_if_carrier_off(ppp_iface);
@@ -667,7 +660,8 @@ static int handle_at_ppp(enum at_parser_cmd_type cmd_type, struct at_parser *par
 	};
 
 	if (cmd_type == AT_PARSER_CMD_TYPE_READ) {
-		send_status_notification();
+		rsp_send("\r\n#XPPP: %u,%u,%u\r\n", !sm_ppp_is_stopped(), ppp_peer_connected,
+			 ppp_pdn_cid);
 		return 0;
 	}
 	if (cmd_type != AT_PARSER_CMD_TYPE_SET || param_count < 2 || param_count > 3) {
@@ -685,15 +679,36 @@ static int handle_at_ppp(enum at_parser_cmd_type cmd_type, struct at_parser *par
 		return -EINVAL;
 	}
 
-	/* Send "OK" first in case stopping PPP results in the CMUX AT channel switching. */
-	rsp_send_ok();
 	if (op == OP_START) {
-		sm_ppp_set_auto_start(true);
+		if (ppp_state != PPP_STATE_STOPPED) {
+			LOG_ERR("PPP already running");
+			return -EALREADY;
+		}
 		ppp_pdn_cid = 0;
 		/* Store PPP PDN if given */
 		at_parser_num_get(parser, 2, &ppp_pdn_cid);
+
+		if (!ppp_pipe) {
+			struct sm_at_host_ctx *ctx = sm_at_host_get_current();
+			struct modem_pipe *pipe = ctx ? sm_at_host_get_pipe(ctx) : NULL;
+
+			if (!ctx || !pipe) {
+				LOG_ERR("No pipe available for PPP.");
+				return -ENODEV;
+			}
+			ppp_pipe = pipe;
+			rsp_send_ok();
+			sm_ppp_detach_at_pipe = true;
+		} else {
+			/* We already have a pipe, this is coming from CMUX module.
+			 * A statically assigned channel from AT#XCMUX command.
+			 */
+			rsp_send_ok();
+		}
+		sm_ppp_set_auto_start(true);
 		delegate_ppp_event(PPP_START, PPP_REASON_CMD);
 	} else {
+		rsp_send_ok();
 		sm_ppp_set_auto_start(false);
 		delegate_ppp_event(PPP_STOP, PPP_REASON_CMD);
 	}
