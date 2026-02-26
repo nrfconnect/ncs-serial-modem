@@ -869,6 +869,12 @@ static int at_sec_sockopt_to_sockopt(enum at_sec_sockopt at_option, int *level, 
 	case AT_TLS_DTLS_HANDSHAKE_TIMEO:
 		*option = TLS_DTLS_HANDSHAKE_TIMEO;
 		break;
+	case AT_TLS_DTLS_CONN_SAVE:
+		*option = TLS_DTLS_CONN_SAVE;
+		break;
+	case AT_TLS_DTLS_CONN_LOAD:
+		*option = TLS_DTLS_CONN_LOAD;
+		break;
 	case AT_TLS_DTLS_FRAG_EXT:
 		*option = TLS_DTLS_FRAG_EXT;
 		break;

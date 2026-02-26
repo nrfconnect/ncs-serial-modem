@@ -643,6 +643,18 @@ Syntax
     * ``<value>`` is an integer that indicates the DTLS handshake timeout in seconds.
       It can be one of the following values: ``1``, ``3``, ``7``, ``15``, ``31``, ``63``, ``123``.
 
+  * ``19`` - ``AT_TLS_DTLS_CONN_SAVE`` (set-only).
+    Write-only socket option to save DTLS connection.
+
+    * ``<value>`` can be any integer value, which will be ignored.
+
+    After this option is successfully called, you must call ``AT_TLS_DTLS_CONN_LOAD`` before continuing to communicate on the socket.
+
+  * ``20`` - ``AT_TLS_DTLS_CONN_LOAD`` (set-only).
+    Write-only socket option to load DTLS connection.
+
+    * ``<value>`` can be any integer value, which will be ignored.
+
   * ``22`` - ``AT_TLS_DTLS_FRAG_EXT``.
 
     * ``<value>`` is an integer that indicates the use of the DTLS fragmentation extension specified in RFC 6066.
@@ -651,11 +663,6 @@ Syntax
       * ``0`` - ``DTLS_FRAG_EXT_DISABLED``.
       * ``1`` - ``DTLS_FRAG_EXT_512_ENABLED``.
       * ``2`` - ``DTLS_FRAG_EXT_1024_ENABLED``.
-
-      This is only supported by the following modem firmware:
-
-        * mfw_nrf91x1 v2.0.4 or later
-        * mfw_nrf9151-ntn
 
 See `nRF socket options <nrfxlib_nrf_sockets_>`_ for explanation of the supported options.
 
