@@ -329,8 +329,11 @@ static int ppp_start(void)
 	struct ppp_context *const ctx = net_if_l2_data(ppp_iface);
 
 	if (!configure_ppp_link_ip_addresses(ctx)) {
-		ret = -EADDRNOTAVAIL;
-		goto error;
+		return -EADDRNOTAVAIL;
+	}
+
+	if (!ppp_pipe) {
+		return -EINVAL;
 	}
 
 	ppp_state = PPP_STATE_STARTING;
@@ -718,6 +721,78 @@ static int handle_at_ppp(enum at_parser_cmd_type cmd_type, struct at_parser *par
 		sm_ppp_set_auto_start(false);
 		delegate_ppp_event(PPP_STOP, PPP_REASON_CMD);
 	}
+	return -SILENT_AT_COMMAND_RET;
+}
+
+SM_AT_CMD_CUSTOM(cgdata, "AT+CGDATA", handle_at_cgdata);
+static int handle_at_cgdata(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+			    uint32_t param_count)
+{
+	/* AT+CGDATA per 3GPP TS 27.007 section 10.1.12.
+	 *
+	 * Supported forms:
+	 *   AT+CGDATA           - Start PPP with default CID
+	 *   AT+CGDATA="PPP"     - Start PPP with default CID (L2P must be "PPP")
+	 *   AT+CGDATA="PPP",<cid> - Start PPP with specified CID
+	 *   AT+CGDATA=?         - Report supported L2P values
+	 */
+	int ret;
+
+	if (cmd_type == AT_PARSER_CMD_TYPE_TEST) {
+		rsp_send("\r\n+CGDATA: (\"PPP\")\r\n");
+		return 0;
+	}
+
+	if (cmd_type != AT_PARSER_CMD_TYPE_SET || param_count > 3) {
+		return -EINVAL;
+	}
+
+	/* Default CID (0 = default PDP context). */
+	unsigned int cid = 0;
+
+	if (param_count >= 2) {
+		/* Parse and validate the L2P string parameter. */
+		char l2p[8];
+		size_t l2p_len = sizeof(l2p);
+
+		ret = util_string_get(parser, 1, l2p, &l2p_len);
+		if (ret || strcasecmp(l2p, "PPP") != 0) {
+			return -EINVAL;
+		}
+	}
+
+	if (param_count == 3) {
+		ret = at_parser_num_get(parser, 2, &cid);
+		if (ret) {
+			return -EINVAL;
+		}
+	}
+
+	if (ppp_state != PPP_STATE_STOPPED) {
+		LOG_ERR("PPP already running");
+		return -EALREADY;
+	}
+
+	if (ppp_pipe) {
+		sm_ppp_detach();
+	}
+
+	ppp_urc_pipe = NULL;
+	struct sm_at_host_ctx *ctx = sm_at_host_get_current();
+	struct modem_pipe *pipe = ctx ? sm_at_host_get_pipe(ctx) : NULL;
+
+	if (!ctx || !pipe) {
+		LOG_ERR("No pipe available for PPP.");
+		return -ENODEV;
+	}
+	ppp_pipe = pipe;
+	sm_ppp_keep_pipe_attached = false;
+	ppp_pdn_cid = cid;
+	rsp_send("\r\nCONNECT\r\n");
+	sm_at_host_release(ctx);
+	modem_ppp_attach(&ppp_module, ppp_pipe);
+	sm_ppp_set_auto_start(true);
+	delegate_ppp_event(PPP_START, PPP_REASON_CMD);
 	return -SILENT_AT_COMMAND_RET;
 }
 
