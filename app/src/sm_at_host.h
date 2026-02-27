@@ -126,19 +126,46 @@ void data_send(const uint8_t *data, size_t len);
  */
 int enter_datamode(sm_datamode_handler_t handler, size_t data_len);
 
-/**
- * @brief Check whether Serial Modem AT host is in data mode
- *
- * @retval true if yes, false if no.
- */
-bool in_datamode(void);
+bool in_datamode_ctx(struct sm_at_host_ctx *ctx);
+bool in_datamode_pipe(struct modem_pipe *pipe);
+bool in_at_mode_ctx(struct sm_at_host_ctx *ctx);
+bool in_at_mode_pipe(struct modem_pipe *pipe);
+bool is_idle_ctx(struct sm_at_host_ctx *ctx);
+bool is_idle_pipe(struct modem_pipe *pipe);
 
 /**
- * @brief Check whether Serial Modem AT host is in AT command mode
+ * @brief Check whether AT host context is in data mode
  *
  * @retval true if yes, false if no.
  */
-bool in_at_mode(void);
+#define in_datamode(X)                                                                             \
+	_Generic((X),                                                                              \
+		struct sm_at_host_ctx * : in_datamode_ctx,                                         \
+		struct modem_pipe * : in_datamode_pipe                                             \
+		)(X)
+
+/**
+ * @brief Check whether AT host context is in AT command mode
+ *
+ * @retval true if yes, false if no.
+ */
+#define in_at_mode(X)                                                                              \
+	_Generic((X),                                                                              \
+		struct sm_at_host_ctx * : in_at_mode_ctx,                                          \
+		struct modem_pipe * : in_at_mode_pipe                                              \
+		)(X)
+
+/**
+ * @brief Check whether AT host context is idle (in AT command mode and not processing any
+ * command)
+ *
+ * @retval true if yes, false if no.
+ */
+#define is_idle(X)                                                                                 \
+	_Generic((X),                                                                              \
+		struct sm_at_host_ctx * : is_idle_ctx,                                             \
+		struct modem_pipe * : is_idle_pipe                                                 \
+		)(X)
 
 /**
  * @brief Exit the data mode handler
@@ -176,34 +203,6 @@ int sm_at_cb_wrapper(char *buf, size_t len, char *at_cmd, sm_at_callback cb);
 void sm_at_host_echo(bool enable);
 
 /**
- * @brief Check whether echo URC delay is in progress.
- *
- * @retval true if echo URC delay is in progress, false otherwise.
- */
-bool sm_at_host_echo_urc_delay(void);
-
-/** @brief Events which can be notified by the AT host. */
-enum sm_event {
-	SM_EVENT_NONE,           /**< No event. */
-	SM_EVENT_URC = 0x01,     /**< URC can be sent. */
-	SM_EVENT_AT_MODE = 0x02, /**< Entered AT command mode. */
-};
-
-/** @brief Event callback structure. */
-struct sm_event_callback {
-	sys_snode_t node;
-	void (*cb)(struct k_work *work);
-	enum sm_event events;
-};
-
-/**
- * @brief Register an event callback to be notified when the specified event occurs.
- * @param cb Pointer to the event callback structure.
- * @param event Event to register for.
- */
-void sm_at_host_register_event_cb(struct sm_event_callback *cb, enum sm_event event);
-
-/**
  * @brief Set the active modem pipe for AT communication.
  *
  * This allows switching between UART pipe (direct mode) and CMUX DLCI pipe.
@@ -213,10 +212,10 @@ void sm_at_host_register_event_cb(struct sm_event_callback *cb, enum sm_event ev
 int sm_at_host_set_pipe(struct sm_at_host_ctx *ctx, struct modem_pipe *pipe);
 
 /**
- * @brief Release the conxtext from associated pipe and mark for descruction.
+ * @brief Release the context from associated pipe and mark for destruction.
  *
  * This detaches and releases the modem pipe from the AT host context
- * and mark the conxtext for descruction.
+ * and marks the context for destruction.
  *
  * @param ctx AT host context
  */
@@ -259,7 +258,11 @@ struct sm_at_host_ctx *sm_at_host_get_urc_ctx(void);
  * Returns the context of the currently executing AT command/work.
  * Falls back to first instance if no context is currently active.
  *
- * The returned context is only valid during the execution of an AT command
+ * The returned context is only valid during the execution of an AT command.
+ *
+ * WARNING: Do not store the returned pointer as it may become invalid
+ *          when the context is destroyed.
+ *          Use sm_at_host_get_current_pipe() instead.
  *
  * @return Pointer to current AT host context
  */
@@ -278,12 +281,27 @@ static inline struct modem_pipe *sm_at_host_get_current_pipe(void)
 /**
  * @brief Get the modem pipe associated with the URC AT host context.
  *
+ * There is no promise that the returned pipe is open, or in AT command mode.
+ * On most cases, you should use urc_send() to send URCs.
+ *
  * @return struct modem_pipe*
  */
 static inline struct modem_pipe *sm_at_host_get_urc_pipe(void)
 {
 	return sm_at_host_get_pipe(sm_at_host_get_urc_ctx());
 }
+
+/**
+ * @brief Submit a work to be executed when the current AT command processing is done.
+ *
+ * If the pipe is not currently processing an AT command, the work will be executed immediately.
+ * Execution happens in the SM work queue context with the AT host context of the current pipe,
+ * so sm_at_host_get_current() will return the correct context.
+ *
+ * @param pipe Modem pipe to associate the work with.
+ * @param handler Work handler to be executed.
+ */
+void sm_at_host_queue_idle_work(struct modem_pipe *pipe, struct k_work *work);
 
 /**
  * @brief Define a wrapper for a Serial Modem custom AT command callback.

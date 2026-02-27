@@ -48,6 +48,7 @@ cmock_handle(${ZEPHYR_BASE}/../nrfxlib/nrf_modem/include/nrf_modem_at.h
   FUNC_EXCLUDE "nrf_modem_at_cmd")
 cmock_handle(${ZEPHYR_BASE}/include/zephyr/net/socket.h zephyr/net)
 cmock_handle(${ZEPHYR_NRF_MODULE_DIR}/include/modem/modem_jwt.h)
+cmock_handle(${PROJECT_SOURCE_DIR}/../../src/sm_at_socket.h)
 
 # Generate test runner
 test_runner_generate(src/test_at_commands.c)
