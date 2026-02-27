@@ -239,8 +239,15 @@ test -c $AT_CMUX
 
 if [ $TRACE -gt 0 ]; then
 	echo "Starting trace collection..."
-	start-stop-daemon --start --pidfile $TRACE_PID_FILE --make-pidfile \
-	 --background --exec /bin/dd -- if=$MT_CMUX of=$MODEM_TRACE_FILE bs=1024
+	# Prefer to use socat, if installed.
+	if command -v socat >/dev/null 2>&1; then
+		start-stop-daemon --start --pidfile $TRACE_PID_FILE --make-pidfile \
+			--background --exec $(command -v socat) -- -u $MT_CMUX,cfmakeraw,clocal=1 \
+			CREATE:$MODEM_TRACE_FILE
+	else
+		start-stop-daemon --start --pidfile $TRACE_PID_FILE --make-pidfile \
+		--background --exec /bin/dd -- if=$MT_CMUX of=$MODEM_TRACE_FILE bs=1024
+	fi
 fi
 echo "Connect and wait for PPP link..."
 
