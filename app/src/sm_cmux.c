@@ -404,3 +404,44 @@ static int handle_at_cmux(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 		return -EINVAL;
 	}
 }
+
+#if CONFIG_SM_MODEM_TRACE_BACKEND_CMUX
+
+SM_AT_CMD_CUSTOM(xcmuxtrace, "AT#XCMUXTRACE", handle_at_xcmuxtrace);
+static int handle_at_xcmuxtrace(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+			       uint32_t param_count)
+{
+	struct modem_pipe *pipe;
+
+	if (cmd_type == AT_PARSER_CMD_TYPE_TEST) {
+		rsp_send("\r\n#XCMUXTRACE: (1 ... %d)\r\n", CONFIG_SM_CMUX_CHANNEL_COUNT);
+		return 0;
+	}
+	if (cmd_type != AT_PARSER_CMD_TYPE_SET || param_count > 2) {
+		return -EINVAL;
+	}
+
+	if (param_count == 2) {
+		int ch;
+		int ret = at_parser_num_get(parser, 1, &ch);
+
+		if (ret || (ch < 2 || ch >= CONFIG_SM_CMUX_CHANNEL_COUNT)) {
+			return -EINVAL;
+		}
+		pipe = sm_cmux_get_dlci(ch);
+	} else {
+		pipe = sm_at_host_get_current_pipe();
+	}
+
+	if (!pipe) {
+		return -ENODEV;
+	}
+	rsp_send_ok();
+	sm_trace_backend_detach();
+	sm_at_host_release(sm_at_host_get_ctx_from(pipe));
+	sm_trace_backend_attach(pipe);
+
+	return -SILENT_AT_COMMAND_RET;
+}
+
+#endif
