@@ -20,8 +20,10 @@
 
 LOG_MODULE_REGISTER(sm_sock, CONFIG_SM_LOG_LEVEL);
 
-#define SM_FDS_COUNT CONFIG_POSIX_OPEN_MAX
-#define SM_MAX_SOCKET_COUNT (SM_FDS_COUNT - 1)
+/* Ensure the socket count so we do a change consciously when it is changed. */
+BUILD_ASSERT(NRF_MODEM_MAX_SOCKET_COUNT == 8, "NRF_MODEM_MAX_SOCKET_COUNT must be 8");
+
+#define SM_MAX_SOCKET_COUNT NRF_MODEM_MAX_SOCKET_COUNT
 
 /**@brief Socketopt operations. */
 enum sm_socketopt_operation {
