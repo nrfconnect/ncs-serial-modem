@@ -232,13 +232,13 @@ int util_string_to_double_get(struct at_parser *parser, size_t index, double *va
 	return 0;
 }
 
-void util_get_ip_addr(int cid, char addr4[INET_ADDRSTRLEN], char addr6[INET6_ADDRSTRLEN])
+void util_get_ip_addr(int cid, char addr4[NET_INET_ADDRSTRLEN], char addr6[NET_INET6_ADDRSTRLEN])
 {
 	int ret;
 	char cmd[32];
-	char tmp[sizeof(struct in6_addr)];
-	char addr1[INET6_ADDRSTRLEN];
-	char addr2[INET6_ADDRSTRLEN];
+	char tmp[sizeof(struct net_in6_addr)];
+	char addr1[NET_INET6_ADDRSTRLEN];
+	char addr2[NET_INET6_ADDRSTRLEN];
 
 	if (addr4) {
 		addr4[0] = '\0';
@@ -248,8 +248,8 @@ void util_get_ip_addr(int cid, char addr4[INET_ADDRSTRLEN], char addr6[INET6_ADD
 	}
 	sprintf(cmd, "AT+CGPADDR=%d", cid);
 	/** parse +CGPADDR: <cid>,<PDP_addr_1>,<PDP_addr_2>
-	 * PDN type "IP": PDP_addr_1 is <IPv4>, max 16(INET_ADDRSTRLEN), '.' and digits
-	 * PDN type "IPV6": PDP_addr_1 is <IPv6>, max 46(INET6_ADDRSTRLEN),':', digits, 'A'~'F'
+	 * PDN type "IP": PDP_addr_1 is <IPv4>, max 16(NET_INET_ADDRSTRLEN), '.' and digits
+	 * PDN type "IPV6": PDP_addr_1 is <IPv6>, max 46(NET_INET6_ADDRSTRLEN),':', digits, 'A'~'F'
 	 * PDN type "IPV4V6": <IPv4>,<IPv6> or <IPV4> or <IPv6>
 	 */
 	ret = sm_util_at_scanf(cmd, "+CGPADDR: %*d,\"%45[.:0-9A-F]\",\"%45[:0-9A-F]\"",
@@ -257,9 +257,9 @@ void util_get_ip_addr(int cid, char addr4[INET_ADDRSTRLEN], char addr6[INET6_ADD
 	if (ret <= 0) {
 		return;
 	}
-	if (addr4 != NULL && zsock_inet_pton(AF_INET, addr1, tmp) == 1) {
+	if (addr4 != NULL && zsock_inet_pton(NET_AF_INET, addr1, tmp) == 1) {
 		strcpy(addr4, addr1);
-	} else if (addr6 != NULL && zsock_inet_pton(AF_INET6, addr1, tmp) == 1) {
+	} else if (addr6 != NULL && zsock_inet_pton(NET_AF_INET6, addr1, tmp) == 1) {
 		strcpy(addr6, addr1);
 		return;
 	}
@@ -267,7 +267,7 @@ void util_get_ip_addr(int cid, char addr4[INET_ADDRSTRLEN], char addr6[INET6_ADD
 	if (addr6 == NULL) {
 		return;
 	}
-	if (ret > 1 && zsock_inet_pton(AF_INET6, addr2, tmp) == 1) {
+	if (ret > 1 && zsock_inet_pton(NET_AF_INET6, addr2, tmp) == 1) {
 		strcpy(addr6, addr2);
 	}
 }
@@ -292,13 +292,13 @@ int util_str_to_int(const char *str_buf, int base, int *output)
 #define PORT_MAX_SIZE    5 /* 0xFFFF = 65535 */
 #define PDN_ID_MAX_SIZE  2 /* 0..10 */
 
-int util_resolve_host(int cid, const char *host, uint16_t port, int family, struct sockaddr *sa)
+int util_resolve_host(int cid, const char *host, uint16_t port, int family, struct net_sockaddr *sa)
 {
 	int err;
 	char service[PORT_MAX_SIZE + PDN_ID_MAX_SIZE + 2];
 	struct zsock_addrinfo *ai = NULL;
 	struct zsock_addrinfo hints = {
-		.ai_flags  = AI_NUMERICSERV | AI_PDNSERV,
+		.ai_flags  = ZSOCK_AI_NUMERICSERV | AI_PDNSERV,
 		.ai_family = family
 	};
 
@@ -313,7 +313,7 @@ int util_resolve_host(int cid, const char *host, uint16_t port, int family, stru
 		*sa = *(ai->ai_addr);
 		zsock_freeaddrinfo(ai);
 
-		if (sa->sa_family != AF_INET && sa->sa_family != AF_INET6) {
+		if (sa->sa_family != NET_AF_INET && sa->sa_family != NET_AF_INET6) {
 			err = DNS_EAI_ADDRFAMILY;
 		}
 	}
@@ -332,18 +332,19 @@ int util_resolve_host(int cid, const char *host, uint16_t port, int family, stru
 	return err;
 }
 
-int util_get_peer_addr(struct sockaddr *peer, char addr[static INET6_ADDRSTRLEN], uint16_t *port)
+int util_get_peer_addr(struct net_sockaddr *peer, char addr[static NET_INET6_ADDRSTRLEN],
+		       uint16_t *port)
 {
 	const char *ret = NULL;
 
-	if (peer->sa_family == AF_INET) {
-		ret = zsock_inet_ntop(AF_INET, &((struct sockaddr_in *)peer)->sin_addr,
-				addr, INET6_ADDRSTRLEN);
-		*port = ntohs(((struct sockaddr_in *)peer)->sin_port);
+	if (peer->sa_family == NET_AF_INET) {
+		ret = zsock_inet_ntop(NET_AF_INET, &((struct net_sockaddr_in *)peer)->sin_addr,
+				addr, NET_INET6_ADDRSTRLEN);
+		*port = net_ntohs(((struct net_sockaddr_in *)peer)->sin_port);
 	} else {
-		ret = zsock_inet_ntop(AF_INET6, &((struct sockaddr_in6 *)peer)->sin6_addr,
-				addr, INET6_ADDRSTRLEN);
-		*port = ntohs(((struct sockaddr_in6 *)peer)->sin6_port);
+		ret = zsock_inet_ntop(NET_AF_INET6, &((struct net_sockaddr_in6 *)peer)->sin6_addr,
+				addr, NET_INET6_ADDRSTRLEN);
+		*port = net_ntohs(((struct net_sockaddr_in6 *)peer)->sin6_port);
 	}
 
 	if (ret == NULL) {
@@ -373,12 +374,12 @@ int sm_util_pdn_id_get(uint8_t cid)
 
 static int pdn_sa_family_from_ip_string(const char *src)
 {
-	char buf[INET6_ADDRSTRLEN];
+	char buf[NET_INET6_ADDRSTRLEN];
 
-	if (zsock_inet_pton(AF_INET, src, buf)) {
-		return AF_INET;
-	} else if (zsock_inet_pton(AF_INET6, src, buf)) {
-		return AF_INET6;
+	if (zsock_inet_pton(NET_AF_INET, src, buf)) {
+		return NET_AF_INET;
+	} else if (zsock_inet_pton(NET_AF_INET6, src, buf)) {
+		return NET_AF_INET6;
 	}
 	return -1;
 }
@@ -390,16 +391,16 @@ static void pdn_dynamic_info_dns_addr_fill(struct sm_pdn_dynamic_info *pdn_info,
 {
 	const int family = pdn_sa_family_from_ip_string(dns_addr_str_primary);
 
-	if (family == AF_INET) {
-		(void)zsock_inet_pton(AF_INET, dns_addr_str_primary,
+	if (family == NET_AF_INET) {
+		(void)zsock_inet_pton(NET_AF_INET, dns_addr_str_primary,
 				      &(pdn_info->dns_addr4_primary));
-		(void)zsock_inet_pton(AF_INET, dns_addr_str_secondary,
+		(void)zsock_inet_pton(NET_AF_INET, dns_addr_str_secondary,
 				      &(pdn_info->dns_addr4_secondary));
 		pdn_info->ipv4_mtu = mtu;
-	} else if (family == AF_INET6) {
-		(void)zsock_inet_pton(AF_INET6, dns_addr_str_primary,
+	} else if (family == NET_AF_INET6) {
+		(void)zsock_inet_pton(NET_AF_INET6, dns_addr_str_primary,
 				      &(pdn_info->dns_addr6_primary));
-		(void)zsock_inet_pton(AF_INET6, dns_addr_str_secondary,
+		(void)zsock_inet_pton(NET_AF_INET6, dns_addr_str_secondary,
 				      &(pdn_info->dns_addr6_secondary));
 		pdn_info->ipv6_mtu = mtu;
 	}
@@ -416,8 +417,8 @@ int sm_util_pdn_dynamic_info_get(uint8_t cid, struct sm_pdn_dynamic_info *pdn_in
 {
 	int ret;
 	char at_cmd_buf[sizeof("AT+CGCONTRDP=###")];
-	char dns_addr_str_primary[INET6_ADDRSTRLEN];
-	char dns_addr_str_secondary[INET6_ADDRSTRLEN];
+	char dns_addr_str_primary[NET_INET6_ADDRSTRLEN];
+	char dns_addr_str_secondary[NET_INET6_ADDRSTRLEN];
 	uint32_t mtu = 0;
 
 	if (!pdn_info) {

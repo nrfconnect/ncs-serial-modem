@@ -183,13 +183,13 @@ static bool configure_ppp_link_ip_addresses(struct ppp_context *ctx)
 {
 	static uint8_t ppp_ll_addr[PPP_INTERFACE_IDENTIFIER_LEN];
 	uint8_t ll_addr_len;
-	char addr4[INET_ADDRSTRLEN];
-	char addr6[INET6_ADDRSTRLEN];
+	char addr4[NET_INET_ADDRSTRLEN];
+	char addr6[NET_INET6_ADDRSTRLEN];
 
 	util_get_ip_addr(ppp_pdn_cid, addr4, addr6);
 
 	if (*addr4) {
-		if (zsock_inet_pton(AF_INET, addr4, &ctx->ipcp.my_options.address) != 1) {
+		if (zsock_inet_pton(NET_AF_INET, addr4, &ctx->ipcp.my_options.address) != 1) {
 			return false;
 		}
 	} else if (!*addr6) {
@@ -200,7 +200,7 @@ static bool configure_ppp_link_ip_addresses(struct ppp_context *ctx)
 	if (*addr6) {
 		struct in6_addr in6;
 
-		if (zsock_inet_pton(AF_INET6, addr6, &in6) != 1) {
+		if (zsock_inet_pton(NET_AF_INET6, addr6, &in6) != 1) {
 			return false;
 		}
 		/* The interface identifier is the last 64 bits of the IPv6 address. */

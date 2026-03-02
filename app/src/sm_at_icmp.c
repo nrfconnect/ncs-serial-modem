@@ -122,7 +122,7 @@ static uint32_t send_ping_wait_reply(void)
 	const uint16_t icmp_hdr_len = ICMP_HDR_LEN;
 	struct timeval tv;
 
-	if (si->ai_family == AF_INET) {
+	if (si->ai_family == NET_AF_INET) {
 		/* Generate IPv4 ICMP EchoReq */
 
 		/* Ping header */
@@ -469,8 +469,8 @@ static int ping_test_handler(const char *target)
 	}
 
 	/* Use the first result to decide which address family to use */
-	if (res->ai_family == AF_INET) {
-		char ipv4_addr[INET_ADDRSTRLEN];
+	if (res->ai_family == NET_AF_INET) {
+		char ipv4_addr[NET_INET_ADDRSTRLEN];
 
 		LOG_INF("Ping target's IPv4 address");
 		util_get_ip_addr(ping_argv.pdn, ipv4_addr, NULL);
@@ -489,8 +489,8 @@ static int ping_test_handler(const char *target)
 			return -ret;
 		}
 		ping_argv.src = res;
-	} else if (res->ai_family == AF_INET6) {
-		char ipv6_addr[INET6_ADDRSTRLEN];
+	} else if (res->ai_family == NET_AF_INET6) {
+		char ipv6_addr[NET_INET6_ADDRSTRLEN];
 
 		LOG_INF("Ping target's IPv6 address");
 		util_get_ip_addr(ping_argv.pdn, NULL, ipv6_addr);
