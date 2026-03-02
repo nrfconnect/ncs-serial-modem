@@ -316,7 +316,7 @@ static int broker_init(void)
 	if (err) {
 		return -EAGAIN;
 	}
-	if (sa.sa_family == AF_INET) {
+	if (sa.sa_family == NET_AF_INET) {
 		ctx.broker = *(struct sockaddr_in *)&sa;
 	} else {
 		ctx.broker6 = *(struct sockaddr_in6 *)&sa;
@@ -374,7 +374,7 @@ static int do_mqtt_connect(void)
 	}
 
 	/* MQTT client configuration */
-	if (ctx.family == AF_INET) {
+	if (ctx.family == NET_AF_INET) {
 		client.broker = &ctx.broker;
 	} else {
 		client.broker = &ctx.broker6;
@@ -591,7 +591,7 @@ static int handle_at_mqtt_connect(enum at_parser_cmd_type cmd_type, struct at_pa
 					return err;
 				}
 			}
-			ctx.family = (op == MQTTC_CONNECT) ? AF_INET : AF_INET6;
+			ctx.family = (op == MQTTC_CONNECT) ? NET_AF_INET : NET_AF_INET6;
 			err = do_mqtt_connect();
 		} else if (op == MQTTC_DISCONNECT) {
 			err = do_mqtt_disconnect();
