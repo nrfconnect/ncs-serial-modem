@@ -79,7 +79,7 @@ struct sm_send_ntf {
 };
 
 static struct sm_socket {
-	int type;                        /* SOCK_STREAM or SOCK_DGRAM */
+	int type;                        /* NRF_SOCK_STREAM or NRF_SOCK_DGRAM */
 	uint16_t role;                   /* Client or Server */
 	sec_tag_t sec_tag;               /* Security tag of the credential */
 	int family;                      /* Socket address family */
@@ -119,7 +119,7 @@ static void init_socket(struct sm_socket *socket)
 	socket->type = 0;
 	socket->role = AT_SOCKET_ROLE_CLIENT;
 	socket->sec_tag = SEC_TAG_TLS_INVALID;
-	socket->family = AF_UNSPEC;
+	socket->family = NRF_AF_UNSPEC;
 	socket->fd = INVALID_SOCKET;
 	socket->cid = 0;
 	socket->send_flags = 0;
@@ -489,7 +489,7 @@ static int clear_so_send_cb(struct sm_socket *socket)
 static int do_socket_open(struct sm_socket *sock)
 {
 	int ret = 0;
-	int proto = IPPROTO_TCP;
+	int proto = NRF_IPPROTO_TCP;
 
 	if (sock->family != NRF_AF_INET && sock->family != NRF_AF_INET6 &&
 	    sock->family != NRF_AF_PACKET) {
@@ -715,7 +715,7 @@ static int sockopt_set(struct sm_socket *sock, enum at_sockopt at_option, int at
 {
 	int ret, level, option;
 	void *value = &at_value;
-	socklen_t len = sizeof(at_value);
+	net_socklen_t len = sizeof(at_value);
 	struct timeval tmo;
 
 	ret = at_sockopt_to_sockopt(at_option, &level, &option);
@@ -741,7 +741,7 @@ static int sockopt_set(struct sm_socket *sock, enum at_sockopt at_option, int at
 static int sockopt_get(struct sm_socket *sock, enum at_sockopt at_option)
 {
 	int ret, value, level, option;
-	socklen_t len = sizeof(int);
+	net_socklen_t len = sizeof(int);
 
 	ret = at_sockopt_to_sockopt(at_option, &level, &option);
 	if (ret) {
@@ -813,7 +813,7 @@ static int at_sec_sockopt_to_sockopt(enum at_sec_sockopt at_option, int *level, 
 }
 
 static int sec_sockopt_set(struct sm_socket *sock, enum at_sec_sockopt at_option, void *value,
-			   socklen_t len)
+			   net_socklen_t len)
 {
 	int ret, level, option;
 
@@ -823,7 +823,7 @@ static int sec_sockopt_set(struct sm_socket *sock, enum at_sec_sockopt at_option
 	}
 
 	/* Options with special handling. */
-	if (level == SOL_TLS && option == TLS_HOSTNAME) {
+	if (level == ZSOCK_SOL_TLS && option == ZSOCK_TLS_HOSTNAME) {
 		if (sm_util_casecmp(value, "NULL")) {
 			value = NULL;
 			len = 0;
@@ -843,7 +843,7 @@ static int sec_sockopt_set(struct sm_socket *sock, enum at_sec_sockopt at_option
 static int sec_sockopt_get(struct sm_socket *sock, enum at_sec_sockopt at_option)
 {
 	int ret, value, level, option;
-	socklen_t len = sizeof(int);
+	net_socklen_t len = sizeof(int);
 
 	ret = at_sec_sockopt_to_sockopt(at_option, &level, &option);
 	if (ret) {
@@ -894,7 +894,7 @@ int bind_to_local_addr(struct sm_socket *sock, uint16_t port)
 
 		struct nrf_sockaddr_in local = {
 			.sin_family = NRF_AF_INET,
-			.sin_port = htons(port)
+			.sin_port = net_htons(port)
 		};
 
 		if (nrf_inet_pton(NRF_AF_INET, ipv4_addr, &local.sin_addr) != 1) {
@@ -920,7 +920,7 @@ int bind_to_local_addr(struct sm_socket *sock, uint16_t port)
 
 		struct nrf_sockaddr_in6 local = {
 			.sin6_family = NRF_AF_INET6,
-			.sin6_port = htons(port)
+			.sin6_port = net_htons(port)
 		};
 
 		if (nrf_inet_pton(NRF_AF_INET6, ipv6_addr, &local.sin6_addr) != 1) {
@@ -944,14 +944,14 @@ int bind_to_local_addr(struct sm_socket *sock, uint16_t port)
 static int do_connect(struct sm_socket *sock, const char *url, uint16_t port)
 {
 	int ret = 0;
-	struct sockaddr sa = {.sa_family = AF_UNSPEC};
+	struct net_sockaddr sa = {.sa_family = NET_AF_UNSPEC};
 
 	LOG_DBG("connect %s:%d", url, port);
 	ret = util_resolve_host(sock->cid, url, port, sock->family, &sa);
 	if (ret) {
 		return -EAGAIN;
 	}
-	if (sa.sa_family == AF_INET) {
+	if (sa.sa_family == NRF_AF_INET) {
 		ret = nrf_connect(sock->fd, (struct nrf_sockaddr *)&sa,
 				  sizeof(struct nrf_sockaddr_in));
 	} else {
@@ -1048,9 +1048,9 @@ static int do_recv(struct sm_socket *sock, int timeout, int flags,
 	int sockfd = sock->fd;
 	struct timeval tmo = {.tv_sec = timeout};
 
-	ret = nrf_setsockopt(sock->fd, SOL_SOCKET, SO_RCVTIMEO, &tmo, sizeof(tmo));
+	ret = nrf_setsockopt(sock->fd, NRF_SOL_SOCKET, NRF_SO_RCVTIMEO, &tmo, sizeof(tmo));
 	if (ret) {
-		LOG_ERR("nrf_setsockopt(%d) error: %d", SO_RCVTIMEO, -errno);
+		LOG_ERR("nrf_setsockopt(%d) error: %d", NRF_SO_RCVTIMEO, -errno);
 		return -errno;
 	}
 	ret = nrf_recv(sockfd, (void *)sm_data_buf, data_len, flags);
@@ -1093,7 +1093,7 @@ static int do_sendto(struct sm_socket *sock, const char *url, uint16_t port, con
 {
 	int ret = 0;
 	uint32_t sent = 0;
-	struct sockaddr sa = {.sa_family = AF_UNSPEC};
+	struct net_sockaddr sa = {.sa_family = NET_AF_UNSPEC};
 	bool send_ntf = (flags & SM_MSG_SEND_ACK) != 0;
 
 	LOG_DBG("sendto %s:%d, flags=%d", url, port, flags);
@@ -1120,8 +1120,8 @@ static int do_sendto(struct sm_socket *sock, const char *url, uint16_t port, con
 	do {
 		ret = nrf_sendto(sock->fd, data + sent, len - sent, flags,
 				 (struct nrf_sockaddr *)&sa,
-				 sa.sa_family == AF_INET ? sizeof(struct nrf_sockaddr_in)
-							 : sizeof(struct nrf_sockaddr_in6));
+				 sa.sa_family == NRF_AF_INET ? sizeof(struct nrf_sockaddr_in)
+							     : sizeof(struct nrf_sockaddr_in6));
 		if (ret <= 0) {
 			ret = -errno;
 			break;
@@ -1157,13 +1157,13 @@ static int do_recvfrom(struct sm_socket *sock, int timeout, int flags,
 		       enum sm_socket_mode mode, size_t data_len)
 {
 	int ret;
-	struct sockaddr remote;
-	socklen_t addrlen = sizeof(struct sockaddr);
+	struct net_sockaddr remote;
+	net_socklen_t addrlen = sizeof(struct nrf_sockaddr);
 	struct timeval tmo = {.tv_sec = timeout};
 
-	ret = nrf_setsockopt(sock->fd, SOL_SOCKET, SO_RCVTIMEO, &tmo, sizeof(tmo));
+	ret = nrf_setsockopt(sock->fd, NRF_SOL_SOCKET, NRF_SO_RCVTIMEO, &tmo, sizeof(tmo));
 	if (ret) {
-		LOG_ERR("nrf_setsockopt(%d) error: %d", SO_RCVTIMEO, -errno);
+		LOG_ERR("nrf_setsockopt(%d) error: %d", NRF_SO_RCVTIMEO, -errno);
 		return -errno;
 	}
 	ret = nrf_recvfrom(sock->fd, (void *)sm_data_buf, data_len, flags,
@@ -1184,7 +1184,7 @@ static int do_recvfrom(struct sm_socket *sock, int timeout, int flags,
 			char peer_addr[NRF_INET6_ADDRSTRLEN] = {0};
 			uint16_t peer_port = 0;
 
-			util_get_peer_addr(&remote, peer_addr, &peer_port);
+			util_get_peer_addr((struct net_sockaddr *)&remote, peer_addr, &peer_port);
 			rsp_send("\r\n#XRECVFROM: %d,%d,%d,\"%s\",%d\r\n", sock->fd, mode,
 				 ret, peer_addr, peer_port);
 		}
@@ -1209,7 +1209,7 @@ static int socket_datamode_callback(uint8_t op, const uint8_t *data, int len, ui
 	int ret = 0;
 
 	if (op == DATAMODE_SEND) {
-		if (datamode_sock->type == SOCK_DGRAM &&
+		if (datamode_sock->type == NRF_SOCK_DGRAM &&
 		    (flags & SM_DATAMODE_FLAGS_MORE_DATA) != 0) {
 			LOG_ERR("Data mode buffer overflow");
 			exit_datamode_handler(-EOVERFLOW);
@@ -1300,8 +1300,8 @@ STATIC int handle_at_socket(enum at_parser_cmd_type cmd_type, struct at_parser *
 
 	case AT_PARSER_CMD_TYPE_TEST:
 		rsp_send("\r\n#XSOCKET: <handle>,(%d,%d,%d),(%d,%d,%d),(%d,%d),<cid>\r\n",
-			AF_INET, AF_INET6, AF_PACKET,
-			SOCK_STREAM, SOCK_DGRAM, SOCK_RAW,
+			NRF_AF_INET, NRF_AF_INET6, NRF_AF_PACKET,
+			NRF_SOCK_STREAM, NRF_SOCK_DGRAM, NRF_SOCK_RAW,
 			AT_SOCKET_ROLE_CLIENT, AT_SOCKET_ROLE_SERVER);
 		err = 0;
 		break;
@@ -1357,9 +1357,9 @@ STATIC int handle_at_secure_socket(enum at_parser_cmd_type cmd_type,
 			goto error;
 		}
 		if (sock->role == AT_SOCKET_ROLE_SERVER) {
-			peer_verify = TLS_PEER_VERIFY_NONE;
+			peer_verify = ZSOCK_TLS_PEER_VERIFY_NONE;
 		} else if (sock->role == AT_SOCKET_ROLE_CLIENT) {
-			peer_verify = TLS_PEER_VERIFY_REQUIRED;
+			peer_verify = ZSOCK_TLS_PEER_VERIFY_REQUIRED;
 		} else {
 			err = -EINVAL;
 			goto error;
@@ -1407,8 +1407,8 @@ STATIC int handle_at_secure_socket(enum at_parser_cmd_type cmd_type,
 	case AT_PARSER_CMD_TYPE_TEST:
 		rsp_send("\r\n#XSSOCKET: <handle>,(%d,%d),(%d,%d),(%d,%d),"
 			 "<sec_tag>,<peer_verify>,<cid>\r\n",
-			AF_INET, AF_INET6,
-			SOCK_STREAM, SOCK_DGRAM,
+			NRF_AF_INET, NRF_AF_INET6,
+			NRF_SOCK_STREAM, NRF_SOCK_DGRAM,
 			AT_SOCKET_ROLE_CLIENT, AT_SOCKET_ROLE_SERVER);
 		err = 0;
 		break;
@@ -1962,7 +1962,7 @@ STATIC int handle_at_getaddrinfo(enum at_parser_cmd_type cmd_type, struct at_par
 				 uint32_t param_count)
 {
 	int err = -EINVAL;
-	char hostname[NI_MAXHOST];
+	char hostname[ZSOCK_NI_MAXHOST];
 	char host[SM_MAX_URL];
 	int size = SM_MAX_URL;
 	struct nrf_addrinfo *result;
@@ -1978,13 +1978,13 @@ STATIC int handle_at_getaddrinfo(enum at_parser_cmd_type cmd_type, struct at_par
 		if (param_count == 3) {
 			/* DNS query with designated address family */
 			struct nrf_addrinfo hints = {
-				.ai_family = AF_UNSPEC
+				.ai_family = NRF_AF_UNSPEC
 			};
 			err = at_parser_num_get(parser, 2, &hints.ai_family);
 			if (err) {
 				return err;
 			}
-			if (hints.ai_family < 0  || hints.ai_family > AF_INET6) {
+			if (hints.ai_family < 0  || hints.ai_family > NRF_AF_INET6) {
 				return -EINVAL;
 			}
 			err = nrf_getaddrinfo(host, NULL, &hints, &result);
@@ -2010,7 +2010,7 @@ STATIC int handle_at_getaddrinfo(enum at_parser_cmd_type cmd_type, struct at_par
 
 				nrf_inet_ntop(NRF_AF_INET, &host->sin_addr, hostname,
 					      sizeof(hostname));
-			} else if (res->ai_family == AF_INET6) {
+			} else if (res->ai_family == NRF_AF_INET6) {
 				struct nrf_sockaddr_in6 *host =
 					(struct nrf_sockaddr_in6 *)result->ai_addr;
 

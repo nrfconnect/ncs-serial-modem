@@ -36,7 +36,7 @@ struct k_work_q sm_work_q;
 
 /* Helper callbacks for mocking nrf_getsockopt with output parameters */
 static int mock_getsockopt_timeval_callback(int socket, int level, int option_name,
-					    void *option_value, socklen_t *option_len,
+					    void *option_value, net_socklen_t *option_len,
 					    int num_calls)
 {
 	struct timeval *tmo;
@@ -53,7 +53,7 @@ static int mock_getsockopt_timeval_callback(int socket, int level, int option_na
 }
 
 static int mock_getsockopt_int_callback(int socket, int level, int option_name, void *option_value,
-					socklen_t *option_len, int num_calls)
+					net_socklen_t *option_len, int num_calls)
 {
 	int *value = (int *)option_value;
 
@@ -66,7 +66,7 @@ static int mock_getsockopt_int_callback(int socket, int level, int option_name, 
 }
 
 static int mock_getsockopt_hostname_callback(int socket, int level, int option_name,
-					     void *option_value, socklen_t *option_len,
+					     void *option_value, net_socklen_t *option_len,
 					     int num_calls)
 {
 	char *hostname = (char *)option_value;
@@ -716,22 +716,22 @@ static int mock_getaddrinfo_success_callback(const char *host, const char *servi
 	static struct {
 		struct zsock_addrinfo ai;
 		union {
-			struct sockaddr sa;
-			struct sockaddr_in sa_in;
-			struct sockaddr_in6 sa_in6;
+			struct net_sockaddr sa;
+			struct net_sockaddr_in sa_in;
+			struct net_sockaddr_in6 sa_in6;
 		} addr;
 	} getaddrinfo_result;
 
 	/* Setup a valid IPv4 address structure */
 	memset(&getaddrinfo_result, 0, sizeof(getaddrinfo_result));
-	getaddrinfo_result.addr.sa_in.sin_family = AF_INET;
-	getaddrinfo_result.addr.sa_in.sin_port = htons(80);
-	getaddrinfo_result.addr.sa_in.sin_addr.s_addr = htonl(0xC0A80001); /* 192.168.0.1 */
+	getaddrinfo_result.addr.sa_in.sin_family = NRF_AF_INET;
+	getaddrinfo_result.addr.sa_in.sin_port = net_htons(80);
+	getaddrinfo_result.addr.sa_in.sin_addr.s_addr = net_htonl(0xC0A80001); /* 192.168.0.1 */
 
 	/* Setup addrinfo structure */
-	getaddrinfo_result.ai.ai_family = AF_INET;
-	getaddrinfo_result.ai.ai_socktype = SOCK_STREAM;
-	getaddrinfo_result.ai.ai_protocol = IPPROTO_TCP;
+	getaddrinfo_result.ai.ai_family = NRF_AF_INET;
+	getaddrinfo_result.ai.ai_socktype = NRF_SOCK_STREAM;
+	getaddrinfo_result.ai.ai_protocol = NRF_IPPROTO_TCP;
 	getaddrinfo_result.ai.ai_addrlen = sizeof(getaddrinfo_result.addr.sa_in);
 	getaddrinfo_result.ai.ai_addr = &getaddrinfo_result.addr.sa;
 
@@ -1565,27 +1565,27 @@ void test_xrecv_connection_closed(void)
 }
 
 /* Helper callback for mocking zsock_inet_ntop */
-static char *mock_zsock_inet_ntop_callback(sa_family_t af, const void *src, char *dst,
-					   socklen_t size, int num_calls)
+static char *mock_zsock_inet_ntop_callback(
+	net_sa_family_t af, const void *src, char *dst, net_socklen_t size, int num_calls)
 {
-	if (af == AF_INET) {
+	if (af == NRF_AF_INET) {
 		strcpy(dst, "192.168.0.1");
-	} else if (af == AF_INET6) {
+	} else if (af == NRF_AF_INET6) {
 		strcpy(dst, "2001:db8::1");
 	}
 	return dst;
 }
 
 /* Helper callback for mocking zsock_inet_ntop for specific IPs */
-static char *mock_zsock_inet_ntop_10_0_0_1_callback(sa_family_t af, const void *src, char *dst,
-						    socklen_t size, int num_calls)
+static char *mock_zsock_inet_ntop_10_0_0_1_callback(
+	net_sa_family_t af, const void *src, char *dst, net_socklen_t size, int num_calls)
 {
 	strcpy(dst, "10.0.0.1");
 	return dst;
 }
 
-static char *mock_zsock_inet_ntop_192_168_0_100_callback(sa_family_t af, const void *src, char *dst,
-							 socklen_t size, int num_calls)
+static char *mock_zsock_inet_ntop_192_168_0_100_callback(
+	net_sa_family_t af, const void *src, char *dst, net_socklen_t size, int num_calls)
 {
 	strcpy(dst, "192.168.0.100");
 	return dst;
@@ -1598,15 +1598,15 @@ static ssize_t mock_nrf_recvfrom_callback(int socket, void *buffer, size_t lengt
 {
 	const char *test_data = "UDP data";
 	size_t data_len = strlen(test_data);
-	struct sockaddr_in *sa_in = (struct sockaddr_in *)address;
+	struct nrf_sockaddr_in *sa_in = (struct nrf_sockaddr_in *)address;
 
 	if (length >= data_len) {
 		memcpy(buffer, test_data, data_len);
 		/* Set up source address */
-		sa_in->sin_family = AF_INET;
-		sa_in->sin_port = htons(8080);
-		sa_in->sin_addr.s_addr = htonl(0xC0A80001); /* 192.168.0.1 */
-		*address_len = sizeof(struct sockaddr_in);
+		sa_in->sin_family = NRF_AF_INET;
+		sa_in->sin_port = net_htons(8080);
+		sa_in->sin_addr.s_addr = net_htonl(0xC0A80001); /* 192.168.0.1 */
+		*address_len = sizeof(struct nrf_sockaddr_in);
 		return data_len;
 	}
 	return -1;
@@ -1659,15 +1659,15 @@ static ssize_t mock_nrf_recvfrom_hex_callback(int socket, void *buffer, size_t l
 	/* Return binary data: 0x48 0x65 0x6C 0x6C 0x6F = "Hello" */
 	const uint8_t test_data[] = {0x48, 0x65, 0x6C, 0x6C, 0x6F};
 	size_t data_len = sizeof(test_data);
-	struct sockaddr_in *sa_in = (struct sockaddr_in *)address;
+	struct nrf_sockaddr_in *sa_in = (struct nrf_sockaddr_in *)address;
 
 	if (length >= data_len) {
 		memcpy(buffer, test_data, data_len);
 		/* Set up source address */
-		sa_in->sin_family = AF_INET;
-		sa_in->sin_port = htons(9000);
-		sa_in->sin_addr.s_addr = htonl(0x0A000001); /* 10.0.0.1 */
-		*address_len = sizeof(struct sockaddr_in);
+		sa_in->sin_family = NRF_AF_INET;
+		sa_in->sin_port = net_htons(9000);
+		sa_in->sin_addr.s_addr = net_htonl(0x0A000001); /* 10.0.0.1 */
+		*address_len = sizeof(struct nrf_sockaddr_in);
 		return data_len;
 	}
 	return -1;
@@ -1719,15 +1719,15 @@ static ssize_t mock_nrf_recvfrom_ipv6_callback(int socket, void *buffer, size_t 
 {
 	const char *test_data = "IPv6 UDP";
 	size_t data_len = strlen(test_data);
-	struct sockaddr_in6 *sa_in6 = (struct sockaddr_in6 *)address;
+	struct nrf_sockaddr_in6 *sa_in6 = (struct nrf_sockaddr_in6 *)address;
 
 	if (length >= data_len) {
 		memcpy(buffer, test_data, data_len);
 		/* Set up IPv6 source address */
-		sa_in6->sin6_family = AF_INET6;
-		sa_in6->sin6_port = htons(7000);
+		sa_in6->sin6_family = NRF_AF_INET6;
+		sa_in6->sin6_port = net_htons(7000);
 		/* 2001:db8::1 */
-		*address_len = sizeof(struct sockaddr_in6);
+		*address_len = sizeof(struct nrf_sockaddr_in6);
 		return data_len;
 	}
 	return -1;
@@ -1780,15 +1780,15 @@ static ssize_t mock_nrf_recvfrom_limited_callback(int socket, void *buffer, size
 	/* Return only 10 bytes */
 	const char *test_data = "0123456789";
 	size_t data_len = 10;
-	struct sockaddr_in *sa_in = (struct sockaddr_in *)address;
+	struct nrf_sockaddr_in *sa_in = (struct nrf_sockaddr_in *)address;
 
 	if (length >= data_len) {
 		memcpy(buffer, test_data, data_len);
 		/* Set up source address */
-		sa_in->sin_family = AF_INET;
-		sa_in->sin_port = htons(5000);
-		sa_in->sin_addr.s_addr = htonl(0xC0A80064); /* 192.168.0.100 */
-		*address_len = sizeof(struct sockaddr_in);
+		sa_in->sin_family = NRF_AF_INET;
+		sa_in->sin_port = net_htons(5000);
+		sa_in->sin_addr.s_addr = net_htonl(0xC0A80064); /* 192.168.0.100 */
+		*address_len = sizeof(struct nrf_sockaddr_in);
 		return data_len;
 	}
 	return -1;
@@ -1881,12 +1881,12 @@ static ssize_t mock_nrf_recvfrom_zero_callback(int socket, void *buffer, size_t 
 					       nrf_socklen_t *address_len, int num_calls)
 {
 	/* Return 0 to indicate zero-length datagram received */
-	struct sockaddr_in *sa_in = (struct sockaddr_in *)address;
+	struct nrf_sockaddr_in *sa_in = (struct nrf_sockaddr_in *)address;
 
-	sa_in->sin_family = AF_INET;
-	sa_in->sin_port = htons(3000);
-	sa_in->sin_addr.s_addr = htonl(0xC0A80002); /* 192.168.0.2 */
-	*address_len = sizeof(struct sockaddr_in);
+	sa_in->sin_family = NRF_AF_INET;
+	sa_in->sin_port = net_htons(3000);
+	sa_in->sin_addr.s_addr = net_htonl(0xC0A80002); /* 192.168.0.2 */
+	*address_len = sizeof(struct nrf_sockaddr_in);
 	return 0;
 }
 
@@ -2314,7 +2314,7 @@ static int mock_nrf_getaddrinfo_ipv4_callback(const char *nodename, const char *
 	/* Setup IPv4 address */
 	memset(&result, 0, sizeof(result));
 	result.sa.sin_family = NRF_AF_INET;
-	result.sa.sin_addr.s_addr = htonl(0xC0A80001); /* 192.168.0.1 */
+	result.sa.sin_addr.s_addr = net_htonl(0xC0A80001); /* 192.168.0.1 */
 
 	/* Setup addrinfo */
 	result.ai.ai_family = NRF_AF_INET;
@@ -2398,7 +2398,7 @@ void test_xgetaddrinfo_ipv6(void)
 	__cmock_nrf_freeaddrinfo_Expect(NULL);
 	__cmock_nrf_freeaddrinfo_IgnoreArg_ai();
 
-	/* Execute XGETADDRINFO command with IPv6 family (AF_INET6 = 2) */
+	/* Execute XGETADDRINFO command with IPv6 family (NRF_AF_INET6 = 2) */
 	send_at_command("AT#XGETADDRINFO=\"ipv6.example.com\",2\r\n");
 
 	/* Verify response contains IPv6 address */

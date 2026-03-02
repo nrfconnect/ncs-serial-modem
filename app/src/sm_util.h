@@ -114,7 +114,7 @@ int util_string_to_double_get(struct at_parser *parser, size_t index, double *va
  * @param[out] addr4 Buffer to hold the IPv4 address. May be NULL.
  * @param[out] addr6 Buffer to hold the IPv6 address. May be NULL.
  */
-void util_get_ip_addr(int cid, char addr4[INET_ADDRSTRLEN], char addr6[INET6_ADDRSTRLEN]);
+void util_get_ip_addr(int cid, char addr4[NET_INET_ADDRSTRLEN], char addr6[NET_INET6_ADDRSTRLEN]);
 
 /**
  * @brief convert string to integer
@@ -143,7 +143,8 @@ int util_str_to_int(const char *str, int base, int *output);
  *           Otherwise, an errno code or a dns_resolve_status enum value
  *           (defined in `zephyr/net/dns_resolve.h`).
  */
-int util_resolve_host(int cid, const char *host, uint16_t port, int family, struct sockaddr *sa);
+int util_resolve_host(int cid, const char *host, uint16_t port, int family,
+		      struct net_sockaddr *sa);
 
 /**
  * @brief Get peer IP address and port in printable format.
@@ -154,7 +155,7 @@ int util_resolve_host(int cid, const char *host, uint16_t port, int family, stru
  * @retval 0 If the operation was successful.
  *           Otherwise, a (negative) error code is returned.
  */
-int util_get_peer_addr(struct sockaddr *peer, char addr[static INET6_ADDRSTRLEN], uint16_t *port);
+int util_get_peer_addr(struct net_sockaddr *peer, char addr[NET_INET6_ADDRSTRLEN], uint16_t *port);
 
 /**
  * @brief Get PDN ID from AT command response
@@ -183,19 +184,19 @@ struct sm_pdn_dynamic_info {
 	/**
 	 * @brief Primary IPv4 DNS address.
 	 */
-	struct in_addr dns_addr4_primary;
+	struct net_in_addr dns_addr4_primary;
 	/**
 	 * @brief Secondary IPv4 DNS address.
 	 */
-	struct in_addr dns_addr4_secondary;
+	struct net_in_addr dns_addr4_secondary;
 	/**
 	 * @brief Primary IPv6 DNS address.
 	 */
-	struct in6_addr dns_addr6_primary;
+	struct net_in6_addr dns_addr6_primary;
 	/**
 	 * @brief Secondary IPv6 DNS address.
 	 */
-	struct in6_addr dns_addr6_secondary;
+	struct net_in6_addr dns_addr6_secondary;
 };
 
 /**
