@@ -392,15 +392,15 @@ void test_xsocket_invalid_type(void)
 
 /*
  * Test: Create maximum number of sockets
- * - Tests that the application can create up to CONFIG_POSIX_OPEN_MAX-1 sockets
+ * - Tests that the application can create up to NRF_MODEM_MAX_SOCKET_COUNT sockets
  * - Verifies that attempting to create one more socket fails
  */
 void test_xsocket_max_sockets(void)
 {
 	const char *response;
-	int max_sockets = CONFIG_POSIX_OPEN_MAX - 1;
+	int max_sockets = NRF_MODEM_MAX_SOCKET_COUNT;
 
-	/* Create 3 sockets (determined by CONFIG_POSIX_OPEN_MAX - 1) */
+	/* Create 3 sockets (determined by NRF_MODEM_MAX_SOCKET_COUNT) */
 	for (int i = 0; i < max_sockets; i++) {
 
 		/* Mock nrf_socket to return fd */
@@ -432,11 +432,11 @@ void test_xsocket_max_sockets(void)
 
 	/* Clean up: close all 3 sockets */
 	for (int i = 0; i < max_sockets; i++) {
+		char send_buf[20];
 		__cmock_nrf_close_ExpectAndReturn(i, 0);
+		sprintf(send_buf, "AT#XCLOSE=%d\r\n", i);
+		send_at_command(send_buf);
 	}
-	send_at_command("AT#XCLOSE=0\r\n");
-	send_at_command("AT#XCLOSE=1\r\n");
-	send_at_command("AT#XCLOSE=2\r\n");
 }
 
 /*
@@ -2051,7 +2051,7 @@ void test_xapoll_stop_socket(void)
 void test_xapoll_start_all_sockets(void)
 {
 	const char *response;
-	int max_sockets = CONFIG_POSIX_OPEN_MAX - 1;
+	int max_sockets = NRF_MODEM_MAX_SOCKET_COUNT;
 
 	/* Create multiple sockets */
 	for (int i = 0; i < max_sockets; i++) {
@@ -2075,11 +2075,11 @@ void test_xapoll_start_all_sockets(void)
 
 	/* Close all sockets */
 	for (int i = 0; i < max_sockets; i++) {
+		char send_buf[20];
 		__cmock_nrf_close_ExpectAndReturn(i, 0);
+		sprintf(send_buf, "AT#XCLOSE=%d\r\n", i);
+		send_at_command(send_buf);
 	}
-	send_at_command("AT#XCLOSE=0\r\n");
-	send_at_command("AT#XCLOSE=1\r\n");
-	send_at_command("AT#XCLOSE=2\r\n");
 }
 
 /*
@@ -2090,7 +2090,7 @@ void test_xapoll_start_all_sockets(void)
 void test_xapoll_stop_all_sockets(void)
 {
 	const char *response;
-	int max_sockets = CONFIG_POSIX_OPEN_MAX - 1;
+	int max_sockets = NRF_MODEM_MAX_SOCKET_COUNT;
 
 	/* Create multiple sockets */
 	for (int i = 0; i < max_sockets; i++) {
@@ -2118,11 +2118,11 @@ void test_xapoll_stop_all_sockets(void)
 
 	/* Close all sockets */
 	for (int i = 0; i < max_sockets; i++) {
+		char send_buf[20];
 		__cmock_nrf_close_ExpectAndReturn(i, 0);
+		sprintf(send_buf, "AT#XCLOSE=%d\r\n", i);
+		send_at_command(send_buf);
 	}
-	send_at_command("AT#XCLOSE=0\r\n");
-	send_at_command("AT#XCLOSE=1\r\n");
-	send_at_command("AT#XCLOSE=2\r\n");
 }
 
 /*
@@ -2234,7 +2234,7 @@ void test_xapoll_invalid_socket(void)
 void test_xclose_operation(void)
 {
 	const char *response;
-	int max_sockets = CONFIG_POSIX_OPEN_MAX - 1;
+	int max_sockets = NRF_MODEM_MAX_SOCKET_COUNT;
 
 	/* Test 1: Close single socket using handle */
 	/* Create one socket */
