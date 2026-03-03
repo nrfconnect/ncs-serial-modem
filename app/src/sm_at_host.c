@@ -1482,6 +1482,16 @@ bool is_idle_pipe(struct modem_pipe *pipe)
 	return is_idle_ctx(ctx);
 }
 
+bool is_open_pipe(struct modem_pipe *pipe)
+{
+	return pipe ? sm_pipe_is_open(pipe) : false;
+}
+
+bool is_open_ctx(struct sm_at_host_ctx *ctx)
+{
+	return sm_at_host_get_pipe(ctx);
+}
+
 void exit_datamode_handler(int result)
 {
 	struct sm_at_host_ctx *ctx = sm_at_host_get_current();
@@ -1737,6 +1747,27 @@ static struct sm_at_host_ctx *sm_at_host_create(struct modem_pipe *pipe)
 	return ctx;
 }
 
+static void send_urcs(void)
+{
+	while (!ring_buf_is_empty(&urc_buf)) {
+		struct sm_at_host_ctx *ctx;
+		uint8_t *p;
+		size_t len = ring_buf_get_claim(&urc_buf, &p, UINT16_MAX);
+
+		SYS_SLIST_FOR_EACH_CONTAINER(&instance_list, ctx, node) {
+			if (!is_open(ctx) || !in_at_mode(ctx)) {
+				continue;
+			}
+			int send = sm_at_host_pipe_tx_blocking(ctx, p, len);
+
+			if (send < len) {
+				LOG_ERR("Failed to send URC: %d (ctx %p)", send, ctx);
+			}
+		}
+		ring_buf_get_finish(&urc_buf, len);
+	}
+}
+
 static void sm_at_host_work_fn(struct k_work *work)
 {
 	struct sm_at_host_msg msg;
@@ -1804,16 +1835,7 @@ static void sm_at_host_work_fn(struct k_work *work)
 		case SM_EVENT_URC:
 			/* Don't interrupt AT command execution */
 			if (is_idle(ctx)) {
-				while (!ring_buf_is_empty(&urc_buf)) {
-					uint8_t *p;
-					size_t len = ring_buf_get_claim(&urc_buf, &p, UINT16_MAX);
-					int send = sm_at_host_pipe_tx_blocking(msg.ctx, p, len);
-
-					if (send < len) {
-						LOG_ERR("Failed to send URC: %d", send);
-					}
-					ring_buf_get_finish(&urc_buf, len);
-				}
+				send_urcs();
 				idle_work(ctx);
 			} else  {
 				check_idle_timer(ctx, false);

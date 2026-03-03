@@ -167,6 +167,12 @@ bool is_idle_pipe(struct modem_pipe *pipe);
 		struct modem_pipe * : is_idle_pipe                                                 \
 		)(X)
 
+#define is_open(X) \
+		_Generic((X), \
+			struct sm_at_host_ctx * : is_open_ctx, \
+			struct modem_pipe * : is_open_pipe \
+			)(X)
+
 /**
  * @brief Exit the data mode handler
  *
