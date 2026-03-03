@@ -1403,9 +1403,8 @@ void rsp_send_error(void)
 	rsp_send(ERROR_STR);
 }
 
-static void rsp_send_internal(bool urc, const char *fmt, va_list arg_ptr)
+static void rsp_send_internal(struct sm_at_host_ctx *ctx, bool urc, const char *fmt, va_list arg_ptr)
 {
-	struct sm_at_host_ctx *ctx = urc ? sm_at_host_get_urc_ctx() : sm_at_host_get_current();
 	static K_MUTEX_DEFINE(mutex_rsp_buf);
 	static char rsp_buf[SM_AT_MAX_RSP_LEN];
 	int rsp_len;
@@ -1420,27 +1419,40 @@ static void rsp_send_internal(bool urc, const char *fmt, va_list arg_ptr)
 	k_mutex_unlock(&mutex_rsp_buf);
 }
 
-void rsp_send(const char *fmt, ...)
+void rsp_send_to(struct modem_pipe *pipe, const char *fmt, ...)
 {
+	struct sm_at_host_ctx *ctx = sm_at_host_get_ctx_from(pipe);
 	va_list arg_ptr;
 
 	va_start(arg_ptr, fmt);
-	rsp_send_internal(false, fmt, arg_ptr);
+	rsp_send_internal(ctx, false, fmt, arg_ptr);
+	va_end(arg_ptr);
+}
+
+
+void rsp_send(const char *fmt, ...)
+{
+	struct sm_at_host_ctx *ctx = sm_at_host_get_current();
+	va_list arg_ptr;
+
+	va_start(arg_ptr, fmt);
+	rsp_send_internal(ctx, false, fmt, arg_ptr);
 	va_end(arg_ptr);
 }
 
 void urc_send(const char *fmt, ...)
 {
+	struct sm_at_host_ctx *ctx = sm_at_host_get_urc_ctx();
 	va_list arg_ptr;
 
 	va_start(arg_ptr, fmt);
-	rsp_send_internal(true, fmt, arg_ptr);
+	rsp_send_internal(ctx, true, fmt, arg_ptr);
 	va_end(arg_ptr);
 }
 
-void data_send(const uint8_t *data, size_t len)
+void data_send(struct modem_pipe *pipe, const uint8_t *data, size_t len)
 {
-	struct sm_at_host_ctx *ctx = sm_at_host_get_current();
+	struct sm_at_host_ctx *ctx = sm_at_host_get_ctx_from(pipe);
 
 	sm_at_send_internal(ctx, data, len, false, SM_DEBUG_PRINT_SHORT);
 }

@@ -145,6 +145,7 @@ static struct sm_socket *find_avail_socket(void)
 
 	return NULL;
 }
+
 static struct async_poll_ctx *poll_ctx_from_sock(struct sm_socket *sock)
 {
 	if (sock == NULL) {
@@ -248,7 +249,7 @@ static void auto_reception(struct sm_socket *sock)
 	}
 	if (!in_datamode(sock->pipe)) {
 		/* <CR><LF> after the data. */
-		rsp_send("\r\n");
+		rsp_send_to(sock->pipe, "\r\n");
 	}
 }
 
@@ -360,12 +361,7 @@ void sm_at_socket_poll_work_handler(struct k_work *work)
 			/* Do not send URC for the same events twice, unless send/recv is done. */
 			sock->async_poll.xapoll_events &= ~xapoll_events;
 			if (xapoll_events) {
-				/* TODO: If we are in sm_work_q context, and not an idle handler
-				 * then this "pipe" might be the wrong one.
-				 * rsp_send() goes into "current" pipe, not the one associated
-				 * with this poll_ctx.
-				 */
-				rsp_send("\r\n#XAPOLL: %d,%d\r\n", sock->fd, xapoll_events);
+				rsp_send_to(pipe, "\r\n#XAPOLL: %d,%d\r\n", sock->fd, xapoll_events);
 			}
 		}
 
@@ -459,12 +455,8 @@ static void send_cb(const struct nrf_modem_sendcb_params *params)
 	sock->send_ntf.bytes_sent = params->bytes_sent;
 	atomic_set(&sock->send_ntf.ready, 1);
 
-	if (sock->pipe) {
-		/* Schedule work to execute in AT context */
-		sm_at_host_queue_idle_work(sock->pipe, &work);
-	} else {
-		k_work_submit_to_queue(&sm_work_q, &work);
-	}
+	/* Schedule work to execute in AT context */
+	sm_at_host_queue_idle_work(sock->pipe, &work);
 }
 
 static int set_so_send_cb(struct sm_socket *socket)
@@ -1052,7 +1044,7 @@ static int do_send(struct sm_socket *sock, const uint8_t *data, int len, int fla
 		sent += ret;
 	}
 
-	if (!in_datamode(sock->pipe)) {
+	if (!in_datamode(sm_at_host_get_current())) {
 		rsp_send("\r\n#XSEND: %d,%d,%d\r\n", sock->fd,
 			 send_ntf ? AT_SOCKET_SEND_RESULT_NW_ACK_URC
 				  : AT_SOCKET_SEND_RESULT_DEFAULT,
@@ -1080,7 +1072,7 @@ static int data_send_hex(struct sm_socket *sock, const uint8_t *buf, int recv_le
 			LOG_ERR("Failed to convert binary data to hex string");
 			return -EINVAL;
 		}
-		data_send(hex_buf, size);
+		data_send(sock->pipe, hex_buf, size);
 		consumed += size / 2; /* size is in hex string length */
 		if (recv_len - consumed < data_len) {
 			data_len = recv_len - consumed;
@@ -1117,7 +1109,7 @@ static int do_recv(struct sm_socket *sock, int timeout, int flags,
 		LOG_WRN("nrf_recv() return 0");
 	} else {
 		if (!in_datamode(sock->pipe)) {
-			rsp_send("\r\n#XRECV: %d,%d,%d\r\n", sock->fd, mode, ret);
+			rsp_send_to(sock->pipe, "\r\n#XRECV: %d,%d,%d\r\n", sock->fd, mode, ret);
 		}
 
 		if (mode == AT_SOCKET_MODE_HEX) {
@@ -1126,7 +1118,7 @@ static int do_recv(struct sm_socket *sock, int timeout, int flags,
 				return ret;
 			}
 		} else {
-			data_send(sm_data_buf, ret);
+			data_send(sock->pipe, sm_data_buf, ret);
 		}
 		ret = 0;
 
@@ -1189,7 +1181,7 @@ static int do_sendto(struct sm_socket *sock, const char *url, uint16_t port, con
 	}
 
 	if (!in_datamode(sock->pipe)) {
-		rsp_send("\r\n#XSENDTO: %d,%d,%d\r\n", sock->fd,
+		rsp_send_to(sock->pipe, "\r\n#XSENDTO: %d,%d,%d\r\n", sock->fd,
 			 send_ntf ? AT_SOCKET_SEND_RESULT_NW_ACK_URC
 				  : AT_SOCKET_SEND_RESULT_DEFAULT,
 			 sent);
@@ -1233,7 +1225,7 @@ static int do_recvfrom(struct sm_socket *sock, int timeout, int flags,
 			uint16_t peer_port = 0;
 
 			util_get_peer_addr(&remote, peer_addr, &peer_port);
-			rsp_send("\r\n#XRECVFROM: %d,%d,%d,\"%s\",%d\r\n", sock->fd, mode,
+			rsp_send_to(sock->pipe, "\r\n#XRECVFROM: %d,%d,%d,\"%s\",%d\r\n", sock->fd, mode,
 				 ret, peer_addr, peer_port);
 		}
 
@@ -1243,7 +1235,7 @@ static int do_recvfrom(struct sm_socket *sock, int timeout, int flags,
 				return ret;
 			}
 		} else {
-			data_send(sm_data_buf, ret);
+			data_send(sock->pipe, sm_data_buf, ret);
 		}
 
 		update_poll_events(sock, NRF_POLLIN, true);
@@ -1709,6 +1701,7 @@ STATIC int handle_at_connect(enum at_parser_cmd_type cmd_type, struct at_parser 
 		if (err) {
 			return err;
 		}
+		sock->pipe = sm_at_host_get_current_pipe();
 		err = do_connect(sock, url, port);
 		break;
 
@@ -1749,6 +1742,7 @@ STATIC int handle_at_send(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 		if (err) {
 			return err;
 		}
+		sock->pipe = sm_at_host_get_current_pipe();
 		if (mode == AT_SOCKET_MODE_UNFORMATTED || mode == AT_SOCKET_MODE_HEX) {
 			if (param_count > 4) {
 				err = at_parser_string_ptr_get(parser, 4, &str_ptr, &size);
@@ -1846,6 +1840,7 @@ STATIC int handle_at_recv(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 				return -ENOBUFS;
 			}
 		}
+		sock->pipe = sm_at_host_get_current_pipe();
 		err = do_recv(sock, timeout, flags, mode, data_len);
 		break;
 
@@ -1896,6 +1891,7 @@ STATIC int handle_at_sendto(enum at_parser_cmd_type cmd_type, struct at_parser *
 		if (err) {
 			return err;
 		}
+		sock->pipe = sm_at_host_get_current_pipe();
 		if (mode == AT_SOCKET_MODE_UNFORMATTED || mode == AT_SOCKET_MODE_HEX) {
 			if (param_count > 6) {
 				err = at_parser_string_ptr_get(parser, 6, &str_ptr, &size);
@@ -1995,6 +1991,7 @@ STATIC int handle_at_recvfrom(enum at_parser_cmd_type cmd_type, struct at_parser
 				return -ENOBUFS;
 			}
 		}
+		sock->pipe = sm_at_host_get_current_pipe();
 		err = do_recvfrom(sock, timeout, flags, mode, data_len);
 		break;
 
@@ -2123,17 +2120,18 @@ static void xapoll_read_response(void)
 static int set_xapoll_events(struct sm_socket *sock, uint8_t events)
 {
 	int ret;
+	struct modem_pipe *pipe = sm_at_host_get_current_pipe();
+	struct async_poll_ctx *poll_ctx =
+		sm_at_host_get_async_poll_ctx(pipe);
 
 	if (sock) {
+		sock->pipe = pipe;
 		/* Set events for a specific socket. */
 		sock->async_poll.xapoll_events_requested = events;
 		return update_poll_events(sock, events, true);
 	}
 
 	/* Set events for all sockets in this context */
-	struct modem_pipe *pipe = sm_at_host_get_current_pipe();
-	struct async_poll_ctx *poll_ctx =
-		sm_at_host_get_async_poll_ctx(pipe);
 	poll_ctx->xapoll_events_requested = events;
 	for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
 		if (socks[i].fd != INVALID_SOCKET && socks[i].pipe == pipe) {
@@ -2258,6 +2256,7 @@ STATIC int handle_at_recvcfg(enum at_parser_cmd_type cmd_type, struct at_parser 
 			return -EINVAL;
 		}
 		if (sock) {
+			sock->pipe = pipe;
 			sock->async_poll.adr_flags = flags;
 			sock->async_poll.adr_hex = hex_mode != 0;
 			err = update_poll_events(sock, NRF_POLLIN, false);
