@@ -56,6 +56,7 @@ int32_t sm_fota_info;
 
 static char path[FILE_URI_MAX];
 static char hostname[URI_HOST_MAX];
+static struct modem_pipe *fota_pipe;
 
 #if defined(CONFIG_SM_FULL_FOTA)
 /* Buffer used as temporary storage when downloading the modem firmware.
@@ -287,7 +288,7 @@ static void fota_dl_handler(const struct fota_download_evt *evt)
 		sm_fota_stage = FOTA_STAGE_DOWNLOAD;
 		sm_fota_status = FOTA_STATUS_OK;
 		sm_fota_info = evt->progress;
-		rsp_send("\r\n#XFOTA: %d,%d,%d\r\n",
+		urc_send_to(fota_pipe, "\r\n#XFOTA: %d,%d,%d\r\n",
 			sm_fota_stage, sm_fota_status, sm_fota_info);
 		break;
 	case FOTA_DOWNLOAD_EVT_FINISHED:
@@ -296,17 +297,18 @@ static void fota_dl_handler(const struct fota_download_evt *evt)
 		sm_modem_full_fota = (sm_fota_type == DFU_TARGET_IMAGE_TYPE_FULL_MODEM);
 		/* Save, in case reboot by reset */
 		sm_settings_fota_save();
-		rsp_send("\r\n#XFOTA: %d,%d\r\n", sm_fota_stage, sm_fota_status);
+		urc_send_to(fota_pipe, "\r\n#XFOTA: %d,%d\r\n", sm_fota_stage, sm_fota_status);
 		break;
 	case FOTA_DOWNLOAD_EVT_ERASE_TIMEOUT:
 		LOG_INF("Erasure timeout reached. Erasure continues.");
 		break;
 	case FOTA_DOWNLOAD_EVT_ERASE_PENDING:
 		sm_fota_stage = FOTA_STAGE_DOWNLOAD_ERASE_PENDING;
-		rsp_send("\r\n#XFOTA: %d,%d\r\n", sm_fota_stage, sm_fota_status);
+		urc_send_to(fota_pipe, "\r\n#XFOTA: %d,%d\r\n", sm_fota_stage, sm_fota_status);
 		break;
 	case FOTA_DOWNLOAD_EVT_ERASE_DONE:
-		rsp_send("\r\n#XFOTA: %d,%d\r\n", FOTA_STAGE_DOWNLOAD_ERASED, sm_fota_status);
+		urc_send_to(fota_pipe, "\r\n#XFOTA: %d,%d\r\n", FOTA_STAGE_DOWNLOAD_ERASED,
+			    sm_fota_status);
 		/* Back to init now that the erasure is complete so that potential pre-start
 		 * error codes are printed with the same stage than if there had been no erasure.
 		 */
@@ -315,7 +317,7 @@ static void fota_dl_handler(const struct fota_download_evt *evt)
 	case FOTA_DOWNLOAD_EVT_ERROR:
 		sm_fota_status = FOTA_STATUS_ERROR;
 		sm_fota_info = evt->cause;
-		rsp_send("\r\n#XFOTA: %d,%d,%d\r\n",
+		urc_send_to(fota_pipe, "\r\n#XFOTA: %d,%d,%d\r\n",
 			sm_fota_stage, sm_fota_status, sm_fota_info);
 		/* FOTA session terminated */
 		sm_fota_init_state();
@@ -323,7 +325,7 @@ static void fota_dl_handler(const struct fota_download_evt *evt)
 	case FOTA_DOWNLOAD_EVT_CANCELLED:
 		sm_fota_status = FOTA_STATUS_CANCELLED;
 		sm_fota_info = 0;
-		rsp_send("\r\n#XFOTA: %d,%d\r\n", sm_fota_stage, sm_fota_status);
+		urc_send_to(fota_pipe, "\r\n#XFOTA: %d,%d\r\n", sm_fota_stage, sm_fota_status);
 		/* FOTA session terminated */
 		sm_fota_init_state();
 		break;
@@ -345,6 +347,7 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 
 	switch (cmd_type) {
 	case AT_PARSER_CMD_TYPE_SET:
+		fota_pipe = sm_at_host_get_current_pipe();
 		err = at_parser_num_get(parser, 1, &op);
 		if (err < 0) {
 			return err;
@@ -492,10 +495,12 @@ void sm_fota_post_process(void)
 	}
 	LOG_INF("FOTA result %d,%d,%d", sm_fota_stage, sm_fota_status, sm_fota_info);
 
+	struct modem_pipe *pipe = fota_pipe ? fota_pipe : sm_at_host_get_urc_pipe();
+
 	if (sm_fota_status == FOTA_STATUS_OK) {
-		rsp_send("\r\n#XFOTA: %d,%d\r\n", sm_fota_stage, sm_fota_status);
+		urc_send_to(pipe, "\r\n#XFOTA: %d,%d\r\n", sm_fota_stage, sm_fota_status);
 	} else {
-		rsp_send("\r\n#XFOTA: %d,%d,%d\r\n", sm_fota_stage, sm_fota_status,
+		urc_send_to(pipe, "\r\n#XFOTA: %d,%d,%d\r\n", sm_fota_stage, sm_fota_status,
 			sm_fota_info);
 	}
 

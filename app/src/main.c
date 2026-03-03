@@ -44,15 +44,16 @@ static struct nrf_modem_fault_info modem_fault_info;
 static void on_modem_failure(struct k_work *)
 {
 	int ret;
+	struct modem_pipe *pipe = sm_at_host_get_urc_pipe();
 
-	rsp_send("\r\n#XMODEM: FAULT,0x%x,0x%x\r\n", modem_fault_info.reason,
-		 modem_fault_info.program_counter);
+	urc_send_to(pipe, "\r\n#XMODEM: FAULT,0x%x,0x%x\r\n", modem_fault_info.reason,
+		    modem_fault_info.program_counter);
 
 	ret = nrf_modem_lib_shutdown();
-	rsp_send("\r\n#XMODEM: SHUTDOWN,%d\r\n", ret);
+	urc_send_to(pipe, "\r\n#XMODEM: SHUTDOWN,%d\r\n", ret);
 
 	ret = nrf_modem_lib_init();
-	rsp_send("\r\n#XMODEM: INIT,%d\r\n", ret);
+	urc_send_to(pipe, "\r\n#XMODEM: INIT,%d\r\n", ret);
 }
 K_WORK_DEFINE(modem_failure_work, on_modem_failure);
 

@@ -23,6 +23,7 @@ enum sm_sms_operation {
 };
 
 static int sms_handle = -1;
+static struct modem_pipe *sms_pipe;
 
 static void sms_callback(struct sms_data *const data, void *context)
 {
@@ -53,7 +54,7 @@ static void sms_callback(struct sms_data *const data, void *context)
 			strcat(rsp_buf, "\",\"");
 			strcat(rsp_buf, data->payload);
 			strcat(rsp_buf, "\"\r\n");
-			rsp_send("%s", rsp_buf);
+			urc_send_to(sms_pipe, "%s", rsp_buf);
 		} else {
 			LOG_DBG("concatenated message %d, %d, %d",
 				header->concatenated.ref_number,
@@ -106,7 +107,7 @@ static void sms_callback(struct sms_data *const data, void *context)
 					strcat(rsp_buf, messages[i]);
 				}
 				strcat(rsp_buf, "\"\r\n");
-				rsp_send("%s", rsp_buf);
+				urc_send_to(sms_pipe, "%s", rsp_buf);
 			} else {
 				return;
 			}
@@ -181,6 +182,7 @@ static int handle_at_sms(enum at_parser_cmd_type cmd_type, struct at_parser *par
 		if (op == AT_SMS_STOP) {
 			err = do_sms_stop();
 		} else if (op == AT_SMS_START) {
+			sms_pipe = sm_at_host_get_current_pipe();
 			err = do_sms_start();
 		} else if (op ==  AT_SMS_SEND) {
 			char number[SMS_MAX_ADDRESS_LEN_CHARS + 1];

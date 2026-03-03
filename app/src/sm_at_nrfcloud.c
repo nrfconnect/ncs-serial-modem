@@ -27,6 +27,7 @@ LOG_MODULE_REGISTER(sm_nrfcloud, CONFIG_SM_LOG_LEVEL);
 static struct k_work cloud_cmd;
 static K_SEM_DEFINE(sem_date_time, 0, 1);
 uint8_t sm_at_buf[CONFIG_SM_AT_BUF_SIZE + 1];
+static struct modem_pipe *nrfcloud_pipe;
 
 #if defined(CONFIG_NRF_CLOUD_LOCATION)
 
@@ -272,7 +273,7 @@ static void loc_req_wk(struct k_work *work)
 	}
 
 	if (err) {
-		rsp_send("\r\n#XNRFCLOUDPOS: %d\r\n", err < 0 ? -1 : err);
+		urc_send_to(nrfcloud_pipe, "\r\n#XNRFCLOUDPOS: %d\r\n", err < 0 ? -1 : err);
 	}
 	if (nrfcloud_wifi_pos) {
 		k_free(nrfcloud_wifi_data.ap_info);
@@ -303,7 +304,8 @@ static int do_cloud_send_msg(const char *message, int len)
 static void on_cloud_evt_ready(void)
 {
 	sm_nrf_cloud_ready = true;
-	rsp_send("\r\n#XNRFCLOUD: %d,%d\r\n", sm_nrf_cloud_ready, sm_nrf_cloud_send_location);
+	urc_send_to(nrfcloud_pipe, "\r\n#XNRFCLOUD: %d,%d\r\n", sm_nrf_cloud_ready,
+		    sm_nrf_cloud_send_location);
 #if defined(CONFIG_NRF_CLOUD_LOCATION)
 	at_monitor_resume(&ncell_meas);
 #endif
@@ -312,7 +314,8 @@ static void on_cloud_evt_ready(void)
 static void on_cloud_evt_disconnected(void)
 {
 	sm_nrf_cloud_ready = false;
-	rsp_send("\r\n#XNRFCLOUD: %d,%d\r\n", sm_nrf_cloud_ready, sm_nrf_cloud_send_location);
+	urc_send_to(nrfcloud_pipe, "\r\n#XNRFCLOUD: %d,%d\r\n", sm_nrf_cloud_ready,
+		    sm_nrf_cloud_send_location);
 #if defined(CONFIG_NRF_CLOUD_LOCATION)
 	at_monitor_pause(&ncell_meas);
 #endif
@@ -326,7 +329,7 @@ static void on_cloud_evt_location_data_received(const struct nrf_cloud_data *con
 
 	err = nrf_cloud_location_process(data->ptr, &result);
 	if (err == 0) {
-		rsp_send("\r\n#XNRFCLOUDPOS: %d,%lf,%lf,%d\r\n",
+		urc_send_to(nrfcloud_pipe, "\r\n#XNRFCLOUDPOS: %d,%lf,%lf,%d\r\n",
 			result.type, result.lat, result.lon, result.unc);
 	} else {
 		if (err == 1) {
@@ -335,7 +338,7 @@ static void on_cloud_evt_location_data_received(const struct nrf_cloud_data *con
 			err = result.err;
 		}
 		LOG_ERR("Failed to process the location request response (%d).", err);
-		rsp_send("\r\n#XNRFCLOUDPOS: %d\r\n", err < 0 ? -1 : err);
+		urc_send_to(nrfcloud_pipe, "\r\n#XNRFCLOUDPOS: %d\r\n", err < 0 ? -1 : err);
 	}
 
 #else
@@ -439,7 +442,7 @@ static void on_cloud_evt_data_received(const struct nrf_cloud_data *const data)
 				return;
 			}
 		}
-		rsp_send("\r\n#XNRFCLOUD: %s\r\n", (char *)data->ptr);
+		urc_send_to(nrfcloud_pipe, "\r\n#XNRFCLOUD: %s\r\n", (char *)data->ptr);
 	}
 }
 
@@ -563,6 +566,7 @@ static int handle_at_nrf_cloud(enum at_parser_cmd_type cmd_type, struct at_parse
 
 	switch (cmd_type) {
 	case AT_PARSER_CMD_TYPE_SET:
+		nrfcloud_pipe = sm_at_host_get_current_pipe();
 		err = at_parser_num_get(parser, 1, &op);
 		if (err < 0) {
 			return err;
