@@ -84,6 +84,17 @@ void sm_at_host_uninit(void);
 void rsp_send(const char *fmt, ...);
 
 /**
+ * @brief Send URC to a specific modem pipe.
+ *
+ * This is safe to call with NULL pointer for pipe, in which case message is dropped.
+ *
+ * @param pipe Modem pipe to send the URC through
+ * @param fmt URC message format string
+ *
+ */
+void urc_send_to(struct modem_pipe *pipe, const char *fmt, ...);
+
+/**
  * @brief Send URC message
  *
  * URC messages are queued and sent when possible.
@@ -106,11 +117,14 @@ void rsp_send_error(void);
 /**
  * @brief Send raw data received in data mode
  *
+ * This is safe to call with NULL pointer for pipe, in which case data is dropped.
+ *
+ * @param pipe Modem pipe to send data through
  * @param data Raw data received
  * @param len Length of raw data
  *
  */
-void data_send(const uint8_t *data, size_t len);
+void data_send(struct modem_pipe *pipe, const uint8_t *data, size_t len);
 
 /**
  * @brief Request Serial Modem AT host to enter data mode
@@ -251,8 +265,6 @@ struct sm_at_host_ctx *sm_at_host_get_ctx_from(struct modem_pipe *pipe);
 
 /**
  * @brief Get the AT host context for URC transmission.
- *
- * URCs are always sent to the first (primary) instance.
  *
  * @return Pointer to first AT host context
  */

@@ -81,6 +81,8 @@ static struct k_work gnss_status_notify_work;
 /* FIFO to pass the GNSS statuses to the notifier worker. */
 K_FIFO_DEFINE(gnss_status_fifo);
 
+static struct modem_pipe *gnss_pipe;
+
 /* Whether to use the nRF Cloud assistive services that were compiled in (A-GNSS/P-GPS).
  * If enabled, the connection to nRF Cloud is required during GNSS startup
  * and assistance data will be downloaded.
@@ -123,7 +125,7 @@ static void gnss_status_notifier(struct k_work *)
 {
 	while (!k_fifo_is_empty(&gnss_status_fifo)) {
 		gnss_status = (enum gnss_status)k_fifo_get(&gnss_status_fifo, K_NO_WAIT);
-		rsp_send("\r\n#XGNSS: 1,%d\r\n", gnss_status);
+		urc_send_to(gnss_pipe, "\r\n#XGNSS: 1,%d\r\n", gnss_status);
 	}
 }
 
@@ -517,11 +519,11 @@ static void gnss_fix_sender(struct k_work *)
 	}
 
 	/* GIS accuracy: http://wiki.gis.com/wiki/index.php/Decimal_degrees, use default .6lf */
-	rsp_send("\r\n#XGNSS: %lf,%lf,%f,%f,%f,%f,\"%04u-%02u-%02u %02u:%02u:%02u\"\r\n",
-		pvt.latitude, pvt.longitude, (double)pvt.altitude,
-		(double)pvt.accuracy, (double)pvt.speed, (double)pvt.heading,
-		pvt.datetime.year, pvt.datetime.month, pvt.datetime.day,
-		pvt.datetime.hour, pvt.datetime.minute, pvt.datetime.seconds);
+	urc_send_to(gnss_pipe,
+		    "\r\n#XGNSS: %lf,%lf,%f,%f,%f,%f,\"%04u-%02u-%02u %02u:%02u:%02u\"\r\n",
+		    pvt.latitude, pvt.longitude, (double)pvt.altitude, (double)pvt.accuracy,
+		    (double)pvt.speed, (double)pvt.heading, pvt.datetime.year, pvt.datetime.month,
+		    pvt.datetime.day, pvt.datetime.hour, pvt.datetime.minute, pvt.datetime.seconds);
 
 	for (int i = 0; i < NRF_MODEM_GNSS_MAX_SATELLITES; ++i) {
 		if (pvt.sv[i].sv) { /* SV number 0 indicates no satellite */
@@ -659,6 +661,8 @@ static int handle_at_gnss(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 				LOG_ERR("GNSS is already running. Stop it first.");
 				return -EBUSY;
 			}
+
+			gnss_pipe = sm_at_host_get_current_pipe();
 
 			err = at_parser_num_get(
 				parser, CLOUD_ASSISTANCE_IDX, &gnss_cloud_assistance);

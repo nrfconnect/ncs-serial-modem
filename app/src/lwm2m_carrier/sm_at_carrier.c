@@ -54,8 +54,8 @@ static void print_err(const lwm2m_carrier_event_t *evt)
 
 	LOG_ERR("LWM2M_CARRIER_EVENT_ERROR: %s, reason %d", strerr[err->type], err->value);
 
-	rsp_send("\r\n#XCARRIEREVT: %u,%u,%d\r\n",
-		 LWM2M_CARRIER_EVENT_ERROR, err->type, err->value);
+	urc_send_to(sm_at_host_get_urc_pipe(), "\r\n#XCARRIEREVT: %u,%u,%d\r\n",
+		    LWM2M_CARRIER_EVENT_ERROR, err->type, err->value);
 }
 
 static void print_deferred(const lwm2m_carrier_event_t *evt)
@@ -91,8 +91,8 @@ static void print_deferred(const lwm2m_carrier_event_t *evt)
 	LOG_INF("LWM2M_CARRIER_EVENT_DEFERRED: reason %s, timeout %d seconds",
 		strdef[def->reason], def->timeout);
 
-	rsp_send("\r\n#XCARRIEREVT: %u,%u,%d\r\n",
-		 LWM2M_CARRIER_EVENT_DEFERRED, def->reason, def->timeout);
+	urc_send_to(sm_at_host_get_urc_pipe(), "\r\n#XCARRIEREVT: %u,%u,%d\r\n",
+		    LWM2M_CARRIER_EVENT_DEFERRED, def->reason, def->timeout);
 }
 
 static void on_event_app_data(const lwm2m_carrier_event_t *event)
@@ -129,13 +129,15 @@ static void on_event_app_data(const lwm2m_carrier_event_t *event)
 			return;
 		}
 
-		rsp_send("\r\n#XCARRIEREVT: %u,%hhu,\"%s\",%zu\r\n\"", event->type, app_data->type,
-			 uri_path, size);
-		data_send(sm_data_buf, size);
-		rsp_send("\"");
+		struct modem_pipe *pipe = sm_at_host_get_urc_pipe();
+
+		urc_send_to(pipe, "\r\n#XCARRIEREVT: %u,%hhu,\"%s\",%zu\r\n\"", event->type,
+			    app_data->type, uri_path, size);
+		data_send(pipe, sm_data_buf, size);
+		urc_send_to(pipe, "\"");
 	} else {
-		rsp_send("\r\n#XCARRIEREVT: %u,%hhu,\"%s\"\r\n", event->type, app_data->type,
-			 uri_path);
+		urc_send_to(sm_at_host_get_urc_pipe(), "\r\n#XCARRIEREVT: %u,%hhu,\"%s\"\r\n",
+			    event->type, app_data->type, uri_path);
 	}
 }
 
@@ -235,7 +237,7 @@ int lwm2m_carrier_event_handler(const lwm2m_carrier_event_t *event)
 		return 0;
 	}
 
-	rsp_send("\r\n#XCARRIEREVT: %d,%d\r\n", event->type, err);
+	urc_send_to(sm_at_host_get_urc_pipe(), "\r\n#XCARRIEREVT: %d,%d\r\n", event->type, err);
 
 #if defined(CONFIG_SM_CARRIER_AUTO_CONTROL)
 	/* Allow time for the URC be flushed before reboot */

@@ -46,6 +46,7 @@ static struct sm_mqtt_ctx {
 		struct sockaddr_in  broker;
 		struct sockaddr_in6 broker6;
 	};
+	struct modem_pipe *pipe;
 } ctx;
 
 static char mqtt_broker_url[SM_MAX_URL + 1];
@@ -95,20 +96,20 @@ static int handle_mqtt_publish_evt(struct mqtt_client *const c, const struct mqt
 	/* MQTT client does not track the packet identifiers, so MQTT_QOS_2_EXACTLY_ONCE
 	 * promise is not kept. This deviates from MQTT v3.1.1.
 	 */
-	rsp_send("\r\n#XMQTTMSG: %d,%d\r\n",
+	urc_send_to(ctx.pipe, "\r\n#XMQTTMSG: %d,%d\r\n",
 		evt->param.publish.message.topic.topic.size,
 		evt->param.publish.message.payload.len);
-	data_send(evt->param.publish.message.topic.topic.utf8,
+	data_send(ctx.pipe, evt->param.publish.message.topic.topic.utf8,
 		evt->param.publish.message.topic.topic.size);
-	data_send("\r\n", 2);
+	data_send(ctx.pipe, "\r\n", 2);
 	do {
 		ret = mqtt_read_publish_payload_blocking(c, sm_data_buf, sizeof(sm_data_buf));
 		if (ret > 0) {
-			data_send(sm_data_buf, ret);
+			data_send(ctx.pipe, sm_data_buf, ret);
 			size_read += ret;
 		}
 	} while (ret >= 0 && size_read < evt->param.publish.message.payload.len);
-	data_send("\r\n", 2);
+	data_send(ctx.pipe, "\r\n", 2);
 
 
 	return 0;
@@ -207,7 +208,7 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 		break;
 	}
 
-	rsp_send("\r\n#XMQTTEVT: %d,%d\r\n", evt->type, ret);
+	urc_send_to(ctx.pipe, "\r\n#XMQTTEVT: %d,%d\r\n", evt->type, ret);
 }
 
 static void mqtt_thread_fn(void *arg1, void *arg2, void *arg3)
@@ -366,6 +367,8 @@ static int do_mqtt_connect(void)
 	if (ctx.connected) {
 		return -EISCONN;
 	}
+
+	ctx.pipe = sm_at_host_get_current_pipe();
 
 	/* Init MQTT broker */
 	err = broker_init();

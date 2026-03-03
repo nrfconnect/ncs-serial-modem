@@ -36,6 +36,7 @@ static struct ping_argv_t {
 	uint32_t interval;
 	uint16_t pdn;
 } ping_argv;
+static struct modem_pipe *ping_pipe;
 
 static void ping_task(struct k_work *item);
 K_WORK_DEFINE(ping_work, ping_task);
@@ -402,7 +403,7 @@ wait_for_data:
 	}
 
 	/* Result */
-	rsp_send("#XPING: %d.%03d seconds\r\n",
+	urc_send_to(ping_pipe, "#XPING: %d.%03d seconds\r\n",
 		(uint32_t)(delta_t)/1000, (uint32_t)(delta_t)%1000);
 
 close_end:
@@ -444,7 +445,7 @@ static void ping_task(struct k_work *item)
 		int avg_s = avg / 1000;
 		int avg_f = avg % 1000;
 
-		rsp_send("#XPING: average %d.%03d seconds\r\n",
+		urc_send_to(ping_pipe, "#XPING: average %d.%03d seconds\r\n",
 			avg_s, avg_f);
 
 		LOG_INF("Approximate round trip times in milli-seconds:\n"
@@ -565,6 +566,7 @@ STATIC int handle_at_icmp_ping(enum at_parser_cmd_type cmd_type, struct at_parse
 			};
 		}
 
+		ping_pipe = sm_at_host_get_current_pipe();
 		err = ping_test_handler(target);
 		break;
 

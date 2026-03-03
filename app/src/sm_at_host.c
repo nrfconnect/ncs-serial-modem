@@ -69,6 +69,12 @@ struct data_mode {
 	size_t data_len;     /* Expected data length in data mode. */
 };
 
+/** Buffered URC message targeting a specific pipe */
+struct urc_msg {
+	sys_snode_t node;
+	char urc[];
+};
+
 /* Forward declarations */
 static void idle_timer_handler(struct k_timer *timer);
 static void idle_work(struct sm_at_host_ctx *ctx);
@@ -155,6 +161,7 @@ struct sm_at_host_ctx {
 	bool echo_enabled;
 
 	sys_slist_t idle_work_list;
+	sys_slist_t buffered_urcs;
 
 	/* Asynchronous poll context for sockets */
 	struct async_poll_ctx poll_ctx;
@@ -983,10 +990,28 @@ static int sm_at_send_internal(struct sm_at_host_ctx *ctx, const uint8_t *data, 
 		return -EINTR;
 	}
 
-	if (urc) {
-		ret = ring_buf_put(&urc_buf, data, len);
-		if (ret < len) {
-			LOG_ERR("URC buffer full, dropped %d bytes", len - ret);
+	/* Even if this is URC, bypass buffering if pipe is free */
+	if (urc && (!ctx || (ctx && !is_idle(ctx)))) {
+		/* Global URC for all pipes */
+		if (ctx == NULL) {
+			LOG_DBG("URC: %s", (const char *)data);
+			ret = ring_buf_put(&urc_buf, data, len);
+			if (ret < len) {
+				LOG_ERR("URC buffer full, dropped %d bytes", len - ret);
+			}
+			ctx = sm_at_host_get_urc_ctx();
+		} else {
+			/* Pipe specific URC */
+			struct urc_msg *msg = calloc(1, sizeof(struct urc_msg) + len + 1);
+
+			if (!msg) {
+				LOG_ERR("Failed to allocate URC message");
+				return -ENOMEM;
+			}
+			strcpy(msg->urc, (const char *)data);
+			K_SPINLOCK(&sm_at_host_lock) {
+				sys_slist_append(&ctx->buffered_urcs, &msg->node);
+			}
 		}
 		if (!is_idle(ctx)) {
 			LOG_DBG("AT command in progress, delaying URC processing");
@@ -1357,9 +1382,9 @@ void rsp_send_error(void)
 	rsp_send(ERROR_STR);
 }
 
-static void rsp_send_internal(bool urc, const char *fmt, va_list arg_ptr)
+static void rsp_send_internal(struct sm_at_host_ctx *ctx, bool urc, const char *fmt,
+			      va_list arg_ptr)
 {
-	struct sm_at_host_ctx *ctx = urc ? sm_at_host_get_urc_ctx() : sm_at_host_get_current();
 	static K_MUTEX_DEFINE(mutex_rsp_buf);
 	static char rsp_buf[SM_AT_MAX_RSP_LEN];
 	int rsp_len;
@@ -1374,12 +1399,24 @@ static void rsp_send_internal(bool urc, const char *fmt, va_list arg_ptr)
 	k_mutex_unlock(&mutex_rsp_buf);
 }
 
-void rsp_send(const char *fmt, ...)
+void urc_send_to(struct modem_pipe *pipe, const char *fmt, ...)
 {
+	struct sm_at_host_ctx *ctx = sm_at_host_get_ctx_from(pipe);
 	va_list arg_ptr;
 
 	va_start(arg_ptr, fmt);
-	rsp_send_internal(false, fmt, arg_ptr);
+	rsp_send_internal(ctx, true, fmt, arg_ptr);
+	va_end(arg_ptr);
+}
+
+
+void rsp_send(const char *fmt, ...)
+{
+	struct sm_at_host_ctx *ctx = sm_at_host_get_current();
+	va_list arg_ptr;
+
+	va_start(arg_ptr, fmt);
+	rsp_send_internal(ctx, false, fmt, arg_ptr);
 	va_end(arg_ptr);
 }
 
@@ -1388,13 +1425,13 @@ void urc_send(const char *fmt, ...)
 	va_list arg_ptr;
 
 	va_start(arg_ptr, fmt);
-	rsp_send_internal(true, fmt, arg_ptr);
+	rsp_send_internal(NULL, true, fmt, arg_ptr);
 	va_end(arg_ptr);
 }
 
-void data_send(const uint8_t *data, size_t len)
+void data_send(struct modem_pipe *pipe, const uint8_t *data, size_t len)
 {
-	struct sm_at_host_ctx *ctx = sm_at_host_get_current();
+	struct sm_at_host_ctx *ctx = sm_at_host_get_ctx_from(pipe);
 
 	sm_at_send_internal(ctx, data, len, false, SM_DEBUG_PRINT_SHORT);
 }
@@ -1641,6 +1678,19 @@ static void idle_work(struct sm_at_host_ctx *ctx)
 
 	do {
 		K_SPINLOCK(&sm_at_host_lock) {
+			node = sys_slist_get(&ctx->buffered_urcs);
+		}
+		if (!node) {
+			break;
+		}
+		struct urc_msg *msg = CONTAINER_OF(node, struct urc_msg, node);
+
+		sm_at_host_pipe_tx_blocking(ctx, (uint8_t *)msg->urc, strlen(msg->urc));
+		free(msg);
+	} while (true);
+
+	do {
+		K_SPINLOCK(&sm_at_host_lock) {
 			node = sys_slist_get(&ctx->idle_work_list);
 		}
 		if (!node) {
@@ -1693,6 +1743,7 @@ static int sm_at_host_ctx_init(struct sm_at_host_ctx *ctx, struct modem_pipe *pi
 	k_timer_init(&ctx->data_inactivity_timer, inactivity_timer_handler, NULL);
 	k_timer_init(&ctx->idle_timer, idle_timer_handler, NULL);
 	sys_slist_init(&ctx->idle_work_list);
+	sys_slist_init(&ctx->buffered_urcs);
 
 	return 0;
 }
@@ -1908,9 +1959,17 @@ static int sm_at_host_destroy(struct sm_at_host_ctx *ctx)
 	k_work_cancel_sync(&ctx->rx_work, &sync);
 	k_work_cancel_sync(&ctx->raw_send_scheduled_work, &sync);
 
-	/* Remove from instance list */
+	/* Remove from instance list and free buffered URCs */
 	K_SPINLOCK(&sm_at_host_lock) {
+		sys_snode_t *node;
+		sys_snode_t *next;
+		struct urc_msg *msg;
+
 		sys_slist_find_and_remove(&instance_list, &ctx->node);
+		SYS_SLIST_FOR_EACH_NODE_SAFE(&ctx->buffered_urcs, node, next) {
+			msg = CONTAINER_OF(node, struct urc_msg, node);
+			free(msg);
+		}
 	}
 
 	LOG_INF("Destroyed AT host instance %p", (void *)ctx);
