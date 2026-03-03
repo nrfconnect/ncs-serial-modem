@@ -33,7 +33,8 @@ Syntax
   * ``1`` - Start FOTA for application update.
   * ``2`` - Start FOTA for modem delta update.
   * ``3`` - Start FOTA for full modem update.
-    Can only be used when the :file:`overlay-full_fota.conf` configuration file is used.
+    Can only be used when the :file:`overlay-full_fota.conf` configuration file and
+    :file:`PM_STATIC_YML_FILE=pm_static_nrf9151dk_nrf9151_ns_full_fota.yml` compile option are used.
 
     Not supported on the Thingy:91 X.
 
