@@ -123,6 +123,7 @@ tests:
     build_only: true
     extra_args:
       - EXTRA_CONF_FILE="overlay-full_fota.conf"
+      - PM_STATIC_YML_FILE=pm_static_nrf9151dk_nrf9151_ns_full_fota.yml
     extra_configs:
       - CONFIG_SM_DFU_MODEM_FULL=y
     platform_allow:
