@@ -120,7 +120,7 @@ Response syntax
 
 ::
 
-   #XSOCKET: <handle>,<family>,<role>,<type>,<cid>
+   #XSOCKET: <handle>,<family>,<role>,<type>,<cid>[,<peer_addr>,<peer_port>]
 
 * The ``<handle>`` parameter is an integer.
   When positive or ``0``, the socket is valid.
@@ -146,15 +146,27 @@ Response syntax
 * The ``<cid>`` parameter is an integer indicating the used PDN connection.
   It represents ``cid`` in the ``+CGDCONT`` command.
 
+* The ``<peer_addr>`` parameter is an optional string containing the IP address of the remote peer that connected.
+  It supports both IPv4 and IPv6 addresses.
+  This parameter is only present for sockets created by accepting a connection on a listening socket.
+
+* The ``<peer_port>`` parameter is an optional unsigned 16-bit integer (0 - 65535).
+  It represents the port number of the remote peer.
+  This parameter is only present for sockets created by accepting a connection on a listening socket.
+
+
 Example
 ~~~~~~~
 
 ::
 
    AT#XSOCKET?
-   #XSOCKET: 0,1,0,1,0
-   #XSOCKET: 1,2,0,1,0
+   #XSOCKET: 0,2,1,1,0
+
+   #XSOCKET: 1,2,1,1,0,"1111:2222:3333:4444::1",1234
+
    #XSOCKET: 4,1,0,2,1
+
    OK
 
 Test command
@@ -1866,3 +1878,253 @@ Test command
 ------------
 
 The test command is not supported.
+
+Socket listen #XLISTEN
+=======================
+
+The ``#XLISTEN`` command allows you to put a TCP server socket in listening mode to accept incoming connections.
+
+The socket must be a stream socket (TCP) that has been bound to a local port using the ``#XBIND`` command before it can be put in listening mode.
+
+.. note::
+
+   The nRF91 modem does not support TLS server sockets, so the ``#XLISTEN`` command cannot be used with TLS sockets created with the ``#XSSOCKET`` command.
+   This means that for production use cases, the network must be isolated from the public internet.
+
+.. note::
+
+   The nRF91 modem uses a fixed backlog of 2 for listening sockets, this means that up to 2 incoming connections can be queued for acceptance.
+   After accepting a connection with the ``#XACCEPT`` command, the connection is removed from the acceptance queue.
+
+
+Set command
+-----------
+
+The set command allows you to put a socket in listening mode.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XLISTEN=<handle>
+
+* The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSOCKET`` command.
+  The socket must be a stream socket (TCP) that has been bound to a local port.
+
+Example
+~~~~~~~
+
+::
+
+   AT#XLISTEN=0
+   OK
+
+Read command
+------------
+
+The read command allows you to list all sockets that are in listening mode.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XLISTEN?
+
+Response syntax
+~~~~~~~~~~~~~~~
+
+::
+
+   #XLISTEN: <handle>,<cid>,<local_port>
+
+* The ``<handle>`` parameter is an integer indicating the socket handle.
+
+* The ``<cid>`` parameter is an integer indicating the PDN connection ID.
+
+* The ``<local_port>`` parameter is an unsigned 16-bit integer (0 - 65535).
+  It represents the local port the socket is bound to and listening on.
+
+Example
+~~~~~~~
+
+::
+
+   AT#XLISTEN?
+   #XLISTEN: 0,0,1000
+
+   OK
+
+Test command
+------------
+
+The test command tests the existence of the command and provides information about the type of its subparameters.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XLISTEN=?
+
+Response syntax
+~~~~~~~~~~~~~~~
+
+::
+
+   #XLISTEN: <handle>
+
+Example
+~~~~~~~
+
+::
+
+   AT#XLISTEN=?
+   #XLISTEN: <handle>
+   OK
+
+Socket accept #XACCEPT
+=======================
+
+The ``#XACCEPT`` command allows you to accept an incoming connection on a listening socket.
+
+This command is used with TCP server sockets that have been put in listening mode with the ``#XLISTEN`` command.
+When a connection is accepted, a new socket is created to handle the connection, and the original listening socket continues to listen for additional connections.
+
+.. note::
+
+   The listening socket is set to non-blocking mode when ``#XLISTEN`` command is executed.
+   If there are no incoming connections when the ``#XACCEPT`` command is executed, it will return an error.
+   The ``#XAPOLL`` command can be used to receive asynchronous notifications (``POLLIN``) for incoming connections on the listening socket.
+
+
+Set command
+-----------
+
+The set command allows you to accept an incoming connection on a listening socket.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XACCEPT=<handle>
+
+* The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSOCKET`` command.
+  The socket must be a stream socket (TCP) that is in listening mode.
+
+Response syntax
+~~~~~~~~~~~~~~~
+
+::
+
+   #XACCEPT: <handle>,<cid>,"<peer_addr>",<peer_port>
+
+* The ``<handle>`` parameter is an integer indicating the new socket handle created for the accepted connection.
+  This new socket can be used to send and receive data with the connected client.
+
+* The ``<cid>`` parameter is an integer indicating the PDN connection ID.
+
+* The ``<peer_addr>`` parameter is a string containing the IP address of the remote peer that connected.
+  It supports both IPv4 and IPv6 addresses.
+
+* The ``<peer_port>`` parameter is an unsigned 16-bit integer (0 - 65535).
+  It represents the port number of the remote peer.
+
+Example
+~~~~~~~
+
+::
+
+   AT#XSOCKET=2,1,0
+   #XSOCKET: 0,1,6
+
+   OK
+
+   // Enable asynchronous polling for all the sockets with POLLIN event.
+   AT#XAPOLL=,1,1
+   OK
+
+   AT#XBIND=0,1000
+   OK
+
+   AT#XLISTEN=0
+   OK
+
+   // POLLIN for listening socket is received when a client connects.
+   #XAPOLL: 0,1
+
+   // Accept the incoming connection.
+   AT#XACCEPT=0
+   #XACCEPT: 1,0,"1111:2222:3333:4444::1",1234
+
+   OK
+
+   // Once the connection is accepted, data can be received and sent with the new socket handle.
+   #XAPOLL: 1,1
+
+   AT#XRECV=1,0,0,1
+   #XRECV: 1,0,17
+   Hello from client
+   OK
+
+   AT#XSEND=1,0,0,"Hello from server"
+   #XSEND: 1,0,17
+
+   OK
+
+   #XAPOLL: 1,1
+
+   AT#XRECV=1,0,0,1
+   #XRECV: 1,0,15
+   Bye from client
+   OK
+
+   // Client closes the connection. POLLIN event is always received with POLLHUP, if POLLIN is enabled for polling.
+   #XAPOLL: 1,17
+   AT#XRECV=1,0,0,1
+   OK
+
+   AT#XCLOSE=1
+   #XCLOSE: 1,0
+
+   OK
+
+   AT#XCLOSE
+   #XCLOSE: 0,0
+
+   OK
+
+Read command
+------------
+
+The read command is not supported.
+
+Test command
+------------
+
+The test command tests the existence of the command and provides information about the type of its subparameters.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XACCEPT=?
+
+Response syntax
+~~~~~~~~~~~~~~~
+
+::
+
+   #XACCEPT: <handle>
+
+Example
+~~~~~~~
+
+::
+
+   AT#XACCEPT=?
+   #XACCEPT: <handle>
+   OK

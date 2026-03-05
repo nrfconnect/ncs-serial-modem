@@ -66,6 +66,7 @@ target_sources(app PRIVATE
   ../stubs/control_pin_stubs.c
   ../stubs/pm_stubs.c
   ../stubs/at_cmd_custom_stubs.c
+  ../stubs/kernel_stubs.c
   ../../src/sm_util.c
   ../../src/sm_at_socket.c
   ../../src/sm_at_host.c

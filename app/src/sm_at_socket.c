@@ -20,8 +20,7 @@
 
 LOG_MODULE_REGISTER(sm_sock, CONFIG_SM_LOG_LEVEL);
 
-#define SM_FDS_COUNT CONFIG_POSIX_OPEN_MAX
-#define SM_MAX_SOCKET_COUNT (SM_FDS_COUNT - 1)
+#define SM_MAX_SOCKET_COUNT CONFIG_POSIX_OPEN_MAX
 
 /**@brief Socketopt operations. */
 enum sm_socketopt_operation {
@@ -83,11 +82,15 @@ static struct sm_socket {
 	int family;                      /* Socket address family */
 	int fd;                          /* Socket descriptor. */
 	uint16_t cid;                    /* PDP Context ID, 0: primary; 1~10: secondary */
+	uint16_t local_port;             /* Explicitly bound local port. */
 	int send_flags;                  /* Send flags */
 	bool send_cb_set: 1;             /* Send callback set */
 	bool connected: 1;               /* Connected flag. */
+	bool listen: 1;                  /* Listen flag for TCP server sockets. */
 	struct sm_async_poll async_poll; /* Async poll info. */
 	struct sm_send_ntf send_ntf;     /* Send notification info. */
+	struct sockaddr_storage *remote_addr; /* Remote peer address (for accepted connections). */
+	socklen_t remote_addrlen;        /* Length of remote peer address. */
 } socks[SM_MAX_SOCKET_COUNT];
 
 static struct sm_socket *datamode_sock; /* Socket for data mode */
@@ -120,11 +123,15 @@ static void init_socket(struct sm_socket *socket)
 	socket->family = AF_UNSPEC;
 	socket->fd = INVALID_SOCKET;
 	socket->cid = 0;
+	socket->local_port = 0;
 	socket->send_flags = 0;
 	socket->send_cb_set = false;
 	socket->connected = false;
+	socket->listen = false;
 	socket->send_ntf = (struct sm_send_ntf){0};
 	socket->async_poll = (struct sm_async_poll){0};
+	socket->remote_addr = NULL;
+	socket->remote_addrlen = 0;
 }
 
 static struct sm_socket *find_socket(int fd)
@@ -656,6 +663,12 @@ static int do_socket_close(struct sm_socket *sock)
 
 	rsp_send("\r\n#XCLOSE: %d,%d\r\n", sock->fd, ret);
 
+	/* Free remote peer address if allocated */
+	if (sock->remote_addr != NULL) {
+		k_free(sock->remote_addr);
+		sock->remote_addr = NULL;
+	}
+
 	init_socket(sock);
 
 	return ret;
@@ -877,7 +890,7 @@ static int sec_sockopt_get(struct sm_socket *sock, enum at_sec_sockopt at_option
 	return ret;
 }
 
-int bind_to_local_addr(struct sm_socket *sock, uint16_t port)
+static int bind_to_local_addr(struct sm_socket *sock, uint16_t port)
 {
 	int ret;
 
@@ -936,6 +949,7 @@ int bind_to_local_addr(struct sm_socket *sock, uint16_t port)
 		return -EINVAL;
 	}
 
+	sock->local_port = port;
 	return 0;
 }
 
@@ -1288,9 +1302,20 @@ STATIC int handle_at_socket(enum at_parser_cmd_type cmd_type, struct at_parser *
 		for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
 			if (socks[i].fd != INVALID_SOCKET &&
 			    socks[i].sec_tag == SEC_TAG_TLS_INVALID) {
-				rsp_send("\r\n#XSOCKET: %d,%d,%d,%d,%d\r\n", socks[i].fd,
-					 socks[i].family, socks[i].role, socks[i].type,
-					 socks[i].cid);
+				if (socks[i].remote_addr != NULL) {
+					char peer_addr[NRF_INET6_ADDRSTRLEN] = {0};
+					uint16_t peer_port = 0;
+
+					util_get_peer_addr((struct sockaddr *)socks[i].remote_addr,
+							   peer_addr, &peer_port);
+					rsp_send("\r\n#XSOCKET: %d,%d,%d,%d,%d,\"%s\",%d\r\n",
+						 socks[i].fd, socks[i].family, socks[i].role,
+						 socks[i].type, socks[i].cid, peer_addr, peer_port);
+				} else {
+					rsp_send("\r\n#XSOCKET: %d,%d,%d,%d,%d\r\n", socks[i].fd,
+						 socks[i].family, socks[i].role, socks[i].type,
+						 socks[i].cid);
+				}
 			}
 		}
 		err = 0;
@@ -1946,6 +1971,170 @@ STATIC int handle_at_recvfrom(enum at_parser_cmd_type cmd_type, struct at_parser
 			}
 		}
 		err = do_recvfrom(sock, timeout, flags, mode, data_len);
+		break;
+
+	default:
+		break;
+	}
+
+	return err;
+}
+
+int do_listen(struct sm_socket *sock)
+{
+	int ret;
+
+	if (sock->type != NRF_SOCK_STREAM || sock->local_port == 0 ||
+	    sock->sec_tag != SEC_TAG_TLS_INVALID) {
+		return -EOPNOTSUPP;
+	}
+
+	/* Set the socket to non-blocking mode, so accept() won't block. */
+	ret = nrf_fcntl(sock->fd, NRF_F_SETFL, NRF_O_NONBLOCK);
+	if (ret) {
+		LOG_ERR("nrf_fcntl() failed: %d", -errno);
+		return -errno;
+	}
+
+	/* nRF modem ignores the backlog parameter. Backlog in modem is fixed to 2. */
+	ret = nrf_listen(sock->fd, 2);
+	if (ret) {
+		LOG_ERR("nrf_listen() failed: %d", -errno);
+		return -errno;
+	}
+
+	sock->role = AT_SOCKET_ROLE_SERVER;
+	sock->listen = true;
+
+	return 0;
+}
+
+SM_AT_CMD_CUSTOM(xlisten, "AT#XLISTEN", handle_at_listen);
+STATIC int handle_at_listen(enum at_parser_cmd_type cmd_type, struct at_parser *parser, uint32_t)
+{
+	int err = -EINVAL;
+	int fd;
+
+	struct sm_socket *sock = NULL;
+
+	switch (cmd_type) {
+	case AT_PARSER_CMD_TYPE_SET:
+		err = at_parser_num_get(parser, 1, &fd);
+		if (err) {
+			return err;
+		}
+		sock = find_socket(fd);
+		if (sock == NULL) {
+			return -EINVAL;
+		}
+		err = do_listen(sock);
+		break;
+
+	case AT_PARSER_CMD_TYPE_READ:
+		for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
+			if (socks[i].fd != INVALID_SOCKET && socks[i].listen) {
+				rsp_send("\r\n#XLISTEN: %d,%d,%d\r\n", socks[i].fd, socks[i].cid,
+					 socks[i].local_port);
+			}
+		}
+		err = 0;
+		break;
+
+	case AT_PARSER_CMD_TYPE_TEST:
+		rsp_send("\r\n#XLISTEN: <handle>\r\n");
+		err = 0;
+		break;
+
+	default:
+		break;
+	}
+
+	return err;
+}
+
+int do_accept(struct sm_socket *sock)
+{
+	int ret;
+	struct sockaddr remote;
+	socklen_t addrlen = sizeof(struct sockaddr);
+	char peer_addr[NRF_INET6_ADDRSTRLEN] = {0};
+	uint16_t peer_port = 0;
+
+	if (sock->type != NRF_SOCK_STREAM || !sock->listen) {
+		return -EOPNOTSUPP;
+	}
+
+	ret = nrf_accept(sock->fd, (struct nrf_sockaddr *)&remote, (nrf_socklen_t *)&addrlen);
+	if (ret < 0) {
+		LOG_ERR("nrf_accept() failed: %d", -errno);
+		return -errno;
+	}
+
+	struct sm_socket *new_sock = find_avail_socket();
+	if (new_sock == NULL) {
+		LOG_ERR("Max socket count reached, closing accepted socket");
+		nrf_close(ret);
+		return -EINVAL;
+	}
+	init_socket(new_sock);
+	new_sock->fd = ret;
+	new_sock->family = remote.sa_family;
+	new_sock->type = NRF_SOCK_STREAM;
+	new_sock->role = AT_SOCKET_ROLE_SERVER;
+	new_sock->cid = sock->cid;
+	new_sock->connected = true;
+
+	util_get_peer_addr(&remote, peer_addr, &peer_port);
+	rsp_send("\r\n#XACCEPT: %d,%d,\"%s\",%d\r\n", new_sock->fd, new_sock->cid, peer_addr,
+		 peer_port);
+
+	/* Store the address of the remote peer */
+	new_sock->remote_addr = k_malloc(sizeof(struct sockaddr_storage));
+	if (new_sock->remote_addr != NULL) {
+		memcpy(new_sock->remote_addr, &remote, sizeof(struct sockaddr_storage));
+		new_sock->remote_addrlen = addrlen;
+	} else {
+		LOG_WRN("Failed to allocate memory for remote peer address");
+	}
+
+ 	/* Update poll events for xapoll and automatic data reception */
+	new_sock->async_poll.adr_flags = poll_ctx.adr_flags;
+	new_sock->async_poll.adr_hex = poll_ctx.adr_hex;
+	new_sock->async_poll.xapoll_events_requested = poll_ctx.xapoll_events_requested;
+	update_poll_events(new_sock,
+			   NRF_POLLIN | NRF_POLLOUT | NRF_POLLERR | NRF_POLLHUP | NRF_POLLNVAL,
+			   true);
+
+	/* Restore POLLIN for listening socket. */
+	update_poll_events(sock, NRF_POLLIN, true);
+
+	return 0;
+}
+
+SM_AT_CMD_CUSTOM(xaccept, "AT#XACCEPT", handle_at_accept);
+STATIC int handle_at_accept(enum at_parser_cmd_type cmd_type, struct at_parser *parser, uint32_t)
+{
+	int err = -EINVAL;
+	int fd;
+
+	struct sm_socket *sock = NULL;
+
+	switch (cmd_type) {
+	case AT_PARSER_CMD_TYPE_SET:
+		err = at_parser_num_get(parser, 1, &fd);
+		if (err) {
+			return err;
+		}
+		sock = find_socket(fd);
+		if (sock == NULL) {
+			return -EINVAL;
+		}
+		err = do_accept(sock);
+		break;
+
+	case AT_PARSER_CMD_TYPE_TEST:
+		rsp_send("\r\n#XACCEPT: <handle>\r\n");
+		err = 0;
 		break;
 
 	default:
