@@ -250,6 +250,15 @@ config SM_NRF_CLOUD
 	default y
 	select EXPERIMENTAL
 
+if SM_NRF_CLOUD
+config HEAP_MEM_POOL_ADD_SIZE_SM_NRF_CLOUD
+	int "Additional heap memory pool size for nRF Cloud support"
+	default 8192
+	help
+	  Some libraries used by nRF Cloud use System Heap (k_malloc() / k_free()) for
+	  dynamic memory allocation.
+endif # SM_NRF_CLOUD
+
 config SM_MQTTC
 	bool "MQTT client support"
 	default y
@@ -268,6 +277,15 @@ config SM_PPP
 
 config SM_CMUX
 	bool "CMUX support"
+
+config SM_CMUX_CHANNEL_COUNT
+	int "Number of CMUX channels"
+	depends on SM_CMUX
+	default 3
+	range 1 63
+	help
+	  Number of channels to be used by the CMUX implementation.
+	  Each channel adds about 4 kB of RAM usage for buffers.
 
 if SM_PPP
 
@@ -333,14 +351,25 @@ choice NRF_MODEM_LIB_TRACE_BACKEND
 
 config SM_MODEM_TRACE_BACKEND_CMUX
 	bool "CMUX modem trace backend"
-	depends on SM_CMUX
+	depends on SM_CMUX_CHANNEL_COUNT > 1
 	help
 	  When CMUX is enabled, modem traces are transmitted on a dedicated CMUX channel.
 	  The trace channel is the first channel after the AT command channel and the PPP channel.
 
 endchoice # NRF_MODEM_LIB_TRACE_BACKEND
 
-endif
+if SM_MODEM_TRACE_BACKEND_CMUX
+
+config SM_MODEM_TRACE_DROP_ON_TIMEOUT
+	bool "Drop modem trace data if the CMUX trace channel is slow"
+	default y
+
+config SM_MODEM_TRACE_CMUX_TX_TIMEOUT_MS
+	int "Timeout for sending modem trace data over CMUX in milliseconds"
+	default 100
+
+endif # SM_MODEM_TRACE_BACKEND_CMUX
+endif # NRF_MODEM_LIB_TRACE
 
 #
 # Hardware RX byte counting for UART

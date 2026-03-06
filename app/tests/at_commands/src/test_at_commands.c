@@ -17,6 +17,7 @@
 #include <dfu/dfu_target.h>
 
 #include "sm_at_host.h"
+#include "uart_stub.h"
 
 /* CMock-generated mocks */
 #include "cmock_nrf_modem_at.h"
@@ -32,26 +33,10 @@ extern int _nrf_modem_at_cmd_custom_list_end;
 int _nrf_modem_at_cmd_custom_list_start;
 int _nrf_modem_at_cmd_custom_list_end;
 
-/* Work queue needed by sm_at_host and other modules */
-struct k_work_q sm_work_q;
-
 /* Response capture - provided by sm_at_host_stubs.c */
 extern void capture_response_data(const uint8_t *data, size_t len);
 extern void clear_captured_response(void);
 extern const char *get_captured_response(void);
-
-/* Helper to send AT command and capture response */
-static void send_at_command(const char *cmd)
-{
-	bool stop_at_receive = false;
-	const uint8_t *cmd_bytes = (const uint8_t *)cmd;
-	size_t cmd_len = strlen(cmd);
-
-	clear_captured_response();
-
-	/* Send command through sm_at_receive() */
-	sm_at_receive(cmd_bytes, cmd_len, &stop_at_receive);
-}
 
 /*
  * Test: AT#XSMVER command - basic functionality

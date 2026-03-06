@@ -12,6 +12,86 @@ This page describes AT commands related to the Point-to-Point Protocol (PPP).
 PPP is enabled in |SM| by compiling it with the appropriate configuration files, depending on your use case (with or without CMUX).
 See the :ref:`sm_config_files` section for more information.
 
+Enter data state +CGDATA
+========================
+
+The ``AT+CGDATA`` command enters data state and starts PPP, as specified in `3GPP TS 27.007`_ (section 10.1.12).
+
+Set command
+-----------
+
+The set command starts PPP on the current channel, optionally specifying the layer 2 protocol and PDN connection.
+
+Syntax
+~~~~~~
+
+::
+
+   AT+CGDATA[=<L2P>[,<cid>]]
+
+* The ``<L2P>`` parameter is a string specifying the layer 2 protocol to use.
+  The only supported value is ``"PPP"``.
+  If omitted, ``"PPP"`` is assumed.
+
+* The ``<cid>`` parameter is an integer indicating the PDN connection to use.
+  Its default value is ``0``, which represents the default PDN connection.
+
+Response syntax
+~~~~~~~~~~~~~~~
+
+::
+
+   CONNECT
+
+Examples
+~~~~~~~~
+
+With default parameters:
+
+::
+
+   AT+CGDATA
+
+   CONNECT
+
+Request PPP to use specified PDN connection:
+
+::
+
+   AT+CGDATA="PPP",1
+
+   CONNECT
+
+Test command
+------------
+
+The test command lists the supported layer 2 protocols.
+
+Syntax
+~~~~~~
+
+::
+
+   AT+CGDATA=?
+
+Response syntax
+~~~~~~~~~~~~~~~
+
+::
+
+   +CGDATA: (<L2P_values>)
+
+Example
+~~~~~~~
+
+::
+
+   AT+CGDATA=?
+
+   +CGDATA: ("PPP")
+
+   OK
+
 Control PPP #XPPP
 =================
 

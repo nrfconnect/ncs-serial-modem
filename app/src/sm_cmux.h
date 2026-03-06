@@ -6,23 +6,17 @@
 #ifndef SM_CMUX_
 #define SM_CMUX_
 
+#include <stdint.h>
 #include <stdbool.h>
 
 struct modem_pipe;
 
-/* CMUX channels. Does not include AT-channel. */
+/* Default CMUX channels when AT#XCMUX is used */
 enum cmux_channel {
-#if defined(CONFIG_SM_PPP)
-	CMUX_PPP_CHANNEL,
-#endif
-#if defined(CONFIG_SM_MODEM_TRACE_BACKEND_CMUX)
-	CMUX_MODEM_TRACE_CHANNEL,
-#endif
-	CMUX_EXT_CHANNEL_COUNT
+	CMUX_AT_CHANNEL = 1,
+	CMUX_PPP_CHANNEL = 2,
+	CMUX_MODEM_TRACE_CHANNEL = 3,
 };
-struct modem_pipe *sm_cmux_reserve(enum cmux_channel channel);
-void sm_cmux_release(enum cmux_channel channel);
-bool sm_cmux_dlci_is_open(enum cmux_channel channel);
 
 #if CONFIG_SM_CMUX
 bool sm_cmux_is_started(void);
@@ -32,5 +26,14 @@ static inline bool sm_cmux_is_started(void)
 	return false;
 }
 #endif
+
+/**
+ * @brief Get a pointer to the modem_pipe associated with a given DLCI address.
+ *
+ * @param address The DLCI address.
+ * @return struct modem_pipe* Pointer to the modem_pipe,
+ *	   or NULL if there is no pipe associated with the given address.
+ */
+struct modem_pipe *sm_cmux_get_dlci(uint8_t address);
 
 #endif
