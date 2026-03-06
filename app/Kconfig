@@ -250,6 +250,20 @@ config SM_NRF_CLOUD
 	default y
 	select EXPERIMENTAL
 
+config SM_NRF_CLOUD_LOCATION
+	bool "nRF Cloud Location support"
+	depends on SM_NRF_CLOUD
+	help
+	  Enable the nRF Cloud Location service for cloud-assisted geolocation.
+	  Supports A-GNSS, P-GPS, and Wi-Fi positioning:
+
+	  - A-GNSS: Reduces GNSS time-to-first-fix by downloading assistance data from nRF Cloud.
+	  - P-GPS: Enables predicted GPS ephemerides for offline or intermittent connectivity scenarios.
+	  - Wi-Fi: Uses Wi-Fi access point scanning for positioning without GNSS.
+
+	  A-GNSS and P-GPS data are sourced from the modem's GNSS subsystem; Wi-Fi data from the Wi-Fi scanner.
+	  A-GNSS and P-GPS can be enabled independently at compile time using NRF_CLOUD_AGNSS and NRF_CLOUD_PGPS.
+
 config SM_MQTTC
 	bool "MQTT client support"
 	default y

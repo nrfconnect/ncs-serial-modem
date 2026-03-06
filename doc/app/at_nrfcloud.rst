@@ -64,26 +64,6 @@ It can have the following integer values:
    You must use the :ref:`#XGNSS <SM_AT_GNSS>` AT command to start GNSS either in single-fix or periodic navigation mode.
    The interval between fixes must be at least 5 seconds.
 
-.. note::
-   The application supports the nRF Cloud cloud2device appId ``MODEM`` to send an AT command from the cloud:
-
-   * cloud2device schema::
-
-       {"appId":"MODEM", "messageType":"CMD", "data":"<AT_command>"}.
-
-   * device2cloud schema::
-
-       {"appId":"MODEM", "messageType":"RSP", "data":"<AT_response>"}.
-
-.. note::
-   The application supports the nRF Cloud cloud2device appId ``DEVICE`` to gracefully disconnect from the cloud:
-
-   * cloud2device schema::
-
-       {"appId":"DEVICE", "messageType":"DISCON"}.
-
-   There is no response sent to nRF Cloud for this appId.
-
 Unsolicited notification
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -202,7 +182,7 @@ The request uses information from the cellular network, Wi-Fi® access points, o
    To use ``#XNRFCLOUDPOS``, the following preconditions apply:
 
    * The device must be connected to nRF Cloud using :ref:`#XNRFCLOUD <SM_AT_NRFCLOUD>`.
-   * The ``CONFIG_NRF_CLOUD_LOCATION`` Kconfig option must be enabled.
+   * The ``CONFIG_SM_NRF_CLOUD_LOCATION`` Kconfig option must be enabled.
 
 Set command
 -----------

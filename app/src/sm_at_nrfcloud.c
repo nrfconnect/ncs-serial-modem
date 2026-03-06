@@ -12,22 +12,20 @@
 #include <net/nrf_cloud.h>
 #include <net/nrf_cloud_agnss.h>
 #include <net/nrf_cloud_pgps.h>
-#include <net/nrf_cloud_location.h>
+#include <net/nrf_cloud_coap.h>
+#include "nrf_cloud_coap_transport.h"
 #include <modem/at_parser.h>
 #include <modem/nrf_modem_lib.h>
+#include <modem/modem_info.h>
 #include "sm_util.h"
 #include "sm_at_host.h"
 #include "sm_at_nrfcloud.h"
 
 LOG_MODULE_REGISTER(sm_nrfcloud, CONFIG_SM_LOG_LEVEL);
 
-#define MODEM_AT_RSP \
-	"{\"appId\":\"MODEM\", \"messageType\":\"RSP\", \"data\":\"%s\"}"
-
-static struct k_work cloud_cmd;
 static K_SEM_DEFINE(sem_date_time, 0, 1);
 
-#if defined(CONFIG_NRF_CLOUD_LOCATION)
+#if defined(CONFIG_SM_NRF_CLOUD_LOCATION)
 
 /* Cellular positioning services .*/
 enum sm_nrfcloud_cellpos {
@@ -79,14 +77,14 @@ static bool nrfcloud_ncellmeas_done;
 /* nRF Cloud location request Wi-Fi data. */
 static struct wifi_scan_info nrfcloud_wifi_data;
 
-#endif /* CONFIG_NRF_CLOUD_LOCATION */
+#endif /* CONFIG_SM_NRF_CLOUD_LOCATION */
 
 static char nrfcloud_device_id[NRF_CLOUD_CLIENT_ID_MAX_LEN];
 
 bool sm_nrf_cloud_ready;
 bool sm_nrf_cloud_send_location;
 
-#if defined(CONFIG_NRF_CLOUD_LOCATION)
+#if defined(CONFIG_SM_NRF_CLOUD_LOCATION)
 AT_MONITOR(ncell_meas, "NCELLMEAS", ncell_meas_mon, PAUSED);
 
 static void ncell_meas_mon(const char *notify)
@@ -240,13 +238,38 @@ exit:
 	LOG_INF("NCELLMEAS notification parse (err: %d)", err);
 }
 
+int get_single_cell_info(struct lte_lc_cell *const cell_inf)
+{
+	int err;
+	struct modem_param_info modem_inf;
+
+	err = modem_info_params_init(&modem_inf);
+	if (err) {
+		LOG_ERR("Could not initialize modem info module, error: %d", err);
+		return err;
+	}
+	err = modem_info_params_get(&modem_inf);
+	if (err) {
+		LOG_ERR("Could not obtain information from modem, error: %d", err);
+		return err;
+	}
+	cell_inf->mcc = modem_inf.network.mcc.value;
+	cell_inf->mnc = modem_inf.network.mnc.value;
+	cell_inf->tac = modem_inf.network.area_code.value;
+	cell_inf->id = modem_inf.network.cellid_dec;
+	cell_inf->rsrp = modem_inf.network.rsrp.value;
+
+	return 0;
+}
+
 static void loc_req_wk(struct k_work *work)
 {
 	int err = 0;
 
 	if (nrfcloud_cell_pos == CELLPOS_SINGLE_CELL) {
+		LOG_DBG("Requesting single-cell location from nRF Cloud.");
 		/* Obtain the single cell info from the modem */
-		err = nrf_cloud_location_scell_data_get(&nrfcloud_cell_data.current_cell);
+		err = get_single_cell_info(&nrfcloud_cell_data.current_cell);
 		if (err) {
 			LOG_ERR("Failed to obtain single-cell cellular network information (%d).",
 				err);
@@ -259,250 +282,59 @@ static void loc_req_wk(struct k_work *work)
 		}
 	}
 
-	if (!err) {
-		err = nrf_cloud_location_request(
-			nrfcloud_cell_pos ? &nrfcloud_cell_data : NULL,
-			nrfcloud_wifi_pos ? &nrfcloud_wifi_data : NULL, NULL, NULL);
-		if (err) {
-			LOG_ERR("Failed to request nRF Cloud location (%d).", err);
-		} else {
-			LOG_INF("nRF Cloud location requested.");
-		}
-	}
+	struct nrf_cloud_location_result result = {0};
+	const struct nrf_cloud_rest_location_request request = {
+		.config = NULL,
+		.cell_info = nrfcloud_cell_pos ? &nrfcloud_cell_data : NULL,
+		.wifi_info = nrfcloud_wifi_pos ? &nrfcloud_wifi_data : NULL};
 
-	if (err) {
+	err = nrf_cloud_coap_location_get(&request, &result);
+	if (err == 0) {
+		rsp_send("\r\n#XNRFCLOUDPOS: %d,%lf,%lf,%d\r\n",
+			result.type, result.lat, result.lon, result.unc);
+	} else {
+		LOG_ERR("Failed to request nRF Cloud location (%d).", err);
 		rsp_send("\r\n#XNRFCLOUDPOS: %d\r\n", err < 0 ? -1 : err);
 	}
+
 	if (nrfcloud_wifi_pos) {
 		k_free(nrfcloud_wifi_data.ap_info);
 	}
 	nrfcloud_sending_loc_req = false;
 }
 
-#endif /* CONFIG_NRF_CLOUD_LOCATION */
+#endif /* CONFIG_SM_NRF_CLOUD_LOCATION */
 
 static int do_cloud_send_msg(const char *message, int len)
 {
 	int err;
-	struct nrf_cloud_tx_data msg = {
-		.data.ptr = message,
-		.data.len = len,
-		.topic_type = NRF_CLOUD_TOPIC_MESSAGE,
-		.qos = MQTT_QOS_0_AT_MOST_ONCE
-	};
+	const char *resource = "msg/d2c";
 
-	err = nrf_cloud_send(&msg);
+	err = nrf_cloud_coap_post(resource, NULL, message, len, COAP_CONTENT_FORMAT_APP_JSON, false,
+				  NULL, NULL);
 	if (err) {
-		LOG_ERR("nrf_cloud_send failed, error: %d", err);
+		LOG_ERR("nrf_cloud_coap_json_message_send failed, error: %d", err);
 	}
 
 	return err;
 }
 
-static void on_cloud_evt_ready(void)
+static void on_cloud_ready(void)
 {
 	sm_nrf_cloud_ready = true;
 	rsp_send("\r\n#XNRFCLOUD: %d,%d\r\n", sm_nrf_cloud_ready, sm_nrf_cloud_send_location);
-#if defined(CONFIG_NRF_CLOUD_LOCATION)
+#if defined(CONFIG_SM_NRF_CLOUD_LOCATION)
 	at_monitor_resume(&ncell_meas);
 #endif
 }
 
-static void on_cloud_evt_disconnected(void)
+static void on_cloud_disconnected(void)
 {
 	sm_nrf_cloud_ready = false;
 	rsp_send("\r\n#XNRFCLOUD: %d,%d\r\n", sm_nrf_cloud_ready, sm_nrf_cloud_send_location);
-#if defined(CONFIG_NRF_CLOUD_LOCATION)
+#if defined(CONFIG_SM_NRF_CLOUD_LOCATION)
 	at_monitor_pause(&ncell_meas);
 #endif
-}
-
-static void on_cloud_evt_location_data_received(const struct nrf_cloud_data *const data)
-{
-#if defined(CONFIG_NRF_CLOUD_LOCATION)
-	int err;
-	struct nrf_cloud_location_result result;
-
-	err = nrf_cloud_location_process(data->ptr, &result);
-	if (err == 0) {
-		rsp_send("\r\n#XNRFCLOUDPOS: %d,%lf,%lf,%d\r\n",
-			result.type, result.lat, result.lon, result.unc);
-	} else {
-		if (err == 1) {
-			err = -ENOMSG;
-		} else if (err == -EFAULT) {
-			err = result.err;
-		}
-		LOG_ERR("Failed to process the location request response (%d).", err);
-		rsp_send("\r\n#XNRFCLOUDPOS: %d\r\n", err < 0 ? -1 : err);
-	}
-
-#else
-	ARG_UNUSED(data);
-#endif
-}
-
-static void cloud_cmd_wk(struct k_work *work)
-{
-	int ret;
-	char *cmd_rsp;
-
-	ARG_UNUSED(work);
-
-	/* Send AT command to modem */
-	ret = nrf_modem_at_cmd(sm_at_buf, sizeof(sm_at_buf), "%s", sm_at_buf);
-	if (ret < 0) {
-		LOG_ERR("AT command failed: %d", ret);
-		return;
-	} else if (ret > 0) {
-		LOG_WRN("AT command error, type: %d", nrf_modem_at_err_type(ret));
-	}
-	LOG_INF("MODEM RSP %s", sm_at_buf);
-	/* replace \" with \' in JSON string-type value */
-	for (int i = 0; i < strlen(sm_at_buf); i++) {
-		if (sm_at_buf[i] == '\"') {
-			sm_at_buf[i] = '\'';
-		}
-	}
-	/* format JSON reply */
-	cmd_rsp = k_malloc(strlen(sm_at_buf) + sizeof(MODEM_AT_RSP));
-	if (cmd_rsp == NULL) {
-		LOG_WRN("Unable to allocate buffer");
-		return;
-	}
-	sprintf(cmd_rsp, MODEM_AT_RSP, sm_at_buf);
-	/* Send AT response to cloud */
-	ret = do_cloud_send_msg(cmd_rsp, strlen(cmd_rsp));
-	if (ret) {
-		LOG_ERR("Send AT response to cloud error: %d", ret);
-	}
-	k_free(cmd_rsp);
-}
-
-static bool handle_cloud_cmd(const char *buf_in)
-{
-	const cJSON *app_id = NULL;
-	const cJSON *msg_type = NULL;
-	const cJSON *at_cmd = NULL;
-	bool ret = false;
-
-	cJSON *cloud_cmd_json = cJSON_Parse(buf_in);
-
-	if (cloud_cmd_json == NULL) {
-		const char *error_ptr = cJSON_GetErrorPtr();
-
-		if (error_ptr != NULL) {
-			LOG_ERR("JSON parsing error before: %s", error_ptr);
-		}
-		goto end;
-	}
-
-	app_id = cJSON_GetObjectItemCaseSensitive(cloud_cmd_json, NRF_CLOUD_JSON_APPID_KEY);
-	if (cJSON_GetStringValue(app_id) == NULL) {
-		goto end;
-	}
-
-	/* Format expected from nrf cloud:
-	 * {"appId":"MODEM", "messageType":"CMD", "data":"<AT command>"}
-	 */
-	if (strcmp(app_id->valuestring, NRF_CLOUD_JSON_APPID_VAL_MODEM) == 0) {
-		msg_type = cJSON_GetObjectItemCaseSensitive(cloud_cmd_json,
-							    NRF_CLOUD_JSON_MSG_TYPE_KEY);
-		if (cJSON_GetStringValue(msg_type) != NULL) {
-			if (strcmp(msg_type->valuestring, NRF_CLOUD_JSON_MSG_TYPE_VAL_CMD) != 0) {
-				goto end;
-			}
-		}
-
-		/* The value of attribute "data" contains the actual command */
-		at_cmd = cJSON_GetObjectItemCaseSensitive(cloud_cmd_json, NRF_CLOUD_JSON_DATA_KEY);
-		if (cJSON_GetStringValue(at_cmd) != NULL) {
-			LOG_INF("MODEM CMD %s", at_cmd->valuestring);
-			strcpy(sm_at_buf, at_cmd->valuestring);
-			k_work_submit_to_queue(&sm_work_q, &cloud_cmd);
-			ret = true;
-		}
-	}
-
-end:
-	cJSON_Delete(cloud_cmd_json);
-	return ret;
-}
-
-static void on_cloud_evt_data_received(const struct nrf_cloud_data *const data)
-{
-	if (sm_nrf_cloud_ready) {
-		if (((char *)data->ptr)[0] == '{') {
-			/* Check if it's a cloud command sent from the cloud */
-			if (handle_cloud_cmd(data->ptr)) {
-				return;
-			}
-		}
-		rsp_send("\r\n#XNRFCLOUD: %s\r\n", (char *)data->ptr);
-	}
-}
-
-static void cloud_event_handler(const struct nrf_cloud_evt *evt)
-{
-	switch (evt->type) {
-	case NRF_CLOUD_EVT_TRANSPORT_CONNECTING:
-		LOG_DBG("NRF_CLOUD_EVT_TRANSPORT_CONNECTING");
-		if (evt->status != NRF_CLOUD_CONNECT_RES_SUCCESS) {
-			LOG_ERR("Failed to connect to nRF Cloud, status: %d",
-				(enum nrf_cloud_connect_result)evt->status);
-		}
-		break;
-	case NRF_CLOUD_EVT_TRANSPORT_CONNECTED:
-		LOG_INF("NRF_CLOUD_EVT_TRANSPORT_CONNECTED");
-		break;
-	case NRF_CLOUD_EVT_READY:
-		LOG_INF("NRF_CLOUD_EVT_READY");
-		on_cloud_evt_ready();
-		break;
-	case NRF_CLOUD_EVT_TRANSPORT_DISCONNECTED:
-		LOG_INF("NRF_CLOUD_EVT_TRANSPORT_DISCONNECTED: %d",
-			(enum nrf_cloud_disconnect_status)evt->status);
-		on_cloud_evt_disconnected();
-		break;
-	case NRF_CLOUD_EVT_ERROR:
-		LOG_ERR("NRF_CLOUD_EVT_ERROR: %d",
-			(enum nrf_cloud_error_status)evt->status);
-		break;
-	case NRF_CLOUD_EVT_SENSOR_DATA_ACK:
-		LOG_DBG("NRF_CLOUD_EVT_SENSOR_DATA_ACK");
-		break;
-	case NRF_CLOUD_EVT_RX_DATA_GENERAL:
-		LOG_INF("NRF_CLOUD_EVT_RX_DATA_GENERAL");
-		on_cloud_evt_data_received(&evt->data);
-		break;
-	case NRF_CLOUD_EVT_RX_DATA_DISCON:
-		LOG_INF("DEVICE DISCON");
-		/* No action required, handled in lib_nrf_cloud */
-		break;
-	case NRF_CLOUD_EVT_RX_DATA_LOCATION:
-		LOG_INF("NRF_CLOUD_EVT_RX_DATA_LOCATION");
-		on_cloud_evt_location_data_received(&evt->data);
-		break;
-	case NRF_CLOUD_EVT_RX_DATA_SHADOW:
-		LOG_DBG("NRF_CLOUD_EVT_RX_DATA_SHADOW");
-		break;
-	case NRF_CLOUD_EVT_USER_ASSOCIATION_REQUEST:
-		LOG_DBG("NRF_CLOUD_EVT_USER_ASSOCIATION_REQUEST");
-		break;
-	case NRF_CLOUD_EVT_USER_ASSOCIATED:
-		LOG_DBG("NRF_CLOUD_EVT_USER_ASSOCIATED");
-		break;
-	case NRF_CLOUD_EVT_FOTA_DONE:
-		LOG_DBG("NRF_CLOUD_EVT_FOTA_DONE");
-		break;
-	case NRF_CLOUD_EVT_TRANSPORT_CONNECT_ERROR:
-		LOG_INF("NRF_CLOUD_EVT_TRANSPORT_CONNECT_ERROR: %d",
-			(enum nrf_cloud_connect_result)evt->status);
-		break;
-	default:
-		LOG_DBG("Unknown NRF_CLOUD_EVT %d: %u", evt->type, evt->status);
-		break;
-	}
 }
 
 static void date_time_event_handler(const struct date_time_evt *evt)
@@ -576,12 +408,8 @@ static int handle_at_nrf_cloud(enum at_parser_cmd_type cmd_type, struct at_parse
 					return err;
 				}
 			}
-			/* Disconnect for the case where a connection previously
-			 * got initiated and failed to receive NRF_CLOUD_EVT_READY.
-			 */
-			nrf_cloud_disconnect();
 
-			err = nrf_cloud_connect();
+			err = nrf_cloud_coap_connect(NULL);
 			if (err) {
 				LOG_ERR("Cloud connection failed, error: %d", err);
 			} else {
@@ -591,14 +419,17 @@ static int handle_at_nrf_cloud(enum at_parser_cmd_type cmd_type, struct at_parse
 				if (k_sem_take(&sem_date_time, K_SECONDS(10)) != 0) {
 					LOG_WRN("Failed to get current time");
 				}
+				on_cloud_ready();
 			}
 		} else if (op == SM_NRF_CLOUD_SEND && sm_nrf_cloud_ready) {
 			/* enter data mode */
 			err = enter_datamode(nrf_cloud_datamode_callback, 0);
 		} else if (op == SM_NRF_CLOUD_DISCONNECT) {
-			err = nrf_cloud_disconnect();
+			err = nrf_cloud_coap_disconnect();
 			if (err) {
 				LOG_ERR("Cloud disconnection failed, error: %d", err);
+			} else {
+				on_cloud_disconnected();
 			}
 		} else {
 			err = -EINVAL;
@@ -623,7 +454,7 @@ static int handle_at_nrf_cloud(enum at_parser_cmd_type cmd_type, struct at_parse
 	return err;
 }
 
-#if defined(CONFIG_NRF_CLOUD_LOCATION)
+#if defined(CONFIG_SM_NRF_CLOUD_LOCATION)
 
 SM_AT_CMD_CUSTOM(xnrfcloudpos, "AT#XNRFCLOUDPOS", handle_at_nrf_cloud_pos);
 static int handle_at_nrf_cloud_pos(enum at_parser_cmd_type cmd_type,
@@ -759,29 +590,24 @@ static int handle_at_nrf_cloud_pos(enum at_parser_cmd_type cmd_type,
 	return 0;
 }
 
-#endif /* CONFIG_NRF_CLOUD_LOCATION */
+#endif /* CONFIG_SM_NRF_CLOUD_LOCATION */
 
 static void sm_at_nrfcloud_init(int ret, void *ctx)
 {
 	static bool initialized;
 	int err;
-	struct nrf_cloud_init_param init_param = {
-		.event_handler = cloud_event_handler
-	};
 
 	if (initialized) {
 		return;
 	}
 	initialized = true;
 
-	err = nrf_cloud_init(&init_param);
-	if (err && err != -EACCES) {
-		LOG_ERR("Cloud could not be initialized, error: %d", err);
+	err = nrf_cloud_coap_init();
+	if (err) {
+		LOG_ERR("Failed to initialize nRF Cloud CoAP library: %d", err);
 		return;
 	}
-
-	k_work_init(&cloud_cmd, cloud_cmd_wk);
-#if defined(CONFIG_NRF_CLOUD_LOCATION)
+#if defined(CONFIG_SM_NRF_CLOUD_LOCATION)
 	k_work_init(&nrfcloud_loc_req, loc_req_wk);
 #endif
 	nrf_cloud_client_id_get(nrfcloud_device_id, sizeof(nrfcloud_device_id));
