@@ -13,7 +13,9 @@
 
 LOG_MODULE_REGISTER(sm_sms, CONFIG_SM_LOG_LEVEL);
 
-#define MAX_CONCATENATED_MESSAGE  3
+#define MAX_CONCATENATED_MESSAGE 10
+#define SM_SMS_AT_HEADER_INFO_MAX_LEN 64
+#define MAX_CONCATENATED_MESSAGE_AGE 3000
 
 /**@brief SMS operations. */
 enum sm_sms_operation {
@@ -29,8 +31,10 @@ static void sms_callback(struct sms_data *const data, void *context)
 	static uint16_t ref_number;
 	static uint8_t total_msgs;
 	static uint8_t count;
-	static char messages[MAX_CONCATENATED_MESSAGE - 1][SMS_MAX_PAYLOAD_LEN_CHARS + 1];
-	static char rsp_buf[MAX_CONCATENATED_MESSAGE * SMS_MAX_PAYLOAD_LEN_CHARS + 64] = {0};
+	static int64_t last_received_uptime;
+	static char rsp_buf[SMS_MAX_PAYLOAD_LEN_CHARS + SM_SMS_AT_HEADER_INFO_MAX_LEN] = {0};
+	static char *concat_rsp_buf = NULL;
+	int64_t uptime = k_uptime_get();
 
 	ARG_UNUSED(context);
 
@@ -54,14 +58,65 @@ static void sms_callback(struct sms_data *const data, void *context)
 			strcat(rsp_buf, data->payload);
 			strcat(rsp_buf, "\"\r\n");
 			rsp_send("%s", rsp_buf);
+			if (concat_rsp_buf != NULL && uptime - last_received_uptime > MAX_CONCATENATED_MESSAGE_AGE) {
+				LOG_WRN("Cleaned SMS ref number %d, last_received_uptime=%lld, uptime=%lld",
+					ref_number, last_received_uptime, uptime);
+				ref_number = 0;
+				total_msgs = 0;
+				count = 0;
+				if (concat_rsp_buf != NULL) {
+					free(concat_rsp_buf);
+					concat_rsp_buf = NULL;
+				}
+				last_received_uptime = 0;
+			}
 		} else {
 			LOG_DBG("concatenated message %d, %d, %d",
 				header->concatenated.ref_number,
-				total_msgs = header->concatenated.total_msgs,
+				header->concatenated.total_msgs,
 				header->concatenated.seq_number);
+
+			if (last_received_uptime != 0 &&
+			    ref_number != header->concatenated.ref_number &&
+			    uptime - last_received_uptime > MAX_CONCATENATED_MESSAGE_AGE) {
+				LOG_WRN("Cleaned SMS ref number %d, last_received_uptime=%lld, uptime=%lld",
+					ref_number, last_received_uptime, uptime);
+				ref_number = 0;
+				total_msgs = 0;
+				count = 0;
+				if (concat_rsp_buf != NULL) {
+					free(concat_rsp_buf);
+					concat_rsp_buf = NULL;
+				}
+				last_received_uptime = 0;
+			}
+
 			/* ref_number and total_msgs should remain unchanged */
 			if (ref_number == 0) {
 				ref_number = header->concatenated.ref_number;
+				
+				if (header->concatenated.total_msgs > MAX_CONCATENATED_MESSAGE) {
+					LOG_ERR("SMS concatenated message limited to %d, received: %d",
+						MAX_CONCATENATED_MESSAGE, header->concatenated.total_msgs);
+					goto done;
+				}
+	
+				/* Allocate buffer for concatenated message. The allocation
+				 * size is an upper boundary as headers and last message part
+				 * are slightly less in practice.
+				 */
+				uint16_t concat_msg_len =
+					SM_SMS_AT_HEADER_INFO_MAX_LEN +
+					SMS_MAX_PAYLOAD_LEN_CHARS * header->concatenated.total_msgs;
+				concat_rsp_buf = malloc(concat_msg_len);
+				if (concat_rsp_buf == NULL) {
+					LOG_ERR("SMS concatenated message no memory for "
+						"%d bytes, %d messages",
+						concat_msg_len,
+						header->concatenated.total_msgs);
+					goto done;
+				}
+				memset(concat_rsp_buf, 0, concat_msg_len);
 			}
 			if (ref_number != header->concatenated.ref_number) {
 				LOG_ERR("SMS concatenated message ref_number error: %d, %d",
@@ -76,10 +131,7 @@ static void sms_callback(struct sms_data *const data, void *context)
 					total_msgs, header->concatenated.total_msgs);
 				goto done;
 			}
-			if (total_msgs > MAX_CONCATENATED_MESSAGE) {
-				LOG_ERR("SMS concatenated message no memory: %d", total_msgs);
-				goto done;
-			}
+			last_received_uptime = uptime;
 			/* seq_number should start with 1 but could arrive in random order */
 			if (header->concatenated.seq_number == 0 ||
 			    header->concatenated.seq_number > total_msgs) {
@@ -88,25 +140,30 @@ static void sms_callback(struct sms_data *const data, void *context)
 				goto done;
 			}
 			if (header->concatenated.seq_number == 1) {
-				sprintf(rsp_buf, "\r\n#XSMS: \"%02d-%02d-%02d %02d:%02d:%02d\",\"",
+				sprintf(concat_rsp_buf,
+					"\r\n#XSMS: \"%02d-%02d-%02d %02d:%02d:%02d\",\"",
 					header->time.year, header->time.month, header->time.day,
 					header->time.hour, header->time.minute,
 					header->time.second);
-				strcat(rsp_buf, header->originating_address.address_str);
-				strcat(rsp_buf, "\",\"");
-				strcat(rsp_buf, data->payload);
-				count++;
+				strcat(concat_rsp_buf, header->originating_address.address_str);
+				strcat(concat_rsp_buf, "\",\"");
+				strcat(concat_rsp_buf, data->payload);
+				//LOG_WRN("concat_rsp_buf (seq_number=1): %s", concat_rsp_buf);
 			} else {
-				strcpy(messages[header->concatenated.seq_number - 2],
-					data->payload);
-				count++;
+				strcpy(concat_rsp_buf + SM_SMS_AT_HEADER_INFO_MAX_LEN + (header->concatenated.seq_number - 1) * SMS_MAX_PAYLOAD_LEN_CHARS,
+				       data->payload);
+				//LOG_WRN("concat_rsp_buf (seq_number=%d): %s", header->concatenated.seq_number,
+				//	data->payload);
 			}
+			count++;
 			if (count == total_msgs) {
-				for (int i = 0; i < (total_msgs - 1); i++) {
-					strcat(rsp_buf, messages[i]);
+				for (int i = 1; i < (total_msgs); i++) {
+					//LOG_DBG("concat_rsp_buf (%d): %s", i, concat_rsp_buf + SM_SMS_AT_HEADER_INFO_MAX_LEN + i * SMS_MAX_PAYLOAD_LEN_CHARS);
+					strncat(concat_rsp_buf, concat_rsp_buf + SM_SMS_AT_HEADER_INFO_MAX_LEN + i * SMS_MAX_PAYLOAD_LEN_CHARS, SMS_MAX_PAYLOAD_LEN_CHARS);
 				}
-				strcat(rsp_buf, "\"\r\n");
-				rsp_send("%s", rsp_buf);
+				strcat(concat_rsp_buf, "\"\r\n");
+				//LOG_WRN("concat_rsp_buf: %s", concat_rsp_buf);
+				rsp_send("%s", concat_rsp_buf);
 			} else {
 				return;
 			}
@@ -114,6 +171,11 @@ done:
 			ref_number = 0;
 			total_msgs = 0;
 			count = 0;
+			if (concat_rsp_buf != NULL) {
+				free(concat_rsp_buf);
+				concat_rsp_buf = NULL;
+			}
+			last_received_uptime = 0;
 		}
 	} else if (data->type == SMS_TYPE_STATUS_REPORT) {
 		LOG_INF("Status report received");
