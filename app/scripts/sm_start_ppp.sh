@@ -143,6 +143,7 @@ noremoteip
 defaultroute
 defaultroute-metric -1
 lcp-echo-interval 0
+asyncmap 0xffffffff
 $PPP_DEBUG
 "
 
