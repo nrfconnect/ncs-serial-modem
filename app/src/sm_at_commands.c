@@ -271,11 +271,13 @@ STATIC int handle_at_clac(enum at_parser_cmd_type cmd_type, struct at_parser *, 
 		 *	* AT+IPR
 		 *	* AT+CMUX
 		 *	* AT+CGDATA
+		 *	* AT+IFC
 		 */
 		if ((strncasecmp(cmd, "AT+", strlen("AT+")) == 0 &&
 		     strncasecmp(cmd, "AT+IPR", strlen("AT+IPR")) != 0 &&
 		     strncasecmp(cmd, "AT+CMUX", strlen("AT+CMUX")) != 0 &&
-		     strncasecmp(cmd, "AT+CGDATA", strlen("AT+CGDATA")) != 0) ||
+		     strncasecmp(cmd, "AT+CGDATA", strlen("AT+CGDATA")) != 0 &&
+			 strncasecmp(cmd, "AT+IFC", strlen("AT+IFC")) != 0) ||
 		    strncasecmp(cmd, "AT%%", strlen("AT%%")) == 0) {
 			continue;
 		}
