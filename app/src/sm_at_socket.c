@@ -1158,7 +1158,7 @@ static int do_recvfrom(struct sm_socket *sock, int timeout, int flags,
 {
 	int ret;
 	struct net_sockaddr remote;
-	net_socklen_t addrlen = sizeof(struct nrf_sockaddr);
+	net_socklen_t addrlen = sizeof(struct net_sockaddr);
 	struct timeval tmo = {.tv_sec = timeout};
 
 	ret = nrf_setsockopt(sock->fd, NRF_SOL_SOCKET, NRF_SO_RCVTIMEO, &tmo, sizeof(tmo));
