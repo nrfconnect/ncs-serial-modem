@@ -38,6 +38,8 @@ extern int handle_at_recvcfg_wrapper_xrecvcfg(char *buf, size_t len, char *at_cm
 extern int handle_at_socketopt_wrapper_xsocketopt(char *buf, size_t len, char *at_cmd);
 extern int handle_at_secure_socket_wrapper_xssocket(char *buf, size_t len, char *at_cmd);
 extern int handle_at_secure_socketopt_wrapper_xssocketopt(char *buf, size_t len, char *at_cmd);
+extern int handle_at_listen_wrapper_xlisten(char *buf, size_t len, char *at_cmd);
+extern int handle_at_accept_wrapper_xaccept(char *buf, size_t len, char *at_cmd);
 
 /* Wrapper for nrf_modem_at_cmd that handles custom commands */
 int nrf_modem_at_cmd(void *buf, size_t buf_size, const char *fmt, ...)
@@ -73,6 +75,10 @@ int nrf_modem_at_cmd(void *buf, size_t buf_size, const char *fmt, ...)
 			ret = handle_at_close_wrapper_xclose((char *)buf, buf_size, at_cmd);
 		} else if (strncasecmp(at_cmd, "AT#XBIND", 8) == 0) {
 			ret = handle_at_bind_wrapper_xbind((char *)buf, buf_size, at_cmd);
+		} else if (strncasecmp(at_cmd, "AT#XLISTEN", 10) == 0) {
+			ret = handle_at_listen_wrapper_xlisten((char *)buf, buf_size, at_cmd);
+		} else if (strncasecmp(at_cmd, "AT#XACCEPT", 10) == 0) {
+			ret = handle_at_accept_wrapper_xaccept((char *)buf, buf_size, at_cmd);
 		} else if (strncasecmp(at_cmd, "AT#XCONNECT", 11) == 0) {
 			ret = handle_at_connect_wrapper_xconnect((char *)buf, buf_size, at_cmd);
 		} else if (strncasecmp(at_cmd, "AT#XSENDTO", 10) == 0) {

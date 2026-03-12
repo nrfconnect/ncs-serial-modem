@@ -64,6 +64,20 @@ static int mock_getsockopt_int_callback(int socket, int level, int option_name, 
 	return 0;
 }
 
+static int mock_getsockopt_tcp_srv_sesstimeo_callback(int socket, int level, int option_name,
+						      void *option_value, net_socklen_t *option_len,
+						      int num_calls)
+{
+	int *value = (int *)option_value;
+
+	/* Return 135 on first call, 0 on second call for SO_TCP_SRV_SESSTIMEO */
+	if (*option_len >= sizeof(int)) {
+		*value = (num_calls == 0) ? 135 : 0;
+		*option_len = sizeof(int);
+	}
+	return 0;
+}
+
 static int mock_getsockopt_hostname_callback(int socket, int level, int option_name,
 					     void *option_value, net_socklen_t *option_len,
 					     int num_calls)
@@ -79,6 +93,30 @@ static int mock_getsockopt_hostname_callback(int socket, int level, int option_n
 	return 0;
 }
 
+static char *mock_zsock_inet_ntop_192_168_0_100_callback(
+	net_sa_family_t af, const void *src, char *dst, net_socklen_t size, int num_calls)
+{
+	strcpy(dst, "192.168.0.100");
+	return dst;
+}
+
+static int mock_nrf_accept_with_peer_callback(int socket, struct nrf_sockaddr *restrict address,
+					      nrf_socklen_t *restrict address_len, int num_calls)
+{
+	/* Populate the address structure with peer information */
+	struct nrf_sockaddr_in *addr_in = (struct nrf_sockaddr_in *)address;
+
+	addr_in->sin_family = NRF_AF_INET;
+	addr_in->sin_port = nrf_htons(5555); /* Port 5555 in network byte order */
+	addr_in->sin_addr.s_addr = nrf_htonl(0xC0A80064); /* 192.168.0.100 */
+
+	if (address_len) {
+		*address_len = sizeof(struct nrf_sockaddr_in);
+	}
+
+	return 7; /* Return new socket fd */
+}
+
 void setUp(void)
 {
 	/* This is run before EACH test */
@@ -90,6 +128,8 @@ void tearDown(void)
 	/* This is run after EACH test */
 	/* Reset any stubs to prevent interference between tests */
 	__cmock_nrf_getsockopt_Stub(NULL);
+	__cmock_zsock_inet_ntop_Stub(NULL);
+	__cmock_nrf_accept_Stub(NULL);
 }
 
 /*
@@ -759,6 +799,234 @@ void test_xconnect_operation(void)
 	/* Close socket */
 	__cmock_nrf_close_ExpectAndReturn(1, 0);
 	send_at_command("AT#XCLOSE=1\r\n");
+}
+
+/*
+ * Test: Socket listen operation via AT command
+ * - Command: AT#XLISTEN=<handle>\r\n
+ * - Tests: Putting a TCP socket into listening mode
+ */
+void test_xlisten_operation(void)
+{
+	const char *response;
+	const char *cgpaddr_resp = "+CGPADDR: 0,\"10.0.0.1\",\"\"\r\nOK\r\n";
+
+	/* Create TCP server socket first */
+	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 5);
+	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
+	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
+	send_at_command("AT#XSOCKET=1,1,1\r\n"); /* family=1, type=1, role=1 (server) */
+	response = get_captured_response();
+	TEST_ASSERT_TRUE(strstr(response, "#XSOCKET: 5,1,6") != NULL);
+	clear_captured_response();
+
+	/* Bind to port 8080 before listening */
+	__cmock_nrf_modem_at_cmd_CMockExpectAnyArgsAndReturn(__LINE__, 0);
+	__cmock_nrf_modem_at_cmd_CMockReturnMemThruPtr_buf(__LINE__, (void *)cgpaddr_resp,
+							   strlen(cgpaddr_resp) + 1);
+	__cmock_nrf_modem_at_cmd_CMockIgnoreArg_len(__LINE__);
+	__cmock_nrf_modem_at_cmd_CMockIgnoreArg_fmt(__LINE__);
+	__cmock_zsock_inet_pton_ExpectAnyArgsAndReturn(1);
+	__cmock_nrf_inet_pton_ExpectAnyArgsAndReturn(1);
+	__cmock_nrf_bind_ExpectAndReturn(5, NULL, sizeof(struct nrf_sockaddr_in), 0);
+	__cmock_nrf_bind_IgnoreArg_address();
+	__cmock_nrf_bind_IgnoreArg_address_len();
+	send_at_command("AT#XBIND=5,8080\r\n");
+	response = get_captured_response();
+	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
+	clear_captured_response();
+
+	/* Mock fcntl to set non-blocking mode and listen */
+	__cmock_nrf_fcntl_ExpectAndReturn(5, NRF_F_SETFL, NRF_O_NONBLOCK, 0);
+	__cmock_nrf_listen_ExpectAndReturn(5, 2, 0); /* backlog=2 (fixed in modem) */
+
+	/* Execute listen command */
+	send_at_command("AT#XLISTEN=5\r\n");
+
+	/* Verify successful listen response */
+	response = get_captured_response();
+	if (strstr(response, "OK") == NULL) {
+		printf("XLISTEN response: %s\n", response);
+	}
+	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
+
+	/* Close socket */
+	__cmock_nrf_close_ExpectAndReturn(5, 0);
+	send_at_command("AT#XCLOSE=5\r\n");
+}
+
+/*
+ * Test: AT#XLISTEN? (READ command type)
+ * - Verifies READ command lists all listening sockets
+ */
+void test_xlisten_read_command(void)
+{
+	const char *response;
+	const char *cgpaddr_resp = "+CGPADDR: 0,\"10.0.0.1\",\"\"\r\nOK\r\n";
+
+	/* Create TCP server socket */
+	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 3);
+	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	send_at_command("AT#XSOCKET=1,1,1\r\n");
+	clear_captured_response();
+
+	/* Bind to port 9000 */
+	__cmock_nrf_modem_at_cmd_CMockExpectAnyArgsAndReturn(__LINE__, 0);
+	__cmock_nrf_modem_at_cmd_CMockReturnMemThruPtr_buf(__LINE__, (void *)cgpaddr_resp,
+							   strlen(cgpaddr_resp) + 1);
+	__cmock_nrf_modem_at_cmd_CMockIgnoreArg_len(__LINE__);
+	__cmock_nrf_modem_at_cmd_CMockIgnoreArg_fmt(__LINE__);
+	__cmock_zsock_inet_pton_ExpectAnyArgsAndReturn(1);
+	__cmock_nrf_inet_pton_ExpectAnyArgsAndReturn(1);
+	__cmock_nrf_bind_ExpectAndReturn(3, NULL, sizeof(struct nrf_sockaddr_in), 0);
+	__cmock_nrf_bind_IgnoreArg_address();
+	__cmock_nrf_bind_IgnoreArg_address_len();
+	send_at_command("AT#XBIND=3,9000\r\n");
+	clear_captured_response();
+
+	/* Put socket in listening mode */
+	__cmock_nrf_fcntl_ExpectAndReturn(3, NRF_F_SETFL, NRF_O_NONBLOCK, 0);
+	__cmock_nrf_listen_ExpectAndReturn(3, 2, 0);
+	send_at_command("AT#XLISTEN=3\r\n");
+	clear_captured_response();
+
+	/* Execute read command */
+	send_at_command("AT#XLISTEN?\r\n");
+
+	/* Verify response contains listening socket details */
+	response = get_captured_response();
+	/* Format: #XLISTEN: <handle>,<cid>,<local_port> */
+	TEST_ASSERT_TRUE(strstr(response, "#XLISTEN: 3,0,9000") != NULL);
+	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
+
+	/* Close socket */
+	__cmock_nrf_close_ExpectAndReturn(3, 0);
+	send_at_command("AT#XCLOSE=3\r\n");
+}
+
+/*
+ * Test: AT#XLISTEN with socket that is not bound
+ * - Should fail because socket must be bound before listen
+ */
+void test_xlisten_not_bound(void)
+{
+	const char *response;
+
+	/* Create TCP server socket but don't bind it */
+	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 2);
+	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	send_at_command("AT#XSOCKET=1,1,1\r\n");
+	clear_captured_response();
+
+	/* Try to listen without binding - should fail */
+	send_at_command("AT#XLISTEN=2\r\n");
+
+	/* Verify error response */
+	response = get_captured_response();
+	TEST_ASSERT_TRUE(strstr(response, "ERROR") != NULL);
+
+	/* Close socket */
+	__cmock_nrf_close_ExpectAndReturn(2, 0);
+	send_at_command("AT#XCLOSE=2\r\n");
+}
+
+/*
+ * Test: Socket accept operation via AT command
+ * - Command: AT#XACCEPT=<handle>\r\n
+ * - Tests: Accepting an incoming connection on a listening socket
+ */
+void test_xaccept_operation(void)
+{
+	const char *response;
+	const char *cgpaddr_resp = "+CGPADDR: 0,\"10.0.0.1\",\"\"\r\nOK\r\n";
+
+	/* Create TCP server socket */
+	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 1);
+	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	send_at_command("AT#XSOCKET=1,1,1\r\n");
+	clear_captured_response();
+
+	/* Bind to port 7000 */
+	__cmock_nrf_modem_at_cmd_CMockExpectAnyArgsAndReturn(__LINE__, 0);
+	__cmock_nrf_modem_at_cmd_CMockReturnMemThruPtr_buf(__LINE__, (void *)cgpaddr_resp,
+							   strlen(cgpaddr_resp) + 1);
+	__cmock_nrf_modem_at_cmd_CMockIgnoreArg_len(__LINE__);
+	__cmock_nrf_modem_at_cmd_CMockIgnoreArg_fmt(__LINE__);
+	__cmock_zsock_inet_pton_ExpectAnyArgsAndReturn(1);
+	__cmock_nrf_inet_pton_ExpectAnyArgsAndReturn(1);
+	__cmock_nrf_bind_ExpectAndReturn(1, NULL, sizeof(struct nrf_sockaddr_in), 0);
+	__cmock_nrf_bind_IgnoreArg_address();
+	__cmock_nrf_bind_IgnoreArg_address_len();
+	send_at_command("AT#XBIND=1,7000\r\n");
+	clear_captured_response();
+
+	/* Put socket in listening mode */
+	__cmock_nrf_fcntl_ExpectAndReturn(1, NRF_F_SETFL, NRF_O_NONBLOCK, 0);
+	__cmock_nrf_listen_ExpectAndReturn(1, 2, 0);
+	send_at_command("AT#XLISTEN=1\r\n");
+	clear_captured_response();
+
+	/* Mock successful accept - returns new socket fd=7 with peer info */
+	/* Use callback to properly populate the address structure */
+	__cmock_nrf_accept_Stub(mock_nrf_accept_with_peer_callback);
+	__cmock_zsock_inet_ntop_Stub(mock_zsock_inet_ntop_192_168_0_100_callback);
+	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* POLLCB for new socket */
+	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* POLLCB restore for listening socket */
+
+	/* Execute accept command */
+	send_at_command("AT#XACCEPT=1\r\n");
+
+	/* Verify successful accept response */
+	/* Format: #XACCEPT: <new_handle>,<cid>,"<peer_addr>",<peer_port> */
+	response = get_captured_response();
+	TEST_ASSERT_TRUE(strstr(response, "#XACCEPT: 7,0,\"192.168.0.100\",5555") != NULL);
+	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
+
+	/* Close sockets */
+	__cmock_nrf_close_ExpectAndReturn(7, 0);
+	send_at_command("AT#XCLOSE=7\r\n");
+	__cmock_nrf_close_ExpectAndReturn(1, 0);
+	send_at_command("AT#XCLOSE=1\r\n");
+}
+
+/*
+ * Test: AT#XACCEPT with invalid socket scenarios
+ * - Tests:
+ *   1. Accepting from a non-existing socket handle
+ *   2. Accepting from a socket that exists but is not listening
+ */
+void test_xaccept_not_listening(void)
+{
+	const char *response;
+
+	/* Test 1: Try to accept on non-existing socket handle */
+	send_at_command("AT#XACCEPT=99\r\n");
+
+	/* Verify error response */
+	response = get_captured_response();
+	TEST_ASSERT_TRUE(strstr(response, "ERROR") != NULL);
+	clear_captured_response();
+
+	/* Test 2: Create TCP server socket but don't put it in listening mode */
+	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 4);
+	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	send_at_command("AT#XSOCKET=1,1,1\r\n"); /* role=1 (server) */
+	clear_captured_response();
+
+	/* Try to accept on socket that is not listening - should fail */
+	send_at_command("AT#XACCEPT=4\r\n");
+
+	/* Verify error response */
+	response = get_captured_response();
+	TEST_ASSERT_TRUE(strstr(response, "ERROR") != NULL);
+
+	/* Close socket */
+	__cmock_nrf_close_ExpectAndReturn(4, 0);
+	send_at_command("AT#XCLOSE=4\r\n");
 }
 
 /*
@@ -1563,13 +1831,6 @@ static char *mock_zsock_inet_ntop_10_0_0_1_callback(
 	net_sa_family_t af, const void *src, char *dst, net_socklen_t size, int num_calls)
 {
 	strcpy(dst, "10.0.0.1");
-	return dst;
-}
-
-static char *mock_zsock_inet_ntop_192_168_0_100_callback(
-	net_sa_family_t af, const void *src, char *dst, net_socklen_t size, int num_calls)
-{
-	strcpy(dst, "192.168.0.100");
 	return dst;
 }
 
@@ -2468,7 +2729,6 @@ void test_xssocket_read_operation(void)
 	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
 	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_TAG_LIST */
 	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_PEER_VERIFY */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_ROLE */
 	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
 	send_at_command("AT#XSSOCKET=2,1,1,42\r\n");
 	response = get_captured_response();
@@ -2639,26 +2899,11 @@ void test_xssocket_ipv4_tcp_server(void)
 	 * 1. SO_SNDTIMEO (SOL_SOCKET)
 	 * 2. SO_SEC_TAG_LIST (SOL_SECURE)
 	 * 3. SO_SEC_PEER_VERIFY (SOL_SECURE)
-	 * 4. SO_SEC_ROLE (SOL_SECURE) - server only, verified below
-	 * 5. SO_POLLCB (SOL_SOCKET)
+	 * 4. SO_POLLCB (SOL_SOCKET)
 	 */
 	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
 	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_TAG_LIST */
 	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_PEER_VERIFY */
-
-	/* Verify SO_SEC_ROLE is set to server (value 1) */
-	int expected_role = 1; /* NRF_SO_SEC_ROLE_SERVER */
-
-	__cmock_nrf_setsockopt_ExpectWithArrayAndReturn(
-		0,                      /* socket fd */
-		NRF_SOL_SECURE,        /* level */
-		NRF_SO_SEC_ROLE,       /* option_name */
-		&expected_role,        /* option_value */
-		1,                     /* option_value array size */
-		sizeof(int),           /* option_len */
-		0                      /* return value */
-	);
-
 	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
 
 	/* Send AT command: family=1(IPv4), type=1(STREAM), role=1(server), sec_tag=42 */
@@ -2846,6 +3091,55 @@ void test_xsocketopt_reuseaddr(void)
 	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKETOPT=0,1,2,1\r\n");
 	response = get_captured_response();
+	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
+
+	/* Close socket */
+	__cmock_nrf_close_ExpectAndReturn(0, 0);
+	send_at_command("AT#XCLOSE=0\r\n");
+}
+
+/*
+ * Test: Set and get socket option SO_TCP_SRV_SESSTIMEO
+ * - Command: AT#XSOCKETOPT=<handle>,1,55,<value> (set)
+ *            AT#XSOCKETOPT=<handle>,0,55 (get)
+ * - Tests: Setting and getting SO_TCP_SRV_SESSTIMEO option (option 55)
+ */
+void test_xsocketopt_tcp_srv_sesstimeo(void)
+{
+	const char *response;
+
+	/* Create a TCP socket */
+	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 0);
+	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
+	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Bind to PDN */
+	send_at_command("AT#XSOCKET=1,1,0\r\n");
+	response = get_captured_response();
+	TEST_ASSERT_TRUE(strstr(response, "#XSOCKET: 0") != NULL);
+	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
+
+	/* Set SO_TCP_SRV_SESSTIMEO (option 55) to 135 */
+	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	send_at_command("AT#XSOCKETOPT=0,1,55,135\r\n");
+	response = get_captured_response();
+	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
+
+	/* Get SO_TCP_SRV_SESSTIMEO (option 55) - should return 135 */
+	__cmock_nrf_getsockopt_Stub(mock_getsockopt_tcp_srv_sesstimeo_callback);
+	send_at_command("AT#XSOCKETOPT=0,0,55\r\n");
+	response = get_captured_response();
+	TEST_ASSERT_TRUE(strstr(response, "#XSOCKETOPT: 0,135") != NULL);
+	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
+
+	/* Set SO_TCP_SRV_SESSTIMEO (option 55) to 0 */
+	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	send_at_command("AT#XSOCKETOPT=0,1,55,0\r\n");
+	response = get_captured_response();
+	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
+
+	/* Get SO_TCP_SRV_SESSTIMEO (option 55) - should return 0 */
+	send_at_command("AT#XSOCKETOPT=0,0,55\r\n");
+	response = get_captured_response();
+	TEST_ASSERT_TRUE(strstr(response, "#XSOCKETOPT: 0,0") != NULL);
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
