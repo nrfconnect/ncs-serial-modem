@@ -22,6 +22,7 @@ LOG_MODULE_REGISTER(sm_httpc, CONFIG_SM_LOG_LEVEL);
 #define HTTP_HOST_MAX_LEN         256
 #define HTTP_FILE_MAX_LEN         256
 #define HTTP_REQUEST_BODY_MAX_LEN 1024
+#define HTTP_EXTRA_HEADERS_SIZE   512
 #define HTTP_RESPONSE_TIMEOUT_MS  30000
 #define HTTP_MAX_REQUESTS         2
 #define INVALID_HANDLE            -1
@@ -65,6 +66,7 @@ struct http_request {
 	uint16_t port;                                /* Port number */
 	char request_body[HTTP_REQUEST_BODY_MAX_LEN]; /* Request body */
 	int request_body_len;                         /* Request body length */
+	char extra_headers[HTTP_EXTRA_HEADERS_SIZE];  /* Extra HTTP headers */
 	uint8_t recv_buf[HTTP_RECV_BUF_SIZE];         /* Receive buffer */
 	int recv_buf_len;                             /* Bytes in receive buffer */
 	char *send_ptr;                               /* Pointer to data being sent */
@@ -115,6 +117,7 @@ static struct http_request *alloc_request(void)
 			http_requests[i].state = HTTP_STATE_IDLE;
 			http_requests[i].content_length = -1;
 			http_requests[i].owns_socket = false;
+			http_requests[i].extra_headers[0] = '\0';
 			return &http_requests[i];
 		}
 	}
@@ -261,9 +264,13 @@ static int http_build_request(struct http_request *req, char *buf, size_t buf_le
 
 	if (req->request_body_len > 0) {
 		len += snprintf(buf + len, buf_len - len,
-				"Content-Length: %d\r\n"
-				"Content-Type: application/json\r\n",
+				"Content-Length: %d\r\n",
 				req->request_body_len);
+	}
+
+	/* Add extra headers if provided */
+	if (req->extra_headers[0] != '\0') {
+		len += snprintf(buf + len, buf_len - len, "%s", req->extra_headers);
 	}
 
 	len += snprintf(buf + len, buf_len - len, "\r\n");
@@ -841,6 +848,8 @@ STATIC int handle_at_httpcreq(enum at_parser_cmd_type cmd_type, struct at_parser
 			return -EINVAL;
 		}
 
+		LOG_DBG("Total param_count: %d", param_count);
+
 		/* Get optional body length for POST/PUT (data mode) */
 		int body_len = 0;
 		int next_param_idx = 4; /* Next parameter index after method */
@@ -857,9 +866,10 @@ STATIC int handle_at_httpcreq(enum at_parser_cmd_type cmd_type, struct at_parser
 						HTTP_REQUEST_BODY_MAX_LEN);
 					return -EINVAL;
 				}
-				next_param_idx++;
 				LOG_DBG("Body length: %d", body_len);
 			}
+			/* Move to next parameter after body_len slot */
+			next_param_idx++;
 		}
 
 		/* Allocate request */
@@ -876,6 +886,41 @@ STATIC int handle_at_httpcreq(enum at_parser_cmd_type cmd_type, struct at_parser
 		strncpy(req->url, url, sizeof(req->url) - 1);
 		req->method = method;
 		req->request_body_len = 0;
+		req->extra_headers[0] = '\0';
+
+		/* Parse extra headers (parameters 5 onwards) */
+		LOG_DBG("Parsing extra headers from index %d, param_count=%d", next_param_idx,
+			param_count);
+		for (int i = next_param_idx; i <= param_count; i++) {
+			const char *header_ptr;
+			size_t header_len;
+
+			err = at_parser_string_ptr_get(parser, i, &header_ptr, &header_len);
+			if (err) {
+				/* Could be empty parameter or non-existent - skip it */
+				LOG_DBG("Skipping parameter %d (err=%d)", i, err);
+				continue;
+			}
+
+			/* Skip empty strings */
+			if (header_len == 0 || header_ptr[0] == '\0') {
+				LOG_DBG("Skipping empty header at param %d", i);
+				continue;
+			}
+
+			/* Append header with \r\n */
+			size_t current_len = strlen(req->extra_headers);
+			int ret = snprintf(req->extra_headers + current_len,
+					   sizeof(req->extra_headers) - current_len,
+					   "%.*s\r\n", (int)header_len, header_ptr);
+
+			if (ret >= (int)(sizeof(req->extra_headers) - current_len)) {
+				LOG_ERR("Extra headers buffer overflow");
+				http_close_request(req);
+				return -ENOMEM;
+			}
+			LOG_DBG("Added extra header: %.*s", (int)header_len, header_ptr);
+		}
 
 		/* Parse URL */
 		LOG_DBG("Parsing URL: %s", url);
@@ -898,7 +943,9 @@ STATIC int handle_at_httpcreq(enum at_parser_cmd_type cmd_type, struct at_parser
 				http_close_request(req);
 				return err;
 			}
-			/* Response will be sent when data mode exits */
+			/* OK is sent by AT framework before entering data mode */
+			/* Response (#XHTTPCREQ) will be sent when data mode exits */
+			return 0;
 		} else {
 			/* Start request immediately (no body or GET/DELETE/HEAD) */
 			LOG_DBG("Starting HTTP request");
@@ -917,9 +964,12 @@ STATIC int handle_at_httpcreq(enum at_parser_cmd_type cmd_type, struct at_parser
 	}
 
 	case AT_PARSER_CMD_TYPE_TEST:
-		rsp_send("\r\n#XHTTPCREQ: <socket_fd>,<url>,<method>[,<body_len>]\r\n");
+		rsp_send("\r\n#XHTTPCREQ: <socket_fd>,<url>,<method>"
+			 "[,<body_len>[,<header>]...]\r\n");
 		rsp_send("Methods: 0=GET, 1=POST, 2=PUT, 3=DELETE, 4=HEAD\r\n");
 		rsp_send("body_len: Length of body data (POST/PUT enter data mode)\r\n");
+		rsp_send("header: Extra HTTP header (multiple allowed, e.g. \"Authorization: "
+			 "Bearer token\")\r\n");
 		err = 0;
 		break;
 
