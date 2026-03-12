@@ -254,8 +254,20 @@ echo "Connect and wait for PPP link..."
 
 chat $CHATOPT -t$TIMEOUT "${CHAT_SCRIPT[@]}" >$AT_CMUX <$AT_CMUX
 
+check_devices_or_exit() {
+	# Verify that UART devices are still present
+	if [ ! -c $PPP_CMUX ] || [ ! -c $AT_CMUX ] || [ ! -c $MODEM ]; then
+		echo "Error: UART devices not found, exiting..."
+		start-stop-daemon --stop --pidfile $TRACE_PID_FILE --remove-pidfile \
+				  --oknodo --retry 1
+		pkill ldattach
+		exit 1
+	fi
+}
+
 shutdown_modem() {
 	set +eu
+	check_devices_or_exit
 	start-stop-daemon --stop --pidfile $TRACE_PID_FILE --remove-pidfile --oknodo --retry 1
 	chat $CHATOPT -t5 '' $SHUTDOWN_SCRIPT >$AT_CMUX <$AT_CMUX
 	CHAT_ERR=$?
@@ -275,6 +287,7 @@ shutdown_modem() {
 ppp_start() {
 	set +eu
 	set -x
+	check_devices_or_exit
 	pppd $PPP_CMUX $PPP_OPTIONS
 	if [ "$?" -eq 5 ]; then
 		echo "pppd terminated with signal, shutting down modem..."
@@ -300,6 +313,7 @@ export TRACE_PID_FILE
 export -f ppp_start
 export -f shutdown_modem
 export -f cmux_close
+export -f check_devices_or_exit
 
 # Start PPPD in a subshell
 # Logs go to syslog so redirect output to /dev/null
