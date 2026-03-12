@@ -19,6 +19,9 @@
 #include "sm_util.h"
 #include "sm_ctrl_pin.h"
 #include "sm_uart_handler.h"
+#if defined(CONFIG_SM_HTTPC)
+#include "sm_at_httpc.h"
+#endif
 
 LOG_MODULE_REGISTER(sm, CONFIG_SM_LOG_LEVEL);
 

@@ -17,6 +17,7 @@
 #include "sm_util.h"
 #include "sm_at_host.h"
 #include "sm_sockopt.h"
+#include "sm_at_httpc.h"
 
 LOG_MODULE_REGISTER(sm_sock, CONFIG_SM_LOG_LEVEL);
 
@@ -129,7 +130,7 @@ static void init_socket(struct sm_socket *socket)
 	socket->async_poll = (struct sm_async_poll){0};
 }
 
-static struct sm_socket *find_socket(int fd)
+struct sm_socket *find_socket(int fd)
 {
 	for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
 		if (socks[i].fd == fd) {
@@ -330,11 +331,37 @@ static void poll_work_fn(struct k_work *)
 		/* Send #XAPOLL URC for poll events. */
 		if (!data_mode) {
 			uint8_t xapoll_events = revents & (sock->async_poll.xapoll_events);
+			bool http_needs_rearm = false;
+
+			LOG_DBG("Socket %d: revents=0x%x xapoll_events=0x%x result=0x%x", sock->fd,
+				revents, sock->async_poll.xapoll_events, xapoll_events);
 
 			/* Do not send URC for the same events twice, unless send/recv is done. */
 			sock->async_poll.xapoll_events &= ~xapoll_events;
+			LOG_DBG("Socket %d: After clear, xapoll_events=0x%x", sock->fd,
+				sock->async_poll.xapoll_events);
+
 			if (xapoll_events) {
 				rsp_send("\r\n#XAPOLL: %d,%d\r\n", sock->fd, xapoll_events);
+
+				/* Notify HTTP client if it's using this socket */
+#if defined(CONFIG_SM_HTTPC)
+				LOG_DBG("Socket %d: Calling sm_at_httpc_poll_event()", sock->fd);
+				http_needs_rearm = sm_at_httpc_poll_event(sock->fd, xapoll_events);
+				LOG_DBG("Socket %d: Returned, http_needs_rearm=%d", sock->fd,
+					http_needs_rearm);
+#endif
+			}
+
+			/* If HTTP client requests POLLIN re-arm, restore it before clearing */
+			if (http_needs_rearm && (revents & NRF_POLLIN)) {
+				LOG_DBG("Socket %d: HTTP requested POLLIN re-arm", sock->fd);
+				sock->async_poll.xapoll_events |= NRF_POLLIN;
+				sock->async_poll.events |= NRF_POLLIN;  /* MUST also restore */
+				/* Clear POLLIN from revents to prevent line 374 from clearing it
+				 * from events
+				 */
+				revents &= ~NRF_POLLIN;
 			}
 		}
 
@@ -350,7 +377,11 @@ static void poll_work_fn(struct k_work *)
 
 		/* Remove POLLIN from poll, until recv is done. */
 		if (revents & NRF_POLLIN) {
+			LOG_DBG("Socket %d: Clearing POLLIN from events (was 0x%x)", sock->fd,
+				sock->async_poll.events);
 			sock->async_poll.events &= ~NRF_POLLIN;
+			LOG_DBG("Socket %d: After clear, events=0x%x", sock->fd,
+				sock->async_poll.events);
 
 			/* Automatic data reception may reactivate POLLIN. */
 			if (((at_mode && (sock->async_poll.adr_flags & SM_ADR_AT_MODE)) ||
@@ -364,6 +395,8 @@ static void poll_work_fn(struct k_work *)
 			sock->async_poll.events, sock->async_poll.xapoll_events);
 
 		/* Re-register for remaining events */
+		LOG_DBG("Socket %d: Re-registering poll (events=0x%x, xapoll_events=0x%x)",
+			sock->fd, sock->async_poll.events, sock->async_poll.xapoll_events);
 		update_poll_events(sock, 0, false);
 
 		/* Exit data mode handler on socket error */
@@ -2037,7 +2070,8 @@ STATIC int handle_at_getaddrinfo(enum at_parser_cmd_type cmd_type, struct at_par
 	return err;
 }
 
-static void xapoll_stop(struct sm_socket *sock)
+/* Exported for HTTP client use */
+void xapoll_stop(struct sm_socket *sock)
 {
 	if (sock) {
 		/* Stop events for a specific socket. */
@@ -2065,14 +2099,21 @@ static void xapoll_read_response(void)
 	}
 }
 
-static int set_xapoll_events(struct sm_socket *sock, uint8_t events)
+/* Exported for HTTP client use */
+int set_xapoll_events(struct sm_socket *sock, uint8_t events)
 {
 	int ret;
 
 	if (sock) {
 		/* Set events for a specific socket. */
+		LOG_DBG("set_xapoll_events fd=%d events=0x%x (old_xapoll=0x%x, old_req=0x%x)",
+			sock->fd, events, sock->async_poll.xapoll_events,
+			sock->async_poll.xapoll_events_requested);
 		sock->async_poll.xapoll_events_requested = events;
-		return update_poll_events(sock, events, true);
+		ret = update_poll_events(sock, events, true);
+		LOG_DBG("set_xapoll_events fd=%d done ret=%d (new_xapoll=0x%x)", sock->fd, ret,
+			sock->async_poll.xapoll_events);
+		return ret;
 	}
 
 	/* Set events for all sockets. */
