@@ -7,9 +7,6 @@ tests:
     platform_allow:
       - nrf9151dk/nrf9151/ns
       - thingy91x/nrf9151/ns
-    integration_platforms:
-      - nrf9151dk/nrf9151/ns
-      - thingy91x/nrf9151/ns
   serial_modem.extmcu:
     sysbuild: true
     build_only: true
@@ -17,8 +14,7 @@ tests:
       - EXTRA_DTC_OVERLAY_FILE="overlay-external-mcu.overlay"
     platform_allow:
       - nrf9151dk/nrf9151/ns
-    integration_platforms:
-      - nrf9151dk/nrf9151/ns
+    tags: exclude_integration
   serial_modem.extmcu.mtrace:
     sysbuild: true
     build_only: true
@@ -26,8 +22,6 @@ tests:
       - EXTRA_DTC_OVERLAY_FILE="overlay-external-mcu.overlay"
       - app_SNIPPET=nrf91-modem-trace-uart
     platform_allow:
-      - nrf9151dk/nrf9151/ns
-    integration_platforms:
       - nrf9151dk/nrf9151/ns
   serial_modem.no_dtr:
     sysbuild: true
@@ -37,8 +31,7 @@ tests:
     platform_allow:
       - nrf9151dk/nrf9151/ns
       - thingy91x/nrf9151/ns
-    integration_platforms:
-      - nrf9151dk/nrf9151/ns
+    tags: exclude_integration
   serial_modem.ppp_without_cmux:
     sysbuild: true
     build_only: true
@@ -57,8 +50,7 @@ tests:
     platform_allow:
       - nrf9151dk/nrf9151/ns
       - thingy91x/nrf9151/ns
-    integration_platforms:
-      - nrf9151dk/nrf9151/ns
+    tags: exclude_integration
   serial_modem.ppp_cmux.mtrace:
     sysbuild: true
     build_only: true
@@ -81,8 +73,7 @@ tests:
       - EXTRA_DTC_OVERLAY_FILE="overlay-external-mcu.overlay"
     platform_allow:
       - nrf9151dk/nrf9151/ns
-    integration_platforms:
-      - nrf9151dk/nrf9151/ns
+    tags: exclude_integration
   serial_modem.ppp_cmux_with_extmcu.mtrace:
     sysbuild: true
     build_only: true
@@ -94,8 +85,7 @@ tests:
       - CONFIG_SM_LOG_LEVEL_DBG=y
     platform_allow:
       - nrf9151dk/nrf9151/ns
-    integration_platforms:
-      - nrf9151dk/nrf9151/ns
+    tags: exclude_integration
   serial_modem.ppp_cmux_with_modem_trace:
     sysbuild: true
     build_only: true
@@ -127,8 +117,6 @@ tests:
       - CONFIG_SM_DFU_MODEM_FULL=y
     platform_allow:
       - nrf9151dk/nrf9151/ns
-    integration_platforms:
-      - nrf9151dk/nrf9151/ns
   serial_modem.pgps_agnss:
     sysbuild: true
     build_only: true
@@ -144,6 +132,7 @@ tests:
       - CONFIG_NRF_CLOUD_AGNSS=n
     platform_allow:
       - nrf9151dk/nrf9151/ns
+    tags: exclude_integration
   serial_modem.lwm2m_carrier:
     sysbuild: true
     build_only: true
@@ -161,16 +150,14 @@ tests:
       - SB_EXTRA_CONF_FILE=sysbuild-softbank.conf
     platform_allow:
       - nrf9151dk/nrf9151/ns
-    integration_platforms:
-      - nrf9151dk/nrf9151/ns
+    tags: exclude_integration
   serial_modem.lwm2m_carrier.lgu:
     sysbuild: true
     build_only: true
     extra_args: EXTRA_CONF_FILE="overlay-carrier.conf;overlay-carrier-lgu.conf"
     platform_allow:
       - nrf9151dk/nrf9151/ns
-    integration_platforms:
-      - nrf9151dk/nrf9151/ns
+    tags: exclude_integration
   serial_modem.modem_trace_app_log_dbg:
     sysbuild: true
     build_only: true
@@ -183,8 +170,7 @@ tests:
     platform_allow:
       - nrf9151dk/nrf9151/ns
       - thingy91x/nrf9151/ns
-    integration_platforms:
-      - nrf9151dk/nrf9151/ns
+    tags: exclude_integration
   serial_modem.auto_connect:
     sysbuild: true
     build_only: true
@@ -199,3 +185,4 @@ tests:
       - CONFIG_SM_AUTO_CONNECT_PDN_PASSWORD="mypassword"
     platform_allow:
       - nrf9151dk/nrf9151/ns
+    tags: exclude_integration
