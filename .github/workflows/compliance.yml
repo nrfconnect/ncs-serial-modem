@@ -55,9 +55,12 @@ jobs:
           $ZEPHYR_BASE/scripts/ci/check_compliance.py \
             --annotate \
             -e Kconfig \
+            -e KconfigBasic \
             -e KconfigBasicNoModules \
             -e ClangFormat \
             -e Ruff \
+            -e SysbuildKconfig \
+            -e SysbuildKconfigBasic \
             -e SysbuildKconfigBasicNoModules \
             -e LicenseAndCopyrightCheck \
             -c origin/${BASE_REF}..
