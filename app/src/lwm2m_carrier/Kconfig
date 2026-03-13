@@ -34,4 +34,12 @@ config SM_CARRIER_AUTO_CONTROL
 	  stack. If this is disabled, the host MCU must perform these operations via AT commands
 	  when requested.
 
+config HEAP_MEM_POOL_ADD_SIZE_SM_CARRIER
+	int "Additional heap memory pool size for LwM2M Carrier"
+	default 4096
+	help
+	  Additional heap memory pool size for LwM2M Carrier. This is added to the default heap
+	  memory pool size and can be used to ensure that there is enough memory for LwM2M Carrier
+	  operations.
+
 endif # SM_CARRIER
