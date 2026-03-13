@@ -101,6 +101,107 @@ Example
    +IPR: (),(115200,230400,460800,921600,1000000)
    OK
 
+|SM| UART flow control AT+IFC
+=============================
+
+The ``AT+IFC`` command sets the UART flow control.
+
+Set command
+-----------
+
+The set command sets the UART flow control.
+
+Syntax
+~~~~~~
+
+::
+
+   AT+IFC=<flow_control>
+
+The ``<flow_control>`` parameter is an integer value specifying the desired flow control:
+
+- 0: Disable flow control
+- 2: Enable RTS/CTS flow control
+
+.. note::
+
+   The flow control change takes effect after the modem responds with ``OK``.
+   The host must switch to the new flow control settings to continue communication.
+
+Example
+~~~~~~~
+
+Disable flow control.
+
+::
+
+   AT+IFC=0
+   OK
+
+Enable RTS/CTS flow control.
+
+::
+
+   AT+IFC=2
+   OK
+
+Read command
+------------
+
+The read command reads the current UART flow control.
+
+Syntax
+~~~~~~
+
+::
+
+   AT+IFC?
+
+Response syntax
+~~~~~~~~~~~~~~~
+
+::
+
+   +IFC: <flow_control>
+
+Example
+~~~~~~~
+
+::
+
+   AT+IFC?
+   +IFC: 0
+   OK
+
+Test command
+------------
+
+The test command lists the supported flow control modes.
+
+Syntax
+~~~~~~
+
+::
+
+   AT+IFC=?
+
+Response syntax
+~~~~~~~~~~~~~~~
+
+::
+
+   +IFC: (list of supported flow control modes)
+
+Example
+~~~~~~~
+
+::
+
+   AT+IFC=?
+   +IFC: (0,2)
+   OK
+
+
 |SM| echo E0/E1
 ===============
 

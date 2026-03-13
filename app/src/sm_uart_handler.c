@@ -653,3 +653,71 @@ static int handle_at_ipr(enum at_parser_cmd_type cmd_type, struct at_parser *par
 
 	return -SILENT_AT_COMMAND_RET;
 }
+SM_AT_CMD_CUSTOM(ifc, "AT+IFC", handle_at_ifc);
+static int handle_at_ifc(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+			  uint32_t param_count)
+{
+	int err;
+	struct uart_config cfg;
+	uint16_t flow_ctrl;
+
+	err = uart_config_get(sm_uart_dev, &cfg);
+	if (err) {
+		LOG_ERR("uart_config_get: %d", err);
+		return err;
+	}
+
+	if (cmd_type == AT_PARSER_CMD_TYPE_READ) {
+		rsp_send("\r\n+IFC: %u\r\n", cfg.flow_ctrl & UART_CFG_FLOW_CTRL_RTS_CTS ? 2 : 0);
+		return 0;
+	}
+
+	if (cmd_type == AT_PARSER_CMD_TYPE_TEST) {
+		rsp_send("\r\n+IFC: (0,2)\r\n");
+		return 0;
+	}
+
+	if (cmd_type != AT_PARSER_CMD_TYPE_SET || param_count != 2) {
+		return -EINVAL;
+	}
+
+	if (sm_cmux_is_started()) {
+		LOG_ERR("Cannot change flow control while CMUX is active.");
+		return -EBUSY;
+	}
+
+	err = at_parser_num_get(parser, 1, &flow_ctrl);
+	if (err) {
+		return err;
+	}
+
+	/* Convert standard AT values of 0 and 2 to the right definition */
+	if (flow_ctrl == 0) {
+		cfg.flow_ctrl = UART_CFG_FLOW_CTRL_NONE;
+	} else if (flow_ctrl == 2) {
+		cfg.flow_ctrl = UART_CFG_FLOW_CTRL_RTS_CTS;
+	} else {
+		LOG_ERR("Unsupported flow control: %u", flow_ctrl);
+		return -EINVAL;
+	}
+
+	rsp_send_ok();
+
+	err = modem_pipe_close(&sm_pipe.pipe, K_SECONDS(1));
+	if (err) {
+		LOG_ERR("modem_pipe_close: %d", err);
+		return err;
+	}
+	err = uart_configure(sm_uart_dev, &cfg);
+	if (err) {
+		LOG_ERR("uart_configure: %d", err);
+		return err;
+	}
+	err = modem_pipe_open(&sm_pipe.pipe, K_SECONDS(1));
+	if (err) {
+		LOG_ERR("modem_pipe_open: %d", err);
+		return err;
+	}
+
+	return -SILENT_AT_COMMAND_RET;
+}
