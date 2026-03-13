@@ -62,6 +62,7 @@
 .. _`nRF Cloud A-GNSS`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/networking/nrf_cloud_agnss.html
 .. _`nRF Cloud P-GPS`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/networking/nrf_cloud_pgps.html
 .. _`nRF Cloud location`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/networking/nrf_cloud_location.html
+.. _`nRF Cloud Location Services`: https://docs.nordicsemi.com/bundle/nrf-cloud/page/LocationServices/LSOverview.html
 .. _`Modem library`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrfxlib/nrf_modem/README.html
 .. _`Trusted Firmware-M`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/security/tfm/index.html
 .. _`Zephyr’s Cellular modem`: https://docs.nordicsemi.com/bundle/ncs-latest/page/zephyr/samples/net/cellular_modem/README.html

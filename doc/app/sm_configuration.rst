@@ -174,6 +174,13 @@ CONFIG_SM_GNSS - GNSS support in |SM|
 CONFIG_SM_NRF_CLOUD - nRF Cloud support in |SM|
    This option enables additional AT commands for using the nRF Cloud service.
 
+.. _CONFIG_SM_NRF_CLOUD_LOCATION:
+
+CONFIG_SM_NRF_CLOUD_LOCATION - nRF Cloud Location support
+   This option enables the `nRF Cloud Location Services <nRF Cloud Location Services_>`_ for cloud-assisted geolocation.
+   Supports cellular and Wi-Fi positioning.
+   This requires :ref:`CONFIG_SM_NRF_CLOUD <CONFIG_SM_NRF_CLOUD>` to be enabled.
+
 .. _CONFIG_SM_MQTTC:
 
 CONFIG_SM_MQTTC - MQTT client support in |SM|

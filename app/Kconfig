@@ -259,6 +259,13 @@ config HEAP_MEM_POOL_ADD_SIZE_SM_NRF_CLOUD
 	  dynamic memory allocation.
 endif # SM_NRF_CLOUD
 
+config SM_NRF_CLOUD_LOCATION
+	bool "nRF Cloud Location support"
+	depends on SM_NRF_CLOUD
+	help
+	  Enable the nRF Cloud Location service for cloud-assisted geolocation.
+	  Supports cellular and Wi-Fi positioning.
+
 config SM_MQTTC
 	bool "MQTT client support"
 	default y
