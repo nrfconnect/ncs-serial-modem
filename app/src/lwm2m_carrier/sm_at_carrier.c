@@ -118,14 +118,21 @@ static void on_event_app_data(const lwm2m_carrier_event_t *event)
 	}
 
 	if (app_data->type == LWM2M_CARRIER_APP_DATA_EVENT_DATA_WRITE) {
-		/* In theory, sm_data_buf should be twice as large as
+		/* In theory, buf should be twice as large as
 		 * SM_CARRIER_APP_DATA_BUFFER_LEN to account for the hex string.
-		 * However, sm_data_buf is not expected to receive more than 512 bytes in downlink.
+		 * However, buf is not expected to receive more than 512 bytes in downlink.
 		 */
-		size = bin2hex(app_data->buffer, app_data->buffer_len, sm_data_buf,
-			      sizeof(sm_data_buf));
+		uint8_t *buf = calloc(1, CONFIG_SM_CARRIER_APP_DATA_BUFFER_LEN);
+
+		if (buf == NULL) {
+			LOG_ERR("Failed to allocate memory for data mode buffer");
+			return;
+		}
+		size = bin2hex(app_data->buffer, app_data->buffer_len, buf,
+			      CONFIG_SM_CARRIER_APP_DATA_BUFFER_LEN);
 		if (size == 0) {
 			LOG_ERR("Failed to encode array to hex string");
+			free(buf);
 			return;
 		}
 
@@ -133,8 +140,9 @@ static void on_event_app_data(const lwm2m_carrier_event_t *event)
 
 		urc_send_to(pipe, "\r\n#XCARRIEREVT: %u,%hhu,\"%s\",%zu\r\n\"", event->type,
 			    app_data->type, uri_path, size);
-		data_send(pipe, sm_data_buf, size);
+		data_send(pipe, buf, size);
 		urc_send_to(pipe, "\"");
+		free(buf);
 	} else {
 		urc_send_to(sm_at_host_get_urc_pipe(), "\r\n#XCARRIEREVT: %u,%hhu,\"%s\"\r\n",
 			    event->type, app_data->type, uri_path);
@@ -262,9 +270,16 @@ static int carrier_datamode_callback(uint8_t op, const uint8_t *data, int len, u
 		}
 
 		size_t size = CONFIG_SM_CARRIER_APP_DATA_BUFFER_LEN / 2;
+		uint8_t *buf = calloc(1, size);
 
-		size = hex2bin(data, len, sm_data_buf, size);
+		if (buf == NULL) {
+			LOG_ERR("Failed to allocate memory for data mode buffer");
+			return -ENOMEM;
+		}
+
+		size = hex2bin(data, len, buf, size);
 		if (size == 0) {
+			free(buf);
 			LOG_ERR("Failed to decode hex string to array");
 			return -EINVAL;
 		}
@@ -272,12 +287,14 @@ static int carrier_datamode_callback(uint8_t op, const uint8_t *data, int len, u
 		uint16_t path[3] = { LWM2M_CARRIER_OBJECT_APP_DATA_CONTAINER, 0, 0 };
 		uint8_t path_len = 3;
 
-		ret = lwm2m_carrier_app_data_set(path, path_len, sm_data_buf, size);
+		ret = lwm2m_carrier_app_data_set(path, path_len, buf, size);
 		if (ret < 0) {
 			LOG_ERR("Send failed: %d", ret);
+			free(buf);
 			return ret;
 		}
 		/* Return the amount of data sent. */
+		free(buf);
 		return len;
 
 	} else if (op == DATAMODE_EXIT) {
@@ -333,11 +350,17 @@ static int do_carrier_appdata_set(enum at_parser_cmd_type, struct at_parser *par
 
 	int ret = 0;
 
-	char data_ascii[CONFIG_SM_CARRIER_APP_DATA_BUFFER_LEN] = {0};
 	size_t data_ascii_len = CONFIG_SM_CARRIER_APP_DATA_BUFFER_LEN;
-
-	uint8_t data[CONFIG_SM_CARRIER_APP_DATA_BUFFER_LEN / 2];
 	size_t data_len = CONFIG_SM_CARRIER_APP_DATA_BUFFER_LEN / 2;
+
+	uint8_t *data = calloc(1, data_len);
+	uint8_t *data_ascii = calloc(1, data_ascii_len);
+
+	if (data == NULL || data_ascii == NULL) {
+		LOG_ERR("Failed to allocate memory for data");
+		ret = -ENOMEM;
+		goto out;
+	}
 
 	if (param_count == 3) {
 		uint16_t path[3] = { LWM2M_CARRIER_OBJECT_APP_DATA_CONTAINER, 0, 0 };
@@ -345,13 +368,13 @@ static int do_carrier_appdata_set(enum at_parser_cmd_type, struct at_parser *par
 
 		ret = util_string_get(parser, 2, data_ascii, &data_ascii_len);
 		if (ret) {
-			return ret;
+			goto out;
 		}
 
 		data_len = hex2bin(data_ascii, data_ascii_len, data, data_len);
 		if (data_len == 0) {
 			LOG_ERR("Failed to decode hex string to array");
-			return -EINVAL;
+			goto out;
 		}
 
 		ret = lwm2m_carrier_app_data_set(path, path_len, data, data_len);
@@ -364,13 +387,13 @@ static int do_carrier_appdata_set(enum at_parser_cmd_type, struct at_parser *par
 
 		ret = at_parser_num_get(parser, param_count - 2, &inst_id);
 		if (ret) {
-			return ret;
+			goto out;
 		}
 
 		ret = at_parser_num_get(parser, param_count - 1,
 					&res_inst_id);
 		if (ret) {
-			return ret;
+			goto out;
 		}
 
 		uint16_t path[4] = { LWM2M_CARRIER_OBJECT_BINARY_APP_DATA_CONTAINER, inst_id, 0,
@@ -380,13 +403,13 @@ static int do_carrier_appdata_set(enum at_parser_cmd_type, struct at_parser *par
 		if (param_count == 5) {
 			ret = util_string_get(parser, 2, data_ascii, &data_ascii_len);
 			if (ret) {
-				return ret;
+				goto out;
 			}
 
 			size = hex2bin(data_ascii, data_ascii_len, data, data_len);
 			if (size == 0) {
 				LOG_ERR("Failed to decode hex string to array");
-				return -EINVAL;
+				goto out;
 			}
 
 			data_ptr = data;
@@ -394,7 +417,9 @@ static int do_carrier_appdata_set(enum at_parser_cmd_type, struct at_parser *par
 
 		ret = lwm2m_carrier_app_data_set(path, path_len, data_ptr, size);
 	}
-
+out:
+	free(data);
+	free(data_ascii);
 	return ret;
 }
 
@@ -747,24 +772,36 @@ SM_AT_CMD_CUSTOM(xcarrier_log_data, "AT#XCARRIER=\"log_data\"",
 static int do_carrier_event_log_log_data(enum at_parser_cmd_type, struct at_parser *parser,
 					 uint32_t)
 {
-	char data_ascii[CONFIG_SM_CARRIER_APP_DATA_BUFFER_LEN] = {0};
+	int ret;
 	size_t data_ascii_len = CONFIG_SM_CARRIER_APP_DATA_BUFFER_LEN;
-
-	uint8_t data[CONFIG_SM_CARRIER_APP_DATA_BUFFER_LEN / 2];
 	size_t data_len = CONFIG_SM_CARRIER_APP_DATA_BUFFER_LEN / 2;
 
-	int ret = util_string_get(parser, 2, data_ascii, &data_ascii_len);
+	uint8_t *data = calloc(1, data_len);
+	uint8_t *data_ascii = calloc(1, data_ascii_len);
+
+	if (data == NULL || data_ascii == NULL) {
+		LOG_ERR("Failed to allocate memory for data");
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	ret = util_string_get(parser, 2, data_ascii, &data_ascii_len);
 	if (ret) {
-		return ret;
+		goto out;
 	}
 
 	data_len = hex2bin(data_ascii, data_ascii_len, data, data_len);
 	if (data_len == 0) {
 		LOG_ERR("Failed to decode hex string to array");
-		return -EINVAL;
+		ret = -EINVAL;
+		goto out;
 	}
 
-	return lwm2m_carrier_log_data_set(data, data_len);
+	ret = lwm2m_carrier_log_data_set(data, data_len);
+out:
+	free(data);
+	free(data_ascii);
+	return ret;
 }
 
 /* AT#XCARRIER="position",<latitude>,<longitude>,<altitude>,<timestamp>,<uncertainty> */
