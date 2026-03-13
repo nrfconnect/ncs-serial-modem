@@ -256,7 +256,7 @@ static int carrier_datamode_callback(uint8_t op, const uint8_t *data, int len, u
 
 	if (op == DATAMODE_SEND) {
 		if ((flags & SM_DATAMODE_FLAGS_MORE_DATA) != 0) {
-			LOG_ERR("Datamode buffer overflow");
+			LOG_ERR("Data mode buffer overflow");
 			exit_datamode_handler(-EOVERFLOW);
 			return -EOVERFLOW;
 		}
@@ -281,7 +281,7 @@ static int carrier_datamode_callback(uint8_t op, const uint8_t *data, int len, u
 		return len;
 
 	} else if (op == DATAMODE_EXIT) {
-		LOG_DBG("datamode exit");
+		LOG_DBG("data mode exit");
 	}
 
 	return 0;

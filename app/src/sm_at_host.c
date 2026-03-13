@@ -592,11 +592,11 @@ static bool set_sm_mode(struct sm_at_host_ctx *ctx, enum sm_operation_mode mode)
 	if (ctx->at_mode == SM_AT_COMMAND_MODE) {
 		if (mode == SM_DATA_MODE) {
 			if (ctx->data_rb_buf == NULL) {
-				LOG_DBG("Allocating datamode buffer of size %d",
+				LOG_DBG("Allocating data mode buffer of size %d",
 					CONFIG_SM_DATAMODE_BUF_SIZE);
 				ctx->data_rb_buf = malloc(CONFIG_SM_DATAMODE_BUF_SIZE);
 				if (ctx->data_rb_buf == NULL) {
-					LOG_ERR("Failed to allocate datamode buffer");
+					LOG_ERR("Failed to allocate data mode buffer");
 					return false;
 				}
 				ring_buf_init(&ctx->data_rb, CONFIG_SM_DATAMODE_BUF_SIZE,
@@ -651,7 +651,7 @@ static bool exit_datamode(void)
 		k_mutex_unlock(&ctx->mutex_data);
 
 		if (ctx->data_mode.handler_result) {
-			LOG_ERR("Datamode handler error: %d", ctx->data_mode.handler_result);
+			LOG_ERR("Data mode handler error: %d", ctx->data_mode.handler_result);
 			ctx->data_mode.handler_result = -1;
 		}
 		rsp_send("\r\n#XDATAMODE: %d\r\n", ctx->data_mode.handler_result);
