@@ -263,8 +263,9 @@ No other GPIO control is required to utilize the PSM or eDRX modes.
 Incoming data wake-up
 =====================
 
-When the UART is powered down and there is incoming data, the |SM| application issues a pulse signal on the **RI** pin to notify the host.
+When the UART is powered down and there is incoming data, the |SM| application asserts the **RI** pin to notify the host.
 The RI signal is handled by the modem driver on the host, which powers up the UART device and asserts the DTR line, signaling the |SM| that the UART is powered on and ready to receive data.
+The RI signal remains asserted until the nRF91 UART is activated and ready to transmit data.
 
 .. figure:: images/cmux-wakeup-timing.svg
    :alt: Modem waking up the host timing diagram
@@ -272,7 +273,9 @@ The RI signal is handled by the modem driver on the host, which powers up the UA
    Sequence diagram showing the wake-up sequence when the UART is powered down
 
 This sequence diagram illustrates the wake-up sequence when the UART is powered down.
-The RI signal pulse triggers the host to power up its UART and assert DTR, which in turn signals the modem that the UART interface is ready.
+The RI signal triggers the host to power up its UART and assert DTR.
+Once the host UART is ready and DTR is asserted, the nRF91 enables its UART interface.
+The RI signal remains active throughout this process and only returns to inactive once the nRF91 UART is active.
 This coordinated wake-up ensures both ends of the communication link are ready before data transmission begins.
 
 Host-initiated wake-up
