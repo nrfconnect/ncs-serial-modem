@@ -285,9 +285,6 @@ The following configuration files are provided:
   Used in conjunction with :file:`overlay-carrier.conf`.
   For more information, see the `Carrier-specific dependencies`_ section of the `LwM2M carrier`_ documentation.
 
-* :file:`overlay-full_fota.conf` - Configuration file that adds full modem FOTA support.
-  See :ref:`SM_AT_FOTA` for more information on how to use full modem FOTA functionality.
-
 * :file:`overlay-cmux.conf` - Configuration file that adds support for the CMUX protocol.
   See :ref:`SM_AT_CMUX` for more information.
 
@@ -306,6 +303,9 @@ The following configuration files are provided:
 
      The use of Memfault features in |SM| are `Experimental <Software maturity levels_>`_.
 
+* :file:`overlay-full-fota.conf` - Configuration file that adds full modem FOTA support.
+  See :ref:`SM_AT_FOTA` for more information on how to use full modem FOTA functionality.
+
 * :file:`overlay-disable-dtr.overlay` - Devicetree overlay that disables the DTR and RI pins and related functionality.
   This overlay can be used if your setup does not have the need or means for managing the power externally.
   Modify the overlay to fit your configuration.
@@ -314,8 +314,12 @@ The following configuration files are provided:
   This is needed when capturing modem traces and application debug logs simultaneously.
   See the :ref:`sm_logging` documentation for more information.
 
+* :file:`overlay-external-flash.overlay` - Devicetree overlay that enables external flash.
+  This overlay is needed when using full modem FOTA functionality.
+  See the :ref:`SM_AT_FOTA` for more information.
+
 * :file:`pm_static_nrf9151dk_nrf9151_ns_full_fota.yml` - Partition manager static configuration for full modem FOTA functionality.
-  Use PM_STATIC_YML_FILE=pm_static_nrf9151dk_nrf9151_ns_full_fota.yml compile option to add this file into the build.
+  Use ``PM_STATIC_YML_FILE=pm_static_nrf9151dk_nrf9151_ns_full_fota.yml`` compile option to add this file into the build.
   See the :ref:`SM_AT_FOTA` for more information.
 
 The board-specific devicetree overlays (:file:`boards/*.overlay`) set up configurations that are specific to each supported development kit.
