@@ -50,7 +50,7 @@ struct dtr_uart_data {
 	struct k_work_delayable dtr_work;
 
 	/* --- RI (Ring Indicator) --- */
-	struct k_work_delayable ri_work;
+	bool ri_active;	/* RI signal currently active */
 
 	/* --- Power Management --- */
 	bool pm_suspended;	/* 0 = UART && DTR active, 1 = UART && DTR inactive */
@@ -206,26 +206,24 @@ static void activate_rx(struct dtr_uart_data *data)
 	user_callback(data->dev, &evt);
 }
 
-/* --- RI handling --- */
-static void ri_work_fn(struct k_work *work)
-{
-	const struct k_work_delayable *delayed_work =
-		CONTAINER_OF(work, struct k_work_delayable, work);
-	const struct dtr_uart_data *data =
-		CONTAINER_OF(delayed_work, struct dtr_uart_data, ri_work);
-	const struct dtr_uart_config *config = data->dev->config;
-
-	LOG_INF("RI: Stop");
-	gpio_pin_set_dt(&config->ri_gpio, 0);
-}
-
 static void ri_start(struct dtr_uart_data *data)
 {
 	const struct dtr_uart_config *config = data->dev->config;
 
 	LOG_INF("RI: Start");
 	gpio_pin_set_dt(&config->ri_gpio, 1);
-	k_work_schedule(&data->ri_work, K_MSEC(100));
+	data->ri_active = true;
+}
+
+static void ri_stop(struct dtr_uart_data *data)
+{
+	const struct dtr_uart_config *config = data->dev->config;
+
+	if (data->ri_active) {
+		LOG_INF("RI: Stop");
+		gpio_pin_set_dt(&config->ri_gpio, 0);
+		data->ri_active = false;
+	}
 }
 
 /* --- DTR handling --- */
@@ -256,14 +254,13 @@ static void dtr_work_handler(struct k_work *work)
 	data->dtr_state = asserted;
 
 	if (asserted) {
-		/* Stop RI signal. */
-		k_work_cancel_delayable(&data->ri_work);
-		gpio_pin_set_dt(&config->ri_gpio, 0);
-
 		/* Enable UART and RX/TX. */
 		power_on_uart(data);
 		activate_rx(data);
 		activate_tx(data);
+
+		/* Stop RI signal. */
+		ri_stop(data);
 	} else {
 		/* Disable TX. */
 		deactivate_tx(data);
@@ -382,7 +379,7 @@ static int api_tx(const struct device *dev, const uint8_t *buf, size_t len, int3
 	data->tx_buf = buf;
 	data->tx_len = len;
 
-	/* Start RI pulse. */
+	/* Start RI signal. */
 	ri_start(data);
 
 	/* Buffer the data until DTR is down. */
@@ -580,7 +577,6 @@ static int dtr_uart_init(const struct device *dev)
 	k_mutex_init(&data->dtr_mutex);
 	k_sem_init(&data->rx_disable_sync, 0, 1);
 	k_work_init_delayable(&data->dtr_work, dtr_work_handler);
-	k_work_init_delayable(&data->ri_work, ri_work_fn);
 
 	/* Set UART callback. */
 	err = uart_callback_set(config->uart, uart_callback, (void *)dev);

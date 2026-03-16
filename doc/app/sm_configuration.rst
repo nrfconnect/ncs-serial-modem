@@ -319,4 +319,4 @@ The following configuration files are provided:
   See the :ref:`SM_AT_FOTA` for more information.
 
 The board-specific devicetree overlays (:file:`boards/*.overlay`) set up configurations that are specific to each supported development kit.
-All of them configure the DTR to be deasserted from a button and RI to blink an LED.
+All of them configure the DTR to be deasserted from a button and RI to drive an LED.

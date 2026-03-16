@@ -66,7 +66,7 @@ The |SM| application uses DTR (Data Terminal Ready) and RI (Ring Indicator) pins
 * Added:
 
   * DTR pin, which is a level-based input that is configured in the devicetree with the ``dtr-gpios`` property.
-  * RI pin, which is a pulse-based output that is configured in the devicetree with the ``ri-gpios`` property.
+  * RI pin, which is a level-based output that is configured in the devicetree with the ``ri-gpios`` property.
 
 See :ref:`uart_configuration` for more information on how DTR and RI pins work in the |SM| application.
 See :ref:`sm_cellular_modem` for information on how to configure DTR and RI pins when using the |SM| application as a Zephyr modem.
