@@ -224,43 +224,43 @@
      class="timing-label"
      id="text44">t4</text>
   <!-- RI signal (active low) -->
-  <!-- Inactive (high) before pulse -->
+  <!-- Inactive (high) before assertion -->
   <line
      x1="150"
      y1="60"
-     x2="250"
+     x2="370"
      y2="60"
      class="high"
      id="line46" />
   <!-- Transition to low -->
   <line
-     x1="250"
+     x1="370"
      y1="60"
-     x2="250"
+     x2="370"
      y2="80"
      class="signal-line"
      stroke-width="2"
      id="line48" />
-  <!-- Pulse (low) for 120ms -->
-  <line
-     x1="250"
-     y1="80"
-     x2="370"
-     y2="80"
-     class="low"
-     id="line50" />
-  <!-- Transition back to high -->
+  <!-- RI stays low while UART is inactive -->
   <line
      x1="370"
      y1="80"
-     x2="370"
+     x2="610"
+     y2="80"
+     class="low"
+     id="line50" />
+  <!-- Transition back to high when nRF91 UART becomes active -->
+  <line
+     x1="610"
+     y1="80"
+     x2="610"
      y2="60"
      class="signal-line"
      stroke-width="2"
      id="line52" />
-  <!-- Inactive (high) after pulse -->
+  <!-- Inactive (high) after nRF91 UART is active -->
   <line
-     x1="370"
+     x1="610"
      y1="60"
      x2="850"
      y2="60"
@@ -268,12 +268,17 @@
      id="line54" />
   <!-- RI labels -->
   <text
-     x="200"
+     x="260"
      y="55"
      class="signal-label"
      id="text56">Inactive</text>
   <text
-     x="600"
+     x="400"
+     y="75"
+     class="signal-label"
+     id="text58">Active</text>
+  <text
+     x="730"
      y="55"
      class="signal-label"
      id="text60">Inactive</text>
@@ -401,23 +406,23 @@
      class="signal-label"
      id="text94">Active</text>
   <!-- Timing annotations with arrows -->
-  <!-- RI pulse annotation -->
+  <!-- RI signal annotation -->
   <text
-     x="305.88928"
-     y="98.316025"
+     x="367"
+     y="110"
      text-anchor="middle"
      class="timing-label"
-     id="text98">100ms pulse</text>
+     id="text98">RI asserted</text>
   <!-- Host UART enable annotation -->
   <text
-     x="453.67838"
-     y="84.776009"
+     x="488.67838"
+     y="94.776009"
      text-anchor="middle"
      class="timing-label"
      id="text102">Host enables</text>
   <text
-     x="455.39807"
-     y="84.806023"
+     x="490.39807"
+     y="94.806023"
      text-anchor="middle"
      class="timing-label"
      dy="12"
