@@ -37,8 +37,3 @@
 &i2c2 {
 	status = "disabled";
 };
-
-/* Enable external flash */
-&gd25wb256 {
-	status = "okay";
-};
