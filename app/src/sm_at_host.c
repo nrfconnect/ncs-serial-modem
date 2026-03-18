@@ -478,6 +478,7 @@ static int sm_at_host_pipe_tx_blocking(struct sm_at_host_ctx *ctx, const uint8_t
 {
 	struct modem_pipe *pipe = ctx ? atomic_ptr_get(&ctx->pipe) : NULL;
 	int ret;
+	int retries = 5;
 
 	if (!pipe) {
 		LOG_WRN("No pipe assigned for transmission (ctx: %p)", (void *)ctx);
@@ -493,9 +494,11 @@ static int sm_at_host_pipe_tx_blocking(struct sm_at_host_ctx *ctx, const uint8_t
 		} else if (ret == 0) {
 			/* No data transmitted, wait for transmit idle event */
 			if (k_event_wait(&ctx->pipe_event, BIT(MODEM_PIPE_EVENT_TRANSMIT_IDLE),
-					 true, K_SECONDS(1)) == 0) {
-				LOG_ERR("Failed to wait for transmit idle event");
-				return -EIO;
+					 true, K_MSEC(100)) == 0) {
+				if (--retries == 0) {
+					LOG_ERR("Pipe blocked, dropping %d bytes", len);
+					return -EIO;
+				}
 			}
 		} else {
 			buf += ret;
