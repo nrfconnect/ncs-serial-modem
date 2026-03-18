@@ -31,6 +31,7 @@ target_sources_ifdef(CONFIG_SM_MQTTC app PRIVATE src/sm_at_mqtt.c)
 target_sources_ifdef(CONFIG_SM_HTTPC app PRIVATE src/sm_at_httpc.c)
 target_sources_ifdef(CONFIG_SM_MODEM_TRACE_BACKEND_CMUX app PRIVATE src/sm_trace_backend_cmux.c)
 target_sources_ifdef(CONFIG_SM_MODEM_TRACE_BACKEND_UART app PRIVATE src/sm_trace_backend_uart.c)
+target_sources_ifdef(CONFIG_NRF_PROVISIONING app PRIVATE src/sm_at_provisioning.c)
 
 add_subdirectory_ifdef(CONFIG_SM_CARRIER src/lwm2m_carrier)
 
