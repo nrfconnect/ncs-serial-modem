@@ -3,11 +3,13 @@
  *
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
+#define _POSIX_C_SOURCE 200809L /* for strdup() */
 #include <zephyr/logging/log.h>
 #include <zephyr/kernel.h>
 #include <stdio.h>
 #include <string.h>
 #include <modem/sms.h>
+#include <assert.h>
 #include "sm_util.h"
 #include "sm_at_host.h"
 
@@ -22,18 +24,47 @@ enum sm_sms_operation {
 	AT_SMS_SEND
 };
 
-static int sms_handle = -1;
-static struct modem_pipe *sms_pipe;
+static void cleanup_handler(struct k_work *work);
+struct sm_sms_context {
+	int sms_handle;
+	struct modem_pipe *pipe;
+	uint16_t ref_number;
+	uint8_t total_msgs;
+	uint8_t count;
+	char *messages[MAX_CONCATENATED_MESSAGE];
+	struct k_work_delayable cleanup_work;
+} static sm_sms_ctx = {
+	.sms_handle = -1,
+	.cleanup_work = Z_WORK_DELAYABLE_INITIALIZER(cleanup_handler),
+};
+
+#define MSG(i, _)	ctx->messages[i]
+#define MESSAGES() 	LISTIFY(MAX_CONCATENATED_MESSAGE, MSG, (,))
+
+static const char *concatenated_fmt(int total_msgs)
+{
+	switch (total_msgs) {
+	case 1:
+		return "\r\n#XSMS: \"%02d-%02d-%02d %02d:%02d:%02d\",\""
+		       "%s\",\"%s\"\r\n";
+	case 2:
+		return "\r\n#XSMS: \"%02d-%02d-%02d %02d:%02d:%02d\",\""
+		       "%s\",\"%s%s\"\r\n";
+	case 3:
+		return "\r\n#XSMS: \"%02d-%02d-%02d %02d:%02d:%02d\",\""
+		       "%s\",\"%s%s%s\"\r\n";
+	default:
+		/* This should not happen */
+		assert(false);
+		return NULL;
+	}
+}
+
+
 
 static void sms_callback(struct sms_data *const data, void *context)
 {
-	static uint16_t ref_number;
-	static uint8_t total_msgs;
-	static uint8_t count;
-	static char messages[MAX_CONCATENATED_MESSAGE - 1][SMS_MAX_PAYLOAD_LEN_CHARS + 1];
-	static char rsp_buf[MAX_CONCATENATED_MESSAGE * SMS_MAX_PAYLOAD_LEN_CHARS + 64] = {0};
-
-	ARG_UNUSED(context);
+	struct sm_sms_context *ctx = (struct sm_sms_context *)context;
 
 	if (data == NULL) {
 		LOG_WRN("NULL data");
@@ -44,77 +75,69 @@ static void sms_callback(struct sms_data *const data, void *context)
 		struct sms_deliver_header *header = &data->header.deliver;
 
 		if (!header->concatenated.present) {
-			sprintf(rsp_buf,
-				"\r\n#XSMS: \"%02d-%02d-%02d %02d:%02d:%02d UTC%+03d:%02d\",\"",
-				header->time.year, header->time.month, header->time.day,
-				header->time.hour, header->time.minute, header->time.second,
-				header->time.timezone * 15 / 60,
-				abs(header->time.timezone) * 15 % 60);
-			strcat(rsp_buf, header->originating_address.address_str);
-			strcat(rsp_buf, "\",\"");
-			strcat(rsp_buf, data->payload);
-			strcat(rsp_buf, "\"\r\n");
-			urc_send_to(sms_pipe, "%s", rsp_buf);
+			urc_send_to(ctx->pipe,
+				    "\r\n#XSMS: \"%02d-%02d-%02d %02d:%02d:%02d UTC%+03d:%02d\",\""
+				    "%s\",\"%s\"\r\n",
+				    header->time.year, header->time.month, header->time.day,
+				    header->time.hour, header->time.minute, header->time.second,
+				    header->time.timezone * 15 / 60,
+				    abs(header->time.timezone) * 15 % 60,
+				    header->originating_address.address_str, data->payload);
 		} else {
 			LOG_DBG("concatenated message %d, %d, %d",
 				header->concatenated.ref_number,
-				total_msgs = header->concatenated.total_msgs,
+				header->concatenated.total_msgs,
 				header->concatenated.seq_number);
 			/* ref_number and total_msgs should remain unchanged */
-			if (ref_number == 0) {
-				ref_number = header->concatenated.ref_number;
+			if (ctx->ref_number == 0) {
+				ctx->ref_number = header->concatenated.ref_number;
 			}
-			if (ref_number != header->concatenated.ref_number) {
+			if (ctx->ref_number != header->concatenated.ref_number) {
 				LOG_ERR("SMS concatenated message ref_number error: %d, %d",
-					ref_number, header->concatenated.ref_number);
+					ctx->ref_number, header->concatenated.ref_number);
 				goto done;
 			}
-			if (total_msgs == 0) {
-				total_msgs = header->concatenated.total_msgs;
+			if (ctx->total_msgs == 0) {
+				ctx->total_msgs = header->concatenated.total_msgs;
 			}
-			if (total_msgs != header->concatenated.total_msgs) {
+			if (ctx->total_msgs != header->concatenated.total_msgs) {
 				LOG_ERR("SMS concatenated message total_msgs error: %d, %d",
-					total_msgs, header->concatenated.total_msgs);
+					ctx->total_msgs, header->concatenated.total_msgs);
 				goto done;
 			}
-			if (total_msgs > MAX_CONCATENATED_MESSAGE) {
-				LOG_ERR("SMS concatenated message no memory: %d", total_msgs);
+			if (ctx->total_msgs > MAX_CONCATENATED_MESSAGE) {
+				LOG_ERR("SMS concatenated message no memory: %d", ctx->total_msgs);
 				goto done;
 			}
 			/* seq_number should start with 1 but could arrive in random order */
 			if (header->concatenated.seq_number == 0 ||
-			    header->concatenated.seq_number > total_msgs) {
+			    header->concatenated.seq_number > ctx->total_msgs) {
 				LOG_ERR("SMS concatenated message seq_number error: %d, %d",
-					header->concatenated.seq_number, total_msgs);
+					header->concatenated.seq_number, ctx->total_msgs);
 				goto done;
 			}
-			if (header->concatenated.seq_number == 1) {
-				sprintf(rsp_buf, "\r\n#XSMS: \"%02d-%02d-%02d %02d:%02d:%02d\",\"",
-					header->time.year, header->time.month, header->time.day,
-					header->time.hour, header->time.minute,
-					header->time.second);
-				strcat(rsp_buf, header->originating_address.address_str);
-				strcat(rsp_buf, "\",\"");
-				strcat(rsp_buf, data->payload);
-				count++;
-			} else {
-				strcpy(messages[header->concatenated.seq_number - 2],
-					data->payload);
-				count++;
+
+			char *msg = strdup(data->payload);
+
+			if (msg == NULL) {
+				LOG_ERR("Failed to allocate memory for SMS message");
+				goto done;
 			}
-			if (count == total_msgs) {
-				for (int i = 0; i < (total_msgs - 1); i++) {
-					strcat(rsp_buf, messages[i]);
-				}
-				strcat(rsp_buf, "\"\r\n");
-				urc_send_to(sms_pipe, "%s", rsp_buf);
+			ctx->messages[header->concatenated.seq_number -1] = msg;
+			ctx->count++;
+
+			if (ctx->count == ctx->total_msgs) {
+				urc_send_to(ctx->pipe, concatenated_fmt(ctx->total_msgs), header->time.year, header->time.month,
+					    header->time.day, header->time.hour, header->time.minute,
+					    header->time.second, header->originating_address.address_str,
+					    MESSAGES());
 			} else {
+				/* Wait for more messages */
+				k_work_reschedule(&ctx->cleanup_work, K_MINUTES(5));
 				return;
 			}
 done:
-			ref_number = 0;
-			total_msgs = 0;
-			count = 0;
+			k_work_reschedule(&ctx->cleanup_work, K_NO_WAIT);
 		}
 	} else if (data->type == SMS_TYPE_STATUS_REPORT) {
 		LOG_INF("Status report received");
@@ -123,20 +146,36 @@ done:
 	}
 }
 
+static void cleanup_handler(struct k_work *work)
+{
+	struct k_work_delayable *dwork = k_work_delayable_from_work(work);
+	struct sm_sms_context *ctx = CONTAINER_OF(dwork, struct sm_sms_context, cleanup_work);
+
+	ctx->ref_number = 0;
+	ctx->total_msgs = 0;
+	ctx->count = 0;
+	for (int i = 0; i < MAX_CONCATENATED_MESSAGE; i++) {
+		if (ctx->messages[i]) {
+			free(ctx->messages[i]);
+			ctx->messages[i] = NULL;
+		}
+	}
+}
+
 static int do_sms_start(void)
 {
 	int err = 0;
 
-	if (sms_handle >= 0) {
+	if (sm_sms_ctx.sms_handle >= 0) {
 		/* already registered */
 		return -EBUSY;
 	}
 
-	sms_handle = sms_register_listener(sms_callback, NULL);
-	if (sms_handle < 0) {
-		err = sms_handle;
+	sm_sms_ctx.sms_handle = sms_register_listener(sms_callback, &sm_sms_ctx);
+	if (sm_sms_ctx.sms_handle < 0) {
+		err = sm_sms_ctx.sms_handle;
 		LOG_ERR("SMS start error: %d", err);
-		sms_handle = -1;
+		sm_sms_ctx.sms_handle = -1;
 	}
 
 	return err;
@@ -144,8 +183,8 @@ static int do_sms_start(void)
 
 static int do_sms_stop(void)
 {
-	sms_unregister_listener(sms_handle);
-	sms_handle = -1;
+	sms_unregister_listener(sm_sms_ctx.sms_handle);
+	sm_sms_ctx.sms_handle = -1;
 
 	return 0;
 }
@@ -154,7 +193,7 @@ static int do_sms_send(const char *number, const char *message, uint16_t message
 {
 	int err;
 
-	if (sms_handle < 0) {
+	if (sm_sms_ctx.sms_handle < 0) {
 		LOG_ERR("SMS not registered");
 		return -EPERM;
 	}
@@ -182,7 +221,7 @@ static int handle_at_sms(enum at_parser_cmd_type cmd_type, struct at_parser *par
 		if (op == AT_SMS_STOP) {
 			err = do_sms_stop();
 		} else if (op == AT_SMS_START) {
-			sms_pipe = sm_at_host_get_current_pipe();
+			sm_sms_ctx.pipe = sm_at_host_get_current_pipe();
 			err = do_sms_start();
 		} else if (op ==  AT_SMS_SEND) {
 			char number[SMS_MAX_ADDRESS_LEN_CHARS + 1];
