@@ -59,7 +59,8 @@ jobs:
             -e ClangFormat \
             -e Ruff \
             -e SysbuildKconfigBasicNoModules \
-            -e LicenseAndCopyrightCheck
+            -e LicenseAndCopyrightCheck \
+            -c origin/${BASE_REF}..
 
       - name: Process Compliance Results
         working-directory: serial_modem
