@@ -44,6 +44,9 @@ The following UART signals are used:
 
 The Data Terminal Ready (DTR) and Ring Indicator (RI) signals are the **control signals** used for UART power management, while TX/RX/RTS/CTS are the standard UART signals.
 
+.. important::
+   The use of |SM| without hardware flow control (RTS/CTS) is `experimental <Software maturity levels_>`_ and strongly not recommended.
+   See :ref:`uart_without_flow_control` for more information.
 
 Board-specific pin mapping
 **************************
@@ -71,11 +74,11 @@ The following tables shows how to connect the UART pins to the corresponding pin
          * - TX
            - P0.27
          * - RX
-           - P0.26
+           - P0.26 (pull-up)
          * - RTS
            - P0.14
          * - CTS
-           - P0.15
+           - P0.15 (pull-down)
          * - DTR
            - P0.08 (Button 1, pull-up, active high)
          * - RI
@@ -103,11 +106,11 @@ The following tables shows how to connect the UART pins to the corresponding pin
          * - TX
            - P0.02
          * - RX
-           - P0.03
+           - P0.03 (pull-up)
          * - RTS
            - P0.06
          * - CTS
-           - P0.07
+           - P0.07 (pull-down)
          * - DTR
            - P0.31 (active low, pull-up)
          * - RI
@@ -184,7 +187,7 @@ Host application
 
    .. group-tab:: nRF54L15DK
 
-      The nRF54L15DK host applications use UART30 for Serial Modem communication:
+      The nRF54L15DK host applications use UART30 for |SM| communication:
 
       .. list-table::
          :header-rows: 1
@@ -249,7 +252,7 @@ When DTR is asserted by the host, the UART is enabled and ready for communicatio
 When DTR is deasserted, the UART is powered down to save power.
 
 When the UART is powered down, it releases its high-speed clocks, which are then automatically stopped by the system's power management.
-This achieves the lowest possible power consumption, as the UART is one of the primary power consumers in serial modem configurations.
+This achieves the lowest possible power consumption, as the UART is one of the primary power consumers in |SM| configurations.
 Power consumption can be reduced from hundreds of microamps to just a few microamps when the UART is powered down.
 
 UART power management is completely independent of the modem power management (CFUN, PSM, eDRX, and so on).
@@ -278,6 +281,13 @@ Once the host UART is ready and DTR is asserted, the nRF91 enables its UART inte
 The RI signal remains active throughout this process and only returns to inactive once the nRF91 UART is active.
 This coordinated wake-up ensures both ends of the communication link are ready before data transmission begins.
 
+**With hardware flow control -**  The host can observe its CTS pin (connected to |SM|'s RTS) to know when |SM| is ready to receive data.
+When |SM| starts driving its RTS pin, the host knows that |SM| is ready to receive.
+The host must also have a pull-up on its CTS pin.
+
+**Without hardware flow control-** The host must monitor the RI signal, which is de-asserted when the |SM| UART becomes ready to receive data.
+Alternatively, the host can implement a sufficient timeout between asserting DTR and initiating its first TX operation.
+
 Host-initiated wake-up
 ======================
 
@@ -289,10 +299,33 @@ The modem detects the DTR assertion and powers up its UART interface, allowing c
 
    Sequence diagram showing host-initiated wake-up of the modem
 
+.. _uart_without_flow_control:
+
+Operating without hardware flow control
+========================================
+
+.. important::
+   The use of |SM| without hardware flow control (RTS/CTS) is `experimental <Software maturity levels_>`_ and strongly not recommended..
+   Hardware flow control ensures reliable communication and prevents timing-related issues.
+   Without hardware flow control, there is a risk of data loss in UART communication, especially in high-throughput scenarios.
+
+|SM|'s CTS pin is configured with pull-down, allowing |SM| to transmit when CTS and RTS pins are left floating.
+The host can operate without connecting the hardware flow control signals (CTS/RTS).
+
+**Key requirements:**
+
+* The host must enable its own UART before asserting DTR.
+* To detect when |SM| is ready to receive, monitor the RI signal (de-asserted when ready) or use a sufficient timeout after DTR assertion.
+* See `Incoming data wake-up`_ for detailed timing information.
+
+**Buffer configuration:**
+
+Increase ``CONFIG_SM_UART_RX_BUF_SIZE`` and possibly ``CONFIG_SM_UART_RX_BUF_COUNT`` to provide sufficient buffer space for your use case.
+
 Automatic UART power management using Zephyr's Cellular Modem driver
 ====================================================================
 
-As the Serial Modem's UART interface power state is controlled by the DTR signal from the host, it is possible to automate the power management using Zephyr's cellular modem driver with Zephyr's CMUX (3GPP TS 27.010) module.
+As the |SM|'s UART interface power state is controlled by the DTR signal from the host, it is possible to automate the power management using Zephyr's cellular modem driver with Zephyr's CMUX (3GPP TS 27.010) module.
 This allows host applications to manage the UART power state automatically.
 See the `Zephyr CMUX Power Saving`_ documentation for more information.
 This configuration is completely done in the host.
