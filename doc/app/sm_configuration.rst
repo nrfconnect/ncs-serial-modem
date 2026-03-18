@@ -352,5 +352,8 @@ The following configuration files are provided:
   Use ``PM_STATIC_YML_FILE=pm_static_nrf9151dk_nrf9151_ns_full_fota.yml`` compile option to add this file into the build.
   See the :ref:`SM_AT_FOTA` for more information.
 
+* :file:`overlay-nrf-device-provisioning.conf` - Configuration file that enables the nRF Cloud device provisioning client and its AT command interface.
+  See :ref:`SM_AT_PROVISIONING` for more information.
+
 The board-specific devicetree overlays (:file:`boards/*.overlay`) set up configurations that are specific to each supported development kit.
 All of them configure the DTR to be deasserted from a button and RI to drive an LED.

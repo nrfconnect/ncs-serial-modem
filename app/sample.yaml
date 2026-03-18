@@ -5,7 +5,7 @@ tests:
     sysbuild: true
     build_only: true
     extra_args:
-      - EXTRA_CONF_FILE="overlay-cmux.conf;overlay-ppp.conf;overlay-trace-backend-uart.conf"
+      - EXTRA_CONF_FILE="overlay-cmux.conf;overlay-ppp.conf;overlay-trace-backend-uart.conf;overlay-nrf-device-provisioning.conf"
       - EXTRA_DTC_OVERLAY_FILE="overlay-nrf91m1.overlay;overlay-trace-backend-uart.overlay"
     extra_configs:
       - CONFIG_SM_LOG_LEVEL_DBG=y
