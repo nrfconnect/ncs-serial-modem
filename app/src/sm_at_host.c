@@ -335,6 +335,9 @@ struct sm_at_host_ctx *sm_at_host_get_urc_ctx(void)
 
 struct modem_pipe *sm_at_host_get_pipe(struct sm_at_host_ctx *ctx)
 {
+	if (!sm_at_ctx_check(ctx)) {
+		return NULL;
+	}
 	return ctx ? atomic_ptr_get(&ctx->pipe) : NULL;
 }
 
@@ -385,6 +388,9 @@ static bool sm_at_ctx_check(struct sm_at_host_ctx *ctx)
 
 static void check_idle_timer(struct sm_at_host_ctx *ctx, bool reschedule)
 {
+	if (!ctx) {
+		return;
+	}
 	if (reschedule || k_timer_remaining_ticks(&ctx->idle_timer) == 0) {
 		k_timeout_t delay = ctx->echo_enabled && (reschedule || ctx->at_cmd_len != 0)
 					    ? K_MSEC(CONFIG_SM_URC_DELAY_WITH_INCOMPLETE_ECHO_MS)
@@ -573,6 +579,9 @@ void sm_at_host_release(struct sm_at_host_ctx *ctx)
 
 void sm_at_host_attach(struct modem_pipe *pipe)
 {
+	if (!pipe) {
+		return;
+	}
 	modem_pipe_attach(pipe, null_pipe_handler, NULL);
 	if (sm_pipe_is_open(pipe)) {
 		sm_at_pipe_opened(NULL, pipe);
@@ -1016,11 +1025,13 @@ static int sm_at_send_internal(struct sm_at_host_ctx *ctx, const uint8_t *data, 
 				sys_slist_append(&ctx->buffered_urcs, &msg->node);
 			}
 		}
-		if (!is_idle(ctx)) {
-			LOG_DBG("AT command in progress, delaying URC processing");
-			check_idle_timer(ctx, false);
-		} else {
-			sm_at_host_event_notify(ctx, SM_EVENT_URC);
+		if (ctx) {
+			if (!is_idle(ctx)) {
+				LOG_DBG("AT command in progress, delaying URC processing");
+				check_idle_timer(ctx, false);
+			} else {
+				sm_at_host_event_notify(ctx, SM_EVENT_URC);
+			}
 		}
 		return 0;
 	}
@@ -1506,12 +1517,12 @@ bool in_at_mode_pipe(struct modem_pipe *pipe)
 {
 	struct sm_at_host_ctx *ctx = sm_at_host_get_ctx_from(pipe);
 
-	return in_at_mode_ctx(ctx);
+	return ctx ? in_at_mode_ctx(ctx) : false;
 }
 
 bool is_idle_ctx(struct sm_at_host_ctx *ctx)
 {
-	return (in_at_mode_ctx(ctx) &&
+	return (sm_at_ctx_check(ctx) && in_at_mode_ctx(ctx) &&
 		k_timer_remaining_ticks(&ctx->idle_timer) == 0);
 }
 
@@ -1519,7 +1530,7 @@ bool is_idle_pipe(struct modem_pipe *pipe)
 {
 	struct sm_at_host_ctx *ctx = sm_at_host_get_ctx_from(pipe);
 
-	return is_idle_ctx(ctx);
+	return ctx ? is_idle_ctx(ctx) : false;
 }
 
 bool is_open_pipe(struct modem_pipe *pipe)
@@ -1529,7 +1540,7 @@ bool is_open_pipe(struct modem_pipe *pipe)
 
 bool is_open_ctx(struct sm_at_host_ctx *ctx)
 {
-	return sm_at_host_get_pipe(ctx);
+	return ctx ? is_open_pipe(sm_at_host_get_pipe(ctx)) : false;
 }
 
 void exit_datamode_handler(int result)
