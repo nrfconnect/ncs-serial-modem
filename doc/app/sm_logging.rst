@@ -63,6 +63,68 @@ Use the `Cellular Monitor app`_ for capturing and analyzing modem traces.
    Otherwise, you can choose not to capture RTT logs.
    Having only RTT logs enabled does not cause this issue.
 
+.. _sm_logging_uart_backend:
+
+Shared UART log and trace backend
+**********************************
+
+The |SM| application supports a shared UART backend that routes both Zephyr application logs and modem traces to the same physical UART (``UART1``, VCOM1 on the nRF9151 DK).
+The baud rate of the shared UART is set to 1000000 to support the high data rate required for modem traces.
+
+Configuration
+=============
+
+To use the shared UART backend, build the |SM| application with the Kconfig and devicetree overlays:
+
+.. code-block:: console
+
+   west build -p -b nrf9151dk/nrf9151/ns -- -DEXTRA_CONF_FILE="overlay-trace-backend-uart.conf" -DEXTRA_DTC_OVERLAY_FILE="overlay-trace-backend-uart.overlay"
+
+After flashing, both backends are disabled by default, and the UART is suspended.
+Use the ``AT#XLOG`` and ``AT#XTRACE`` AT commands to activate them at runtime.
+See :ref:`SM_AT_trace` for the full command reference.
+
+.. note::
+
+   Attempting to enable one backend while the other is active returns ``ERROR``.
+   Always disable the active backend before enabling the other.
+
+.. note::
+
+   When measuring power consumption, make sure both backends are disabled (``AT#XLOG=0`` and ``AT#XTRACE=0``) so the UART stays suspended.
+   An active trace or log backend adds approximately 700 uA overhead.
+
+Collecting traces
+=================
+
+To collect modem traces using the shared UART backend:
+
+1. Connect the `Cellular Monitor app`_ to ``UART1`` (VCOM1 on the nRF9151 DK) at 1000000 baud rate.
+#. Enable modem trace collection:
+
+   .. code-block:: console
+
+      AT#XTRACE=1
+      OK
+
+#. Activate the modem to start generating trace data:
+
+   .. code-block:: console
+
+      AT+CFUN=1
+      OK
+
+#. Wait for the modem to register on the network and collect the traces in the `Cellular Monitor app`_.
+#. When done, disable the modem trace backend:
+
+   .. code-block:: console
+
+      AT#XTRACE=0
+      OK
+
+You can analyze the captured trace file in the `Cellular Monitor app`_ to inspect AT commands, network events, and IP-level details.
+If the modem crashes and the crash dump collection was enabled, you can send the trace file to `Nordic Semiconductor support <DevZone_>`_ for further analysis.
+
 .. _sm_modem_trace_cmux:
 
 Modem traces through CMUX
@@ -131,4 +193,4 @@ The stop script automatically terminates trace collection and preserves the trac
 You can open the :file:`/var/log/nrf91-modem-trace.bin` file using the `Cellular Monitor app`_ for analysis.
 This allows you to see the AT commands, network, and IP-level details of the communication between the modem and the cellular network.
 
-If the modem crashes and the crash dump collection was enabled, you can send the trace file to Nordic Semiconductor support for further analysis.
+If the modem crashes and the crash dump collection was enabled, you can send the trace file to `Nordic Semiconductor support <DevZone_>`_ for further analysis.

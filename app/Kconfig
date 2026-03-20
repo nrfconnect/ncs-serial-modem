@@ -363,6 +363,14 @@ config SM_MODEM_TRACE_BACKEND_CMUX
 	  When CMUX is enabled, modem traces are transmitted on a dedicated CMUX channel.
 	  The trace channel is the first channel after the AT command channel and the PPP channel.
 
+config SM_MODEM_TRACE_BACKEND_UART
+	bool "UART modem trace backend (shared with Zephyr log backend)"
+	depends on UART_ASYNC_API
+	help
+	  Uses the zephyr,console UART as the modem trace backend, sharing it
+	  with the Zephyr application log backend. The two are mutually exclusive:
+	  only one can be active at a time. Switch at runtime with AT#XLOG / AT#XTRACE.
+
 endchoice # NRF_MODEM_LIB_TRACE_BACKEND
 
 endif
