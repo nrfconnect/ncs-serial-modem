@@ -415,7 +415,7 @@ void sm_at_socket_poll_work_handler(struct k_work *work)
 				err = -ECONNRESET;
 			}
 			if (err) {
-				exit_datamode_handler(err);
+				exit_datamode_handler(sm_at_host_get_ctx_from(pipe), err);
 			}
 		}
 	}
@@ -1254,7 +1254,7 @@ static int socket_datamode_callback(uint8_t op, const uint8_t *data, int len, ui
 		if (poll_ctx->datamode_sock->type == NRF_SOCK_DGRAM &&
 		    (flags & SM_DATAMODE_FLAGS_MORE_DATA) != 0) {
 			LOG_ERR("Data mode buffer overflow");
-			exit_datamode_handler(-EOVERFLOW);
+			exit_datamode_handler(sm_at_host_get_current(), -EOVERFLOW);
 			return -EOVERFLOW;
 		}
 		if (strlen(udp_url) > 0) {

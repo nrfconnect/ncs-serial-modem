@@ -370,7 +370,7 @@ static int nrf_cloud_datamode_callback(uint8_t op, const uint8_t *data, int len,
 	if (op == DATAMODE_SEND) {
 		if ((flags & SM_DATAMODE_FLAGS_MORE_DATA) != 0) {
 			LOG_ERR("Data mode buffer overflow");
-			exit_datamode_handler(-EOVERFLOW);
+			exit_datamode_handler(sm_at_host_get_current(), -EOVERFLOW);
 			return -EOVERFLOW;
 		}
 		ret = do_cloud_send_msg(data, len);

@@ -193,9 +193,10 @@ bool is_idle_pipe(struct modem_pipe *pipe);
  * Remove the callback to the data mode handler and start dropping the incoming data, until
  * the data mode is exited.
  *
+ * @param ctx AT host context
  * @param result Result of sending in data mode.
  */
-void exit_datamode_handler(int result);
+void exit_datamode_handler(struct sm_at_host_ctx *ctx, int result);
 
 /** @brief Serial Modem AT command callback type. */
 typedef int sm_at_callback(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
