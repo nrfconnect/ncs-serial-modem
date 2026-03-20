@@ -29,6 +29,7 @@ target_sources_ifdef(CONFIG_SM_GNSS app PRIVATE src/sm_at_gnss.c)
 target_sources_ifdef(CONFIG_SM_NRF_CLOUD app PRIVATE src/sm_at_nrfcloud.c)
 target_sources_ifdef(CONFIG_SM_MQTTC app PRIVATE src/sm_at_mqtt.c)
 target_sources_ifdef(CONFIG_SM_MODEM_TRACE_BACKEND_CMUX app PRIVATE src/sm_trace_backend_cmux.c)
+target_sources_ifdef(CONFIG_SM_MODEM_TRACE_BACKEND_UART app PRIVATE src/sm_trace_backend_uart.c)
 
 add_subdirectory_ifdef(CONFIG_SM_CARRIER src/lwm2m_carrier)
 

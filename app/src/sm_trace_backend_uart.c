@@ -1,0 +1,327 @@
+/*
+ * Copyright (c) 2026 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+ */
+
+/*
+ * Custom modem trace backend that shares the UART log backend UART (zephyr,console).
+ *
+ * The log backend uses uart_poll_out (polling, no async callback).
+ * This backend uses uart_tx (async DMA).  The two are mutually exclusive in
+ * time: AT#XLOG and AT#XTRACE each refuse to enable if the other is active.
+ *
+ * AT#XLOG=1   enable Zephyr application log backend
+ * AT#XLOG=0   disable Zephyr application log backend
+ * AT#XTRACE=1 enable modem trace backend
+ * AT#XTRACE=0 disable modem trace backend
+ *
+ * The UART is suspended when backends are off and resumed when either
+ * is enabled.  No baud-rate switching is performed; both sides run at the
+ * baud rate configured in the devicetree (1 000 000 baud on the nRF9151 DK).
+ */
+
+#include <zephyr/drivers/uart.h>
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/logging/log_ctrl.h>
+#include <zephyr/pm/device.h>
+#include <modem/trace_backend.h>
+
+#include <modem/nrf_modem_lib.h>
+#include <modem/nrf_modem_lib_trace.h>
+
+#include "sm_at_host.h"
+
+LOG_MODULE_REGISTER(sm_trace_backend_uart, CONFIG_MODEM_TRACE_BACKEND_LOG_LEVEL);
+
+/* Maximum DMA transfer length (nRF91 UARTE). */
+#define CHUNK_SZ 8191
+
+/* Timeout per individual UART TX attempt. */
+#define UART_TX_WAIT_TIME_MS 1000
+
+/* UART device for the log backend is used both for Zephyr logs and modem traces. */
+#define TRACE_UART_DEVICE_NODE DT_CHOSEN(zephyr_console)
+static const struct device *const trace_uart_dev = DEVICE_DT_GET(TRACE_UART_DEVICE_NODE);
+
+/* Synchronizes trace_backend_write() with activate/deactivate. */
+static K_SEM_DEFINE(tx_sem, 0, 1);
+
+/* Signaled by the UART callback on TX_DONE / TX_ABORTED. */
+static K_SEM_DEFINE(tx_done_sem, 0, 1);
+
+/* Actual bytes transferred in the last async tx, set by the callback. */
+static volatile size_t tx_bytes;
+
+static trace_backend_processed_cb trace_processed_callback;
+
+/* Track which backend is currently using the UART. */
+static bool log_active;
+static bool trace_active;
+
+/* UART async callback — only called when trace backend is active. */
+static void uart_callback(const struct device *dev, struct uart_event *evt, void *user_data)
+{
+	ARG_UNUSED(dev);
+	ARG_UNUSED(user_data);
+
+	switch (evt->type) {
+	case UART_TX_ABORTED:
+		LOG_WRN_RATELIMIT("UART_TX_ABORTED: %zu bytes", evt->data.tx.len);
+		/* fallthrough */
+	case UART_TX_DONE:
+		tx_bytes = evt->data.tx.len;
+		k_sem_give(&tx_done_sem);
+		break;
+	default:
+		break;
+	}
+}
+
+static int trace_backend_init(trace_backend_processed_cb trace_processed_cb)
+{
+	if (trace_processed_cb == NULL) {
+		return -EFAULT;
+	}
+
+	if (!device_is_ready(trace_uart_dev)) {
+		LOG_ERR("UART device not ready");
+		return -ENODEV;
+	}
+
+	trace_processed_callback = trace_processed_cb;
+
+	/* Suspend UART at startup it can be resumed in runtime. */
+	int ret = pm_device_action_run(trace_uart_dev, PM_DEVICE_ACTION_SUSPEND);
+
+	if (ret && ret != -EALREADY) {
+		LOG_ERR("Failed to %s UART device: %d", "suspend", ret);
+		return ret;
+	}
+
+	return 0;
+}
+
+static int trace_backend_deinit(void)
+{
+	return 0;
+}
+
+static int trace_backend_write(const void *data, size_t len)
+{
+	int ret;
+	size_t chunk = MIN(len, CHUNK_SZ);
+
+	if (!trace_active) {
+		LOG_DBG_RATELIMIT("Inactive, dropped %u bytes.", len);
+		trace_processed_callback(len);
+		return len;
+	}
+
+	k_sem_take(&tx_sem, K_FOREVER);
+
+	ret = uart_tx(trace_uart_dev, (const uint8_t *)data, chunk,
+		      UART_TX_WAIT_TIME_MS * USEC_PER_MSEC);
+	if (ret) {
+		LOG_ERR("uart_tx failed: %d", ret);
+		goto out;
+	}
+
+	/* Wait for the UART TX to complete. */
+	k_sem_take(&tx_done_sem, K_FOREVER);
+	if (tx_bytes == 0) {
+		ret = -EAGAIN;
+		goto out;
+	}
+
+	ret = trace_processed_callback(tx_bytes);
+	if (ret) {
+		goto out;
+	}
+
+	ret = tx_bytes;
+
+out:
+	k_sem_give(&tx_sem);
+
+	return ret;
+}
+
+struct nrf_modem_lib_trace_backend trace_backend = {
+	.init = trace_backend_init,
+	.deinit = trace_backend_deinit,
+	.write = trace_backend_write,
+};
+
+static int trace_backend_activate(void)
+{
+	int ret;
+
+	/* Register the async callback. The log backend never calls
+	 * uart_callback_set (it uses polling), so this is the sole owner.
+	 */
+	ret = uart_callback_set(trace_uart_dev, uart_callback, NULL);
+	if (ret) {
+		LOG_ERR("Failed to set UART callback: %d", ret);
+		return ret;
+	}
+
+	/* Release the tx_sem so trace_backend_write() can proceed. */
+	k_sem_give(&tx_sem);
+
+	/* Tell the modem to begin generating traces. */
+	ret = nrf_modem_lib_trace_level_set(NRF_MODEM_LIB_TRACE_LEVEL_FULL);
+	if (ret) {
+		LOG_ERR("Failed to set modem trace level: %d", ret);
+	}
+
+	return ret;
+}
+
+static int trace_backend_deactivate(void)
+{
+	int ret;
+
+	/* Stop the modem from generating new trace data. */
+	ret = nrf_modem_lib_trace_level_set(NRF_MODEM_LIB_TRACE_LEVEL_OFF);
+	if (ret) {
+		LOG_ERR("Failed to set modem trace level: %d", ret);
+	}
+
+	/* Wait for any in-flight write to release tx_sem. */
+	if (k_sem_take(&tx_sem, K_MSEC(UART_TX_WAIT_TIME_MS)) != 0) {
+		uart_tx_abort(trace_uart_dev);
+		k_sem_take(&tx_sem, K_FOREVER);
+	}
+
+	/* Reset semaphores so the next activate() starts clean. */
+	k_sem_reset(&tx_sem);
+	k_sem_reset(&tx_done_sem);
+
+	return ret;
+}
+
+static int uart_suspend(void)
+{
+	int ret = pm_device_action_run(trace_uart_dev, PM_DEVICE_ACTION_SUSPEND);
+
+	if (ret && ret != -EALREADY) {
+		LOG_ERR("Failed to %s UART device: %d", "suspend", ret);
+	}
+	return ret;
+}
+
+static int uart_resume(void)
+{
+	int ret = pm_device_action_run(trace_uart_dev, PM_DEVICE_ACTION_RESUME);
+
+	if (ret && ret != -EALREADY) {
+		LOG_ERR("Failed to %s UART device: %d", "resume", ret);
+		return ret;
+	}
+	return 0;
+}
+
+SM_AT_CMD_CUSTOM(xlog, "AT#XLOG", handle_at_log);
+STATIC int handle_at_log(enum at_parser_cmd_type cmd_type, struct at_parser *parser, uint32_t)
+{
+	const struct log_backend *log_be = log_backend_get_by_name("log_backend_uart");
+
+	if (!log_be) {
+		return -ENODEV;
+	}
+
+	if (cmd_type == AT_PARSER_CMD_TYPE_SET) {
+		int mode;
+		int ret = at_parser_num_get(parser, 1, &mode);
+
+		if (ret || (mode < 0) || (mode > 1)) {
+			return -EINVAL;
+		}
+		if (trace_active) {
+			return -EBUSY;
+		}
+		if (mode == (int)log_active) {
+			return 0;
+		}
+
+		if (mode == 1) {
+			ret = uart_resume();
+			if (ret) {
+				return ret;
+			}
+			if (!log_be->cb->initialized) {
+				log_backend_init(log_be);
+			}
+			log_backend_enable(log_be, log_be->cb->ctx, CONFIG_LOG_DEFAULT_LEVEL);
+			log_active = true;
+		} else {
+			log_backend_disable(log_be);
+			ret = uart_suspend();
+			if (ret) {
+				return ret;
+			}
+			log_active = false;
+		}
+		return 0;
+	} else if (cmd_type == AT_PARSER_CMD_TYPE_READ) {
+		rsp_send("\r\n#XLOG: %d\r\n", (int)log_active);
+		return 0;
+	} else if (cmd_type == AT_PARSER_CMD_TYPE_TEST) {
+		rsp_send("\r\n#XLOG: (0,1)\r\n");
+		return 0;
+	}
+
+	return -EINVAL;
+}
+
+SM_AT_CMD_CUSTOM(xtrace, "AT#XTRACE", handle_at_trace);
+STATIC int handle_at_trace(enum at_parser_cmd_type cmd_type, struct at_parser *parser, uint32_t)
+{
+	if (cmd_type == AT_PARSER_CMD_TYPE_SET) {
+		int mode;
+		int ret = at_parser_num_get(parser, 1, &mode);
+
+		if (ret || (mode < 0) || (mode > 1)) {
+			return -EINVAL;
+		}
+		if (log_active) {
+			return -EBUSY;
+		}
+		if (mode == (int)trace_active) {
+			return 0;
+		}
+
+		if (mode == 1) {
+			ret = uart_resume();
+			if (ret) {
+				return ret;
+			}
+			ret = trace_backend_activate();
+			if (ret) {
+				return ret;
+			}
+			trace_active = true;
+		} else {
+			ret = trace_backend_deactivate();
+			if (ret) {
+				return ret;
+			}
+			ret = uart_suspend();
+			if (ret) {
+				return ret;
+			}
+			trace_active = false;
+		}
+		return 0;
+	} else if (cmd_type == AT_PARSER_CMD_TYPE_READ) {
+		rsp_send("\r\n#XTRACE: %d\r\n", (int)trace_active);
+		return 0;
+	} else if (cmd_type == AT_PARSER_CMD_TYPE_TEST) {
+		rsp_send("\r\n#XTRACE: (0,1)\r\n");
+		return 0;
+	}
+
+	return -EINVAL;
+}

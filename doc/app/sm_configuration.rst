@@ -300,6 +300,16 @@ The following configuration files are provided:
   When enabled, modem traces are transmitted on a dedicated CMUX channel.
   See the :ref:`sm_modem_trace_cmux` documentation for more information.
 
+* :file:`overlay-trace-backend-uart.conf` - Configuration file that enables the shared UART log and modem trace backend.
+  Both backends start disabled and are activated at runtime using ``AT#XLOG`` and ``AT#XTRACE``.
+  Must be combined with :file:`overlay-trace-backend-uart.overlay`.
+  See the :ref:`sm_logging_uart_backend` documentation for more information.
+
+* :file:`overlay-trace-backend-uart.overlay` - Devicetree overlay for the shared UART log and modem trace backend.
+  Routes the logs and modem traces to ``uart1`` (VCOM1 on the nRF9151 DK) at 1000000 baud rate.
+  Must be combined with :file:`overlay-trace-backend-uart.conf`.
+  See the :ref:`sm_logging_uart_backend` documentation for more information.
+
 * :file:`overlay-memfault.conf` - Configuration file that enables `Memfault`_.
   For more information about Memfault features in |NCS|, see the `Memfault library`_ docs.
 

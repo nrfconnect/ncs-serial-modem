@@ -108,6 +108,8 @@
 
 .. ### others
 
+.. _`DevZone`: https://devzone.nordicsemi.com/
+
 .. _`Devacademy VS Code exercise`: https://academy.nordicsemi.com/courses/nrf-connect-sdk-fundamentals/lessons/lesson-1-nrf-connect-sdk-introduction/topic/exercise-1-1/
 
 .. _`Private addresses`: https://en.wikipedia.org/wiki/IP_address#Private_addresses
