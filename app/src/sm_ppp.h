@@ -13,6 +13,7 @@
 extern bool sm_fwd_cgev_notifs;
 
 bool sm_ppp_is_stopped(void);
+bool ppp_is_running(void);
 void sm_ppp_set_auto_start(bool enable);
 
 /** Set the permanent modem pipe for PPP communication */
@@ -20,5 +21,8 @@ void sm_ppp_attach(struct modem_pipe *pipe);
 
 /** Detach the modem pipe from PPP communication */
 void sm_ppp_detach(void);
+
+/** Ask to detach from PIPE after disconnecting PPP */
+void sm_ppp_detach_after_disconnect(void);
 
 #endif

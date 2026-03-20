@@ -220,6 +220,7 @@ static int do_at_and_ppp_channel_switch(int new_at_channel)
 		LOG_DBG("Switching CMUX PPP channel to %d", !cmux.at_channel + 1);
 		sm_at_host_release(sm_at_host_get_ctx_from(ppp_pipe));
 		sm_ppp_attach(ppp_pipe);
+		sm_ppp_detach_after_disconnect();
 	}
 	return -SILENT_AT_COMMAND_RET;
 }
@@ -293,17 +294,13 @@ static int handle_at_xcmux(enum at_parser_cmd_type cmd_type, struct at_parser *p
 		const unsigned int at_channel = DLCI_TO_INDEX(at_dlci);
 
 		if (IS_ENABLED(CONFIG_SM_PPP)) {
-			if (!sm_ppp_is_stopped() && at_channel != cmux.at_channel) {
+			if (ppp_is_running() && at_channel != cmux.at_channel) {
 				/* The AT channel cannot be changed when PPP has a channel reserved.
 				 */
 				return -ENOTSUP;
 			}
 		}
 		if (sm_cmux_is_started()) {
-			if (at_channel == cmux.at_channel) {
-				/* No channel change requested and CMUX is already running */
-				return -EALREADY;
-			}
 			return do_at_and_ppp_channel_switch(at_channel);
 		}
 		cmux.at_channel = at_channel;

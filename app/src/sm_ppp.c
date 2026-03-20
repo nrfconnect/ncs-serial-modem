@@ -241,7 +241,7 @@ static void delegate_ppp_event(enum ppp_action action, enum ppp_reason reason)
 	}
 }
 
-static bool ppp_is_running(void)
+bool ppp_is_running(void)
 {
 	return (ppp_state == PPP_STATE_RUNNING);
 }
@@ -719,7 +719,7 @@ static int handle_at_ppp(enum at_parser_cmd_type cmd_type, struct at_parser *par
 	} else {
 		rsp_send_ok();
 		sm_ppp_set_auto_start(false);
-		delegate_ppp_event(PPP_STOP, PPP_REASON_CMD);
+		sm_ppp_detach();
 	}
 	return -SILENT_AT_COMMAND_RET;
 }
@@ -942,5 +942,14 @@ void sm_ppp_attach(struct modem_pipe *pipe)
 void sm_ppp_detach(void)
 {
 	ppp_pipe = NULL;
+	sm_ppp_keep_pipe_attached = false;
+	sm_ppp_auto_start = false;
+	if (!sm_ppp_is_stopped()) {
+		delegate_ppp_event(PPP_STOP, PPP_REASON_CMD);
+	}
+}
+
+void sm_ppp_detach_after_disconnect(void)
+{
 	sm_ppp_keep_pipe_attached = false;
 }
