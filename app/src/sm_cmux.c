@@ -35,7 +35,6 @@ static void stop_work_fn(struct k_work *work);
 static struct {
 	/* UART backend */
 	struct modem_pipe *uart_pipe;
-	bool uart_pipe_open;
 
 	/* CMUX */
 	struct modem_cmux instance;
@@ -133,9 +132,9 @@ static void stop_work_fn(struct k_work *work)
 		cmux.at_channel = 0;
 
 		/* Return AT host to UART pipe */
-		sm_at_host_set_pipe(sm_at_host_get_urc_ctx(), cmux.uart_pipe);
+		struct modem_pipe *pipe = cmux.uart_pipe;
 		cmux.uart_pipe = NULL;
-		cmux.uart_pipe_open = false;
+		sm_at_host_set_pipe(sm_at_host_get_urc_ctx(), pipe);
 
 		/* Reset all DLCI pipes to a closed state (modem_cmux_release does not clean up) */
 		for (size_t i = 0; i != ARRAY_SIZE(cmux.dlcis); ++i) {
@@ -232,7 +231,6 @@ static int cmux_start(void)
 	if (sm_cmux_is_started()) {
 		ret = modem_pipe_open(cmux.uart_pipe, K_SECONDS(CONFIG_SM_MODEM_PIPE_TIMEOUT));
 		if (!ret) {
-			cmux.uart_pipe_open = true;
 			LOG_INF("CMUX resumed.");
 		}
 		return ret;
@@ -259,9 +257,6 @@ static int cmux_start(void)
 		LOG_ERR("Failed to attach CMUX to UART pipe. (%d)", ret);
 		return ret;
 	}
-
-	/* Pipe is already open, just mark it */
-	cmux.uart_pipe_open = true;
 
 	return 0;
 }
@@ -326,7 +321,7 @@ static int handle_at_xcmuxcld(enum at_parser_cmd_type cmd_type, struct at_parser
 		return -EINVAL;
 	}
 
-	if (!sm_cmux_is_started() || !cmux.uart_pipe_open) {
+	if (!sm_cmux_is_started()) {
 		return -EALREADY;
 	}
 

@@ -12,6 +12,7 @@
 #include "sm_at_dfu.h"
 #include "sm_ppp.h"
 #include "sm_at_socket.h"
+#include "sm_cmux.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -185,11 +186,14 @@ K_MSGQ_DEFINE(sm_at_host_msgq, sizeof(struct sm_at_host_msg), 10, 1);
 static sys_slist_t instance_list = SYS_SLIST_STATIC_INIT(instance_list);
 static K_WORK_DEFINE(sm_at_host_work, sm_at_host_work_fn);
 RING_BUF_DECLARE(urc_buf, CONFIG_SM_URC_BUFFER_SIZE);
-uint8_t sm_response_buf[CONFIG_SM_AT_BUF_SIZE + 1];
+static uint8_t sm_response_buf[CONFIG_SM_AT_BUF_SIZE + 1];
 /* Current executing context (set by entry points) */
 static struct sm_at_host_ctx *current_ctx;
 static struct k_spinlock sm_at_host_lock;
-uint16_t sm_datamode_time_limit;
+
+#if defined(CONFIG_SM_CMUX)
+static uint8_t urc_channel;
+#endif /* CONFIG_SM_CMUX */
 
 /**
  * @brief Create a new AT host instance.
@@ -330,8 +334,31 @@ struct sm_at_host_ctx *sm_at_host_get_urc_ctx(void)
 {
 	struct sm_at_host_ctx *ctx;
 
+#if defined(CONFIG_SM_CMUX)
+	if (sm_cmux_is_started()) {
+		if (urc_channel == 0) {
+			for (uint8_t ch = 1; ch <= CONFIG_SM_CMUX_CHANNEL_COUNT; ++ch) {
+				ctx = sm_at_host_get_ctx_from(sm_cmux_get_dlci(ch));
+				if (in_at_mode(ctx)) {
+					return ctx;
+				}
+			}
+			return NULL;
+		}
+
+		ctx = sm_at_host_get_ctx_from(sm_cmux_get_dlci(urc_channel));
+		if (in_at_mode(ctx)) {
+			return ctx;
+		}
+		return NULL;
+	}
+#endif /* CONFIG_SM_CMUX */
+
 	ctx = SYS_SLIST_PEEK_HEAD_CONTAINER(&instance_list, ctx, node);
-	return ctx;
+	if (in_at_mode(ctx)) {
+		return ctx;
+	}
+	return NULL;
 }
 
 struct modem_pipe *sm_at_host_get_pipe(struct sm_at_host_ctx *ctx)
@@ -602,6 +629,11 @@ static bool set_sm_mode(struct sm_at_host_ctx *ctx, enum sm_operation_mode mode)
 {
 	bool ret = false;
 
+	if (!ctx || !sm_at_ctx_check(ctx)) {
+		LOG_ERR("set_sm_mode: invalid context");
+		return false;
+	}
+
 	if (ctx->at_mode == SM_AT_COMMAND_MODE) {
 		if (mode == SM_DATA_MODE) {
 			if (ctx->data_rb_buf == NULL) {
@@ -645,9 +677,8 @@ static void sm_at_host_event_notify(struct sm_at_host_ctx *ctx, enum sm_event ev
 	});
 }
 
-static bool exit_datamode(void)
+static bool exit_datamode(struct sm_at_host_ctx *ctx)
 {
-	struct sm_at_host_ctx *ctx = sm_at_host_get_current();
 	bool ret = false;
 
 	if (set_sm_mode(ctx, SM_AT_COMMAND_MODE)) {
@@ -712,7 +743,7 @@ static void raw_send(uint8_t flags)
 			if (ret < 0 || (ret == 0 && !retry)) {
 				/* Exit data mode on send failure. Further data is dropped. */
 				LOG_ERR("Send failed: %d, Dropped: %d bytes", ret, claim);
-				exit_datamode_handler(ret ? ret : -EAGAIN);
+				exit_datamode_handler(ctx, ret ? ret : -EAGAIN);
 				ret = claim;
 			} else if (ret == 0 && retry) {
 				retry = false;
@@ -805,7 +836,7 @@ static size_t raw_rx_handler(struct sm_at_host_ctx *ctx, uint8_t c)
 		ctx->data_mode.data_len--;
 		if (ctx->data_mode.data_len == 0) {
 			raw_send(SM_DATAMODE_FLAGS_NONE);
-			(void)exit_datamode();
+			(void)exit_datamode(ctx);
 		}
 	} else {
 retry_match:	/* Find quit_str or partial match at the end of the buffer. */
@@ -813,7 +844,7 @@ retry_match:	/* Find quit_str or partial match at the end of the buffer. */
 			ctx->quit_str_match++;
 			if (ctx->quit_str_match == strlen(quit_str)) {
 				raw_send(SM_DATAMODE_FLAGS_NONE);
-				(void)exit_datamode();
+				(void)exit_datamode(ctx);
 				ctx->quit_str_match = 0;
 			}
 		} else if (ctx->quit_str_match > 0) {
@@ -1005,14 +1036,19 @@ static int sm_at_send_internal(struct sm_at_host_ctx *ctx, const uint8_t *data, 
 
 	/* Even if this is URC, bypass buffering if pipe is free */
 	if (urc && (!ctx || (ctx && !is_idle(ctx)))) {
-		/* Global URC for all pipes */
 		if (ctx == NULL) {
+			ctx = sm_at_host_get_urc_ctx();
 			LOG_DBG("URC: %s", (const char *)data);
+			if (!ctx) {
+				/* Safe to assume that already buffered URCs are outdated as well */
+				ring_buf_reset(&urc_buf);
+				LOG_DBG("No context available for URC");
+				return -EIO;
+			}
 			ret = ring_buf_put(&urc_buf, data, len);
 			if (ret < len) {
 				LOG_ERR("URC buffer full, dropped %d bytes", len - ret);
 			}
-			ctx = sm_at_host_get_urc_ctx();
 		} else {
 			/* Pipe specific URC */
 			struct urc_msg *msg = calloc(1, sizeof(struct urc_msg) + len + 1);
@@ -1339,7 +1375,7 @@ static size_t null_handler(struct sm_at_host_ctx *ctx, uint8_t c)
 		ctx->null_dropped_count -= strlen(quit_str);
 		ctx->null_dropped_count += ring_buf_size_get(&ctx->data_rb);
 		LOG_WRN("Terminating data mode. Dropped %d bytes", ctx->null_dropped_count);
-		(void)exit_datamode();
+		(void)exit_datamode(ctx);
 
 		ctx->null_match_count = 0;
 		ctx->null_dropped_count = 0;
@@ -1548,11 +1584,10 @@ bool is_open_ctx(struct sm_at_host_ctx *ctx)
 	return ctx ? is_open_pipe(sm_at_host_get_pipe(ctx)) : false;
 }
 
-void exit_datamode_handler(int result)
+void exit_datamode_handler(struct sm_at_host_ctx *ctx, int result)
 {
-	struct sm_at_host_ctx *ctx = sm_at_host_get_current();
-
 	if (set_sm_mode(ctx, SM_NULL_MODE)) {
+		sm_at_host_set_current_ctx(ctx);
 		if (ctx->data_mode.handler) {
 			ctx->data_mode.handler(DATAMODE_EXIT, NULL, 0,
 					       SM_DATAMODE_FLAGS_EXIT_HANDLER);
@@ -1560,6 +1595,7 @@ void exit_datamode_handler(int result)
 		ctx->data_mode.handler = NULL;
 		ctx->data_mode.handler_result = result;
 		ctx->data_mode.data_len = 0;
+		sm_at_host_set_current_ctx(NULL);
 	}
 }
 
@@ -1816,22 +1852,20 @@ static struct sm_at_host_ctx *sm_at_host_create(struct modem_pipe *pipe)
 	return ctx;
 }
 
-static void send_urcs(void)
+static void send_urcs(struct sm_at_host_ctx *ctx)
 {
+	if (!ctx || ctx != sm_at_host_get_urc_ctx()) {
+		/* URC CTX have changed, ignore this event */
+		return;
+	}
+
 	while (!ring_buf_is_empty(&urc_buf)) {
-		struct sm_at_host_ctx *ctx;
 		uint8_t *p;
 		size_t len = ring_buf_get_claim(&urc_buf, &p, UINT16_MAX);
+		int send = sm_at_host_pipe_tx_blocking(ctx, p, len);
 
-		SYS_SLIST_FOR_EACH_CONTAINER(&instance_list, ctx, node) {
-			if (!is_open(ctx) || !in_at_mode(ctx)) {
-				continue;
-			}
-			int send = sm_at_host_pipe_tx_blocking(ctx, p, len);
-
-			if (send < len) {
-				LOG_ERR("Failed to send URC: %d (ctx %p)", send, ctx);
-			}
+		if (send < len) {
+			LOG_ERR("Failed to send URC: %d (ctx %p)", send, ctx);
 		}
 		ring_buf_get_finish(&urc_buf, len);
 	}
@@ -1904,7 +1938,7 @@ static void sm_at_host_work_fn(struct k_work *work)
 		case SM_EVENT_URC:
 			/* Don't interrupt AT command execution */
 			if (is_idle(ctx)) {
-				send_urcs();
+				send_urcs(ctx);
 				idle_work(ctx);
 			} else  {
 				check_idle_timer(ctx, false);
@@ -2072,3 +2106,36 @@ STATIC int handle_at_datactrl(enum at_parser_cmd_type cmd_type, struct at_parser
 
 	return ret;
 }
+
+#if defined(CONFIG_SM_CMUX)
+
+SM_AT_CMD_CUSTOM(xcmuxurc, "AT#XCMUXURC", handle_at_xcmuxurc);
+STATIC int handle_at_xcmuxurc(enum at_parser_cmd_type cmd_type, struct at_parser *parser, uint32_t)
+{	int ret = 0;
+	uint16_t channel;
+
+	switch (cmd_type) {
+	case AT_PARSER_CMD_TYPE_SET:
+		ret = at_parser_num_get(parser, 1, &channel);
+		if (ret) {
+			return ret;
+		}
+		if (channel > CONFIG_SM_CMUX_CHANNEL_COUNT) {
+			return -EINVAL;
+		}
+		urc_channel = channel;
+		/* Retrigger, in case we have buffered URCs while pipe changed */
+		check_idle_timer(sm_at_host_get_urc_ctx(), false);
+		break;
+	case AT_PARSER_CMD_TYPE_READ:
+		rsp_send("\r\n#XCMUXURC: %d\r\n", urc_channel);
+		break;
+	case AT_PARSER_CMD_TYPE_TEST:
+		rsp_send("\r\n#XCMUXURC=<channel>\r\n");
+		break;
+	default:
+		break;
+	}
+	return ret;
+}
+#endif /* CONFIG_SM_CMUX */
