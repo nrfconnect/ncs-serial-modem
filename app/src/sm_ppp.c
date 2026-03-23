@@ -719,7 +719,7 @@ static int handle_at_ppp(enum at_parser_cmd_type cmd_type, struct at_parser *par
 	} else {
 		rsp_send_ok();
 		sm_ppp_set_auto_start(false);
-		sm_ppp_detach();
+		delegate_ppp_event(PPP_STOP, PPP_REASON_CMD);
 	}
 	return -SILENT_AT_COMMAND_RET;
 }
