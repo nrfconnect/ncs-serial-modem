@@ -116,8 +116,6 @@ done:
 			total_msgs = 0;
 			count = 0;
 		}
-	} else if (data->type == SMS_TYPE_STATUS_REPORT) {
-		LOG_INF("Status report received");
 	} else {
 		LOG_WRN("Unknown type: %d", data->type);
 	}
