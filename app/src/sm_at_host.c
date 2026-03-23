@@ -149,6 +149,7 @@ struct sm_at_host_ctx {
 
 	/* AT command reception state (for cmd_rx_handler) */
 	bool inside_quotes;
+	bool executing;
 	size_t at_cmd_len;
 	size_t echo_len;
 	uint8_t prev_character;
@@ -1128,16 +1129,20 @@ static void cmd_send(struct sm_at_host_ctx *ctx, uint8_t *buf, size_t cmd_length
 		return;
 	}
 
+	/* Block URCs while command is executing, even if idle timer triggers */
+	ctx->executing = true;
 	/* Send to modem.
 	 * Reserve space for CRLF in the response buffer.
 	 */
 	err = nrf_modem_at_cmd(sm_response_buf + strlen(CRLF_STR),
 			       sizeof(sm_response_buf) - strlen(CRLF_STR), "%s", at_cmd);
 	if (err == -SILENT_AT_COMMAND_RET) {
+		ctx->executing = false;
 		return;
 	} else if (err < 0) {
 		LOG_ERR("AT command failed: %d", err);
 		rsp_send_error();
+		ctx->executing = false;
 		return;
 	} else if (err > 0) {
 		LOG_ERR("AT command error (%d), type: %d: value: %d", err,
@@ -1158,6 +1163,7 @@ static void cmd_send(struct sm_at_host_ctx *ctx, uint8_t *buf, size_t cmd_length
 			LOG_ERR("AT command response failed: %d", err);
 		}
 	}
+	ctx->executing = false;
 }
 
 static size_t cmd_rx_handler(struct sm_at_host_ctx *ctx, uint8_t c)
@@ -1523,7 +1529,7 @@ bool in_at_mode_pipe(struct modem_pipe *pipe)
 bool is_idle_ctx(struct sm_at_host_ctx *ctx)
 {
 	return (sm_at_ctx_check(ctx) && in_at_mode_ctx(ctx) &&
-		k_timer_remaining_ticks(&ctx->idle_timer) == 0);
+		ctx->executing == false && k_timer_remaining_ticks(&ctx->idle_timer) == 0);
 }
 
 bool is_idle_pipe(struct modem_pipe *pipe)
