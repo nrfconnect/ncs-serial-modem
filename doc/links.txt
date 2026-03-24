@@ -86,6 +86,11 @@
 .. _`+CGDCONT`: https://docs.nordicsemi.com/bundle/ref_at_commands_nrf91x1/page/REF/at_commands/packet_domain/cgdcont.html
 .. _`+CGAUTH`: https://docs.nordicsemi.com/bundle/ref_at_commands_nrf91x1/page/REF/at_commands/packet_domain/cgauth.html
 
+.. _`nRF Connect for VS Code`: https://docs.nordicsemi.com/bundle/nrf-connect-vscode/page/index.html
+.. _`nRF Connect for VS Code install`: https://docs.nordicsemi.com/bundle/nrf-connect-vscode/page/get_started/quick_setup.html
+.. _`How to build an application` : https://docs.nordicsemi.com/bundle/nrf-connect-vscode/page/get_started/build_app_ncs.html#how-to-build-an-application
+.. _`Actions View`: https://docs.nordicsemi.com/bundle/nrf-connect-vscode/page/reference/ui_sidebar_actions.html
+
 .. ### docs.zephyrproject.org/
 
 .. _`Zephyr Networking`: https://docs.zephyrproject.org/latest/connectivity/networking/index.html
@@ -102,6 +107,8 @@
 .. _`cbor2 bug` : https://github.com/agronholm/cbor2/issues/272
 
 .. ### others
+
+.. _`Devacademy VS Code exercise`: https://academy.nordicsemi.com/courses/nrf-connect-sdk-fundamentals/lessons/lesson-1-nrf-connect-sdk-introduction/topic/exercise-1-1/
 
 .. _`Private addresses`: https://en.wikipedia.org/wiki/IP_address#Private_addresses
 

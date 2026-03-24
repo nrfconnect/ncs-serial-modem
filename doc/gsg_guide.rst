@@ -10,87 +10,123 @@ Getting started
 Before getting started, make sure you have a proper |NCS| development environment.
 Follow the official `Getting started guide`_.
 
+There are two options for setting up the project, depending on your preferred development environment:
+
+* Using `nRF Connect for VS Code`_ (recommended)
+* Using the command line
+
 Initialization
 **************
 
 This section represents alternative approaches for initializing the workspace.
 
-Add |SM| into existing |NCS| workspace
-======================================
+.. tabs::
 
-Assume you have an existing |NCS| workspace in the :file:`ncs` folder.
+   .. group-tab:: nRF Connect for VS Code
 
-#. Navigate to the workspace folder::
+      #. To install the |NCS| and its toolchain using nRF Connect for VS Code, follow `extension documentation <nRF Connect for VS Code install_>`_ or `Installing nRF Connect SDK and VS Code exercise <Devacademy VS Code exercise_>`_  on Nordic Developer Academy.
+      #. Open the nRF Connect extension in |VSC| by clicking its icon in the :guilabel:`Activity Bar`.
+      #. Click :guilabel:`Create New Application`.
+      #. Select the **Browse nRF Connect SDK add-on Index** option.
+      #. Search for the **Serial Modem** application and create the project.
 
-      cd ncs
+   .. group-tab:: Command line
 
-#. Clone |SM| repository::
+      .. tabs::
 
-      git clone https://github.com/nrfconnect/ncs-serial-modem.git
+         .. group-tab:: Add |SM| into existing |NCS| workspace
 
-#. Set manifest path to the |SM|::
+            Assume you have an existing |NCS| workspace in the :file:`ncs` folder.
 
-      west config manifest.path ncs-serial-modem
+            #. Navigate to the workspace folder::
 
-#. Update the |NCS| modules::
+                  cd ncs
 
-      west update
+            #. Clone |SM| repository::
 
-   Depending on the current state of your |NCS| modules, this may take several minutes as it fetches all |NCS| modules according to the requirements of the |SM|.
+                  git clone https://github.com/nrfconnect/ncs-serial-modem.git
 
-Initialize workspace and add |SM| from scratch
-==============================================
+            #. Set manifest path to the |SM|::
 
-Complete the following steps for initialization:
+                  west config manifest.path ncs-serial-modem
 
-#. To initialize the workspace::
+            #. Update the |NCS| modules::
 
-      west init -m https://github.com/nrfconnect/ncs-serial-modem --mr main ncs
+                  west update
 
-#. Navigate to the workspace folder::
+            Depending on the current state of your |NCS| modules, this may take several minutes as it fetches all |NCS| modules according to the requirements of the |SM|.
 
-      cd ncs
+         .. group-tab:: Initialize workspace and add |SM| from scratch
 
-#. Update the |NCS| modules::
+            Complete the following steps for initialization:
 
-      west update
+            #. To initialize the workspace::
 
-   This may take several minutes as it fetches all |NCS| modules according to the requirements of the |SM|.
+                  west init -m https://github.com/nrfconnect/ncs-serial-modem --mr main ncs
+
+            #. Navigate to the workspace folder::
+
+                  cd ncs
+
+            #. Update the |NCS| modules::
+
+                  west update
+
+            This may take several minutes as it fetches all |NCS| modules according to the requirements of the |SM|.
 
 Building and running
 ********************
 
+Before building and running the application, you need to connect the development kit to your PC using a USB cable and power on the development kit.
 Complete the following steps for building and running:
 
-#. From the workspace folder, navigate to the :file:`ncs-serial-modem` folder::
+.. tabs::
 
-      cd ncs-serial-modem/app
+   .. group-tab:: nRF Connect for VS Code
 
-#. To build the application, run the following command::
+      #. Complete the steps in the `How to build an application`_ section in the extension documentation to build the application.
 
-      west build -p -b nrf9151dk/nrf9151/ns
+	   You can also specify the additional configuration variables (Kconfig, DTC overlays, and extra Kconfig options) while setting up a build configuration during building the application.
+	   See `Providing CMake options <cmake_options_>`_ for more information on setting the additional configuration variables.
 
-   To build the application with Kconfig and DTC overlays and extra Kconfig options, the following command gives an example of how they are passed as build arguments::
+      #. Open the nRF Connect extension in |VSC| by clicking its icon in the :guilabel:`Activity Bar`.
+      #. In the extension's `Actions View`_, click on :guilabel:`Flash`.
 
-      west build -p -b nrf9151dk/nrf9151/ns -- -DEXTRA_CONF_FILE="overlay-ppp.conf;overlay-cmux.conf" -DEXTRA_DTC_OVERLAY_FILE="overlay-external-mcu.overlay" -DCONFIG_SM_LOG_LEVEL_DBG=y
+      The application is now built and flashed to the device.
+      You can open a serial terminal to use the application.
+      The default baud rate is 115200.
 
-#. To program the application, run the following command::
+   .. group-tab:: Command line
 
-      west flash
+      #. From the workspace folder, navigate to the :file:`ncs-serial-modem` folder::
 
-The application is now built and flashed to the device.
-You can open a serial terminal to use the application.
-The default baud rate is 115200.
+            cd ncs-serial-modem/app
 
-.. note::
+      #. To build the application, run the following command::
 
-   When building the |SM| application, the manifest path must point to the :file:`ncs-serial-modem` folder.
-   Otherwise linking will fail as drivers and libraries from |SM| will not be found.
+            west build -p -b nrf9151dk/nrf9151/ns
 
-   To check your current manifest path, run the following command anywhere in your workspace::
+         To build the application with Kconfig, DTC overlays, and extra Kconfig options, the following command gives an example of how they are passed as build arguments::
 
-      west config manifest.path
+            west build -p -b nrf9151dk/nrf9151/ns -- -DEXTRA_CONF_FILE="overlay-ppp.conf;overlay-cmux.conf" -DEXTRA_DTC_OVERLAY_FILE="overlay-external-mcu.overlay" -DCONFIG_SM_LOG_LEVEL_DBG=y
 
-   To set the manifest path for |SM|, run the following command::
+      #. To program the application, run the following command::
 
-      west config manifest.path ncs-serial-modem
+            west flash
+
+      The application is now built and flashed to the device.
+      You can open a serial terminal to use the application.
+      The default baud rate is 115200.
+
+      .. note::
+
+         When building the |SM| application, the manifest path must point to the :file:`ncs-serial-modem` folder.
+         Otherwise linking will fail as drivers and libraries from |SM| will not be found.
+
+         To check your current manifest path, run the following command anywhere in your workspace::
+
+            west config manifest.path
+
+         To set the manifest path for |SM|, run the following command::
+
+            west config manifest.path ncs-serial-modem
