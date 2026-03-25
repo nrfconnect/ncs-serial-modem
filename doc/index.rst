@@ -16,5 +16,4 @@ It includes host examples in the form of the |SM| AT Client library and the |SM|
    app/at_commands
    uart_configuration
    samples/README
-   migration_notes
-   release_notes
+   releases/releases

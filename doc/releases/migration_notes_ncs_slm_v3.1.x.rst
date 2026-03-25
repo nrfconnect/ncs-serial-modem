@@ -1,7 +1,7 @@
 .. _migration_3.1.x_SM:
 
-Migration notes
-###############
+Migration notes from |NCS| v3.1.x SLM
+#####################################
 
 .. contents::
    :local:
