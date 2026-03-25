@@ -308,7 +308,7 @@ static int sm_main(void)
 	return ret;
 
 exit_reboot:
-	LOG_PANIC();
+	log_flush();
 	sys_reboot(SYS_REBOOT_COLD);
 }
 SYS_INIT(sm_main, APPLICATION, 100);
