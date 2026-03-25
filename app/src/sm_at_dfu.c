@@ -312,7 +312,7 @@ static int handle_at_xdfu_init(enum at_parser_cmd_type cmd_type, struct at_parse
 
 			(void)set_full_mfw_dfu_segment_type(DFU_FULL_MFW_SEGMENT_BOOTLOADER);
 
-			LOG_PANIC();
+			log_flush();
 			sys_reboot(SYS_REBOOT_COLD);
 		default:
 			LOG_ERR("Invalid target type: %d", type);
@@ -566,7 +566,7 @@ static int handle_at_xdfu_apply(enum at_parser_cmd_type cmd_type, struct at_pars
 					(void)set_full_mfw_dfu_segment_type(
 						DFU_FULL_MFW_SEGMENT_BOOTLOADER);
 					LOG_INF("Firmware update successful, rebooting...");
-					LOG_PANIC();
+					log_flush();
 					sys_reboot(SYS_REBOOT_COLD);
 				}
 			}

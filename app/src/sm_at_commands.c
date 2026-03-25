@@ -141,7 +141,6 @@ static void sm_shutdown(void)
 {
 	sm_at_host_uninit();
 	sm_power_off_modem();
-	LOG_PANIC();
 	sm_ctrl_pin_enter_shutdown();
 }
 
@@ -160,7 +159,7 @@ FUNC_NORETURN void sm_reset(void)
 {
 	sm_at_host_uninit();
 	sm_power_off_modem();
-	LOG_PANIC();
+	log_flush();
 	sys_reboot(SYS_REBOOT_COLD);
 }
 

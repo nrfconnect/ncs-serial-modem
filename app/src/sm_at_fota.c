@@ -529,7 +529,7 @@ FUNC_NORETURN static void handle_full_fota_activation_fail(int ret)
 		LOG_INF("External flash erase succeeded");
 
 	LOG_WRN("Rebooting...");
-	LOG_PANIC();
+	log_flush();
 	sys_reboot(SYS_REBOOT_COLD);
 }
 

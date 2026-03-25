@@ -101,7 +101,7 @@ void sm_ctrl_pin_enter_sleep_no_uninit(bool at_host_power_off)
 	}
 
 	LOG_INF("Entering sleep. No uninit.");
-	LOG_PANIC();
+	log_flush();
 
 	k_sleep(K_MSEC(100));
 
@@ -155,6 +155,7 @@ void sm_ctrl_pin_enter_idle(void)
 void sm_ctrl_pin_enter_shutdown(void)
 {
 	LOG_INF("Entering shutdown.");
+	log_flush();
 	k_sleep(K_MSEC(100));
 
 	nrf_regulators_system_off(NRF_REGULATORS_NS);

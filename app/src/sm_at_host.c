@@ -1084,7 +1084,6 @@ static void handle_bootloader_at_cmd(uint8_t *buf, size_t buf_size, char *at_cmd
 		}
 	} else if (strncasecmp(at_cmd, AT_XRESET_CMD, sizeof(AT_XRESET_CMD) - 1) == 0) {
 		LOG_INF("Rebooting device via %s command", AT_XRESET_CMD);
-		LOG_PANIC();
 		final_call(sm_reset);
 	} else {
 		LOG_ERR("AT command not supported in bootloader mode: %s", at_cmd);
