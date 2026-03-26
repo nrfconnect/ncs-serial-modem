@@ -163,6 +163,69 @@ The following tables shows how to connect the UART pins to the corresponding pin
       The RI pin is connected to the blue LED, which is used to indicate incoming data.
 
 
+.. _uart_configuration_nrf91m1:
+
+nRF91M1 pre-programmed |SM| application
+=======================================
+
+nRF91M1 is a pre-programmed nRF9151 SiP that runs the |SM| application out of the box.
+
+The pin mapping of the nRF91M1 follows the `nrf9151dk`_ board configuration.
+You can flash the nRF91M1 software to the `nrf9151dk`_ board for development and testing purposes.
+
+The following table shows how to connect the UART pins to the corresponding pins on the nRF91M1 SiP:
+
+.. list-table::
+   :header-rows: 1
+
+   * - Signal
+     - `nrf9151dk`_
+     - `nRF9151 LGA pin assignments`_
+   * - UART0 TX
+     - P0.27
+     - 45
+   * - UART0 RX
+     - P0.26 (pull-up)
+     - 44 (pull-up)
+   * - UART0 RTS
+     - P0.14
+     - 74
+   * - UART0 CTS
+     - P0.15 (pull-down)
+     - 75 (pull-down)
+   * - UART0 DTR
+     - P0.31 (active low, pull-up) (Wire to GND to power on the UART0)
+     - 50 (active low, pull-up)
+   * - UART0 RI
+     - P0.30 (active low)
+     - 49 (active low)
+   * - UART1 TX
+     - P0.29
+     - 48
+
+**AT UART:**
+
+* UART instance: UART0 (VCOM0)
+* Baud rate: 115200
+* Hardware flow control: Enabled
+
+**Log / Trace UART:**
+
+* UART instance: UART1 (VCOM1)
+* Baud rate: 1000000
+* Hardware flow control: Disabled
+
+.. important::
+   When working with the `nrf9151dk`_ board with a PC host, the **DTR** pin must be wired to **GND** to power on the UART0.
+   Currently, you must use a physical jumper wire, but in the future, the `Board Configurator app`_ can be used.
+
+By default in the `nrf9151dk`_ board, the UART0 is routed to VCOM0 on the interface chip, and UART1 is routed to VCOM1 on the interface chip.
+This allows the `nrf9151dk`_ board to be used with a PC host for development and testing.
+
+When working with `nrf9151dk`_ board with an external MCU host, you must disable VCOM0 and VCOM1 in the `Board Configurator app`_ to release the UART pins for external use.
+
+This setup is provided in the :file:`app/overlay-nrf91m1.overlay` devicetree overlay file.
+
 Host application
 ================
 
