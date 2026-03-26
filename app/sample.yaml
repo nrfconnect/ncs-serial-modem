@@ -1,6 +1,14 @@
 sample:
   name: Serial Modem
 tests:
+  serial_modem.nrf91m1:
+    sysbuild: true
+    build_only: true
+    extra_args:
+      - EXTRA_CONF_FILE="overlay-cmux.conf;overlay-ppp.conf"
+      - EXTRA_DTC_OVERLAY_FILE="overlay-nrf91m1.overlay"
+    platform_allow:
+      - nrf9151dk/nrf9151/ns
   serial_modem.default:
     sysbuild: true
     build_only: true

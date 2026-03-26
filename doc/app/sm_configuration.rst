@@ -274,6 +274,10 @@ The following configuration files are provided:
   The overlay is pin compatible with nRF9151DK.
   For other setups, you can customize the overlay to fit your configuration.
 
+* :file:`overlay-nrf91m1.overlay` - Devicetree overlay for use with the nRF91M1 SiP.
+  Configures ``uart0`` and ``uart1`` with pins suitable for nRF9151 DK usage and for connecting to an external MCU.
+  See :ref:`uart_configuration_nrf91m1` for pin details.
+
 * :file:`overlay-carrier.conf` - Configuration file that adds |NCS| `LwM2M carrier`_ support.
   See :ref:`sm_carrier_library_support` for more information on how to connect to an operator's device management platform.
 
