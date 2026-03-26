@@ -216,7 +216,9 @@ static void ri_work_fn(struct k_work *work)
 	const struct dtr_uart_config *config = data->dev->config;
 
 	LOG_DBG("RI: Stop");
-	gpio_pin_set_dt(&config->ri_gpio, 0);
+	if (config->ri_gpio.port != NULL) {
+		gpio_pin_set_dt(&config->ri_gpio, 0);
+	}
 }
 
 static void ri_start(struct dtr_uart_data *data)
@@ -224,8 +226,10 @@ static void ri_start(struct dtr_uart_data *data)
 	const struct dtr_uart_config *config = data->dev->config;
 
 	LOG_DBG("RI: Start");
-	gpio_pin_set_dt(&config->ri_gpio, 1);
-	k_work_schedule(&data->ri_work, K_MSEC(100));
+	if (config->ri_gpio.port != NULL) {
+		gpio_pin_set_dt(&config->ri_gpio, 1);
+		k_work_schedule(&data->ri_work, K_MSEC(100));
+	}
 }
 
 /* --- DTR handling --- */
@@ -258,7 +262,9 @@ static void dtr_work_handler(struct k_work *work)
 	if (asserted) {
 		/* Stop RI signal. */
 		k_work_cancel_delayable(&data->ri_work);
-		gpio_pin_set_dt(&config->ri_gpio, 0);
+		if (config->ri_gpio.port != NULL) {
+			gpio_pin_set_dt(&config->ri_gpio, 0);
+		}
 
 		/* Enable UART and RX/TX. */
 		power_on_uart(data);
@@ -564,15 +570,17 @@ static int dtr_uart_init(const struct device *dev)
 		return err;
 	}
 
-	/* Check and configure RI GPIO as output. */
-	if (!gpio_is_ready_dt(&config->ri_gpio)) {
-		LOG_ERR("RI GPIO not ready");
-		return -ENODEV;
-	}
-	err = gpio_pin_configure_dt(&config->ri_gpio, GPIO_OUTPUT_INACTIVE);
-	if (err < 0) {
-		LOG_ERR("Failed to configure RI GPIO (%d).", err);
-		return err;
+	/* Check and configure RI GPIO as output (optional - may be absent). */
+	if (config->ri_gpio.port != NULL) {
+		if (!gpio_is_ready_dt(&config->ri_gpio)) {
+			LOG_ERR("RI GPIO not ready");
+			return -ENODEV;
+		}
+		err = gpio_pin_configure_dt(&config->ri_gpio, GPIO_OUTPUT_INACTIVE);
+		if (err < 0) {
+			LOG_ERR("Failed to configure RI GPIO (%d).", err);
+			return err;
+		}
 	}
 
 	/* Initialize data structure. */
@@ -638,7 +646,7 @@ static const struct uart_driver_api dtr_uart_api = {
 #define DTR_UART_INIT(n)                                                                           \
 	static const struct dtr_uart_config dtr_uart_config_##n = {                                \
 		.dtr_gpio = GPIO_DT_SPEC_INST_GET(n, dtr_gpios),                                   \
-		.ri_gpio = GPIO_DT_SPEC_INST_GET(n, ri_gpios),                                     \
+		.ri_gpio = GPIO_DT_SPEC_INST_GET_OR(n, ri_gpios, {0}),                              \
 		.uart = DEVICE_DT_GET(DT_PARENT(DT_DRV_INST(n))),                                  \
 	};                                                                                         \
 	static struct dtr_uart_data dtr_uart_data_##n;                                             \

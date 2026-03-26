@@ -253,6 +253,14 @@ config SM_NRF_CLOUD
 	bool "nRF Cloud support"
 	default y
 
+config SM_WIFI
+	bool "Wi-Fi scanning support"
+	depends on WIFI
+	default y if BOARD_THINGY91X_NRF9151_NS
+	help
+	  Support Wi-Fi scanning via AT#XWIFISCAN command.
+	  Requires Wi-Fi hardware (e.g., nRF7002 on Thingy:91 X).
+
 config SM_MQTTC
 	bool "MQTT client support"
 	default y

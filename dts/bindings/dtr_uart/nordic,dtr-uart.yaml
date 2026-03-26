@@ -18,5 +18,5 @@ properties:
 
   ri-gpios:
     type: phandle-array
-    description: Ring Indicator pin
-    required: true
+    description: Ring Indicator pin (optional)
+    required: false

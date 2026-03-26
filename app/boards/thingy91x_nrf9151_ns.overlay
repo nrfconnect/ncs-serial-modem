@@ -4,9 +4,12 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
+#include <thingy91x_wifi.dtsi>
+
 / {
 	chosen {
 		ncs,sm-uart = &dtr_uart0;
+		zephyr,wifi = &nordic_wlan0;
 	};
 };
 
@@ -17,7 +20,7 @@
 	dtr_uart0: dtr-uart {
 		compatible = "nordic,dtr-uart";
 		dtr-gpios = <&gpio0 26 (GPIO_PULL_UP | GPIO_ACTIVE_HIGH)>; /* button0 */
-		ri-gpios = <&gpio0 30 GPIO_ACTIVE_LOW>; /* blue_led */
+		/* ri-gpios removed: blue LED (gpio0.30) is now controlled by sm_led */
 		status = "okay";
 	};
 };

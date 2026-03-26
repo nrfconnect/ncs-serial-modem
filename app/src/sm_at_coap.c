@@ -18,7 +18,10 @@ LOG_MODULE_REGISTER(sm_coap, CONFIG_SM_LOG_LEVEL);
 
 #define COAP_MAX_PATH_LEN	128
 #define COAP_MAX_CONTEXTS	3
-#define COAP_MAX_PAYLOAD	512
+#define COAP_MAX_PAYLOAD	1024
+/* CoAP packet = payload + fixed header (4) + token (≤8) + options + payload marker.
+ * Add 128 bytes of headroom to safely cover all framing overhead. */
+#define COAP_PACKET_BUF_SIZE	(COAP_MAX_PAYLOAD + 128)
 
 /**@brief CoAP context state */
 struct sm_coap_ctx {
@@ -42,7 +45,7 @@ static K_THREAD_STACK_DEFINE(coap_thread_stack, THREAD_STACK_SIZE);
 static bool coap_thread_running = false;
 
 /* Buffers for CoAP */
-static uint8_t coap_rx_buffer[COAP_MAX_PAYLOAD];
+static uint8_t coap_rx_buffer[COAP_PACKET_BUF_SIZE];
 
 /**@brief Send CoAP AT error URC */
 static const char *coap_err_str(int err, char *buf, size_t buf_len)
@@ -262,7 +265,7 @@ static int do_coap_request(int ctx_id, enum coap_method method, const char *path
 {
 	int err;
 	struct sm_coap_ctx *ctx = &coap_contexts[ctx_id];
-	uint8_t request_buf[COAP_MAX_PAYLOAD];
+	static uint8_t request_buf[COAP_PACKET_BUF_SIZE];
 	struct coap_packet request;
 	
 	if (!is_valid_context(ctx_id)) {
@@ -464,9 +467,11 @@ static void coap_thread_fn(void *arg1, void *arg2, void *arg3)
 			}
 			
 			/* Convert payload to hex */
-			char hex_payload[COAP_MAX_PAYLOAD * 2 + 1] = {0};
+			static char hex_payload[COAP_MAX_PAYLOAD * 2 + 1];
 			if (len > 0) {
 				bin_to_hex(payload, len, hex_payload, sizeof(hex_payload));
+			} else {
+				hex_payload[0] = '\0';
 			}
 			
 			/* Send URC: %COAPRECV: <id>,"<path>",<code>,<len>,<hex_payload> */
@@ -666,42 +671,57 @@ static int handle_at_coap_post(enum at_parser_cmd_type cmd_type,
 	
 	switch (cmd_type) {
 	case AT_PARSER_CMD_TYPE_SET:
-		if (param_count >= 3) {
+		if (param_count >= 2) {
 			uint16_t ctx_id;
 			char path[COAP_MAX_PATH_LEN];
 			size_t path_sz = sizeof(path);
-			const char *hex_payload = NULL;
-			size_t hex_len = 0;
-			uint8_t payload[COAP_MAX_PAYLOAD];
+			static char hex_str[COAP_MAX_PAYLOAD * 2 + 1];
+			size_t hex_str_sz = sizeof(hex_str);
+			static uint8_t payload[COAP_MAX_PAYLOAD];
 			int payload_len = 0;
-			
+
+			LOG_DBG("COAPPOST: param_count=%u", param_count);
+
 			err = at_parser_num_get(parser, 1, &ctx_id);
 			if (err) {
+				LOG_ERR("COAPPOST: failed to parse ctx_id: %d", err);
 				return err;
 			}
-			
+
 			err = util_string_get(parser, 2, path, &path_sz);
 			if (err) {
+				LOG_ERR("COAPPOST: failed to parse path: %d", err);
 				return err;
 			}
-			
-			/* Get hex payload if present */
+
+			/* Hex payload is a quoted string param (index 3), optional */
 			if (param_count > 2) {
-				err = at_parser_string_ptr_get(parser, 3, &hex_payload, &hex_len);
-				if (err == 0 && hex_payload && hex_len > 0) {
-					payload_len = hex_to_bin(hex_payload, hex_len,
+				err = util_string_get(parser, 3, hex_str, &hex_str_sz);
+				if (err == 0 && hex_str_sz > 0) {
+					LOG_DBG("COAPPOST: hex payload len=%zu", hex_str_sz);
+					payload_len = hex_to_bin(hex_str, hex_str_sz,
 								 payload, sizeof(payload));
 					if (payload_len < 0) {
+						LOG_ERR("COAPPOST: hex_to_bin failed: %d", payload_len);
 						return -EINVAL;
 					}
+					LOG_DBG("COAPPOST: decoded %d bytes", payload_len);
+				} else {
+					LOG_WRN("COAPPOST: failed to parse hex payload: %d", err);
+					err = 0; /* treat missing payload as empty */
 				}
 			}
-			
+
+			LOG_DBG("COAPPOST: ctx=%d path=%s payload_len=%d", ctx_id, path, payload_len);
 			err = do_coap_request(ctx_id, COAP_METHOD_POST, path,
-				      payload_len > 0 ? payload : NULL, payload_len);
+					      payload_len > 0 ? payload : NULL, payload_len);
 			if (err) {
+				LOG_ERR("COAPPOST: do_coap_request failed: %d", err);
 				coap_send_error("COAPPOST", ctx_id, err);
 			}
+		} else {
+			LOG_ERR("COAPPOST: insufficient params: %u (need >= 2)", param_count);
+			err = -EINVAL;
 		}
 		break;
 		
@@ -725,42 +745,57 @@ static int handle_at_coap_put(enum at_parser_cmd_type cmd_type,
 	
 	switch (cmd_type) {
 	case AT_PARSER_CMD_TYPE_SET:
-		if (param_count >= 3) {
+		if (param_count >= 2) {
 			uint16_t ctx_id;
 			char path[COAP_MAX_PATH_LEN];
 			size_t path_sz = sizeof(path);
-			const char *hex_payload = NULL;
-			size_t hex_len = 0;
-			uint8_t payload[COAP_MAX_PAYLOAD];
+			static char hex_str[COAP_MAX_PAYLOAD * 2 + 1];
+			size_t hex_str_sz = sizeof(hex_str);
+			static uint8_t payload[COAP_MAX_PAYLOAD];
 			int payload_len = 0;
-			
+
+			LOG_DBG("COAPPUT: param_count=%u", param_count);
+
 			err = at_parser_num_get(parser, 1, &ctx_id);
 			if (err) {
+				LOG_ERR("COAPPUT: failed to parse ctx_id: %d", err);
 				return err;
 			}
-			
+
 			err = util_string_get(parser, 2, path, &path_sz);
 			if (err) {
+				LOG_ERR("COAPPUT: failed to parse path: %d", err);
 				return err;
 			}
-			
-			/* Get hex payload if present */
+
+			/* Hex payload is a quoted string param (index 3), optional */
 			if (param_count > 2) {
-				err = at_parser_string_ptr_get(parser, 3, &hex_payload, &hex_len);
-				if (err == 0 && hex_payload && hex_len > 0) {
-					payload_len = hex_to_bin(hex_payload, hex_len,
+				err = util_string_get(parser, 3, hex_str, &hex_str_sz);
+				if (err == 0 && hex_str_sz > 0) {
+					LOG_DBG("COAPPUT: hex payload len=%zu", hex_str_sz);
+					payload_len = hex_to_bin(hex_str, hex_str_sz,
 								 payload, sizeof(payload));
 					if (payload_len < 0) {
+						LOG_ERR("COAPPUT: hex_to_bin failed: %d", payload_len);
 						return -EINVAL;
 					}
+					LOG_DBG("COAPPUT: decoded %d bytes", payload_len);
+				} else {
+					LOG_WRN("COAPPUT: failed to parse hex payload: %d", err);
+					err = 0; /* treat missing payload as empty */
 				}
 			}
-			
+
+			LOG_DBG("COAPPUT: ctx=%d path=%s payload_len=%d", ctx_id, path, payload_len);
 			err = do_coap_request(ctx_id, COAP_METHOD_PUT, path,
-				      payload_len > 0 ? payload : NULL, payload_len);
+					      payload_len > 0 ? payload : NULL, payload_len);
 			if (err) {
+				LOG_ERR("COAPPUT: do_coap_request failed: %d", err);
 				coap_send_error("COAPPUT", ctx_id, err);
 			}
+		} else {
+			LOG_ERR("COAPPUT: insufficient params: %u (need >= 2)", param_count);
+			err = -EINVAL;
 		}
 		break;
 		
