@@ -89,10 +89,13 @@ static void sms_callback(struct sms_data *const data, void *context)
 				goto done;
 			}
 			if (header->concatenated.seq_number == 1) {
-				sprintf(rsp_buf, "\r\n#XSMS: \"%02d-%02d-%02d %02d:%02d:%02d\",\"",
+				sprintf(rsp_buf,
+					"\r\n#XSMS: \"%02d-%02d-%02d %02d:%02d:%02d "
+					"UTC%+03d:%02d\",\"",
 					header->time.year, header->time.month, header->time.day,
-					header->time.hour, header->time.minute,
-					header->time.second);
+					header->time.hour, header->time.minute, header->time.second,
+					header->time.timezone * 15 / 60,
+					abs(header->time.timezone) * 15 % 60);
 				strcat(rsp_buf, header->originating_address.address_str);
 				strcat(rsp_buf, "\",\"");
 				strcat(rsp_buf, data->payload);
