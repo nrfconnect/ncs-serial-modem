@@ -49,7 +49,7 @@ This is the notification syntax when an SMS message is received:
 
   * The ``<datetime>`` parameter is a string.
     It represents the time when the SMS is received.
-    It has a format of ``YY-MM-DD HH:MM:SS``.
+    It has a format of ``YY-MM-DD HH:MM:SS UTC[+|-]HH:MM``.
   * The ``<number>`` parameter is a string.
     It represents the SMS sender's phone number.
   * The ``<text>`` parameter is a string.
@@ -69,13 +69,13 @@ Example
 
   OK
 
-  #XSMS: "21-05-24 11:58:22","090xxxxxxxx","Tested OK"
+  #XSMS: "21-05-24 11:58:22 UTC+09:30","090xxxxxxxx","Tested OK"
 
   at#xsms=2,"+8190xxxxxxxx","0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
   OK
 
-  #XSMS: "21-05-24 13:29:47","090xxxxxxxx","0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+  #XSMS: "21-05-24 13:29:47 UTC-09:00","090xxxxxxxx","0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 Read command
 ------------
