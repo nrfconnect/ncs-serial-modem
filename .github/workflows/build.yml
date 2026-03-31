@@ -1,6 +1,7 @@
 name: Build
 
 on:
+  workflow_dispatch:
   pull_request:
     paths-ignore:
       - "doc/**"
@@ -79,37 +80,71 @@ jobs:
         run: |
           ./nrfutil toolchain-manager launch --chdir serial_modem -- west twister -T . -v --inline-logs --overflow-as-errors --all
 
-      - name: Rename binaries
+      - name: Zip build artifacts
         if: ${{ inputs.trigger_source == 'release-workflow' }}
         working-directory: serial_modem
         run: |
           mkdir -p artifacts
+          mkdir -p artifacts_extras
           VERSION=${{ github.event.release.tag_name || github.ref_name || 'unknown-version' }}
-          NRF9151DK_BUILD_DIR=twister-out/nrf9151dk_nrf9151_ns/zephyr/serial_modem/app
-          NRF54_BUILD_DIR=twister-out/nrf54l15dk_nrf54l15_cpuapp/zephyr/serial_modem/samples
+          NRF9151DK_DIR=twister-out/nrf9151dk_nrf9151_ns/zephyr/serial_modem/app
+          NRF54L15DK_DIR=twister-out/nrf54l15dk_nrf54l15_cpuapp/zephyr/serial_modem/samples
+
+          # Create release bundle: merged.hex, Kconfig, signed images, elf, DFU zip
+          zip_artifacts() {
+            local app_build_dir="$1"
+            local src_dir="$2"
+            local base="$3"
+            local host="$4"
+            local temp root
+            root=$(pwd)
+            temp=$(mktemp -d)
+
+            cp "${src_dir}/merged.hex" "${temp}/${base}.hex"
+            cp "${src_dir}/${app_build_dir}/zephyr/.config" "${temp}/${base}.config"
+            cp "${src_dir}/${app_build_dir}/zephyr/zephyr.elf" "${temp}/${base}.elf"
+            cp "${src_dir}/${app_build_dir}/zephyr/zephyr.dts" "${temp}/${base}.dts"
+            if [ -z "$host" ]; then
+              cp "${src_dir}/${app_build_dir}/zephyr/zephyr.signed.bin" "${temp}/${base}.signed.bin"
+              cp "${src_dir}/dfu_application.zip" "${temp}/${base}_dfu.zip"
+            fi
+            (cd "$temp" && zip -q -r "$root/artifacts/${base}.zip" .)
+
+            cd ${src_dir}
+            find . -type f \( -name '*.elf' -o -name '*.dts' -o -name '.config' \) -exec zip -q -r "${root}/artifacts_extras/${base}_extras.zip" {} +
+            cd ${root}
+
+            rm -rf "$temp"
+          }
+
+          # nRF9151 DK builds for nRF91M1
+          zip_artifacts "app" "${NRF9151DK_DIR}/serial_modem.nrf91m1" "serial_modem_${VERSION}_nrf9151dk_nrf91m1"
 
           # nRF9151 DK ext MCU builds
-          cp ${NRF9151DK_BUILD_DIR}/serial_modem.ppp_cmux_with_extmcu/merged.hex \
-            artifacts/serial_modem_${VERSION}_nrf9151dk_extmcu.hex
-          cp ${NRF9151DK_BUILD_DIR}/serial_modem.ppp_cmux_with_extmcu.mtrace/merged.hex \
-            artifacts/serial_modem_${VERSION}_nrf9151dk_extmcu_mtrace.hex
+          zip_artifacts "app" "${NRF9151DK_DIR}/serial_modem.ppp_cmux_with_extmcu" "serial_modem_${VERSION}_nrf9151dk_extmcu"
+          zip_artifacts "app" "${NRF9151DK_DIR}/serial_modem.ppp_cmux_with_extmcu.mtrace" "serial_modem_${VERSION}_nrf9151dk_extmcu_mtrace"
 
-          # nRF9151 DK normal builds
-          cp ${NRF9151DK_BUILD_DIR}/serial_modem.ppp_cmux/merged.hex \
-            artifacts/serial_modem_${VERSION}_nrf9151dk_normal.hex
-          cp ${NRF9151DK_BUILD_DIR}/serial_modem.ppp_cmux.mtrace/merged.hex \
-            artifacts/serial_modem_${VERSION}_nrf9151dk_normal_mtrace.hex
+          # nRF9151 DK normal builds (serial_modem.ppp_cmux)
+          zip_artifacts "app" "${NRF9151DK_DIR}/serial_modem.ppp_cmux" "serial_modem_${VERSION}_nrf9151dk_normal"
+          zip_artifacts "app" "${NRF9151DK_DIR}/serial_modem.ppp_cmux.mtrace" "serial_modem_${VERSION}_nrf9151dk_normal_mtrace"
 
           # nRF54L15 DK AT client shell build
-          cp ${NRF54_BUILD_DIR}/sm_at_client_shell/sample.sm_at_client_shell/merged.hex \
-            artifacts/sm_at_client_shell_${VERSION}_nrf54l15dk.hex
+          zip_artifacts "sm_at_client_shell" "${NRF54L15DK_DIR}/sm_at_client_shell/sample.sm_at_client_shell" "sm_at_client_shell_${VERSION}_nrf54l15dk" 1
 
           # nRF54L15 DK PPP shell build
-          cp ${NRF54_BUILD_DIR}/sm_ppp_shell/sample.sm_ppp_shell/merged.hex \
-            artifacts/sm_ppp_shell_${VERSION}_nrf54l15dk.hex
+          zip_artifacts "sm_ppp_shell" "${NRF54L15DK_DIR}/sm_ppp_shell/sample.sm_ppp_shell" "sm_ppp_shell_${VERSION}_nrf54l15dk" 1
 
       - name: Upload artifacts
         if: ${{ inputs.trigger_source == 'release-workflow' }}
         uses: actions/upload-artifact@v4
         with:
-          path: serial_modem/artifacts/*
+          path: |
+            serial_modem/artifacts/*
+
+      - name: Upload artifact extras
+        if: ${{ inputs.trigger_source == 'release-workflow' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifact_extras
+          path: |
+            serial_modem/artifacts_extras/*
