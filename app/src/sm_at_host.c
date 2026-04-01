@@ -1684,7 +1684,6 @@ static void idle_timer_handler(struct k_timer *timer)
 {
 	struct sm_at_host_ctx *ctx = CONTAINER_OF(timer, struct sm_at_host_ctx, idle_timer);
 
-	LOG_DBG("Time limit reached");
 	sm_at_host_event_notify(ctx, SM_EVENT_URC);
 }
 
