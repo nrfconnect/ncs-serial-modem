@@ -343,22 +343,14 @@ struct sm_at_host_ctx *sm_at_host_get_urc_ctx(void)
 					return ctx;
 				}
 			}
-			return NULL;
+		} else {
+			return sm_at_host_get_ctx_from(sm_cmux_get_dlci(urc_channel));
 		}
-
-		ctx = sm_at_host_get_ctx_from(sm_cmux_get_dlci(urc_channel));
-		if (in_at_mode(ctx)) {
-			return ctx;
-		}
-		return NULL;
 	}
 #endif /* CONFIG_SM_CMUX */
 
-	ctx = SYS_SLIST_PEEK_HEAD_CONTAINER(&instance_list, ctx, node);
-	if (in_at_mode(ctx)) {
-		return ctx;
-	}
-	return NULL;
+	/* Fallback to first instance if no context is found */
+	return SYS_SLIST_PEEK_HEAD_CONTAINER(&instance_list, ctx, node);
 }
 
 struct modem_pipe *sm_at_host_get_pipe(struct sm_at_host_ctx *ctx)
@@ -1034,8 +1026,7 @@ static int sm_at_send_internal(struct sm_at_host_ctx *ctx, const uint8_t *data, 
 		return -EINTR;
 	}
 
-	/* Even if this is URC, bypass buffering if pipe is free */
-	if (urc && (!ctx || (ctx && !is_idle(ctx)))) {
+	if (urc) {
 		if (ctx == NULL) {
 			ctx = sm_at_host_get_urc_ctx();
 			LOG_DBG("URC: %s", (const char *)data);
@@ -1048,6 +1039,9 @@ static int sm_at_send_internal(struct sm_at_host_ctx *ctx, const uint8_t *data, 
 			ret = ring_buf_put(&urc_buf, data, len);
 			if (ret < len) {
 				LOG_ERR("URC buffer full, dropped %d bytes", len - ret);
+				/* Safe to assume that already buffered URCs are outdated as well */
+				ring_buf_reset(&urc_buf);
+				return -EIO;
 			}
 		} else {
 			/* Pipe specific URC */
