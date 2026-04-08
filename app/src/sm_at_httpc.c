@@ -63,8 +63,7 @@ struct http_request {
 	char *hostname;             /* Hostname (dynamically allocated) */
 	char *path;                 /* URL path (dynamically allocated) */
 	uint16_t port;              /* Port number */
-	char *request_body;         /* Dynamically allocated request body (POST/PUT) */
-	int request_body_len;       /* Bytes written into request_body */
+	int request_body_len;       /* Content-Length for request body (POST/PUT) */
 	char *extra_headers;        /* Extra HTTP headers (dynamically allocated) */
 	uint8_t *recv_buf;          /* Receive buffer (dynamically allocated) */
 	int recv_buf_len;           /* Bytes in receive buffer */
@@ -249,27 +248,27 @@ static int http_build_request(struct http_request *req, char *buf, size_t buf_le
 /* Compile-time length of a string literal (excludes null terminator) */
 #define STRLIT_LEN(s) (sizeof(s) - 1)
 
-/* Start HTTP request (non-blocking) */
-static int http_start_request(struct http_request *req)
+/* Calculate the buffer size needed to hold the HTTP request headers */
+static size_t http_send_buf_size(const struct http_request *req)
 {
-	int ret;
-	struct sm_socket *sock;
-	size_t send_buf_size;
-
-	LOG_INF("HTTP %d %s: %s:%d%s", req->method, http_method_str[req->method],
-		req->hostname, req->port, req->path);
-
-	/* Allocate send buffer sized to the actual header content */
-	send_buf_size =
-		strlen(http_method_str[req->method]) + 1 +
-		strlen(req->path) + STRLIT_LEN(HTTP_VERSION_LINE) +
-		STRLIT_LEN("Host: ") + strlen(req->hostname) + STRLIT_LEN("\r\n") +
-		STRLIT_LEN(HTTP_HDR_USER_AGENT) +
-		STRLIT_LEN(HTTP_HDR_ACCEPT) +
-		(req->request_body_len > 0 ?
+	return strlen(http_method_str[req->method]) + 1 +
+	       strlen(req->path) + STRLIT_LEN(HTTP_VERSION_LINE) +
+	       STRLIT_LEN("Host: ") + strlen(req->hostname) + STRLIT_LEN("\r\n") +
+	       STRLIT_LEN(HTTP_HDR_USER_AGENT) +
+	       STRLIT_LEN(HTTP_HDR_ACCEPT) +
+	       (req->request_body_len > 0 ?
 			STRLIT_LEN("Content-Length: 2147483647\r\n") : 0) +
-		(req->extra_headers ? strlen(req->extra_headers) : 0) +
-		STRLIT_LEN("\r\n") + 1; /* final blank line + null terminator */
+	       (req->extra_headers ? strlen(req->extra_headers) : 0) +
+	       STRLIT_LEN("\r\n") + 1; /* final blank line + null terminator */
+}
+
+/*
+ * Allocate req->send_buf and fill it with the HTTP request header block.
+ * Returns the number of bytes written, or a negative error code.
+ */
+static int http_alloc_build_headers(struct http_request *req)
+{
+	size_t send_buf_size = http_send_buf_size(req);
 
 	req->send_buf = malloc(send_buf_size);
 	if (!req->send_buf) {
@@ -277,8 +276,19 @@ static int http_start_request(struct http_request *req)
 		return -ENOMEM;
 	}
 
-	/* Build HTTP request into persistent buffer */
-	ret = http_build_request(req, req->send_buf, send_buf_size);
+	return http_build_request(req, req->send_buf, send_buf_size);
+}
+
+/* Start HTTP request (non-blocking) */
+static int http_start_request(struct http_request *req)
+{
+	int ret;
+	struct sm_socket *sock;
+
+	LOG_INF("HTTP %d %s: %s:%d%s", req->method, http_method_str[req->method],
+		req->hostname, req->port, req->path);
+
+	ret = http_alloc_build_headers(req);
 	if (ret < 0) {
 		return ret;
 	}
@@ -318,12 +328,6 @@ static void http_close_request(struct http_request *req)
 	if (req->extra_headers != NULL) {
 		free(req->extra_headers);
 		req->extra_headers = NULL;
-	}
-
-	if (req->request_body != NULL) {
-		free(req->request_body);
-		req->request_body = NULL;
-		req->request_body_len = 0;
 	}
 
 	if (req->recv_buf != NULL) {
@@ -576,8 +580,7 @@ static void http_process_request(struct http_request *req, uint8_t events)
 	}
 
 	/* POLLHUP during sending means the server closed the connection unexpectedly. */
-	if ((events & NRF_POLLHUP) &&
-	    (req->state == HTTP_STATE_SENDING_REQUEST || req->state == HTTP_STATE_SENDING_BODY)) {
+	if ((events & NRF_POLLHUP) && req->state == HTTP_STATE_SENDING_REQUEST) {
 		LOG_ERR("HTTP %d: Connection closed during send (events=0x%x)", req->fd,
 			events);
 		http_fail_request(req);
@@ -586,7 +589,6 @@ static void http_process_request(struct http_request *req, uint8_t events)
 
 	switch (req->state) {
 	case HTTP_STATE_SENDING_REQUEST:
-	case HTTP_STATE_SENDING_BODY:
 		/* Handle writable socket */
 		if (events & NRF_POLLOUT) {
 			ret = nrf_send(req->fd, req->send_ptr, req->send_remaining,
@@ -607,23 +609,10 @@ static void http_process_request(struct http_request *req, uint8_t events)
 			req->send_remaining -= ret;
 
 			if (req->send_remaining == 0) {
-				if (req->state == HTTP_STATE_SENDING_REQUEST &&
-				    req->request_body_len > 0) {
-					/* Move to sending body */
-					req->send_ptr = req->request_body;
-					req->send_remaining = req->request_body_len;
-					req->state = HTTP_STATE_SENDING_BODY;
-
-					/* Continue with POLLOUT to send body */
-					set_xapoll_events(sock, NRF_POLLOUT | NRF_POLLIN);
-				} else {
-					/* All sent, now wait for response */
-					req->state = HTTP_STATE_RECEIVING_HEADERS;
-					req->recv_buf_len = 0;
-
-					/* Set up for receiving */
-					set_xapoll_events(sock, NRF_POLLIN);
-				}
+				/* All headers sent, now wait for response */
+				req->state = HTTP_STATE_RECEIVING_HEADERS;
+				req->recv_buf_len = 0;
+				set_xapoll_events(sock, NRF_POLLIN);
 			} else {
 				/* More to send */
 				set_xapoll_events(sock, NRF_POLLOUT | NRF_POLLIN);
@@ -776,7 +765,41 @@ bool sm_at_httpc_poll_event(int fd, uint8_t events)
 	return (req && req->need_rearm_pollin);
 }
 
-/* Data mode callback for receiving POST/PUT body */
+/* Build HTTP request headers and send them synchronously for streaming POST/PUT */
+static int http_send_request_headers(struct http_request *req)
+{
+	int ret;
+	int sent;
+	int n;
+
+	LOG_INF("HTTP %d %s (streaming): %s:%d%s", req->method,
+		http_method_str[req->method], req->hostname, req->port, req->path);
+
+	ret = http_alloc_build_headers(req);
+	if (ret < 0) {
+		return ret;
+	}
+
+	req->state = HTTP_STATE_SENDING_BODY;
+	req->timeout_timestamp = k_uptime_get() + HTTP_RESPONSE_TIMEOUT_MS;
+
+	/* Send headers synchronously (blocking) */
+	sent = 0;
+	while (sent < ret) {
+		n = nrf_send(req->fd, req->send_buf + sent, ret - sent, 0);
+		if (n < 0) {
+			return -errno;
+		}
+		sent += n;
+	}
+
+	free(req->send_buf);
+	req->send_buf = NULL;
+
+	return 0;
+}
+
+/* Data mode callback: streams POST/PUT body directly to socket */
 static int http_datamode_callback(uint8_t op, const uint8_t *data, int len, uint8_t flags)
 {
 	int err = 0;
@@ -794,24 +817,56 @@ static int http_datamode_callback(uint8_t op, const uint8_t *data, int len, uint
 			return -EINVAL;
 		}
 
-		/* Store received body data */
-		memcpy(datamode_req->request_body + datamode_req->request_body_len, data, len);
-		datamode_req->request_body_len += len;
-		return len; /* Return number of bytes accepted */
+		/* Stream body chunk directly to the socket */
+		int sent = 0;
+
+		while (sent < len) {
+			int ret = nrf_send(datamode_req->fd, data + sent, len - sent, 0);
+
+			if (ret < 0) {
+				int err_code = -errno;
+				struct http_request *req_failed = datamode_req;
+
+				datamode_req = NULL;
+				LOG_ERR("Failed to stream request body: %d", err_code);
+				exit_datamode_handler(sm_at_host_get_current(), err_code);
+				http_fail_request(req_failed);
+				return err_code;
+			}
+			sent += ret;
+		}
+		return len;
 	} else if (op == DATAMODE_EXIT) {
 		if (datamode_req) {
-			/* Start the HTTP request now that we have the body */
-			err = http_start_request(datamode_req);
-			if (err) {
-				LOG_ERR("Failed to start request: %d", err);
-				/* Command already returned OK; send an error URC */
+			if (flags & SM_DATAMODE_FLAGS_EXIT_HANDLER) {
+				/* Data mode exited unexpectedly - body not fully sent */
+				LOG_WRN("HTTP %d: Data mode exited unexpectedly",
+					datamode_req->fd);
 				http_fail_request(datamode_req);
+			} else {
+				/* Body fully sent; arm XAPOLL to receive the response */
+				struct sm_socket *sock = find_socket(datamode_req->fd);
+
+				if (sock) {
+					datamode_req->state = HTTP_STATE_RECEIVING_HEADERS;
+					datamode_req->recv_buf_len = 0;
+					datamode_req->timeout_timestamp =
+						k_uptime_get() + HTTP_RESPONSE_TIMEOUT_MS;
+					err = set_xapoll_events(sock, NRF_POLLIN);
+					if (err) {
+						LOG_ERR("Failed to arm XAPOLL: %d", err);
+						http_fail_request(datamode_req);
+					}
+				} else {
+					LOG_ERR("HTTP %d: Socket not found after body send",
+						datamode_req->fd);
+					http_fail_request(datamode_req);
+				}
 			}
 			datamode_req = NULL;
 		}
 
-		if ((flags & SM_DATAMODE_FLAGS_EXIT_HANDLER) != 0) {
-			/* Datamode exited unexpectedly */
+		if (flags & SM_DATAMODE_FLAGS_EXIT_HANDLER) {
 			rsp_send(CONFIG_SM_DATAMODE_TERMINATOR);
 		}
 	}
@@ -1005,14 +1060,15 @@ STATIC int handle_at_httpcreq(enum at_parser_cmd_type cmd_type, struct at_parser
 			return err;
 		}
 
-		/* For POST/PUT with body, enter data mode */
+		/* For POST/PUT with body, send headers now then stream body via data mode */
 		if ((method == HTTP_POST || method == HTTP_PUT) && body_len > 0) {
-			LOG_INF("Entering data mode for %d bytes", body_len);
-			req->request_body = malloc(body_len);
-			if (!req->request_body) {
-				LOG_ERR("Failed to allocate request body (%d bytes)", body_len);
+			LOG_INF("Streaming %d bytes body", body_len);
+			req->request_body_len = body_len;
+			err = http_send_request_headers(req);
+			if (err) {
+				LOG_ERR("Failed to send request headers: %d", err);
 				http_close_request(req);
-				return -ENOMEM;
+				return err;
 			}
 			datamode_req = req;
 			/* Send #XHTTPCREQ before the OK so the host gets the socket fd

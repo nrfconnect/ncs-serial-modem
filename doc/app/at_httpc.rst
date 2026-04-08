@@ -68,7 +68,10 @@ Syntax
   * ``0`` - No request body.
   * Positive integer - Length of the request body in bytes.
     Valid for POST and PUT only.
-    When set, the command responds with ``OK`` and enters data mode.
+    When set, the HTTP request headers are sent to the server immediately when the AT command
+    is processed.
+    The command then responds with ``OK`` and enters data mode.
+    Body bytes are forwarded to the server as they are received from the host in data mode.
     The host must send exactly this many bytes as the request body.
     Data mode exits and ``#XDATAMODE: 0`` is reported when all bytes have been processed.
 
