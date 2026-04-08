@@ -89,6 +89,8 @@ static enum sm_operation_mode get_sm_mode(struct sm_at_host_ctx *ctx);
 static bool sm_at_ctx_check(struct sm_at_host_ctx *ctx);
 static void sm_at_host_event_notify(struct sm_at_host_ctx *ctx, enum sm_event event);
 static void check_idle_timer(struct sm_at_host_ctx *ctx, bool reschedule);
+static void send_urcs(struct sm_at_host_ctx *ctx);
+static void flush_pipe_urcs(struct sm_at_host_ctx *ctx);
 
 /**
  * @brief AT host context structure.
@@ -1482,6 +1484,13 @@ void data_send(struct modem_pipe *pipe, const uint8_t *data, size_t len)
 {
 	struct sm_at_host_ctx *ctx = sm_at_host_get_ctx_from(pipe);
 
+	if (!sm_at_ctx_check(ctx)) {
+		return;
+	}
+	if (is_idle(ctx)) {
+		flush_pipe_urcs(ctx);
+	}
+
 	sm_at_send_internal(ctx, data, len, false, SM_DEBUG_PRINT_SHORT);
 }
 
@@ -1717,13 +1726,14 @@ static void idle_timer_handler(struct k_timer *timer)
 	sm_at_host_event_notify(ctx, SM_EVENT_URC);
 }
 
-static void idle_work(struct sm_at_host_ctx *ctx)
+static void flush_pipe_urcs(struct sm_at_host_ctx *ctx)
 {
-	/* Set as current context */
-	sm_at_host_set_current_ctx(ctx);
-
 	sys_snode_t *node;
 
+	/* Flush global URCs, in case this is the target pipe */
+	send_urcs(ctx);
+
+	/* Flush channel specific URCs send by urc_send_to() */
 	do {
 		K_SPINLOCK(&sm_at_host_lock) {
 			node = sys_slist_get(&ctx->buffered_urcs);
@@ -1736,6 +1746,16 @@ static void idle_work(struct sm_at_host_ctx *ctx)
 		sm_at_host_pipe_tx_blocking(ctx, (uint8_t *)msg->urc, strlen(msg->urc));
 		free(msg);
 	} while (true);
+}
+
+static void idle_work(struct sm_at_host_ctx *ctx)
+{
+	/* Set as current context */
+	sm_at_host_set_current_ctx(ctx);
+
+	sys_snode_t *node;
+
+	flush_pipe_urcs(ctx);
 
 	do {
 		K_SPINLOCK(&sm_at_host_lock) {
@@ -1930,15 +1950,8 @@ static void sm_at_host_work_fn(struct k_work *work)
 
 		switch (msg.sm_event) {
 		case SM_EVENT_URC:
-			/* Don't interrupt AT command execution */
-			if (is_idle(ctx)) {
-				send_urcs(ctx);
-				idle_work(ctx);
-			} else  {
-				check_idle_timer(ctx, false);
-			}
-			break;
 		case SM_EVENT_AT_MODE:
+			/* Don't interrupt AT command execution */
 			if (is_idle(ctx)) {
 				idle_work(ctx);
 			} else  {

@@ -118,6 +118,9 @@ void rsp_send_error(void);
  * @brief Send raw data received in data mode
  *
  * This is safe to call with NULL pointer for pipe, in which case data is dropped.
+ * This is safe to call only from Serial Modem work queue context.
+ *
+ * If the target pipe is AT mode, buffered URCs will be sent before the data.
  *
  * @param pipe Modem pipe to send data through
  * @param data Raw data received
