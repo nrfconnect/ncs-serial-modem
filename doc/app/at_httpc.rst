@@ -68,8 +68,7 @@ Syntax
   * ``0`` - No request body.
   * Positive integer - Length of the request body in bytes.
     Valid for POST and PUT only.
-    When set, the HTTP request headers are sent to the server immediately when the AT command
-    is processed.
+    When set, the HTTP request headers are sent to the server immediately when the AT command is processed.
     The command then responds with ``OK`` and enters data mode.
     Body bytes are forwarded to the server as they are received from the host in data mode.
     The host must send exactly this many bytes as the request body.
@@ -366,6 +365,19 @@ Example
    AT#XHTTPCDATA=?
    #XHTTPCDATA: <socket_fd>[,<length>]
    OK
+
+Idle timeout
+============
+
+Every active HTTP request has a sliding idle timeout controlled by the :ref:`CONFIG_SM_HTTPC_RESPONSE_TIMEOUT_MS <CONFIG_SM_HTTPC_RESPONSE_TIMEOUT_MS>` Kconfig option (default 30 seconds).
+The timer resets each time data is sent or received:
+
+* Sending request headers or body upload chunks (POST/PUT data mode).
+* Receiving response headers or body bytes.
+* Pulling a body chunk in manual mode (``AT#XHTTPCDATA``).
+
+If no such activity occurs within the configured window, the request is aborted and ``#XHTTPCSTAT: <socket_fd>,-1,<total_bytes>`` is emitted.
+The timeout is enforced by a background timer that fires independently of normal socket poll events, so a server that stalls silently (no TCP RST or FIN) is also detected.
 
 HTTP request cancel #XHTTPCCANCEL
 =================================

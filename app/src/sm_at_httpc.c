@@ -7,6 +7,7 @@
 #define _POSIX_C_SOURCE 200809L /* for strdup() */
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/sys/util.h>
 #include <zephyr/net/http/parser_url.h>
 #include <nrf_socket.h>
 #include <modem/at_parser.h>
@@ -26,6 +27,9 @@ LOG_MODULE_REGISTER(sm_httpc, CONFIG_SM_LOG_LEVEL);
 #define HTTP_EXTRA_HEADERS_SIZE   512
 #define HTTP_RESPONSE_TIMEOUT_MS  CONFIG_SM_HTTPC_RESPONSE_TIMEOUT_MS
 #define HTTP_MAX_REQUESTS         NRF_MODEM_MAX_SOCKET_COUNT
+
+/* Periodic scan, so idle timeout fires without a socket poll wakeup (silent server). */
+#define HTTP_TIMEOUT_SCAN_MS MIN(1000U, (uint32_t)HTTP_RESPONSE_TIMEOUT_MS / 4U)
 
 /* Fixed HTTP header lines */
 #define HTTP_VERSION_LINE    " HTTP/1.1\r\n"
@@ -75,10 +79,10 @@ struct http_request {
 	int total_received;         /* Total bytes received */
 	bool headers_complete;      /* Headers fully received */
 	bool need_rearm_pollin;     /* Flag for socket layer to re-arm POLLIN */
-	int64_t timeout_timestamp;  /* Idle timeout (resets on each data reception) */
+	int64_t timeout_timestamp;  /* Idle timeout deadline; reset on each send/receive */
 	struct modem_pipe *pipe;    /* AT pipe that created this request */
 	bool manual_mode;           /* Manual mode: body not auto-received, host pulls chunks */
-	int bytes_sent;             /* Total bytes sent for this request */
+	int bytes_sent;             /* Response-body bytes sent to the host */
 };
 
 static const char * const http_method_str[] = {
@@ -90,7 +94,6 @@ static const char * const http_method_str[] = {
 };
 
 static struct http_request *http_requests[HTTP_MAX_REQUESTS];
-static struct k_mutex http_mutex;
 static struct http_request *datamode_req; /* Request waiting for body data */
 
 /* Forward declarations */
@@ -103,6 +106,67 @@ static bool http_headers_complete(struct http_request *req, char *header_end,
 				  struct sm_socket *sock, bool hup);
 static int parse_http_status_code(const char *buf, int *status_code);
 static int parse_content_length(const char *buf, const char *header_end, int *length);
+static void http_timeout_work_fn(struct k_work *work);
+
+static K_MUTEX_DEFINE(http_mutex);
+static K_WORK_DELAYABLE_DEFINE(http_timeout_dwork,  http_timeout_work_fn);
+
+static bool http_any_active_request_unlocked(void)
+{
+	for (int i = 0; i < HTTP_MAX_REQUESTS; i++) {
+		if (http_requests[i] != NULL && http_requests[i]->state != HTTP_STATE_IDLE) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+/* Arm the scan timer when a request enters a non-idle state (safe without http_mutex). */
+static void http_timeout_monitor_arm(void)
+{
+	(void)k_work_reschedule_for_queue(&sm_work_q, &http_timeout_dwork,
+					  K_MSEC(HTTP_TIMEOUT_SCAN_MS));
+}
+
+/*
+ * Sole enforcement of HTTP idle timeout (SM_HTTPC_RESPONSE_TIMEOUT_MS sliding window).
+ * Runs on sm_work_q; reschedules while any request remains active.
+ */
+static void http_timeout_work_fn(struct k_work *work)
+{
+	ARG_UNUSED(work);
+
+	k_mutex_lock(&http_mutex, K_FOREVER);
+
+	for (int i = 0; i < HTTP_MAX_REQUESTS; i++) {
+		struct http_request *req = http_requests[i];
+
+		if (req == NULL || req->state == HTTP_STATE_IDLE) {
+			continue;
+		}
+
+		/* Body is being streamed via data mode; data mode manages its own
+		 * lifecycle. Do not apply the response idle timeout here.
+		 */
+		if (req->state == HTTP_STATE_SENDING_BODY) {
+			continue;
+		}
+
+		if (k_uptime_get() > req->timeout_timestamp) {
+			LOG_ERR("HTTP request %d idle timeout state %d", req->fd, req->state);
+			http_fail_request(req);
+		}
+	}
+
+	const bool any = http_any_active_request_unlocked();
+
+	k_mutex_unlock(&http_mutex);
+
+	if (any) {
+		http_timeout_monitor_arm();
+	}
+}
 
 /* Find request by socket fd */
 static struct http_request *find_request(int fd)
@@ -249,7 +313,7 @@ static int http_build_request(struct http_request *req, char *buf, size_t buf_le
 #define STRLIT_LEN(s) (sizeof(s) - 1)
 
 /* Calculate the buffer size needed to hold the HTTP request headers */
-static size_t http_send_buf_size(const struct http_request *req)
+static size_t http_headers_size(const struct http_request *req)
 {
 	return strlen(http_method_str[req->method]) + 1 +
 	       strlen(req->path) + STRLIT_LEN(HTTP_VERSION_LINE) +
@@ -268,7 +332,7 @@ static size_t http_send_buf_size(const struct http_request *req)
  */
 static int http_alloc_build_headers(struct http_request *req)
 {
-	size_t send_buf_size = http_send_buf_size(req);
+	size_t send_buf_size = http_headers_size(req);
 
 	req->send_buf = malloc(send_buf_size);
 	if (!req->send_buf) {
@@ -308,6 +372,8 @@ static int http_start_request(struct http_request *req)
 		LOG_ERR("Failed to set XAPOLL events: %d", ret);
 		return ret;
 	}
+
+	http_timeout_monitor_arm();
 
 	return 0;
 }
@@ -350,6 +416,11 @@ static void http_close_request(struct http_request *req)
 
 		req->fd = -1;
 	}
+	/* Clear datamode_req if it points to this request */
+	if (datamode_req == req) {
+		datamode_req = NULL;
+	}
+
 	/* Free this request and clear its slot */
 	for (int i = 0; i < HTTP_MAX_REQUESTS; i++) {
 		if (http_requests[i] == req) {
@@ -565,13 +636,6 @@ static void http_process_request(struct http_request *req, uint8_t events)
 	LOG_DBG("HTTP %d: process_request state=%d events=0x%x time=%lld timeout=%lld", req->fd,
 		req->state, events, k_uptime_get(), req->timeout_timestamp);
 
-	/* Check for idle timeout (no activity for HTTP_RESPONSE_TIMEOUT_MS) */
-	if (k_uptime_get() > req->timeout_timestamp) {
-		LOG_ERR("HTTP request %d timed out in state %d", req->fd, req->state);
-		http_fail_request(req);
-		return;
-	}
-
 	/* POLLERR/POLLNVAL are always fatal; POLLHUP is handled per-state below. */
 	if (events & (NRF_POLLERR | NRF_POLLNVAL)) {
 		LOG_ERR("HTTP %d: Socket error (events=0x%x)", req->fd, events);
@@ -676,7 +740,7 @@ static void http_process_request(struct http_request *req, uint8_t events)
 				return;
 			}
 
-			/* Data received - update idle timeout (resets on each recv) */
+			/* Data received - update idle timeout */
 			req->recv_buf_len += ret;
 			req->recv_buf[req->recv_buf_len] = '\0';
 			req->total_received += ret;
@@ -780,7 +844,6 @@ static int http_send_request_headers(struct http_request *req)
 		return ret;
 	}
 
-	req->state = HTTP_STATE_SENDING_BODY;
 	req->timeout_timestamp = k_uptime_get() + HTTP_RESPONSE_TIMEOUT_MS;
 
 	/* Send headers synchronously (blocking) */
@@ -791,10 +854,16 @@ static int http_send_request_headers(struct http_request *req)
 			return -errno;
 		}
 		sent += n;
+		req->timeout_timestamp = k_uptime_get() + HTTP_RESPONSE_TIMEOUT_MS;
 	}
 
 	free(req->send_buf);
 	req->send_buf = NULL;
+
+	/* Headers sent; body will now be streamed via data mode. */
+	req->state = HTTP_STATE_SENDING_BODY;
+
+	http_timeout_monitor_arm();
 
 	return 0;
 }
@@ -835,11 +904,23 @@ static int http_datamode_callback(uint8_t op, const uint8_t *data, int len, uint
 			}
 			sent += ret;
 		}
+
+		/* Slide response idle window: slow UART upload is activity, not server wait. */
+		if (len > 0) {
+			k_mutex_lock(&http_mutex, K_FOREVER);
+			if (datamode_req != NULL) {
+				datamode_req->timeout_timestamp =
+					k_uptime_get() + HTTP_RESPONSE_TIMEOUT_MS;
+			}
+			k_mutex_unlock(&http_mutex);
+		}
+
 		return len;
 	} else if (op == DATAMODE_EXIT) {
 		if (datamode_req) {
 			if (flags & SM_DATAMODE_FLAGS_EXIT_HANDLER) {
 				/* Data mode exited unexpectedly - body not fully sent */
+				rsp_send(CONFIG_SM_DATAMODE_TERMINATOR);
 				LOG_WRN("HTTP %d: Data mode exited unexpectedly",
 					datamode_req->fd);
 				http_fail_request(datamode_req);
@@ -1290,12 +1371,3 @@ STATIC int handle_at_httpccancel(enum at_parser_cmd_type cmd_type, struct at_par
 
 	return err;
 }
-
-int sm_at_httpc_init(void)
-{
-	k_mutex_init(&http_mutex);
-
-	return 0;
-}
-
-SYS_INIT(sm_at_httpc_init, APPLICATION, 10);
