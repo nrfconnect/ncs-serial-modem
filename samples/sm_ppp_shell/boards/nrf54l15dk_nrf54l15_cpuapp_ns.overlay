@@ -24,6 +24,9 @@
 		zephyr,console = &uart20;
 		zephyr,shell-uart = &uart20;
 	};
+	aliases {
+		modem = &modem;
+	};
 };
 
 /* Zephyr modem UART <-> nRF91 Serial Modem UART */
@@ -35,7 +38,7 @@
 
 	/* Nordic nRF91 Serial Modem configuration */
 	modem: modem {
-		compatible = "nordic,nrf91-slm";
+		compatible = "nordic,nrf91-sm-v2";
 		status = "okay";
 		mdm-ring-gpios = <&gpio1 12 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
 		mdm-dtr-gpios = <&gpio1 11 GPIO_ACTIVE_LOW>;
@@ -43,6 +46,7 @@
 		cmux-enable-runtime-power-save;
 		cmux-close-pipe-on-power-save;
 		cmux-idle-timeout-ms = <5000>;
+		autostarts;
 	};
 };
 
