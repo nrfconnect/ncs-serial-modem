@@ -35,7 +35,7 @@
 
 	/* Nordic nRF91 Serial Modem configuration */
 	modem: modem {
-		compatible = "nordic,nrf91-slm";
+		compatible = "nordic,nrf91m1";
 		status = "okay";
 		mdm-ring-gpios = <&gpio1 12 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
 		mdm-dtr-gpios = <&gpio1 11 GPIO_ACTIVE_LOW>;

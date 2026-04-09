@@ -5,4 +5,5 @@
 
 menu "Drivers"
 rsource "dtr_uart/Kconfig"
+rsource "nrf91m1/Kconfig"
 endmenu

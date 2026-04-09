@@ -1,0 +1,29 @@
+# Copyright (c) 2026 Nordic Semiconductor ASA
+# SPDX-License-Identifier: Apache-2.0
+
+title: Nordic nRF91M1 module
+
+description: |
+  Nordic nRF91 series running the Serial LTE Modem application version 2.0 or later.
+  This includes the nRF91M1 module.
+
+compatible: "nordic,nrf91m1"
+
+include:
+  - name: zephyr,cellular-modem-device.yaml
+    property-blocklist:
+      - zephyr,use-default-pdp-ctx
+
+properties:
+  zephyr,use-default-pdp-ctx:
+    type: int
+    enum:
+      - 0
+      - 1
+    default: 1
+    description: |
+      Modem automatically configures and connects the default PDP context (cid=0) when
+      registered to the network. This is used by default in Serial Modem application.
+
+  zephyr,mdm-reset-behavior:
+    default: ["toggle_on_recovery"]
