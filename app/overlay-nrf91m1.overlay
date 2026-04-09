@@ -25,7 +25,7 @@
 &gpio0 {
 	status = "okay";
 	/* Use PORT event for DTR (31) pin to save power */
-	sense-edge-mask = <0x80000000>;
+	sense-edge-mask = <BIT(31)>;
 };
 
 /* Log / Trace UART */
