@@ -348,6 +348,12 @@ static void uart_callback(const struct device *dev, struct uart_event *evt, void
 		uart_callback_notify_pipe_transmit_idle();
 		break;
 	case UART_RX_RDY:
+		if (!(sm_work_q.flags & K_WORK_QUEUE_STARTED)) {
+			/* Discard data at callback level while the work queue is not
+			 * running yet. Freeing here keeps slab blocks available.
+			 */
+			break;
+		}
 		rx_buf_ref(evt->data.rx.buf);
 		rx_event.buf = &evt->data.rx.buf[evt->data.rx.offset];
 		rx_event.len = evt->data.rx.len;
