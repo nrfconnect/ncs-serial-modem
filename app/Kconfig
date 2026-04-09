@@ -368,9 +368,12 @@ config SM_HTTPC_RESPONSE_TIMEOUT_MS
 	range 1000 300000
 	default 30000
 	help
-	  Idle timeout for an active HTTP request in milliseconds.
-	  The timeout is extended when data is received; if no activity occurs
-	  before it expires, the request is aborted and reported as an error.
+	  The timer is a sliding window: it resets each time data is sent or
+	  received (request headers, body upload chunks, response body chunks).
+	  If no activity occurs within this window the request is aborted and
+	  ``#XHTTPCSTAT: <fd>,-1,<bytes>`` is reported.
+	  A periodic background scan enforces the deadline even when the
+	  server stalls silently without closing the TCP connection.
 
 endif # SM_HTTPC
 

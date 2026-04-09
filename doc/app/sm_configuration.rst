@@ -192,6 +192,22 @@ CONFIG_SM_MQTTC_MESSAGE_BUFFER_LEN - Size of the buffer for the MQTT library
    This option specifies the maximum message size which can be transmitted or received through MQTT (excluding PUBLISH payload).
    The default value is 512, meaning 512 bytes for TX and RX, respectively.
 
+.. _CONFIG_SM_HTTPC:
+
+CONFIG_SM_HTTPC - HTTP client support in |SM|
+   This option enables the HTTP client AT commands for making HTTP/HTTPS requests.
+   See :ref:`SM_AT_HTTPC` for more information.
+
+   When enabled, the following sub-option is available:
+
+   .. _CONFIG_SM_HTTPC_RESPONSE_TIMEOUT_MS:
+
+   CONFIG_SM_HTTPC_RESPONSE_TIMEOUT_MS - HTTP client idle timeout (ms)
+      Idle timeout for an active HTTP request in milliseconds.
+      The timer is a sliding window that resets each time data is sent or received (request headers, body upload chunks, and response body chunks).
+      If no activity occurs within this window the request is aborted, and ``#XHTTPCSTAT: <fd>,-1,<bytes>`` is reported.
+      The default value is 30000 (30 seconds).
+
 .. _CONFIG_SM_UART_RX_BUF_COUNT:
 
 CONFIG_SM_UART_RX_BUF_COUNT - Receive buffers for UART.
