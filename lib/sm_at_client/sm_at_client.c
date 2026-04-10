@@ -523,6 +523,7 @@ static void uart_callback(const struct device*, struct uart_event *evt, void*)
 		}
 		break;
 	case UART_RX_DISABLED:
+		atomic_clear_bit(&uart_state, SM_AT_CLIENT_RX_ENABLED_BIT);
 		k_sem_give(&uart_disabled_sem);
 		k_work_submit((struct k_work *)&rx_process_work);
 		break;
