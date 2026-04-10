@@ -585,19 +585,6 @@ static int dtr_uart_init(const struct device *dev)
 		return -EINVAL;
 	}
 
-	/* Read initial DTR state. */
-	int initial_dtr_state = gpio_pin_get_dt(&config->dtr_gpio);
-
-	if (initial_dtr_state < 0) {
-		LOG_ERR("Failed to read initial DTR state (%d).", initial_dtr_state);
-		return initial_dtr_state;
-	}
-	/* Map GPIO input level directly to DTR state:
-	 * Input level 0 → DTR deasserted (dtr_state = 0, UART inactive)
-	 * Input level 1 → DTR asserted (dtr_state = 1, UART active)
-	 */
-	data->dtr_state = initial_dtr_state;
-
 	/* Set up GPIO interrupt for DTR changes. */
 	gpio_init_callback(&data->dtr_cb, uart_dtr_input_gpio_callback, BIT(config->dtr_gpio.pin));
 	err = gpio_add_callback(config->dtr_gpio.port, &data->dtr_cb);
@@ -611,7 +598,11 @@ static int dtr_uart_init(const struct device *dev)
 		return err;
 	}
 
-	LOG_DBG("DTR UART initialized, initial DTR state: %d", data->dtr_state);
+	/* All devices initialize to active state, so trigger the DTR handler to
+	 * set UART into a correct state.
+	 */
+	data->dtr_state = 1;
+	k_work_reschedule(&data->dtr_work, K_NO_WAIT);
 	return 0;
 }
 
