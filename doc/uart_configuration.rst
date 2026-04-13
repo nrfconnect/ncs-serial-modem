@@ -362,6 +362,27 @@ The modem detects the DTR assertion and powers up its UART interface, allowing c
 
    Sequence diagram showing host-initiated wake-up of the modem
 
+
+Boot-up scenario
+================
+
+To boot-up the |SM| application, the host asserts **ENABLE**, **DTR**, and enables its UART (driving |SM| **CTS** low).
+The |SM| firmware initializes within approximately 500 ms, after which it activates its UART and asserts **RTS** to signal readiness.
+|SM| then transmits a ``"Ready"`` message on **TX**, confirming that the link is operational.
+
+.. figure:: images/boot-up-sequence.svg
+   :alt: Boot-up sequence diagram
+
+   Signal sequence during boot-up
+
+
+The **ENABLE** pin (pin **10** on the nRF9151 SiP) is a high-impedance control input for the nRF9151 internal power management unit (PMU).
+Driving it to a logic high powers on the SiP.
+After **ENABLE** goes high, the |SM| application firmware typically starts within approximately 500 ms.
+Driving it to a logic low brings the device into an extremely low-current state.
+Any internal state not retained in non‑volatile memory is lost, and a full boot-up sequence is required when **ENABLE** is reasserted.
+See `nRF9151 Hardware Design Guidelines — ENABLE`_ for more information about the ENABLE pin.
+
 .. _uart_without_flow_control:
 
 Operating without hardware flow control
@@ -380,6 +401,7 @@ The host can operate without connecting the hardware flow control signals (CTS/R
 * The host must enable its own UART before asserting DTR.
 * To detect when |SM| is ready to receive, monitor the RI signal (de-asserted when ready) or use a sufficient timeout after DTR assertion.
 * See `Incoming data wake-up`_ for detailed timing information.
+* In boot-up scenarios, the host must wait for the ``"Ready"`` message from |SM| before sending any data.
 
 **Buffer configuration:**
 
