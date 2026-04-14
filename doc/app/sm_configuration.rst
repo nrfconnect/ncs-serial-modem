@@ -181,6 +181,12 @@ CONFIG_SM_NRF_CLOUD_LOCATION - nRF Cloud Location support
    Supports cellular and Wi-Fi positioning.
    This requires :ref:`CONFIG_SM_NRF_CLOUD <CONFIG_SM_NRF_CLOUD>` to be enabled.
 
+.. _CONFIG_SM_COAPC:
+
+CONFIG_SM_COAPC - CoAP client support in |SM|
+   This option enables the CoAP client AT commands for making CoAP requests.
+   See :ref:`SM_AT_COAPC` for more information.
+
 .. _CONFIG_SM_MQTTC:
 
 CONFIG_SM_MQTTC - MQTT client support in |SM|

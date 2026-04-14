@@ -266,6 +266,15 @@ config SM_NRF_CLOUD_LOCATION
 	  Enable the nRF Cloud Location service for cloud-assisted geolocation.
 	  Supports cellular and Wi-Fi positioning.
 
+config SM_COAPC
+	bool "CoAP client support"
+	default y
+	select COAP
+	select COAP_CLIENT
+	select EXPERIMENTAL
+	help
+	  Enable CoAP client AT commands for making CoAP requests.
+
 config SM_MQTTC
 	bool "MQTT client support"
 	default y
