@@ -36,6 +36,8 @@ Syntax
     Can only be used when the :file:`overlay-full-fota.conf` configuration file,
     :file:`overlay-external-flash.overlay` devicetree overlay, and
     :file:`PM_STATIC_YML_FILE=pm_static_nrf9151dk_nrf9151_ns_full_fota.yml` compile option are used.
+  * ``5`` - Start FOTA for MCUboot second-stage bootloader update.
+    Only available when the device uses the NSIB (B0) and MCUboot as a second-stage bootloader.
 
     Not supported on the Thingy:91 X.
 
@@ -45,6 +47,8 @@ Syntax
 * The ``<file url>`` parameter is a string.
   It represents the full HTTP or HTTPS path of the target image to download.
   It must be provided to the start operations.
+  For the MCUboot bootloader update, the target image must be the signed image for the **inactive** ``s0``/``s1`` slot.
+  You can use the ``AT#XBOOTINFO=1`` command to query which slot is active.
 * The ``<sec_tag>`` parameter is an integer.
   It indicates to the modem the credential of the security tag used for establishing a secure connection for downloading the image.
   It is associated with the certificate or PSK.
@@ -70,6 +74,12 @@ Syntax
    The external flash is erased automatically after a new firmware activation.
 
    Activating the new modem firmware is done identically to a modem delta update, by resetting either the whole device or only the modem.
+
+.. note::
+
+   For the MCUboot bootloader update, NSIB (B0) uses monotonic counter values to prevent rollback.
+   This means that updates for MCUboot images are limited to the number of slots defined in the ``SB_CONFIG_SECURE_BOOT_NUM_VER_COUNTER_SLOTS`` Kconfig option.
+   In |SM|, it is set to ``40`` by default.
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -123,6 +133,20 @@ Example
    erase modem DFU area for next modem delta update (optional)
    AT#XFOTA=9
    OK
+
+   MCUboot bootloader update
+   AT#XBOOTINFO=1
+   #XBOOTINFO: 0
+   OK
+   AT#XFOTA=5,"https://remote.host/fota/signed_by_mcuboot_and_b0_s1_image.bin",42
+   OK
+   #XFOTA: 1,0,0
+   ...
+   #XFOTA: 4,0
+   AT#XRESET
+   OK
+   Ready
+   #XFOTA: 5,0
 
 Unsolicited notification
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -199,7 +223,7 @@ Response syntax
 
 ::
 
-   #XFOTA: <list of op value>,<file_url>,<sec_tag>,<apn>
+   #XFOTA: <list of op value>,<file_url>,<sec_tag>,<pdn_id>
 
 Examples
 ~~~~~~~~
@@ -208,6 +232,6 @@ Examples
 
    AT#XFOTA=?
 
-   #XFOTA: (0,1,2,3,7,9),<file_url>,<sec_tag>,<apn>
+   #XFOTA: (0,1,2,3,5,7,9),<file_url>,<sec_tag>,<pdn_id>
 
    OK

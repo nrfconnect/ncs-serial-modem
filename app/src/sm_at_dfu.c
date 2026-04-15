@@ -16,6 +16,8 @@
 #include <dfu/dfu_target.h>
 #include <dfu/dfu_target_modem_delta.h>
 #include <dfu/dfu_target_mcuboot.h>
+#include <pm_config.h>
+#include "sm_util.h"
 #include "sm_at_host.h"
 #include "sm_at_dfu.h"
 #include "sm_settings.h"
@@ -29,6 +31,10 @@ enum xdfu_image_type {
 	DFU_TYPE_APP = 0,
 	DFU_TYPE_DELTA_MFW = 1,
 	DFU_TYPE_FULL_MFW = 2,
+#if defined(PM_S1_ADDRESS)
+	/* Banked MCUboot self-update; host must use inactive-slot signed image */
+	DFU_TYPE_MCUBOOT_BL = 3,
+#endif
 };
 
 enum xdfu_full_mfw_segment_type {
@@ -135,9 +141,15 @@ static int xdfu_datamode_callback(uint8_t op, const uint8_t *data, int len, uint
 
 		switch (xdfu_current_image_type) {
 		case DFU_TYPE_APP:
+#if defined(PM_S1_ADDRESS)
+		case DFU_TYPE_MCUBOOT_BL:
+#endif
 			err = dfu_target_mcuboot_write((const void *)data, len);
 			if (err) {
-				LOG_ERR("Failed to write %s: %d", "app firmware", err);
+				LOG_ERR("Failed to write %s: %d",
+					xdfu_current_image_type == DFU_TYPE_APP ? "app firmware" :
+						"MCUboot bootloader firmware",
+					err);
 				xdfu_status = err;
 			}
 			break;
@@ -190,6 +202,9 @@ static int xdfu_datamode_callback(uint8_t op, const uint8_t *data, int len, uint
 
 		switch (xdfu_current_image_type) {
 		case DFU_TYPE_APP:
+#if defined(PM_S1_ADDRESS)
+		case DFU_TYPE_MCUBOOT_BL:
+#endif
 			expected_bytes_written = xdfu_app_datamode_context.len;
 			break;
 		case DFU_TYPE_DELTA_MFW:
@@ -251,6 +266,9 @@ static int handle_at_xdfu_init(enum at_parser_cmd_type cmd_type, struct at_parse
 
 		switch (type) {
 		case DFU_TYPE_APP:
+#if defined(PM_S1_ADDRESS)
+		case DFU_TYPE_MCUBOOT_BL:
+#endif
 			err = at_parser_num_get(parser, 2, &size);
 			if (err) {
 				LOG_ERR("Failed to get size: %d", err);
@@ -261,7 +279,7 @@ static int handle_at_xdfu_init(enum at_parser_cmd_type cmd_type, struct at_parse
 				err = dfu_target_mcuboot_set_buf(app_dfu_buffer,
 								 APP_DFU_BUFFER_SIZE);
 				if (err) {
-					LOG_ERR("Failed to set app firmware buffer: %d", err);
+					LOG_ERR("Failed to set MCUboot DFU buffer: %d", err);
 					return err;
 				}
 				app_dfu_buffer_initialized = true;
@@ -270,16 +288,17 @@ static int handle_at_xdfu_init(enum at_parser_cmd_type cmd_type, struct at_parse
 			err = dfu_target_mcuboot_init(size, 0, NULL);
 			if (err == -EFAULT) {
 				/* Already initialized - abort and retry */
-				LOG_WRN("MCUBoot DFU already initialized, aborting and retrying");
+				LOG_WRN("MCUboot DFU already initialized, aborting and retrying");
 				(void)dfu_target_mcuboot_done(false);
 				err = dfu_target_mcuboot_init(size, 0, NULL);
 			}
 			if (err) {
-				LOG_ERR("Failed to initialize MCUBoot DFU target: %d", err);
+				LOG_ERR("Failed to initialize MCUboot DFU target: %d", err);
 				return err;
 			}
 
-			LOG_INF("MCUBoot DFU initialized successfully");
+			LOG_INF("%s DFU initialized successfully",
+				type == DFU_TYPE_APP ? "MCUboot" : "MCUboot bootloader");
 			return 0;
 		case DFU_TYPE_DELTA_MFW:
 			err = at_parser_num_get(parser, 2, &size);
@@ -320,11 +339,22 @@ static int handle_at_xdfu_init(enum at_parser_cmd_type cmd_type, struct at_parse
 		}
 	case AT_PARSER_CMD_TYPE_TEST:
 #if defined(CONFIG_SM_DFU_MODEM_FULL)
+#if defined(PM_S1_ADDRESS)
+		rsp_send("\r\n#XDFUINIT: (%d,%d,%d,%d),<size>\r\n",
+			DFU_TYPE_APP, DFU_TYPE_DELTA_MFW, DFU_TYPE_FULL_MFW,
+			DFU_TYPE_MCUBOOT_BL);
+#else
 		rsp_send("\r\n#XDFUINIT: (%d,%d,%d),<size>\r\n",
 			DFU_TYPE_APP, DFU_TYPE_DELTA_MFW, DFU_TYPE_FULL_MFW);
+#endif
+#else
+#if defined(PM_S1_ADDRESS)
+		rsp_send("\r\n#XDFUINIT: (%d,%d,%d),<size>\r\n",
+			DFU_TYPE_APP, DFU_TYPE_DELTA_MFW, DFU_TYPE_MCUBOOT_BL);
 #else
 		rsp_send("\r\n#XDFUINIT: (%d,%d),<size>\r\n",
 			DFU_TYPE_APP, DFU_TYPE_DELTA_MFW);
+#endif
 #endif
 		return 0;
 	default:
@@ -355,6 +385,9 @@ static int handle_at_xdfu_write(enum at_parser_cmd_type cmd_type, struct at_pars
 
 		switch (type) {
 		case DFU_TYPE_APP:
+#if defined(PM_S1_ADDRESS)
+		case DFU_TYPE_MCUBOOT_BL:
+#endif
 			if (param_count != 4) {
 				LOG_ERR("Invalid number of parameters for data write");
 				return -EINVAL;
@@ -376,7 +409,7 @@ static int handle_at_xdfu_write(enum at_parser_cmd_type cmd_type, struct at_pars
 			}
 
 			/* Prepare per-chunk accounting for the datamode callback. */
-			xdfu_current_image_type = DFU_TYPE_APP;
+			xdfu_current_image_type = (enum xdfu_image_type)type;
 			xdfu_bytes_written = 0;
 			xdfu_status = 0;
 
@@ -474,11 +507,22 @@ static int handle_at_xdfu_write(enum at_parser_cmd_type cmd_type, struct at_pars
 		}
 	case AT_PARSER_CMD_TYPE_TEST:
 #if defined(CONFIG_SM_DFU_MODEM_FULL)
+#if defined(PM_S1_ADDRESS)
+		rsp_send("\r\n#XDFUWRITE: (%d,%d,%d,%d),<addr>,<len>\r\n",
+			DFU_TYPE_APP, DFU_TYPE_DELTA_MFW, DFU_TYPE_FULL_MFW,
+			DFU_TYPE_MCUBOOT_BL);
+#else
 		rsp_send("\r\n#XDFUWRITE: (%d,%d,%d),<addr>,<len>\r\n",
 			DFU_TYPE_APP, DFU_TYPE_DELTA_MFW, DFU_TYPE_FULL_MFW);
+#endif
+#else
+#if defined(PM_S1_ADDRESS)
+		rsp_send("\r\n#XDFUWRITE: (%d,%d,%d),<addr>,<len>\r\n",
+			DFU_TYPE_APP, DFU_TYPE_DELTA_MFW, DFU_TYPE_MCUBOOT_BL);
 #else
 		rsp_send("\r\n#XDFUWRITE: (%d,%d),<addr>,<len>\r\n",
 			DFU_TYPE_APP, DFU_TYPE_DELTA_MFW);
+#endif
 #endif
 		return 0;
 	default:
@@ -511,20 +555,32 @@ static int handle_at_xdfu_apply(enum at_parser_cmd_type cmd_type, struct at_pars
 
 		switch (type) {
 		case DFU_TYPE_APP:
+#if defined(PM_S1_ADDRESS)
+		case DFU_TYPE_MCUBOOT_BL:
+#endif
 			err = dfu_target_mcuboot_done(true);
 			if (err) {
-				LOG_ERR("App firmware update failed: %d", err);
+				LOG_ERR("%s update finalize failed: %d",
+					type == DFU_TYPE_APP ? "App firmware"
+							     : "MCUboot bootloader",
+					err);
 			} else {
 				err = dfu_target_mcuboot_schedule_update(0);
 				if (err) {
-					LOG_ERR("Failed to schedule app firmware update: %d", err);
+					LOG_ERR("Failed to schedule %s update: %d",
+						type == DFU_TYPE_APP ? "App firmware"
+								     : "MCUboot bootloader",
+						err);
 				}
 			}
 
 			urc_send("#XDFU: %u,%u,%d\r\n",
-				DFU_TYPE_APP, DFU_OPERATION_APPLY_UPDATE, err ? -1 : 0);
+				type, DFU_OPERATION_APPLY_UPDATE, err ? -1 : 0);
 
-			LOG_INF("App firmware update scheduled");
+			if (!err) {
+				LOG_INF("%s update scheduled",
+				type == DFU_TYPE_APP ? "App firmware" : "MCUboot bootloader");
+			}
 
 			return 0;
 		case DFU_TYPE_DELTA_MFW:
@@ -581,11 +637,22 @@ static int handle_at_xdfu_apply(enum at_parser_cmd_type cmd_type, struct at_pars
 		}
 	case AT_PARSER_CMD_TYPE_TEST:
 #if defined(CONFIG_SM_DFU_MODEM_FULL)
+#if defined(PM_S1_ADDRESS)
+		rsp_send("\r\n#XDFUAPPLY: (%d,%d,%d,%d)\r\n",
+			DFU_TYPE_APP, DFU_TYPE_DELTA_MFW, DFU_TYPE_FULL_MFW,
+			DFU_TYPE_MCUBOOT_BL);
+#else
 		rsp_send("\r\n#XDFUAPPLY: (%d,%d,%d)\r\n",
 			DFU_TYPE_APP, DFU_TYPE_DELTA_MFW, DFU_TYPE_FULL_MFW);
+#endif
+#else
+#if defined(PM_S1_ADDRESS)
+		rsp_send("\r\n#XDFUAPPLY: (%d,%d,%d)\r\n",
+			DFU_TYPE_APP, DFU_TYPE_DELTA_MFW, DFU_TYPE_MCUBOOT_BL);
 #else
 		rsp_send("\r\n#XDFUAPPLY: (%d,%d)\r\n",
 			DFU_TYPE_APP, DFU_TYPE_DELTA_MFW);
+#endif
 #endif
 		return 0;
 	default:

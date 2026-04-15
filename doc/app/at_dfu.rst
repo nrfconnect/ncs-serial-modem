@@ -8,7 +8,7 @@ DFU AT commands
    :depth: 2
 
 This page describes AT commands related to Device Firmware Update (DFU) operations.
-These commands allow you to update the application firmware, delta modem firmware, or full modem firmware through UART.
+These commands allow you to update the application firmware, delta modem firmware, full modem firmware, or the MCUboot second-stage bootloader through UART.
 
 .. note::
 
@@ -25,6 +25,9 @@ The following DFU image types are supported:
 * ``0`` - Application firmware (MCUboot)
 * ``1`` - Delta modem firmware
 * ``2`` - Full modem firmware (requires :ref:`CONFIG_SM_DFU_MODEM_FULL <CONFIG_SM_DFU_MODEM_FULL>`)
+* ``3`` - MCUboot second-stage bootloader self-update.
+  Only available when the device uses the NSIB (B0) and MCUboot as a second-stage bootloader.
+  The host must stream the signed image for the **inactive** ``s0``/``s1`` slot.
 
 .. caution::
 
@@ -50,7 +53,7 @@ Syntax
 
 * The ``<type>`` parameter is an integer indicating the DFU image type as specified in the :ref:`dfu_types` section.
 * The ``<size>`` parameter is an integer indicating the total firmware image size in bytes.
-  It is required for application (type ``0``) and delta modem firmware (type ``1``) updates.
+  It is required for application (type ``0``), delta modem firmware (type ``1``), and MCUboot bootloader (type ``3``) updates.
 
 For full modem firmware (type ``2``), the command triggers an immediate reboot into bootloader mode.
 
@@ -97,7 +100,7 @@ Example
 
    AT#XDFUINIT=?
 
-   #XDFUINIT: (0,1,2),<size>
+   #XDFUINIT: (0,1,2,3),<size>
 
    OK
 
@@ -168,7 +171,7 @@ Example
 
    AT#XDFUWRITE=?
 
-   #XDFUWRITE: (0,1,2),<addr>,<len>
+   #XDFUWRITE: (0,1,2,3),<addr>,<len>
 
    OK
 
@@ -191,7 +194,7 @@ Syntax
 
 * The ``<type>`` parameter is an integer indicating the DFU image type as specified in the :ref:`dfu_types` section.
 
-For application (type ``0``) and delta modem firmware (type ``1``), the update is scheduled and will be activated on the next reset, which can be done with the ``AT#XRESET`` command.
+For application (type ``0``), delta modem firmware (type ``1``), and MCUboot bootloader (type ``3``), the update is scheduled and will be activated on the next reset, which can be done with the ``AT#XRESET`` command.
 For full modem firmware (type ``2``), the command applies the current segment (bootloader or firmware) and triggers a reboot if needed.
 
 Example
@@ -238,7 +241,7 @@ Example
 
    AT#XDFUAPPLY=?
 
-   #XDFUAPPLY: (0,1,2)
+   #XDFUAPPLY: (0,1,2,3)
 
    OK
 
@@ -278,6 +281,11 @@ The following example shows a complete application firmware update:
 
 .. code-block:: none
 
+   // Note the current firmware version of the application
+   AT#XSMVER
+   #XSMVER: "v2.0.0-preview1-7-gdf00f46-dirty","3.3.0-rc1"
+   OK
+
    // Initialize DFU for application firmware (total size 123456 bytes)
    AT#XDFUINIT=0,123456
    OK
@@ -308,12 +316,22 @@ The following example shows a complete application firmware update:
    OK
    Ready
 
+   // Verify that the application is running the new firmware
+   AT#XSMVER
+   #XSMVER: "v2.0.0-preview2-8-f0gd0f46-dirty","3.3.0-rc1"
+   OK
+
 Delta modem firmware update
 ---------------------------
 
 The following example shows a complete delta modem firmware update:
 
 .. code-block:: none
+
+   // Note the current modem firmware
+   AT%SHORTSWVER
+   %SHORTSWVER: nrf91x1_2.0.0
+   OK
 
    // Initialize DFU for delta modem firmware (total size 65536 bytes)
    AT#XDFUINIT=1,65536
@@ -345,6 +363,11 @@ The following example shows a complete delta modem firmware update:
    #XMODEMRESET: 0
    OK
 
+   // Verify that the modem is running the new firmware
+   AT%SHORTSWVER
+   %SHORTSWVER: nrf91x1_2.0.4
+   OK
+
 Full modem firmware update
 --------------------------
 
@@ -363,6 +386,11 @@ The full modem update consists of two phases:
 #. Firmware segment - Writes the firmware data.
 
 .. code-block:: none
+
+   // Note the current firmware version of the modem
+   AT%SHORTSWVER
+   %SHORTSWVER: nrf91x1_2.0.0
+   OK
 
    // Initialize DFU for full modem firmware
    AT#XDFUINIT=2
@@ -399,6 +427,82 @@ The full modem update consists of two phases:
    #XDFU: 2,2,0
    // device reboots
    Ready
+
+   // Verify that the modem is running the new firmware
+   AT%SHORTSWVER
+   %SHORTSWVER: nrf91x1_2.0.4
+   OK
+
+MCUboot firmware update
+-----------------------
+
+.. important::
+   NSIB (B0) uses monotonic counter values to prevent rollback of the MCUboot bootloader.
+   When performing an MCUboot DFU, the host must ensure that the new MCUboot image has a strictly higher monotonic counter value than the currently running MCUboot to avoid update failure.
+   This also means that updates for MCUboot images are limited to the number of slots defined in the ``SB_CONFIG_SECURE_BOOT_NUM_VER_COUNTER_SLOTS`` Kconfig option.
+   In |SM|, it is set to ``40`` by default.
+
+The following example shows a complete MCUboot firmware update:
+
+.. code-block:: none
+
+   // Query the current slot for MCUboot image
+   AT#XBOOTINFO=1
+   #XBOOTINFO: 0
+   OK
+
+   // Download the correct MCUboot image for the inactive slot.
+   // The default NCS image names for MCUboot are:
+   // - Slot 0: signed_by_mcuboot_and_b0_mcuboot.bin
+   // - Slot 1: signed_by_mcuboot_and_b0_s1_image.bin
+
+   // In this example, the device is currently running slot 0, so the host should download the signed image for slot 1, which is signed_by_mcuboot_and_b0_s1_image.bin.
+
+   // Note the current monotonic counter value for MCUboot
+   AT#XBOOTINFO=0
+   #XBOOTINFO: 1
+   OK
+
+   // Initialize DFU for MCUboot firmware (total size 23456 bytes)
+   AT#XDFUINIT=3,23456
+   OK
+
+   // Write first chunk (4096 bytes at offset 0)
+   AT#XDFUWRITE=3,0,4096
+   OK
+   // 4096 bytes of firmware data
+   #XDATAMODE: 0
+   #XDFU: 3,1,0
+
+   // Write second chunk (4096 bytes at offset 4096)
+   AT#XDFUWRITE=3,4096,4096
+   OK
+   // 4096 bytes of firmware data
+   #XDATAMODE: 0
+   #XDFU: 3,1,0
+
+   // ... continue writing chunks ...
+
+   // Apply the update
+   AT#XDFUAPPLY=3
+   OK
+   #XDFU: 3,2,0
+
+   // Reset to activate the new firmware
+   AT#XRESET
+   OK
+   Ready
+
+   // Verify that the monotonic counter value for MCUboot was updated
+   AT#XBOOTINFO=0
+   #XBOOTINFO: 2
+   OK
+
+   // (Optional) Verify that the MCUboot slot was switched
+   AT#XBOOTINFO=1
+   #XBOOTINFO: 1
+   OK
+
 
 DFU host example
 ================

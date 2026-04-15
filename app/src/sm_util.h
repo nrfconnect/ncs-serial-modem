@@ -209,6 +209,14 @@ struct sm_pdn_dynamic_info {
  */
 int sm_util_pdn_dynamic_info_get(uint8_t cid, struct sm_pdn_dynamic_info *pdn_info);
 
+/**
+ * @brief Read the fw_info version of the currently active MCUboot bootloader slot.
+ *
+ * @param[out] version  fw_info version of the active slot.
+ * @return 0 on success, negative errno on failure.
+ */
+int sm_util_mcuboot_active_version(uint32_t *version);
+
 #define Z_MODEM_PIPE_EVENT_OPENED_BIT BIT(0)
 
 /**

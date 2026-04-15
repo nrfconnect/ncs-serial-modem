@@ -571,6 +571,77 @@ Test command
 
 The test command is not supported.
 
+MCUboot bootloader info #XBOOTINFO
+==================================
+
+Query information about the MCUboot second-stage bootloader.
+
+This command is only available when the firmware is built with the NSIB (B0) and MCUboot as a second-stage bootloader.
+
+Set command
+-----------
+
+::
+
+   AT#XBOOTINFO=<op>
+
+* ``<op>`` - Operation to perform:
+
+  * ``0`` - Query the firmware version of the active MCUboot slot.
+  * ``1`` - Query which MCUboot bank is currently active.
+
+Response syntax
+~~~~~~~~~~~~~~~
+
+::
+
+   #XBOOTINFO: <value>
+
+* When ``<op>`` is ``0`` - ``<value>`` is an unsigned integer representing ``fw_info.version`` of the active MCUboot slot, set at build time using ``CONFIG_FW_INFO_FIRMWARE_VERSION`` and used by NSIB as a downgrade-protection counter.
+* When ``<op>`` is ``1`` - ``<value>`` is ``0`` if bank ``s0`` is active and ``1`` if bank ``s1`` is active.
+
+Examples
+~~~~~~~~
+
+Query the firmware version of the active MCUboot slot::
+
+   AT#XBOOTINFO=0
+
+   #XBOOTINFO: 1
+
+   OK
+
+Query the active MCUboot slot::
+
+   AT#XBOOTINFO=1
+
+   #XBOOTINFO: 0
+
+   OK
+
+Test command
+------------
+
+::
+
+   AT#XBOOTINFO=?
+
+Response syntax
+~~~~~~~~~~~~~~~
+
+::
+
+   #XBOOTINFO: (0,1)
+
+Example
+~~~~~~~
+
+::
+
+   AT#XBOOTINFO=?
+   #XBOOTINFO: (0,1)
+   OK
+
 Modem fault #XMODEM
 ===================
 

@@ -15,6 +15,8 @@
 #include <zephyr/sys/util.h>
 #include <zephyr/types.h>
 #include <dfu/dfu_target.h>
+#include <tfm/tfm_ioctl_api.h>
+#include <pm_config.h>
 #include <modem/at_parser.h>
 #include <modem/lte_lc.h>
 #include <modem/modem_jwt.h>
@@ -196,7 +198,7 @@ static void sm_modemreset(void)
 
 	ret = nrf_modem_lib_init();
 
-	if (sm_fota_type & DFU_TARGET_IMAGE_TYPE_ANY_MODEM) {
+	if (sm_fota_type == SM_FOTA_TYPE_MFW || sm_fota_type == SM_FOTA_TYPE_FULL_MFW) {
 		sm_fota_post_process();
 	}
 
@@ -319,4 +321,59 @@ STATIC int handle_ate1(enum at_parser_cmd_type cmd_type, struct at_parser *, uin
 	sm_at_host_echo(true);
 
 	return 0;
+}
+
+/** @brief Operations for AT#XBOOTINFO. */
+enum xbootinfo_op {
+	XBOOTINFO_OP_VERSION = 0,
+	XBOOTINFO_OP_SLOT    = 1,
+};
+
+SM_AT_CMD_CUSTOM(xbootinfo, "AT#XBOOTINFO", handle_at_xbootinfo);
+STATIC int handle_at_xbootinfo(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+			       uint32_t param_count)
+{
+	ARG_UNUSED(param_count);
+
+#if !defined(PM_S1_ADDRESS)
+	return -ENOTSUP;
+#else
+	switch (cmd_type) {
+	case AT_PARSER_CMD_TYPE_SET: {
+		uint32_t op = 0;
+		int err = at_parser_num_get(parser, 1, &op);
+
+		if (err) {
+			return -EINVAL;
+		}
+
+		if (op == XBOOTINFO_OP_VERSION) {
+			uint32_t version = 0;
+
+			err = sm_util_mcuboot_active_version(&version);
+			if (err) {
+				return err;
+			}
+			rsp_send("\r\n#XBOOTINFO: %u\r\n", version);
+		} else if (op == XBOOTINFO_OP_SLOT) {
+			bool s0_active = false;
+
+			err = tfm_platform_s0_active(PM_S0_ADDRESS, PM_S1_ADDRESS, &s0_active);
+			if (err != 0) {
+				return err;
+			}
+			rsp_send("\r\n#XBOOTINFO: %u\r\n", s0_active ? 0U : 1U);
+		} else {
+			return -EINVAL;
+		}
+
+		return 0;
+	}
+	case AT_PARSER_CMD_TYPE_TEST:
+		rsp_send("\r\n#XBOOTINFO: (%d,%d)\r\n", XBOOTINFO_OP_VERSION, XBOOTINFO_OP_SLOT);
+		return 0;
+	default:
+		return -EINVAL;
+	}
+#endif
 }

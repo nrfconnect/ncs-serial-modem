@@ -12,10 +12,11 @@
 #include <zephyr/logging/log_ctrl.h>
 #include <zephyr/net/tls_credentials.h>
 #include <zephyr/net/http/parser_url.h>
+#include <strings.h>
 #include <zephyr/device.h>
 #include <zephyr/sys/reboot.h>
 #include <net/fota_download.h>
-#include <fota_download_util.h>
+#include <pm_config.h>
 #include <dfu/dfu_target_full_modem.h>
 #include <dfu/fmfu_fdev.h>
 #include "sm_util.h"
@@ -26,12 +27,6 @@
 
 LOG_MODULE_REGISTER(sm_fota, CONFIG_SM_LOG_LEVEL);
 
-/* file_uri: scheme://hostname[:port]path[?parameters] */
-#define FILE_URI_MAX	CONFIG_DOWNLOADER_MAX_FILENAME_SIZE
-#define SCHEMA_HTTP     "http"
-#define SCHEMA_HTTPS	"https"
-#define URI_HOST_MAX	CONFIG_DOWNLOADER_MAX_HOSTNAME_SIZE
-#define URI_SCHEMA_MAX	8
 #define ERASE_POLL_TIME 2
 
 /* Some features need fota_download update */
@@ -43,19 +38,20 @@ enum sm_fota_operation {
 	SM_FOTA_START_MFW = 2,
 	SM_FOTA_START_FULL_FOTA = 3,
 	SM_FOTA_PAUSE_RESUME = 4,
+	SM_FOTA_START_MCUBOOT_BL = 5,
 	SM_FOTA_MFW_READ = 7,
 	SM_FOTA_ERASE_MFW = 9
 };
 
 bool sm_modem_full_fota;
+bool sm_fota_bl_pending_validate;
+uint32_t sm_fota_bl_version_before;
 
-uint8_t sm_fota_type = DFU_TARGET_IMAGE_TYPE_NONE;
+enum sm_fota_image_type sm_fota_type = SM_FOTA_TYPE_NONE;
 enum fota_stage sm_fota_stage = FOTA_STAGE_INIT;
 enum fota_status sm_fota_status;
 int32_t sm_fota_info;
 
-static char path[FILE_URI_MAX];
-static char hostname[URI_HOST_MAX];
 static struct modem_pipe *fota_pipe;
 
 #if defined(CONFIG_SM_FULL_FOTA)
@@ -190,93 +186,76 @@ static int do_fota_erase_mfw(void)
 	return 0;
 }
 
-static int do_fota_start(int op, const char *file_uri, int sec_tag,
+static int do_fota_start(const char *file_uri, size_t file_uri_len, int sec_tag,
 			 uint8_t pdn_id, enum dfu_target_image_type type)
 {
 	int ret;
 	struct http_parser_url parser = {
-		/* UNINIT checker fix, assumed UF_SCHEMA existence */
 		.field_set = 0
 	};
-	char schema[URI_SCHEMA_MAX];
+	size_t path_off;
+	char *hostname = NULL;
+	char *path = NULL;
 
 	http_parser_url_init(&parser);
-	ret = http_parser_parse_url(file_uri, strlen(file_uri), 0, &parser);
+	ret = http_parser_parse_url(file_uri, file_uri_len, 0, &parser);
 	if (ret) {
 		LOG_ERR("Parse URL error");
 		return -EINVAL;
 	}
 
-	/* Schema stores http/https information */
-	memset(schema, 0x00, 8);
-	if (parser.field_set & (1 << UF_SCHEMA)) {
-		if (parser.field_data[UF_SCHEMA].len < URI_SCHEMA_MAX) {
-			strncpy(schema, file_uri + parser.field_data[UF_SCHEMA].off,
-				parser.field_data[UF_SCHEMA].len);
-		} else {
-			LOG_ERR("URL schema length %d too long, exceeds the max length of %d",
-				parser.field_data[UF_SCHEMA].len, URI_SCHEMA_MAX);
-			return -ENOMEM;
-		}
-	} else {
-		LOG_ERR("Parse schema error");
-		return -EINVAL;
-	}
-
-	/* Path includes folder and file information */
-	/* This stores also the query data after folder and file description */
-	memset(path, 0x00, FILE_URI_MAX);
-	if (parser.field_set & (1 << UF_PATH)) {
-		/* Remove the leading '/' as some HTTP servers don't like it */
-		if ((strlen(file_uri) - parser.field_data[UF_PATH].off + 1) < FILE_URI_MAX) {
-			strncpy(path, file_uri + parser.field_data[UF_PATH].off + 1,
-				strlen(file_uri) - parser.field_data[UF_PATH].off - 1);
-		} else {
-			LOG_ERR("URL path length %d too long, exceeds the max length of %d",
-					strlen(file_uri) - parser.field_data[UF_PATH].off - 1,
-					FILE_URI_MAX);
-			return -ENOMEM;
-		}
-	} else {
+	if (!(parser.field_set & (1 << UF_PATH))) {
 		LOG_ERR("Parse path error");
 		return -EINVAL;
 	}
 
-	/* Stores everything before path (schema, hostname, port) */
-	memset(hostname, 0x00, URI_HOST_MAX);
-	if (parser.field_set & (1 << UF_HOST)) {
-		if (parser.field_data[UF_PATH].off < URI_HOST_MAX) {
-			strncpy(hostname, file_uri, parser.field_data[UF_PATH].off);
-		} else {
-			LOG_ERR("URL host name length %d too long, exceeds the max length of %d",
-					parser.field_data[UF_PATH].off, URI_HOST_MAX);
-			return -ENOMEM;
-		}
-	} else {
+	if (!(parser.field_set & (1 << UF_HOST))) {
 		LOG_ERR("Parse host error");
 		return -EINVAL;
 	}
 
-	/* start HTTP(S) FOTA */
-	if (sm_util_casecmp(schema, SCHEMA_HTTPS)) {
+	path_off = parser.field_data[UF_PATH].off;
+
+	/* host: scheme + authority (everything before the path), e.g. "https://host:port" */
+	hostname = k_malloc(path_off + 1);
+	if (!hostname) {
+		return -ENOMEM;
+	}
+	memcpy(hostname, file_uri, path_off);
+	hostname[path_off] = '\0';
+
+	/* path: URI content after the leading '/' */
+	path = k_malloc(file_uri_len - path_off);
+	if (!path) {
+		k_free(hostname);
+		return -ENOMEM;
+	}
+	memcpy(path, file_uri + path_off + 1, file_uri_len - path_off - 1);
+	path[file_uri_len - path_off - 1] = '\0';
+
+	/* start HTTP(S) FOTA (hostname buffer includes scheme and port, see http_parser) */
+	if (strncasecmp(hostname, "https://", strlen("https://")) == 0) {
 		if (sec_tag == SEC_TAG_TLS_INVALID) {
 			LOG_ERR("Missing sec_tag");
-			return -EINVAL;
+			ret = -EINVAL;
+		} else {
+			ret = fota_download_start_with_image_type(hostname, path, sec_tag, pdn_id,
+								  0, type);
 		}
-		ret = fota_download_start_with_image_type(hostname, path, sec_tag, pdn_id, 0, type);
-	} else if (sm_util_casecmp(schema, SCHEMA_HTTP)) {
+	} else if (strncasecmp(hostname, "http://", strlen("http://")) == 0) {
 		ret = fota_download_start_with_image_type(hostname, path, -1, pdn_id, 0, type);
 	} else {
 		ret = -EINVAL;
 	}
+
+	k_free(hostname);
+	k_free(path);
+
 	/* Send an URC if failed to start */
 	if (ret) {
 		rsp_send("\r\n#XFOTA: %d,%d,%d\r\n", FOTA_STAGE_DOWNLOAD,
 			FOTA_STATUS_ERROR, ret);
 	}
-
-	sm_fota_init_state();
-	sm_fota_type = type;
 
 	return ret;
 }
@@ -294,7 +273,10 @@ static void fota_dl_handler(const struct fota_download_evt *evt)
 	case FOTA_DOWNLOAD_EVT_FINISHED:
 		sm_fota_stage = FOTA_STAGE_ACTIVATE;
 		sm_fota_info = 0;
-		sm_modem_full_fota = (sm_fota_type == DFU_TARGET_IMAGE_TYPE_FULL_MODEM);
+		sm_modem_full_fota = (sm_fota_type == SM_FOTA_TYPE_FULL_MFW);
+#if defined(PM_S1_ADDRESS)
+		sm_fota_bl_pending_validate = (sm_fota_type == SM_FOTA_TYPE_MCUBOOT_BL);
+#endif
 		/* Save, in case reboot by reset */
 		sm_settings_fota_save();
 		urc_send_to(fota_pipe, "\r\n#XFOTA: %d,%d\r\n", sm_fota_stage, sm_fota_status);
@@ -358,30 +340,43 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 			break;
 		case SM_FOTA_START_APP:
 		case SM_FOTA_START_MFW:
+#if defined(PM_S1_ADDRESS)
+		case SM_FOTA_START_MCUBOOT_BL:
+#endif
 #if defined(CONFIG_SM_FULL_FOTA)
 		case SM_FOTA_START_FULL_FOTA:
 #endif
-			char uri[FILE_URI_MAX];
-			uint16_t pdn_id;
-			int size = FILE_URI_MAX;
+		{
+			/* We cannot handle multiple simultaneous FOTA activations. */
+			if (sm_fota_stage == FOTA_STAGE_ACTIVATE) {
+				err = -EBUSY;
+				break;
+			}
+
+			uint16_t pdn_id = 0;
 			sec_tag_t sec_tag = SEC_TAG_TLS_INVALID;
 			enum dfu_target_image_type type;
+			const char *uri_ptr;
+			size_t uri_len;
 
-			err = util_string_get(parser, 2, uri, &size);
+			err = at_parser_string_ptr_get(parser, 2, &uri_ptr, &uri_len);
 			if (err) {
-				return err;
+				break;
 			}
 			if (param_count > 3) {
 				at_parser_num_get(parser, 3, &sec_tag);
 			}
-			if (op == SM_FOTA_START_APP) {
+			if (param_count > 4) {
+				at_parser_num_get(parser, 4, &pdn_id);
+			}
+			if (op == SM_FOTA_START_APP || op == SM_FOTA_START_MCUBOOT_BL) {
 				type = DFU_TARGET_IMAGE_TYPE_MCUBOOT;
 			}
 #if defined(CONFIG_SM_FULL_FOTA)
 			else if (op == SM_FOTA_START_FULL_FOTA) {
 				err = setup_full_modem_fota_config();
 				if (err != 0) {
-					return err;
+					break;
 				}
 				type = DFU_TARGET_IMAGE_TYPE_FULL_MODEM;
 			}
@@ -389,13 +384,30 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 			else {
 				type = DFU_TARGET_IMAGE_TYPE_MODEM_DELTA;
 			}
-			if (param_count > 4) {
-				at_parser_num_get(parser, 4, &pdn_id);
-				err = do_fota_start(op, uri, sec_tag, pdn_id, type);
-			} else {
-				err = do_fota_start(op, uri, sec_tag, 0, type);
+			err = do_fota_start(uri_ptr, uri_len, sec_tag, pdn_id, type);
+			sm_fota_init_state();
+			if (op == SM_FOTA_START_MFW) {
+				sm_fota_type = SM_FOTA_TYPE_MFW;
+			}
+#if defined(CONFIG_SM_FULL_FOTA)
+			else if (op == SM_FOTA_START_FULL_FOTA) {
+				sm_fota_type = SM_FOTA_TYPE_FULL_MFW;
+			}
+#endif
+#if defined(PM_S1_ADDRESS)
+			else if (op == SM_FOTA_START_MCUBOOT_BL) {
+				sm_fota_type = SM_FOTA_TYPE_MCUBOOT_BL;
+
+				/* Save the MCUboot version before FOTA. */
+				sm_util_mcuboot_active_version(&sm_fota_bl_version_before);
+				sm_settings_fota_save();
+			}
+#endif
+			else {
+				sm_fota_type = SM_FOTA_TYPE_APP;
 			}
 			break;
+		}
 #if FOTA_FUTURE_FEATURE
 		case SM_FOTA_PAUSE_RESUME:
 			if (paused) {
@@ -421,10 +433,20 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 		break;
 
 	case AT_PARSER_CMD_TYPE_TEST:
-#if defined(CONFIG_SM_FULL_FOTA)
+#if defined(PM_S1_ADDRESS) && defined(CONFIG_SM_FULL_FOTA)
+		rsp_send("\r\n#XFOTA: "
+			 "(%d,%d,%d,%d,%d,%d,%d)[,<file_url>[,<sec_tag>[,<pdn_id>]]]\r\n",
+			 SM_FOTA_STOP, SM_FOTA_START_APP, SM_FOTA_START_MFW,
+			 SM_FOTA_START_FULL_FOTA, SM_FOTA_START_MCUBOOT_BL, SM_FOTA_MFW_READ,
+			 SM_FOTA_ERASE_MFW);
+#elif defined(PM_S1_ADDRESS)
 		rsp_send("\r\n#XFOTA: (%d,%d,%d,%d,%d,%d)[,<file_url>[,<sec_tag>[,<pdn_id>]]]\r\n",
-			SM_FOTA_STOP, SM_FOTA_START_APP, SM_FOTA_START_MFW,
-			SM_FOTA_MFW_READ, SM_FOTA_ERASE_MFW, SM_FOTA_START_FULL_FOTA);
+			 SM_FOTA_STOP, SM_FOTA_START_APP, SM_FOTA_START_MFW,
+			 SM_FOTA_START_MCUBOOT_BL, SM_FOTA_MFW_READ, SM_FOTA_ERASE_MFW);
+#elif defined(CONFIG_SM_FULL_FOTA)
+		rsp_send("\r\n#XFOTA: (%d,%d,%d,%d,%d,%d)[,<file_url>[,<sec_tag>[,<pdn_id>]]]\r\n",
+			 SM_FOTA_STOP, SM_FOTA_START_APP, SM_FOTA_START_MFW,
+			 SM_FOTA_START_FULL_FOTA, SM_FOTA_MFW_READ, SM_FOTA_ERASE_MFW);
 #else
 		rsp_send("\r\n#XFOTA: (%d,%d,%d,%d,%d)[,<file_url>[,<sec_tag>[,<pdn_id>]]]\r\n",
 			SM_FOTA_STOP, SM_FOTA_START_APP, SM_FOTA_START_MFW,
@@ -449,6 +471,7 @@ static int sm_at_fota_init(void)
 		sm_init_failed = true;
 		return ret;
 	}
+
 	return 0;
 }
 SYS_INIT(sm_at_fota_init, APPLICATION, 0);
@@ -456,10 +479,40 @@ SYS_INIT(sm_at_fota_init, APPLICATION, 0);
 void sm_fota_init_state(void)
 {
 	sm_modem_full_fota = false;
-	sm_fota_type = DFU_TARGET_IMAGE_TYPE_NONE;
+	sm_fota_type = SM_FOTA_TYPE_NONE;
 	sm_fota_stage = FOTA_STAGE_INIT;
 	sm_fota_status = FOTA_STATUS_OK;
 	sm_fota_info = 0;
+}
+
+void sm_fota_mcuboot_bl_boot_check(void)
+{
+#if defined(PM_S1_ADDRESS)
+	if (!sm_fota_bl_pending_validate) {
+		return;
+	}
+
+	uint32_t current_version = 0;
+	int err = sm_util_mcuboot_active_version(&current_version);
+
+	if (err != 0) {
+		sm_fota_status = FOTA_STATUS_ERROR;
+		sm_fota_info = err;
+		LOG_ERR("MCUboot validate: FAIL (fw_info read err %d)", err);
+	} else if (current_version <= sm_fota_bl_version_before) {
+		sm_fota_status = FOTA_STATUS_ERROR;
+		sm_fota_info = 1;
+		LOG_WRN("MCUboot validate: FAIL (version unchanged: %u -> %u)",
+			sm_fota_bl_version_before, current_version);
+	} else {
+		sm_fota_status = FOTA_STATUS_OK;
+		sm_fota_info = 0;
+	}
+
+	sm_fota_type = SM_FOTA_TYPE_MCUBOOT_BL;
+	sm_fota_stage = FOTA_STAGE_COMPLETE;
+	sm_fota_bl_pending_validate = false;
+#endif
 }
 
 #if defined(CONFIG_LWM2M_CARRIER)
@@ -482,7 +535,7 @@ bool lwm2m_os_dfu_application_update_validate(void)
 void sm_fota_post_process(void)
 {
 #if defined(CONFIG_LWM2M_CARRIER)
-	if ((sm_fota_type == DFU_TARGET_IMAGE_TYPE_MCUBOOT) &&
+	if ((sm_fota_type == SM_FOTA_TYPE_APP || sm_fota_type == SM_FOTA_TYPE_MCUBOOT_BL) &&
 	    (sm_fota_status == FOTA_STATUS_OK) &&
 	    (sm_fota_stage == FOTA_STAGE_COMPLETE)) {
 		carrier_app_fota_success = true;

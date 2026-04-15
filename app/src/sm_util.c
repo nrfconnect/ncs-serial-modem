@@ -13,6 +13,9 @@
 #include <nrf_errno.h>
 #include <nrf_modem_at.h>
 #include "sm_util.h"
+#include <pm_config.h>
+#include <fw_info.h>
+#include <tfm/tfm_ioctl_api.h>
 
 LOG_MODULE_REGISTER(sm_util, CONFIG_SM_LOG_LEVEL);
 
@@ -523,4 +526,32 @@ bool sm_util_is_cid_active(uint8_t cid)
 	}
 
 	return false;
+}
+
+int sm_util_mcuboot_active_version(uint32_t *version)
+{
+#if !defined(PM_S1_ADDRESS)
+	ARG_UNUSED(version);
+	return -ENOTSUP;
+#else
+	bool s0_active = false;
+	int err = tfm_platform_s0_active(PM_S0_ADDRESS, PM_S1_ADDRESS, &s0_active);
+
+	if (err != 0) {
+		LOG_ERR("%s active slot: %d", "Failed to read MCUboot", err);
+		return err;
+	}
+
+	uint32_t addr = s0_active ? PM_S0_ADDRESS : PM_S1_ADDRESS;
+	struct fw_info info = { 0 };
+
+	err = tfm_platform_firmware_info(addr, &info);
+	if (err != 0) {
+		LOG_ERR("%s fw_info: %d", "Failed to read MCUboot", err);
+		return err;
+	}
+
+	*version = info.version;
+	return 0;
+#endif
 }
