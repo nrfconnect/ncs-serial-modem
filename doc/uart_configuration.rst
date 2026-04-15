@@ -367,7 +367,7 @@ Boot-up scenario
 ================
 
 To boot-up the |SM| application, the host asserts **ENABLE**, **DTR**, and enables its UART (driving |SM| **CTS** low).
-The |SM| firmware initializes within approximately 500 ms, after which it activates its UART and asserts **RTS** to signal readiness.
+The |SM| firmware initializes within approximately 2000 ms, during which it activates its UART and asserts **RTS** to signal readiness.
 |SM| then transmits a ``"Ready"`` message on **TX**, confirming that the link is operational.
 
 .. figure:: images/boot-up-sequence.svg
@@ -378,7 +378,6 @@ The |SM| firmware initializes within approximately 500 ms, after which it activa
 
 The **ENABLE** pin (pin **10** on the nRF9151 SiP) is a high-impedance control input for the nRF9151 internal power management unit (PMU).
 Driving it to a logic high powers on the SiP.
-After **ENABLE** goes high, the |SM| application firmware typically starts within approximately 500 ms.
 Driving it to a logic low brings the device into an extremely low-current state.
 Any internal state not retained in non‑volatile memory is lost, and a full boot-up sequence is required when **ENABLE** is reasserted.
 See `nRF9151 Hardware Design Guidelines — ENABLE`_ for more information about the ENABLE pin.
