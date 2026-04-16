@@ -15,6 +15,7 @@
 enum {
 	/* The command ran successfully and doesn't want the automatic response to be sent. */
 	SILENT_AT_COMMAND_RET = __ELASTERROR,
+	AT_COMMAND_CONTINUE_RET, /**< The AT command continues to execute on background */
 };
 
 /** The maximum allowed length of an AT command/response passed through the Serial Modem */

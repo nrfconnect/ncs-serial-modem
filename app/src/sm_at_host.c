@@ -440,6 +440,12 @@ static void at_pipe_rx_work_fn(struct k_work *work)
 		LOG_WRN("AT pipe RX work: no pipe assigned (ctx: %p)", (void *)ctx);
 		return;
 	}
+
+	/* Do not parse more commands, if we are still executing */
+	if (ctx->executing) {
+		return;
+	}
+
 	/* Set as current context */
 	sm_at_host_set_current_ctx(ctx);
 
@@ -1160,14 +1166,17 @@ static void cmd_send(struct sm_at_host_ctx *ctx, uint8_t *buf, size_t cmd_length
 		return;
 	}
 
-	/* Block URCs while command is executing, even if idle timer triggers */
+	/* Block CMDs & URCs while command is executing, even if idle timer triggers */
 	ctx->executing = true;
 	/* Send to modem.
 	 * Reserve space for CRLF in the response buffer.
 	 */
 	err = nrf_modem_at_cmd(sm_response_buf + strlen(CRLF_STR),
 			       sizeof(sm_response_buf) - strlen(CRLF_STR), "%s", at_cmd);
-	if (err == -SILENT_AT_COMMAND_RET) {
+
+	if (err == -AT_COMMAND_CONTINUE_RET) {
+		return;
+	} else if (err == -SILENT_AT_COMMAND_RET) {
 		ctx->executing = false;
 		return;
 	} else if (err < 0) {
@@ -1195,6 +1204,19 @@ static void cmd_send(struct sm_at_host_ctx *ctx, uint8_t *buf, size_t cmd_length
 		}
 	}
 	ctx->executing = false;
+}
+
+void sm_at_host_cmd_done(struct sm_at_host_ctx *ctx)
+{
+	if (!sm_at_ctx_check(ctx)) {
+		return;
+	}
+	ctx->executing = false;
+
+	/* Continue processing received data, if there is any */
+	if (is_open(ctx)) {
+		k_work_submit_to_queue(&sm_work_q, &ctx->rx_work);
+	}
 }
 
 static size_t cmd_rx_handler(struct sm_at_host_ctx *ctx, uint8_t c)
@@ -1464,6 +1486,16 @@ void urc_send_to(struct modem_pipe *pipe, const char *fmt, ...)
 void rsp_send(const char *fmt, ...)
 {
 	struct sm_at_host_ctx *ctx = sm_at_host_get_current();
+	va_list arg_ptr;
+
+	va_start(arg_ptr, fmt);
+	rsp_send_internal(ctx, false, fmt, arg_ptr);
+	va_end(arg_ptr);
+}
+
+void rsp_send_to(struct modem_pipe *pipe, const char *fmt, ...)
+{
+	struct sm_at_host_ctx *ctx = sm_at_host_get_ctx_from(pipe);
 	va_list arg_ptr;
 
 	va_start(arg_ptr, fmt);
@@ -1834,6 +1866,7 @@ static struct sm_at_host_ctx *sm_at_host_create(struct modem_pipe *pipe)
 	ctx = sm_at_host_get_urc_ctx();
 	if (ctx && atomic_ptr_cas(&ctx->pipe, NULL, pipe)) {
 		LOG_DBG("Reusing first AT host instance %p for pipe %p", (void *)ctx, (void *)pipe);
+		ctx->executing = false;
 		modem_pipe_attach(pipe, at_pipe_event_handler, ctx);
 		if (urcs_queued) {
 			sm_at_host_event_notify(ctx, SM_EVENT_URC);
