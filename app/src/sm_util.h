@@ -224,6 +224,48 @@ static inline bool sm_pipe_is_open(struct modem_pipe *pipe)
 	       Z_MODEM_PIPE_EVENT_OPENED_BIT;
 }
 
+/**
+ * @brief Get the current functional mode of the modem
+ *
+ * @return value from AT+CFUN? or a negative error code on failure
+ */
+int sm_util_cfun_get(void);
+
+/**
+ * @brief Check if modem is in functional mode that allows LTE connectivity
+ *
+ * @return true if modem is in functional mode 1 (normal) or 21 (LTE is activated).
+ * @return false otherwise
+ */
+bool sm_util_cfun_is_lte_enabled(void);
+
+/**
+ * @brief Get the current network registration status of the modem
+ *
+ * @return value from AT+CEREG? or a negative error code on failure
+ */
+int sm_util_cereg_get(void);
+
+/**
+ * @brief Check if modem is registered to a cellular network
+ *
+ * @return true if registered or roaming
+ * @return false if not registered
+ */
+bool sm_util_cereg_is_registered(void);
+
+/**
+ * @brief Check if a PDP context is active
+ *
+ * Use AT+CGPADDR=<cid> to check if the given PDP context have valid address(es),
+ * which is an indication of whether the PDP context is active or not.
+ *
+ * @param[in] cid The PDP context ID.
+ * @return true if the PDP context is active
+ * @return false if the PDP context is not active
+ */
+bool sm_util_is_cid_active(uint8_t cid);
+
 /** @} */
 
 #endif /* SM_UTIL_ */
