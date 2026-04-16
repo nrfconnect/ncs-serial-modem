@@ -25,6 +25,10 @@
 
 LOG_MODULE_REGISTER(sm_ppp, CONFIG_SM_LOG_LEVEL);
 
+#define CONNECT "\r\nCONNECT\r\n"
+#define NO_CARRIER "\r\nNO CARRIER\r\n"
+#define PDN_ACTIVATION_TIMEOUT K_SECONDS(30)
+
 /* This keeps track of whether the user is registered to the CGEV notifications.
  * We need them to know when to start/stop the PPP link, but that should not
  * influence what the user receives, so we do the filtering based on this.
@@ -40,8 +44,11 @@ static struct sockaddr_ll ppp_zephyr_dst_addr;
 static struct modem_pipe *ppp_pipe;
 static struct modem_pipe *ppp_urc_pipe;
 static struct k_thread ppp_data_passing_thread_id;
+static k_timepoint_t ppp_pdn_timeout;
 static K_THREAD_STACK_DEFINE(ppp_data_passing_thread_stack, KB(2));
 static void ppp_data_passing_thread(void*, void*, void*);
+static void sm_ppp_activate_pdp_dwork_fn(struct k_work *work);
+static K_WORK_DELAYABLE_DEFINE(activate_pdp_dwork,  sm_ppp_activate_pdp_dwork_fn);
 
 enum ppp_action {
 	PPP_START,
@@ -435,6 +442,47 @@ static int ppp_stop(enum ppp_reason reason)
 	return 0;
 }
 
+static void ppp_cmd_fail_return_to_at_mode(void)
+{
+	if (!ppp_pipe) {
+		return;
+	}
+	rsp_send_to(ppp_pipe, NO_CARRIER);
+	cmd_done(ppp_pipe);
+	ppp_pipe = NULL;
+}
+
+static void sm_ppp_activate_pdp_dwork_fn(struct k_work *work)
+{
+	if (!sm_util_cereg_is_registered()) {
+		if (sys_timepoint_expired(ppp_pdn_timeout)) {
+			LOG_ERR("Timeout while waiting for network registration");
+			ppp_cmd_fail_return_to_at_mode();
+			return;
+		}
+		k_work_reschedule_for_queue(&sm_work_q, &activate_pdp_dwork, K_SECONDS(1));
+		return;
+	}
+
+	if (!sm_util_is_cid_active(ppp_pdn_cid)) {
+		LOG_DBG("Activating PDP context %u for PPP...", ppp_pdn_cid);
+		int ret = sm_util_at_printf("AT+CGACT=1,%u", ppp_pdn_cid);
+
+		if (ret) {
+			LOG_ERR("Failed to activate PDP context %u for PPP (%d).", ppp_pdn_cid,
+				ret);
+			ppp_cmd_fail_return_to_at_mode();
+			return;
+		}
+	}
+	LOG_DBG("PDP context %u activated for PPP.", ppp_pdn_cid);
+	rsp_send_to(ppp_pipe, CONNECT);
+	sm_at_host_release(sm_at_host_get_ctx_from(ppp_pipe));
+	modem_ppp_attach(&ppp_module, ppp_pipe);
+	sm_ppp_set_auto_start(true);
+	delegate_ppp_event(PPP_START, PPP_REASON_CMD);
+}
+
 /* We need to receive CGEV notifications at all times.
  * CGEREP AT commands are intercepted to prevent the user
  * from unsubcribing us and make that behavior invisible.
@@ -773,6 +821,10 @@ static int handle_at_cgdata(enum at_parser_cmd_type cmd_type, struct at_parser *
 		return -EALREADY;
 	}
 
+	if (!sm_util_cfun_is_lte_enabled()) {
+		return -ENOTCONN;
+	}
+
 	if (ppp_pipe) {
 		sm_ppp_detach();
 	}
@@ -788,12 +840,10 @@ static int handle_at_cgdata(enum at_parser_cmd_type cmd_type, struct at_parser *
 	ppp_pipe = pipe;
 	sm_ppp_keep_pipe_attached = false;
 	ppp_pdn_cid = cid;
-	rsp_send("\r\nCONNECT\r\n");
-	sm_at_host_release(ctx);
-	modem_ppp_attach(&ppp_module, ppp_pipe);
-	sm_ppp_set_auto_start(true);
-	delegate_ppp_event(PPP_START, PPP_REASON_CMD);
-	return -SILENT_AT_COMMAND_RET;
+	/* Do not block the sm_work_q while waiting for PDP context activation */
+	ppp_pdn_timeout = sys_timepoint_calc(PDN_ACTIVATION_TIMEOUT);
+	(void) k_work_reschedule_for_queue(&sm_work_q, &activate_pdp_dwork, K_NO_WAIT);
+	return -AT_COMMAND_CONTINUE_RET;
 }
 
 static void ppp_data_passing_thread(void*, void*, void*)
