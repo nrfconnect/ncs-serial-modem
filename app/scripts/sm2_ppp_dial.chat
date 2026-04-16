@@ -1,0 +1,31 @@
+#
+# Copyright (c) 2026 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+# This is a chat(8) script for nRF91 Serial Modem v2.0.0 or later
+#
+# Connect to default PDN and start PPP
+#
+# Parameters are delivered in environment variables:
+#  * TIMEOUT    AT command timeout, seconds
+#
+
+ABORT ERROR
+ABORT +CME\sERROR:
+ABORT +CEER:
+ABORT +CNEC_EMM:
+ABORT +CNEC_ESM:
+
+#
+# Check AT channel
+#
+TIMEOUT 1
+''
+AT OK
+
+#
+# Connect to network and start PPP
+#
+AT+CFUN=1 TIMEOUT $TIMEOUT OK
+AT+CGDATA CONNECT
