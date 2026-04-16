@@ -463,3 +463,64 @@ int sm_util_pdn_dynamic_info_get(uint8_t cid, struct sm_pdn_dynamic_info *pdn_in
 
 	return 0;
 }
+
+int sm_util_cfun_get(void)
+{
+	int ret;
+	int cfun_mode;
+
+	ret = sm_util_at_scanf("AT+CFUN?", "+CFUN: %d", &cfun_mode);
+	if (ret < 0) {
+		LOG_ERR("Failed to get CFUN mode, err %d", ret);
+		return ret;
+	}
+
+	return cfun_mode;
+}
+
+bool sm_util_cfun_is_lte_enabled(void)
+{
+	int cfun_mode = sm_util_cfun_get();
+
+	if (cfun_mode < 0) {
+		return false;
+	}
+
+	return (cfun_mode == LTE_LC_FUNC_MODE_NORMAL || cfun_mode == LTE_LC_FUNC_MODE_ACTIVATE_LTE);
+}
+
+int sm_util_cereg_get(void)
+{
+	int ret;
+	int creg_stat;
+
+	ret = sm_util_at_scanf("AT+CEREG?", "+CEREG: %*d,%d", &creg_stat);
+	if (ret < 0) {
+		LOG_ERR("Failed to get CEREG status, err %d", ret);
+		return ret;
+	}
+
+	return creg_stat;
+}
+
+bool sm_util_cereg_is_registered(void)
+{
+	int creg_stat = sm_util_cereg_get();
+
+	return (creg_stat == 1 || creg_stat == 5);
+}
+
+bool sm_util_is_cid_active(uint8_t cid)
+{
+	int ret;
+	char at_cmd_buf[sizeof("AT+CGPADDR=###")];
+	int active_cid;
+
+	(void)snprintf(at_cmd_buf, sizeof(at_cmd_buf), "AT+CGPADDR=%u", cid);
+	ret = sm_util_at_scanf(at_cmd_buf, "+CGPADDR: %d", &active_cid);
+	if (ret == 1 && active_cid == cid) {
+		return true;
+	}
+
+	return false;
+}

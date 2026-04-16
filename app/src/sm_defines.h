@@ -13,9 +13,10 @@
 #define INVALID_SOCKET       -1
 
 enum {
-	/* The command ran successfully and doesn't want the automatic response to be sent. */
+	/** The command ran successfully and doesn't want the automatic response to be sent. */
 	SILENT_AT_COMMAND_RET = __ELASTERROR,
-	AT_COMMAND_CONTINUE_RET, /**< The AT command continues to execute on background */
+	/** The AT command continues to execute on background */
+	AT_COMMAND_CONTINUE_RET,
 };
 
 /** The maximum allowed length of an AT command/response passed through the Serial Modem */
