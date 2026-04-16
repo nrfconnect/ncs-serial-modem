@@ -1,0 +1,38 @@
+#
+# Copyright (c) 2026 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+# This is a chat(8) script for nRF91 Serial Modem v2.0.0 or later
+#
+# Connect to specified PDN and start PPP
+#
+# PDN information is delivered in environment variables:
+#  * CID        Context number, integer 1-10
+#  * PDP_TYPE   Protocol type, string, one of "IP", "IPV6", "IPV4V6"
+#  * APN        Access Point Name, string. Example "internet"
+#  * TIMEOUT    AT command timeout, seconds
+
+ABORT ERROR
+ABORT +CME\sERROR:
+ABORT +CEER:
+ABORT +CNEC_EMM:
+ABORT +CNEC_ESM:
+
+#
+# Check AT channel
+#
+TIMEOUT 1
+''
+AT OK
+
+#
+# Define PDN
+#
+AT+CGDCONT=$CID,"$PDP_TYPE","$APN" OK
+
+#
+# Connect to network and start PPP
+#
+AT+CFUN=1 TIMEOUT $TIMEOUT OK
+AT+CGDATA="PPP",$CID CONNECT
