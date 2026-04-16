@@ -84,6 +84,15 @@ void sm_at_host_uninit(void);
 void rsp_send(const char *fmt, ...);
 
 /**
+ * @brief Send AT command response to a specific modem pipe
+ *
+ * @param pipe Modem pipe to send the response through
+ * @param fmt Response message format string
+ *
+ */
+void rsp_send_to(struct modem_pipe *pipe, const char *fmt, ...);
+
+/**
  * @brief Send URC to a specific modem pipe.
  *
  * This is safe to call with NULL pointer for pipe, in which case message is dropped.
@@ -149,6 +158,8 @@ bool in_at_mode_ctx(struct sm_at_host_ctx *ctx);
 bool in_at_mode_pipe(struct modem_pipe *pipe);
 bool is_idle_ctx(struct sm_at_host_ctx *ctx);
 bool is_idle_pipe(struct modem_pipe *pipe);
+bool is_open_pipe(struct modem_pipe *pipe);
+bool is_open_ctx(struct sm_at_host_ctx *ctx);
 
 /**
  * @brief Check whether AT host context is in data mode
@@ -312,6 +323,24 @@ static inline struct modem_pipe *sm_at_host_get_urc_pipe(void)
 {
 	return sm_at_host_get_pipe(sm_at_host_get_urc_ctx());
 }
+
+/**
+ * @brief Mark the background execution of AT command as completed.
+ *
+ * @param ctx AT host context
+ */
+void sm_at_host_cmd_done(struct sm_at_host_ctx *ctx);
+
+static inline void sm_at_host_cmd_done_pipe(struct modem_pipe *pipe)
+{
+	return sm_at_host_cmd_done(sm_at_host_get_ctx_from(pipe));
+}
+
+#define cmd_done(X) \
+		_Generic((X), \
+			struct sm_at_host_ctx * : sm_at_host_cmd_done, \
+			struct modem_pipe * : sm_at_host_cmd_done_pipe \
+			)(X)
 
 /**
  * @brief Submit a work to be executed when the current AT command processing is done.
