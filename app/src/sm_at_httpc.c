@@ -552,6 +552,12 @@ static bool http_headers_complete(struct http_request *req, char *header_end,
 	req->headers_complete = true;
 	req->state = HTTP_STATE_RECEIVING_BODY;
 
+	/* Adjust total_received to count only body bytes, not header bytes.
+	 * Must be done before any early return so that #XHTTPCSTAT always
+	 * reports body bytes (0 for HEAD/204/304, actual body for others).
+	 */
+	req->total_received -= body_offset;
+
 	http_send_headers_complete(req);
 
 	/* HEAD responses never carry a body (RFC 9110 §9.3.2). Finish now. */
@@ -567,9 +573,6 @@ static bool http_headers_complete(struct http_request *req, char *header_end,
 		http_finish_request(req);
 		return true;
 	}
-
-	/* Adjust total_received to only count body bytes */
-	req->total_received -= body_offset;
 
 	if (req->manual_mode) {
 		/*
