@@ -81,7 +81,7 @@ jobs:
           ./nrfutil toolchain-manager launch --chdir serial_modem -- west twister -T . -v --inline-logs --overflow-as-errors --all
 
       - name: Zip build artifacts
-        if: ${{ inputs.trigger_source == 'release-workflow' }}
+        if: ${{ github.event_name == 'schedule' || inputs.trigger_source == 'release-workflow' }}
         working-directory: serial_modem
         run: |
           mkdir -p artifacts
@@ -135,7 +135,7 @@ jobs:
           zip_artifacts "sm_ppp_shell" "${NRF54L15DK_DIR}/sm_ppp_shell/sample.sm_ppp_shell" "sm_ppp_shell_${VERSION}_nrf54l15dk" 1
 
       - name: Upload artifacts
-        if: ${{ inputs.trigger_source == 'release-workflow' }}
+        if: ${{ github.event_name == 'schedule' || inputs.trigger_source == 'release-workflow' }}
         uses: actions/upload-artifact@v4
         with:
           path: |
