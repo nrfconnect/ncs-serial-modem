@@ -126,7 +126,7 @@ static void sms_concat_handle(struct sms_data *const data)
 	if (header->concatenated.seq_number == 1) {
 		sprintf(sms_ctx.concat_rsp_buf,
 			"\r\n#XSMS: \"%02d-%02d-%02d %02d:%02d:%02d "
-			"UTC%+03d:%02d\",\"%s\",\"%s\"",
+			"UTC%+03d:%02d\",\"%s\",\"%s",
 			header->time.year, header->time.month, header->time.day,
 			header->time.hour, header->time.minute, header->time.second,
 			header->time.timezone * 15 / 60,
