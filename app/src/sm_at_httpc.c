@@ -584,7 +584,7 @@ static bool http_headers_complete(struct http_request *req, char *header_end,
 		/*
 		 * Keep piggybacked body bytes (if any) for the first pull.
 		 * Stop XAPOLL so only the host drives reception via
-		 * AT#XHTTPCDATA=<socket_fd>.
+		 * AT#XHTTPCDATA=<handle>.
 		 */
 		if (body_len > 0)
 			memmove(req->recv_buf, req->recv_buf + body_offset, body_len);
@@ -992,7 +992,7 @@ STATIC int handle_at_httpcreq(enum at_parser_cmd_type cmd_type, struct at_parser
 		/* Validate socket exists */
 		sock = find_socket(socket_fd);
 		if (!sock) {
-			LOG_ERR("Invalid socket FD: %d", socket_fd);
+			LOG_ERR("Invalid socket fd: %d", socket_fd);
 			return -EINVAL;
 		}
 
@@ -1191,7 +1191,7 @@ STATIC int handle_at_httpcreq(enum at_parser_cmd_type cmd_type, struct at_parser
 	}
 
 	case AT_PARSER_CMD_TYPE_TEST:
-		rsp_send("\r\n#XHTTPCREQ: <socket_fd>,<url>,<method>"
+		rsp_send("\r\n#XHTTPCREQ: <handle>,<url>,<method>"
 			 "[,<auto_reception>[,<body_len>[,<header>]...]]\r\n");
 
 		err = 0;
@@ -1325,7 +1325,7 @@ STATIC int handle_at_httpcdata(enum at_parser_cmd_type cmd_type, struct at_parse
 	}
 
 	case AT_PARSER_CMD_TYPE_TEST:
-		rsp_send("\r\n#XHTTPCDATA: <socket_fd>[,<length>]\r\n");
+		rsp_send("\r\n#XHTTPCDATA: <handle>[,<length>]\r\n");
 
 		err = 0;
 		break;
@@ -1371,7 +1371,7 @@ STATIC int handle_at_httpccancel(enum at_parser_cmd_type cmd_type, struct at_par
 		break;
 
 	case AT_PARSER_CMD_TYPE_TEST:
-		rsp_send("\r\n#XHTTPCCANCEL: <socket_fd>\r\n");
+		rsp_send("\r\n#XHTTPCCANCEL: <handle>\r\n");
 		break;
 
 	default:
