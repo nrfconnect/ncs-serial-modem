@@ -444,6 +444,12 @@ static void http_send_status(struct http_request *req)
 		 req->total_received);
 }
 
+/* Send cancel status URC with bytes already delivered to host */
+static void http_send_cancel_status(struct http_request *req)
+{
+	urc_send_to(req->pipe, "\r\n#XHTTPCSTAT: %d,-1,%d\r\n", req->fd, req->bytes_sent);
+}
+
 /* Send error and close request */
 static void http_fail_request(struct http_request *req)
 {
@@ -1354,7 +1360,8 @@ STATIC int handle_at_httpccancel(enum at_parser_cmd_type cmd_type, struct at_par
 		req = find_request(socket_fd);
 		if (req) {
 			LOG_INF("Cancelling HTTP request fd=%d", socket_fd);
-			http_fail_request(req);
+			http_send_cancel_status(req);
+			http_close_request(req);
 			k_mutex_unlock(&http_mutex);
 		} else {
 			k_mutex_unlock(&http_mutex);
