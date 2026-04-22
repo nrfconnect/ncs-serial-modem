@@ -231,6 +231,99 @@ Migration example:
         AT#XRECV=2,0,0,10         // Receive data from socket handle 2 with mode 0, no flags, 10s timeout
         AT#XCLOSE=1               // Close socket handle 1
 
+HTTP client changes
+-------------------
+
+The HTTP client has been redesigned from a dedicated connection-oriented interface to a socket-based interface.
+The old |NCS| SLM HTTP client kept its own HTTP connection state with ``AT#XHTTPCCON``, sent requests with ``AT#XHTTPCREQ``, and delivered the raw HTTP response stream followed by ``#XHTTPCRSP`` notifications.
+In |SM|, the HTTP client reuses Socket AT commands for transport setup and provides dedicated HTTP AT commands for requests and notifications, including headers, body data, and completion status.
+
+The following is the list of changes:
+
+* Removed ``AT#XHTTPCCON``.
+
+  * Create a plain TCP socket with ``AT#XSOCKET`` or a TLS socket with ``AT#XSSOCKET``.
+  * Configure TLS options such as security tag and peer verification with ``AT#XSSOCKETOPT``.
+  * Establish the transport connection with ``AT#XCONNECT=<handle>,<host>,<port>``.
+  * Close the connection with ``AT#XCLOSE`` when no more requests are needed.
+
+* Updated ``AT#XHTTPCREQ`` to operate on an already connected socket.
+
+  * Old syntax: ``AT#XHTTPCREQ=<method>,<resource>[,<headers>[,<content_type>,<content_length>[,<chunked_transfer>]]]``
+  * New syntax: ``AT#XHTTPCREQ=<handle>,<url>,<method>[,<auto_reception>[,<body_len>[,<header 1>[,<header 2>[...]]]]]``
+
+* Changed request parameter model.
+
+  * ``<method>`` changed from a string such as ``"GET"`` or ``"POST"`` to an integer:
+
+    * ``0`` - GET
+    * ``1`` - POST
+    * ``2`` - PUT
+    * ``3`` - DELETE
+    * ``4`` - HEAD
+
+  * ``<resource>`` is replaced by a full ``<url>`` parameter.
+  * Optional headers are no longer passed as one CRLF-delimited string.
+    Each header is now passed as a separate optional parameter.
+  * For POST and PUT, the body upload length is given with ``<body_len>``.
+    The command then enters data mode and the host must send exactly that many bytes.
+  * For GET or HEAD requests with extra headers, set ``<body_len>`` to ``0`` as a placeholder before the header parameters.
+
+* Changed response delivery model.
+
+  * Removed the old raw response plus ``#XHTTPCRSP: <received_byte_count>,<state>`` framing.
+  * Response headers are now reported with ``#XHTTPCHEAD: <handle>,<status_code>,<content_length>``.
+  * In automatic mode, response body chunks are reported with ``#XHTTPCDATA: <handle>,<offset>,<length>`` and the raw body bytes follow immediately.
+  * In manual mode, the host pulls body chunks explicitly with ``AT#XHTTPCDATA=<handle>[,<length>]``.
+  * Request completion including failure, timeout, or cancel is reported with ``#XHTTPCSTAT: <handle>,<status_code>,<total_bytes>``.
+
+* Added request cancellation with ``AT#XHTTPCCANCEL=<handle>``.
+
+Migration example:
+
+     Old approach (|NCS| SLM):
+
+     .. code-block::
+
+        AT#XHTTPCCON=1,"postman-echo.com",80
+        #XHTTPCCON: 1
+        OK
+
+        AT#XHTTPCREQ="GET","/get?foo1=bar1&foo2=bar2"
+        OK
+        #XHTTPCREQ: 0
+
+        HTTP/1.1 200 OK
+        <headers>
+
+        #XHTTPCRSP: 244,1
+        <244 bytes of body>
+
+     New approach (|SM|):
+
+     .. code-block::
+
+        AT#XSOCKET=1,1,0
+        #XSOCKET: 0,1,6
+        OK
+
+        AT#XCONNECT=0,"postman-echo.com",80
+        #XCONNECT: 0,1
+        OK
+
+        AT#XHTTPCREQ=0,"http://postman-echo.com/get?foo1=bar1&foo2=bar2",0
+        #XHTTPCREQ: 0
+        OK
+
+        #XHTTPCHEAD: 0,200,244
+
+        #XHTTPCDATA: 0,0,244
+        <244 bytes of body>
+
+        #XHTTPCSTAT: 0,200,244
+
+For full details of the new interface, see :ref:`SM_AT_HTTPC` and :ref:`SM_AT_SOCKET`.
+
 PPP connection management changes
 ---------------------------------
 
@@ -589,7 +682,6 @@ If you need any of those features with this |SM|, please contact customer suppor
 
          OK
 
-  * HTTP client functionality, including ``AT#XHTTPCCON`` and ``AT#XHTTPCREQ`` commands, and ``#XHTTPCRSP`` notification.
   * FTP and TFTP clients, including ``AT#XFTP`` and ``AT#XTFTP`` commands.
   * The ``AT#XGPIO`` AT command.
   * The ``AT#XPOLL`` command.

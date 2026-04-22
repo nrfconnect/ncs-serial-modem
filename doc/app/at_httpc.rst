@@ -35,10 +35,10 @@ Syntax
 
 ::
 
-   AT#XHTTPCREQ=<socket_fd>,<url>,<method>[,<auto_reception>[,<body_len>[,<header 1>[,<header 2>[...]]]]]
+   AT#XHTTPCREQ=<handle>,<url>,<method>[,<auto_reception>[,<body_len>[,<header 1>[,<header 2>[...]]]]]
 
-* The ``<socket_fd>`` parameter is an integer.
-  It identifies the connected socket file descriptor returned by ``AT#XSOCKET`` or ``AT#XSSOCKET``.
+* The ``<handle>`` parameter is an integer.
+  It identifies the connected socket handle returned by ``AT#XSOCKET`` or ``AT#XSSOCKET``, and connected by ``AT#XCONNECT``.
 
 * The ``<url>`` parameter is a string.
   It specifies the full URL of the request, for example, ``http://host/path`` or ``https://host/path``.
@@ -91,10 +91,10 @@ Response syntax
 
 ::
 
-   #XHTTPCREQ: <socket_fd>
+   #XHTTPCREQ: <handle>
    OK
 
-* The ``<socket_fd>`` parameter is an integer.
+* The ``<handle>`` parameter is an integer.
   It identifies the socket.
 
 Unsolicited notification
@@ -102,9 +102,9 @@ Unsolicited notification
 
 ``#XHTTPCHEAD`` is emitted when response headers have been parsed::
 
-   #XHTTPCHEAD: <socket_fd>,<status_code>,<content_length>
+   #XHTTPCHEAD: <handle>,<status_code>,<content_length>
 
-* The ``<socket_fd>`` parameter is an integer.
+* The ``<handle>`` parameter is an integer.
   It identifies the socket.
 * The ``<status_code>`` parameter is an integer.
   It contains the HTTP status code returned by the server.
@@ -113,11 +113,11 @@ Unsolicited notification
 
 ``#XHTTPCDATA`` is emitted in automatic mode for each received body chunk::
 
-   #XHTTPCDATA: <socket_fd>,<offset>,<length>
+   #XHTTPCDATA: <handle>,<offset>,<length>
 
 The notification line is terminated with ``\r\n`` and the raw body bytes follow immediately with no additional separator.
 
-* The ``<socket_fd>`` parameter is an integer.
+* The ``<handle>`` parameter is an integer.
   It identifies the socket.
 * The ``<offset>`` parameter is an integer.
   It contains the number of body bytes already delivered before this chunk.
@@ -126,9 +126,9 @@ The notification line is terminated with ``\r\n`` and the raw body bytes follow 
 
 ``#XHTTPCSTAT`` is emitted when the request completes, fails, or is cancelled::
 
-   #XHTTPCSTAT: <socket_fd>,<status_code>,<total_bytes>
+   #XHTTPCSTAT: <handle>,<status_code>,<total_bytes>
 
-* The ``<socket_fd>`` parameter is an integer.
+* The ``<handle>`` parameter is an integer.
   It identifies the socket.
 * The ``<status_code>`` parameter is an integer.
   It contains the HTTP status code on success, or ``-1`` on failure, cancel, or timeout.
@@ -252,7 +252,7 @@ Response syntax
 
 ::
 
-   #XHTTPCREQ: <socket_fd>,<url>,<method>[,<auto_reception>[,<body_len>[,<header>]...]]
+   #XHTTPCREQ: <handle>,<url>,<method>[,<auto_reception>[,<body_len>[,<header>]...]]
 
 Example
 ~~~~~~~
@@ -260,7 +260,7 @@ Example
 ::
 
    AT#XHTTPCREQ=?
-   #XHTTPCREQ: <socket_fd>,<url>,<method>[,<auto_reception>[,<body_len>[,<header>]...]]
+   #XHTTPCREQ: <handle>,<url>,<method>[,<auto_reception>[,<body_len>[,<header>]...]]
    OK
 
 HTTP data pull #XHTTPCDATA
@@ -278,9 +278,9 @@ Syntax
 
 ::
 
-   AT#XHTTPCDATA=<socket_fd>[,<length>]
+   AT#XHTTPCDATA=<handle>[,<length>]
 
-* The ``<socket_fd>`` parameter is an integer.
+* The ``<handle>`` parameter is an integer.
   It identifies the socket used when starting the manual-mode request.
 
 * The ``<length>`` parameter is an optional integer.
@@ -292,7 +292,7 @@ Response syntax
 
 When body data is available::
 
-   #XHTTPCDATA: <socket_fd>,<offset>,<length>
+   #XHTTPCDATA: <handle>,<offset>,<length>
    <length bytes of raw body data>
    OK
 
@@ -302,10 +302,10 @@ The ``#XHTTPCDATA:`` line is terminated with ``\r\n``.
 
 When the socket buffer is temporarily empty (EAGAIN)::
 
-   #XHTTPCDATA: <socket_fd>,<offset>,0
+   #XHTTPCDATA: <handle>,<offset>,0
    OK
 
-* The ``<socket_fd>`` parameter is an integer.
+* The ``<handle>`` parameter is an integer.
   It identifies the socket.
 * The ``<offset>`` parameter is an integer.
   It contains the number of body bytes already delivered before this pull.
@@ -319,8 +319,8 @@ when the ``Content-Length`` bytes have all been forwarded.
 
 .. note::
 
-   Retry the pull after a brief delay when ``#XHTTPCDATA: <socket_fd>,<offset>,0`` is received.
-   Use ``AT#XHTTPCCANCEL=<socket_fd>`` to cancel if no more data is needed.
+   Retry the pull after a brief delay when ``#XHTTPCDATA: <handle>,<offset>,0`` is received.
+   Use ``AT#XHTTPCCANCEL=<handle>`` to cancel if no more data is needed.
 
 Example
 ~~~~~~~
@@ -356,7 +356,7 @@ Response syntax
 
 ::
 
-   #XHTTPCDATA: <socket_fd>[,<length>]
+   #XHTTPCDATA: <handle>[,<length>]
 
 Example
 ~~~~~~~
@@ -364,7 +364,7 @@ Example
 ::
 
    AT#XHTTPCDATA=?
-   #XHTTPCDATA: <socket_fd>[,<length>]
+   #XHTTPCDATA: <handle>[,<length>]
    OK
 
 Idle timeout
@@ -377,7 +377,7 @@ The timer resets each time data is sent or received:
 * Receiving response headers or body bytes.
 * Pulling a body chunk in manual mode (``AT#XHTTPCDATA``).
 
-If no such activity occurs within the configured window, the request is aborted and ``#XHTTPCSTAT: <socket_fd>,-1,<total_bytes>`` is emitted.
+If no such activity occurs within the configured window, the request is aborted and ``#XHTTPCSTAT: <handle>,-1,<total_bytes>`` is emitted.
 The timeout is enforced by a background timer that fires independently of normal socket poll events, so a server that stalls silently (no TCP RST or FIN) is also detected.
 
 HTTP request cancel #XHTTPCCANCEL
@@ -395,12 +395,12 @@ Syntax
 
 ::
 
-   AT#XHTTPCCANCEL=<socket_fd>
+   AT#XHTTPCCANCEL=<handle>
 
-* The ``<socket_fd>`` parameter is an integer.
+* The ``<handle>`` parameter is an integer.
   It identifies the socket of the request to cancel.
 
-An unsolicited ``#XHTTPCSTAT: <socket_fd>,-1,<total_bytes>`` notification is emitted after cancellation, where ``<total_bytes>`` is the number of response body bytes already delivered to the host.
+An unsolicited ``#XHTTPCSTAT: <handle>,-1,<total_bytes>`` notification is emitted after cancellation, where ``<total_bytes>`` is the number of response body bytes already delivered to the host.
 
 Example
 ~~~~~~~
@@ -428,7 +428,7 @@ Response syntax
 
 ::
 
-   #XHTTPCCANCEL: <socket_fd>
+   #XHTTPCCANCEL: <handle>
 
 Example
 ~~~~~~~
@@ -436,5 +436,5 @@ Example
 ::
 
    AT#XHTTPCCANCEL=?
-   #XHTTPCCANCEL: <socket_fd>
+   #XHTTPCCANCEL: <handle>
    OK
