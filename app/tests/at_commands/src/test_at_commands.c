@@ -294,6 +294,90 @@ void test_ate_echo_control(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 }
 
+/*
+ * Test: AT#XB1SLOT? - read active bootloader slot
+ * Stub reports S0 active, so response should indicate slot 0.
+ */
+void test_xb1slot_read(void)
+{
+	const char *response;
+
+	send_at_command("AT#XB1SLOT?\r\n");
+
+	response = get_captured_response();
+	TEST_ASSERT_TRUE(strstr(response, "#XB1SLOT: 0") != NULL);
+	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
+}
+
+/*
+ * Test: AT#XB1SLOT=? - test command syntax
+ */
+void test_xb1slot_test(void)
+{
+	const char *response;
+
+	send_at_command("AT#XB1SLOT=?\r\n");
+
+	response = get_captured_response();
+	TEST_ASSERT_TRUE(strstr(response, "#XB1SLOT:") != NULL);
+	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
+}
+
+/*
+ * Test: AT#XB1SLOT set - not supported
+ */
+void test_xb1slot_set_not_supported(void)
+{
+	const char *response;
+
+	send_at_command("AT#XB1SLOT=0\r\n");
+
+	response = get_captured_response();
+	TEST_ASSERT_TRUE(strstr(response, "ERROR") != NULL);
+}
+
+/*
+ * Test: AT#XB1VER? - read active bootloader slot version
+ * Stub reports firmware version 0, so response should indicate version 0.
+ */
+void test_xb1ver_read(void)
+{
+	const char *response;
+
+	send_at_command("AT#XB1VER?\r\n");
+
+	response = get_captured_response();
+	TEST_ASSERT_TRUE(strstr(response, "#XB1VER: 0") != NULL);
+	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
+}
+
+/*
+ * Test: AT#XB1VER=? - test command syntax
+ */
+void test_xb1ver_test(void)
+{
+	const char *response;
+
+	send_at_command("AT#XB1VER=?\r\n");
+
+	response = get_captured_response();
+	TEST_ASSERT_TRUE(strstr(response, "#XB1VER:") != NULL);
+	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
+}
+
+/*
+ * Test: AT#XB1VER set - not supported
+ */
+void test_xb1ver_set_not_supported(void)
+{
+	const char *response;
+
+	send_at_command("AT#XB1VER=1\r\n");
+
+	response = get_captured_response();
+	TEST_ASSERT_TRUE(strstr(response, "ERROR") != NULL);
+}
+
 extern int unity_main(void);
 
 int main(void)
