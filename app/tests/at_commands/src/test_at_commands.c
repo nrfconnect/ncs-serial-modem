@@ -294,6 +294,63 @@ void test_ate_echo_control(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 }
 
+/*
+ * Test: AT#XBOOTINFO=0 - query MCUboot version
+ * Stub reports firmware version 0, so response should indicate version 0.
+ */
+void test_xbootinfo_version(void)
+{
+	const char *response;
+
+	send_at_command("AT#XBOOTINFO=0\r\n");
+
+	response = get_captured_response();
+	TEST_ASSERT_TRUE(strstr(response, "#XBOOTINFO: 0") != NULL);
+	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
+}
+
+/*
+ * Test: AT#XBOOTINFO=1 - query active MCUboot slot
+ * Stub reports S0 active, so response should indicate slot 0.
+ */
+void test_xbootinfo_slot(void)
+{
+	const char *response;
+
+	send_at_command("AT#XBOOTINFO=1\r\n");
+
+	response = get_captured_response();
+	TEST_ASSERT_TRUE(strstr(response, "#XBOOTINFO: 0") != NULL);
+	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
+}
+
+/*
+ * Test: AT#XBOOTINFO=2 - invalid op, should return error
+ */
+void test_xbootinfo_invalid_op(void)
+{
+	const char *response;
+
+	send_at_command("AT#XBOOTINFO=2\r\n");
+
+	response = get_captured_response();
+	TEST_ASSERT_TRUE(strstr(response, "ERROR") != NULL);
+}
+
+/*
+ * Test: AT#XBOOTINFO=? - test command syntax
+ */
+void test_xbootinfo_test(void)
+{
+	const char *response;
+
+	send_at_command("AT#XBOOTINFO=?\r\n");
+
+	response = get_captured_response();
+	TEST_ASSERT_TRUE(strstr(response, "#XBOOTINFO: (0,1)") != NULL);
+	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
+}
+
 extern int unity_main(void);
 
 int main(void)
