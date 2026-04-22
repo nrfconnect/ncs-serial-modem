@@ -133,7 +133,8 @@ The notification line is terminated with ``\r\n`` and the raw body bytes follow 
 * The ``<status_code>`` parameter is an integer.
   It contains the HTTP status code on success, or ``-1`` on failure, cancel, or timeout.
 * The ``<total_bytes>`` parameter is an integer.
-  It contains the total number of body bytes received.
+   On successful completion, failure, or timeout, it contains the total number of response body bytes received by the HTTP client.
+   On cancel (``status_code=-1`` from ``AT#XHTTPCCANCEL``), it contains the number of response body bytes already delivered to the host.
 
 .. note::
 
@@ -399,7 +400,7 @@ Syntax
 * The ``<socket_fd>`` parameter is an integer.
   It identifies the socket of the request to cancel.
 
-An unsolicited ``#XHTTPCSTAT: <socket_fd>,-1,<total_bytes>`` notification is emitted after cancellation.
+An unsolicited ``#XHTTPCSTAT: <socket_fd>,-1,<total_bytes>`` notification is emitted after cancellation, where ``<total_bytes>`` is the number of response body bytes already delivered to the host.
 
 Example
 ~~~~~~~
