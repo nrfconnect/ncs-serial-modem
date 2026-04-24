@@ -344,6 +344,15 @@ PPP connection management changes
     * The :file:`overlay-ppp-cmux-linux.conf` overlay file.
       Use the :file:`overlay-ppp.conf` and :file:`overlay-cmux.conf` files instead.
 
+Other changes
+*************
+
+  * ``AT#XNRFCLOUDPOS``:
+
+    * Changed ``<cell_pos>`` parameter to ``<cell_count>``. The meaning changes from no cell positioning, single-cell or multi-cell to the number of cells to beincluded in the location request.
+      ``0`` means that cellular positioning is not requested at all.
+    * The ``AT#XNRFCLOUDPOS`` command has been updated to use the ``AT%NCELLMEAS`` command internally so the host must not use it anymore.
+
 Removed features
 ****************
 
