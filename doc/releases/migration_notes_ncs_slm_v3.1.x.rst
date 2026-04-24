@@ -77,6 +77,15 @@ The |SM| application uses DTR (Data Terminal Ready) and RI (Ring Indicator) pins
 See :ref:`uart_configuration` for more information on how DTR and RI pins work in the |SM| application.
 See :ref:`sm_cellular_modem` for information on how to configure DTR and RI pins when using the |SM| application as a Zephyr modem.
 
+Custom static partition layout migration
+----------------------------------------
+
+The |SM| no longer uses the |NCS| Partition Manager.
+All flash and SRAM partitions are now defined in devicetree overlays instead of ``pm_static_*.yml`` files.
+
+If you maintained a custom ``pm_static_*.yml`` file, recreate the partition layout as a devicetree overlay, using the files in :file:`app/boards/` and :file:`app/overlay-*.overlay` as a reference.
+For a general guide on migrating from Partition Manager to DTS, see the |NCS| `PM to DTS migration <migration_partitions_>`_ page.
+
 Socket AT command changes
 -------------------------
 

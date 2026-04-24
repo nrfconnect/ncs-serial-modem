@@ -124,9 +124,18 @@ static void check_app_fota_status(void)
 		break;
 	/** Swap back to alternate slot. A confirm changes this state to NONE. */
 	case BOOT_SWAP_TYPE_REVERT:
-		/* Happens on a successful application FOTA. */
-		const int ret = boot_write_img_confirmed();
+		/* Happens on a successful application FOTA.
+		 * boot_write_img_confirmed() resolves the flash area via
+		 * zephyr,code-partition = slot0_ns_partition (fa_off=0x18000),
+		 * which places image_ok at abs 0x8dfe0 — 0x8000 past where MCUboot
+		 * reads the trailer. Use boot_write_img_confirmed_multi(0) instead:
+		 * it uses FLASH_AREA_IMAGE_PRIMARY(0) = slot0_partition (fa_off=0x10000),
+		 * writing image_ok at abs 0x85fe0 where MCUboot expects it.
+		 */
+		LOG_INF("FOTA: REVERT detected, calling boot_write_img_confirmed_multi(0)");
+		const int ret = boot_write_img_confirmed_multi(0);
 
+		LOG_INF("FOTA: boot_write_img_confirmed_multi ret=%d", ret);
 		sm_fota_info = ret;
 		sm_fota_status = ret ? FOTA_STATUS_ERROR : FOTA_STATUS_OK;
 		break;
