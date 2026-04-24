@@ -301,14 +301,18 @@ The following configuration files are provided:
   See :ref:`uart_configuration_nrf91m1` for pin details.
 
 * :file:`overlay-carrier.conf` - Configuration file that adds |NCS| `LwM2M carrier`_ support.
+  Used in conjunction with :file:`overlay-carrier.overlay`.
   See :ref:`sm_carrier_library_support` for more information on how to connect to an operator's device management platform.
 
-* :file:`overlay-carrier-softbank.conf` and :file:`sysbuild-softbank.conf` - Configuration files that add SoftBank configurations needed by the carrier library.
+* :file:`overlay-carrier.overlay` - Devicetree overlay that adds a dedicated flash partition for the LwM2M carrier library NVS storage.
   Used in conjunction with :file:`overlay-carrier.conf`.
+
+* :file:`overlay-carrier-softbank.conf` and :file:`sysbuild-softbank.conf` - Configuration files that add SoftBank configurations needed by the carrier library.
+  Used in conjunction with :file:`overlay-carrier.conf` and :file:`overlay-carrier.overlay`.
   For more information, see the `Carrier-specific dependencies`_ section of the `LwM2M carrier`_ documentation.
 
 * :file:`overlay-carrier-lgu.conf` - This configuration file adds LG U+ configurations needed by the carrier library.
-  Used in conjunction with :file:`overlay-carrier.conf`.
+  Used in conjunction with :file:`overlay-carrier.conf` and :file:`overlay-carrier.overlay`.
   For more information, see the `Carrier-specific dependencies`_ section of the `LwM2M carrier`_ documentation.
 
 * :file:`overlay-cmux.conf` - Configuration file that adds support for the CMUX protocol.
@@ -320,17 +324,16 @@ The following configuration files are provided:
 
 * :file:`overlay-trace-backend-cmux.conf` - Configuration file that enables CMUX modem trace backend.
   When enabled, modem traces are transmitted on a dedicated CMUX channel.
+  Must be combined with :file:`overlay-trace-backend.overlay`.
   See the :ref:`sm_modem_trace_cmux` documentation for more information.
 
-* :file:`overlay-trace-backend-uart.conf` - Configuration file that enables the shared UART log and modem trace backend.
-  Both backends start disabled and are activated at runtime using ``AT#XLOG`` and ``AT#XTRACE``.
-  Must be combined with :file:`overlay-trace-backend-uart.overlay`.
+* :file:`overlay-trace-backend-uart.conf` - Configuration file that enables the UART modem trace backend.
+  Backend starts disabled and is activated at runtime using ``AT#XTRACE``.
+  Must be combined with :file:`overlay-trace-backend.overlay`.
   See the :ref:`sm_logging_uart_backend` documentation for more information.
 
-* :file:`overlay-trace-backend-uart.overlay` - Devicetree overlay for the shared UART log and modem trace backend.
-  Routes the logs and modem traces to ``uart1`` (VCOM1 on the nRF9151 DK) at 1000000 baud rate.
-  Must be combined with :file:`overlay-trace-backend-uart.conf`.
-  See the :ref:`sm_logging_uart_backend` documentation for more information.
+* :file:`overlay-trace-backend.overlay` - Devicetree overlay that defines the SRAM partition used by the modem trace backend.
+  Required when using :file:`overlay-trace-backend-uart.conf` or :file:`overlay-trace-backend-cmux.conf`.
 
 * :file:`overlay-memfault.conf` - Configuration file that enables `Memfault`_.
   For more information about Memfault features in |NCS|, see the `Memfault library`_ docs.
@@ -340,26 +343,38 @@ The following configuration files are provided:
      The use of Memfault features in |SM| are `Experimental <Software maturity levels_>`_.
 
 * :file:`overlay-full-fota.conf` - Configuration file that adds full modem FOTA support.
+  Must be combined with :file:`overlay-full-fota.overlay`.
   See :ref:`SM_AT_FOTA` for more information on how to use full modem FOTA functionality.
+
+* :file:`overlay-full-fota.overlay` - Devicetree overlay that adds a dedicated flash partition for modem firmware storage in external flash.
+  Must be combined with :file:`overlay-full-fota.conf`.
+
+* :file:`overlay-pgps.overlay` - Devicetree overlay that adds a dedicated flash partition for P-GPS prediction data storage.
+  The overlay resizes the MCUboot primary and secondary slots to free up space for the ``pgps_partition``.
+  Required when ``CONFIG_NRF_CLOUD_PGPS`` is enabled.
+  Must also be passed to the ``mcuboot`` image using :makevar:`mcuboot_EXTRA_DTC_OVERLAY_FILE` so that MCUboot operates with the same partition layout.
+  The absolute path to the overlay file must be provided.
+  See :ref:`SM_AT_GNSS` for more information.
+
+* :file:`overlay-disable-b0.overlay` - Devicetree overlay for a build configuration without the NSIB (B0) immutable bootloader.
+  This is intended only for upgrading v1.x.x devices to v2.x.x firmware.
+  Must be combined with ``SB_CONFIG_SECURE_BOOT_APPCORE=n`` in the sysbuild configuration and passed to the ``mcuboot`` image using :makevar:`mcuboot_EXTRA_DTC_OVERLAY_FILE` (using the absolute path).
 
 * :file:`overlay-disable-dtr.overlay` - Devicetree overlay that disables the DTR and RI pins and related functionality.
   This overlay can be used if your setup does not have the need or means for managing the power externally.
   Modify the overlay to fit your configuration.
-
-* :file:`overlay-uart1-hwfc.overlay` - Devicetree overlay that enables hardware flow control on UART 1.
-  This is needed when capturing modem traces and application debug logs simultaneously.
-  See the :ref:`sm_logging` documentation for more information.
-
-* :file:`overlay-external-flash.overlay` - Devicetree overlay that enables external flash.
-  This overlay is needed when using full modem FOTA functionality.
-  See the :ref:`SM_AT_FOTA` for more information.
-
-* :file:`pm_static_nrf9151dk_nrf9151_ns_full_fota.yml` - Partition manager static configuration for full modem FOTA functionality.
-  Use ``PM_STATIC_YML_FILE=pm_static_nrf9151dk_nrf9151_ns_full_fota.yml`` compile option to add this file into the build.
-  See the :ref:`SM_AT_FOTA` for more information.
 
 * :file:`overlay-nrf-device-provisioning.conf` - Configuration file that enables the nRF Cloud device provisioning client and its AT command interface.
   See :ref:`SM_AT_PROVISIONING` for more information.
 
 The board-specific devicetree overlays (:file:`boards/*.overlay`) set up configurations that are specific to each supported development kit.
 All of them configure the DTR to be deasserted from a button and RI to drive an LED.
+
+.. _sm_partition_layouts:
+
+Flash and SRAM partition layouts
+********************************
+
+The |SM| application uses DTS-defined partitions instead of the |NCS| Partition Manager.
+The base partition layout for the nRF9151 DK is defined in :file:`boards/nrf9151dk_nrf9151_ns.overlay`.
+Several DTS overlay files extend or replace parts of the layout for specific build configurations.

@@ -215,7 +215,12 @@ Using the LwM2M carrier library
 The application supports the |NCS| `LwM2M carrier`_ library that you can use to connect to the operator's device management platform.
 See the library's documentation for more information and configuration options.
 
-To enable the LwM2M carrier library, add the parameter ``-DEXTRA_CONF_FILE=overlay-carrier.conf`` to your build command.
+To enable the LwM2M carrier library, add the following parameters to your build command:
+
+.. code-block:: none
+
+   -DEXTRA_CONF_FILE=overlay-carrier.conf
+   -DEXTRA_DTC_OVERLAY_FILE=overlay-carrier.overlay
 
 The CA root certificates that are needed for modem FOTA are not provisioned in the |SM| application.
 You can flash the `Cellular: LwM2M carrier`_ sample to write the certificates to modem before flashing the |SM| application, or use the `Cellular: AT Client`_ sample as explained in `preparing the Cellular: LwM2M Client sample for production <lwm2m_client_provisioning_>`_.
@@ -235,3 +240,23 @@ The certificate provisioning can also be done directly in the |SM| application b
 
 When the `LwM2M carrier`_ library is in use, by default the application will auto-connect to the network on startup.
 This behavior can be changed by disabling the :ref:`CONFIG_SM_AUTO_CONNECT <CONFIG_SM_AUTO_CONNECT>` option.
+
+.. _sm_build_disable_b0:
+
+Building without the immutable B0 bootloader
+********************************************
+
+By default, the |SM| application uses an immutable bootloader B0 (NSIB) and an upgradeable MCUboot bootloader.
+
+Version 1.x of the |SM| application uses only an upgradeable MCUboot bootloader.
+Building without the B0 bootloader is offered as backwards compatibility option if you want to maintain the same partition layout as in version 1.x.
+
+To build without B0 and with a single, non-updatable MCUboot slot, include :file:`overlay-disable-b0.overlay` in both the application and MCUboot images and disable the secure boot appcore in the sysbuild configuration:
+
+.. code-block:: console
+
+   west build -p -b nrf9151dk/nrf9151/ns -- -DEXTRA_DTC_OVERLAY_FILE=overlay-disable-b0.overlay -Dmcuboot_EXTRA_DTC_OVERLAY_FILE=<path-to-app>/overlay-disable-b0.overlay -DSB_CONFIG_SECURE_BOOT_APPCORE=n
+
+Where ``<path-to-app>`` is the absolute path to the :file:`app` directory.
+
+This configuration removes the ``b0`` and ``s1`` partitions, giving MCUboot a single 64 kB slot.

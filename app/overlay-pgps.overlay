@@ -1,0 +1,75 @@
+/*
+ * Copyright (c) 2026 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+ *
+ * Flash partition overlay for nRF9151DK with PGPS data partition.
+ */
+
+/ {
+	chosen {
+		nordic,pgps_partition = &pgps_partition;
+	};
+};
+
+/delete-node/ &slot0_partition;
+/delete-node/ &slot1_partition;
+
+&flash0 {
+	partitions {
+		ranges;
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		slot0_partition: partition@20000 {
+			compatible = "zephyr,mapped-partition";
+			label = "image-0";
+			reg = <0x20000 0x65000>;
+			ranges = <0x0 0x20000 0x65000>;
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			slot0_s_partition: partition@0 {
+				compatible = "zephyr,mapped-partition";
+				label = "image-0-secure";
+				reg = <0x0 0x8000>;
+			};
+
+			slot0_ns_partition: partition@8000 {
+				compatible = "zephyr,mapped-partition";
+				label = "image-0-nonsecure";
+				reg = <0x8000 0x5D000>;
+			};
+		};
+
+		slot1_partition: partition@85000 {
+			compatible = "zephyr,mapped-partition";
+			label = "image-1";
+			reg = <0x85000 0x64000>;
+			ranges = <0x0 0x85000 0x64000>;
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			slot1_s_partition: partition@0 {
+				compatible = "zephyr,mapped-partition";
+				label = "image-1-secure";
+				reg = <0x0 0x8000>;
+			};
+
+			slot1_ns_partition: partition@8000 {
+				compatible = "zephyr,mapped-partition";
+				label = "image-1-nonsecure";
+				reg = <0x8000 0x5C000>;
+			};
+		};
+
+		pgps_partition: partition@e9000 {
+			compatible = "zephyr,mapped-partition";
+			label = "pgps";
+			reg = <0xe9000 0x14000>;
+			ranges = <0x0 0xe9000 0x14000>;
+			#address-cells = <1>;
+			#size-cells = <1>;
+		};
+	};
+};

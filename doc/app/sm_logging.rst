@@ -61,7 +61,7 @@ See `Testing and optimization`_ for instructions.
    Modem traces captured through UART are corrupted if application logs through RTT are simultaneously captured.
    When capturing modem traces through UART with the `Cellular Monitor app`_ and simultaneously capturing RTT logs, for example, with J-Link RTT Viewer, the modem trace misses packets, and captured packets might have incorrect information.
 
-   If you need to capture modem traces and RTT logs at the same time, enable HW flow control for modem trace UART (``-DEXTRA_DTC_OVERLAY_FILE=overlay-uart1-hwfc.overlay``).
+   If you need to capture modem traces and RTT logs at the same time, enable HW flow control for modem trace UART.
    Otherwise, you can choose not to capture RTT logs.
    Having only RTT logs enabled does not cause this issue.
 
