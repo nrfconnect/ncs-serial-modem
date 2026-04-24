@@ -33,9 +33,7 @@ Syntax
   * ``1`` - Start FOTA for application update.
   * ``2`` - Start FOTA for modem delta update.
   * ``3`` - Start FOTA for full modem update.
-    Can only be used when the :file:`overlay-full-fota.conf` configuration file,
-    :file:`overlay-external-flash.overlay` devicetree overlay, and
-    :file:`PM_STATIC_YML_FILE=pm_static_nrf9151dk_nrf9151_ns_full_fota.yml` compile option are used.
+    Can only be used when the :file:`overlay-full-fota.conf` configuration file and :file:`overlay-full-fota.overlay` devicetree overlay are used.
   * ``5`` - Start FOTA for MCUboot second-stage bootloader update.
     Only available when the device uses the NSIB (B0) and MCUboot as a second-stage bootloader.
 

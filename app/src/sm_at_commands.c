@@ -16,7 +16,6 @@
 #include <zephyr/types.h>
 #include <dfu/dfu_target.h>
 #include <tfm/tfm_ioctl_api.h>
-#include <pm_config.h>
 #include <modem/at_parser.h>
 #include <modem/lte_lc.h>
 #include <modem/modem_jwt.h>
@@ -336,9 +335,6 @@ STATIC int handle_at_xbootinfo(enum at_parser_cmd_type cmd_type, struct at_parse
 {
 	ARG_UNUSED(param_count);
 
-#if !defined(PM_S1_ADDRESS)
-	return -ENOTSUP;
-#else
 	switch (cmd_type) {
 	case AT_PARSER_CMD_TYPE_SET: {
 		uint32_t op = 0;
@@ -357,13 +353,12 @@ STATIC int handle_at_xbootinfo(enum at_parser_cmd_type cmd_type, struct at_parse
 			}
 			rsp_send("\r\n#XBOOTINFO: %u\r\n", version);
 		} else if (op == XBOOTINFO_OP_SLOT) {
-			bool s0_active = false;
+			int ret = sm_util_mcuboot_active_slot();
 
-			err = tfm_platform_s0_active(PM_S0_ADDRESS, PM_S1_ADDRESS, &s0_active);
-			if (err != 0) {
-				return err;
+			if (ret < 0) {
+				return ret;
 			}
-			rsp_send("\r\n#XBOOTINFO: %u\r\n", s0_active ? 0U : 1U);
+			rsp_send("\r\n#XBOOTINFO: %u\r\n", ret);
 		} else {
 			return -EINVAL;
 		}
@@ -376,5 +371,4 @@ STATIC int handle_at_xbootinfo(enum at_parser_cmd_type cmd_type, struct at_parse
 	default:
 		return -EINVAL;
 	}
-#endif
 }

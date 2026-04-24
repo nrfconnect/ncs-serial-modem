@@ -10,10 +10,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <zephyr/net/net_ip.h>
+#include <zephyr/storage/flash_map.h>
 #include <nrf_errno.h>
 #include <nrf_modem_at.h>
 #include "sm_util.h"
-#include <pm_config.h>
 #include <fw_info.h>
 #include <tfm/tfm_ioctl_api.h>
 
@@ -528,30 +528,48 @@ bool sm_util_is_cid_active(uint8_t cid)
 	return false;
 }
 
-int sm_util_mcuboot_active_version(uint32_t *version)
+int sm_util_mcuboot_active_slot(void)
 {
-#if !defined(PM_S1_ADDRESS)
-	ARG_UNUSED(version);
-	return -ENOTSUP;
-#else
+#if FIXED_PARTITION_EXISTS(s1_partition)
 	bool s0_active = false;
-	int err = tfm_platform_s0_active(PM_S0_ADDRESS, PM_S1_ADDRESS, &s0_active);
+	int err = tfm_platform_s0_active(PARTITION_ADDRESS(s0_partition),
+					 PARTITION_ADDRESS(s1_partition), &s0_active);
 
 	if (err != 0) {
 		LOG_ERR("%s active slot: %d", "Failed to read MCUboot", err);
 		return err;
 	}
+	return s0_active ? 0 : 1;
+#else
+	return -ENOTSUP;
+#endif
+}
 
-	uint32_t addr = s0_active ? PM_S0_ADDRESS : PM_S1_ADDRESS;
-	struct fw_info info = { 0 };
+int sm_util_mcuboot_active_version(uint32_t *version)
+{
+#if FIXED_PARTITION_EXISTS(s1_partition)
+	bool s0_active = false;
+	int err = tfm_platform_s0_active(PARTITION_ADDRESS(s0_partition),
+					 PARTITION_ADDRESS(s1_partition), &s0_active);
+
+	if (err != 0) {
+		return err;
+	}
+
+	uint32_t addr = s0_active ? PARTITION_ADDRESS(s0_partition)
+				  : PARTITION_ADDRESS(s1_partition);
+	struct fw_info info = {0};
 
 	err = tfm_platform_firmware_info(addr, &info);
 	if (err != 0) {
-		LOG_ERR("%s fw_info: %d", "Failed to read MCUboot", err);
 		return err;
 	}
 
 	*version = info.version;
 	return 0;
+#else
+	ARG_UNUSED(version);
+	return -ENOTSUP;
+
 #endif
 }
