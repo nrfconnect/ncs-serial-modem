@@ -413,15 +413,87 @@ static uint32_t neighborcell_count_get(const char *at_response)
 	return ncell_count;
 }
 
+static struct lte_lc_ncell *parse_ncellmeas_neighbors(
+	struct at_parser *parser,
+	uint8_t ncell_count,
+	int *curr_index)
+{
+	int err;
+	struct lte_lc_ncell *ncells = NULL;
+	int tmp_int = 0;
+	size_t j = 0;
+
+	if (ncell_count != 0) {
+		/* Allocate room for the parsed neighbor info. */
+		ncells = calloc(ncell_count, sizeof(struct lte_lc_ncell));
+		if (ncells == NULL) {
+			LOG_ERR("OOM: ncells");
+			return NULL;
+		}
+	} else {
+		return NULL;
+	}
+
+	/* Parse neighbors */
+	for (j = 0; j < ncell_count; j++) {
+		/* <n_earfcn[j]> */
+		(*curr_index)++;
+		err = at_parser_num_get(parser, *curr_index, &ncells->earfcn);
+		if (err) {
+			LOG_ERR("Could not parse n_earfcn, error: %d", err);
+			goto error_exit;
+		}
+
+		/* <n_phys_cell_id[j]> */
+		(*curr_index)++;
+		err = at_parser_num_get(parser, *curr_index, &ncells->phys_cell_id);
+		if (err) {
+			LOG_ERR("Could not parse n_phys_cell_id, error: %d", err);
+			goto error_exit;
+		}
+
+		/* <n_rsrp[j]> */
+		(*curr_index)++;
+		err = at_parser_num_get(parser, *curr_index, &tmp_int);
+		if (err) {
+			LOG_ERR("Could not parse n_rsrp, error: %d", err);
+			goto error_exit;
+		}
+		ncells->rsrp = tmp_int;
+
+		/* <n_rsrq[j]> */
+		(*curr_index)++;
+		err = at_parser_num_get(parser, *curr_index, &tmp_int);
+		if (err) {
+			LOG_ERR("Could not parse n_rsrq, error: %d", err);
+			goto error_exit;
+		}
+		ncells->rsrq = tmp_int;
+
+		/* <time_diff[j]> */
+		(*curr_index)++;
+		err = at_parser_num_get(parser, *curr_index, &ncells->time_diff);
+		if (err) {
+			LOG_ERR("Could not parse time_diff, error: %d", err);
+			goto error_exit;
+		}
+	}
+
+	return ncells;
+
+error_exit:
+	free(ncells);
+	return NULL;
+}
+
 static int parse_ncellmeas_gci(const char *at_response, struct lte_lc_cells_info *cells)
 {
 	struct at_parser parser;
-	struct lte_lc_ncell *ncells = NULL;
 	int err, status, tmp_int, len;
 	int16_t tmp_short;
 	char tmp_str[7];
 	int curr_index;
-	size_t i = 0, j = 0, k = 0;
+	size_t i = 0, k = 0;
 
 	/* Count the actual number of parameters in the AT response before
 	 * allocating heap for it. This may save quite a bit of heap as the
@@ -435,18 +507,7 @@ static int parse_ncellmeas_gci(const char *at_response, struct lte_lc_cells_info
 	__ASSERT_NO_MSG(cells != NULL);
 	__ASSERT_NO_MSG(cells->gci_cells != NULL);
 
-	/* Fill the defaults */
-	/* TODO: We don't want to clear the old results but we need to clear the old GCI cells
-	 *       only if there are new ones
-	 */
-	/*cells->gci_cells_count = 0;
-	cells->ncells_count = 0;
-	cells->current_cell.id = LTE_LC_CELL_EUTRAN_ID_INVALID;
-
-	for (i = 0; i < gci_count; i++) {
-		cells->gci_cells[i].id = LTE_LC_CELL_EUTRAN_ID_INVALID;
-		cells->gci_cells[i].timing_advance = LTE_LC_CELL_TIMING_ADVANCE_INVALID;
-	}*/
+	/* We don't want to clear old current cell or GCI cell info */
 
 	/*
 	 * Response format for GCI search types:
@@ -491,8 +552,8 @@ static int parse_ncellmeas_gci(const char *at_response, struct lte_lc_cells_info
 	}
 
 	/* Go through the cells */
-	for (i = 0; curr_index < (param_count - (AT_NCELLMEAS_GCI_CELL_PARAMS_COUNT + 1)) &&
-		    i < gci_count;
+	for (i = 0;
+	     curr_index < (param_count - (AT_NCELLMEAS_GCI_CELL_PARAMS_COUNT + 1)) && i < gci_count;
 	     i++) {
 		struct lte_lc_cell parsed_cell;
 		bool is_serving_cell;
@@ -628,8 +689,6 @@ static int parse_ncellmeas_gci(const char *at_response, struct lte_lc_cells_info
 		parsed_ncells_count = tmp_short;
 
 		if (is_serving_cell) {
-			int to_be_parsed_ncell_count = 0;
-
 			/* This the current/serving cell.
 			 * In practice the <neighbor_count> is always 0 for other than
 			 * the serving cell, i.e. no neigbour cell list is available.
@@ -637,80 +696,11 @@ static int parse_ncellmeas_gci(const char *at_response, struct lte_lc_cells_info
 			 */
 			cells->current_cell = parsed_cell;
 			if (parsed_ncells_count != 0) {
-				/* Allocate room for the parsed neighbor info. */
-				if (parsed_ncells_count > CONFIG_LTE_NEIGHBOR_CELLS_MAX) {
-					to_be_parsed_ncell_count = CONFIG_LTE_NEIGHBOR_CELLS_MAX;
-					incomplete = true;
-					LOG_WRN("Cutting response, because received neigbor cell"
-						" count is bigger than configured max: %d",
-						CONFIG_LTE_NEIGHBOR_CELLS_MAX);
-
-				} else {
-					to_be_parsed_ncell_count = parsed_ncells_count;
-				}
-				ncells = calloc(to_be_parsed_ncell_count,
-						sizeof(struct lte_lc_ncell));
-				if (ncells == NULL) {
-					LOG_WRN("Failed to allocate memory for the ncells"
-						" (continue)");
-					continue;
-				}
-				cells->neighbor_cells = ncells;
-				cells->ncells_count = to_be_parsed_ncell_count;
-			}
-
-			/* Parse neighbors */
-			for (j = 0; j < parsed_ncells_count; j++) {
-				/* If maximum number of cells has been stored, skip the data for
-				 * the remaining ncells to be able to continue from next GCI cell
-				 */
-				if (j >= to_be_parsed_ncell_count) {
-					LOG_WRN("Ignoring ncell");
-					curr_index += 5;
-					continue;
-				}
-				/* <n_earfcn[j]> */
-				curr_index++;
-				err = at_parser_num_get(&parser, curr_index,
-							&cells->neighbor_cells[j].earfcn);
-				if (err) {
-					LOG_ERR("Could not parse n_earfcn, error: %d", err);
-					goto clean_exit;
-				}
-
-				/* <n_phys_cell_id[j]> */
-				curr_index++;
-				err = at_parser_num_get(&parser, curr_index,
-							&cells->neighbor_cells[j].phys_cell_id);
-				if (err) {
-					LOG_ERR("Could not parse n_phys_cell_id, error: %d", err);
-					goto clean_exit;
-				}
-
-				/* <n_rsrp[j]> */
-				curr_index++;
-				err = at_parser_num_get(&parser, curr_index, &tmp_int);
-				if (err) {
-					LOG_ERR("Could not parse n_rsrp, error: %d", err);
-					goto clean_exit;
-				}
-				cells->neighbor_cells[j].rsrp = tmp_int;
-
-				/* <n_rsrq[j]> */
-				curr_index++;
-				err = at_parser_num_get(&parser, curr_index, &tmp_int);
-				if (err) {
-					LOG_ERR("Could not parse n_rsrq, error: %d", err);
-					goto clean_exit;
-				}
-				cells->neighbor_cells[j].rsrq = tmp_int;
-
-				/* <time_diff[j]> */
-				curr_index++;
-				err = at_parser_num_get(&parser, curr_index,
-							&cells->neighbor_cells[j].time_diff);
-				if (err) {
-					LOG_ERR("Could not parse time_diff, error: %d", err);
+				cells->neighbor_cells = parse_ncellmeas_neighbors(
+					&parser, parsed_ncells_count, &curr_index);
+				if (cells->neighbor_cells == NULL) {
+					LOG_ERR("Failed to parse neighbor cells");
+					err = -EFAULT;
 					goto clean_exit;
 				}
 			}
@@ -866,61 +856,12 @@ static int parse_ncellmeas(const char *at_response, struct lte_lc_cells_info *ce
 	if (cells->ncells_count == 0) {
 		goto clean_exit;
 	}
-
-	__ASSERT_NO_MSG(cells->neighbor_cells != NULL);
-
-	/* TODO: Remove this check. Do we need a limit for security reasons.
-	 *       This is coming from modem which we can trust.
-	 */
-	if (cells->ncells_count > CONFIG_LTE_NEIGHBOR_CELLS_MAX) {
-		cells->ncells_count = CONFIG_LTE_NEIGHBOR_CELLS_MAX;
-		incomplete = true;
-		LOG_WRN("Cutting response, because received neigbor cell"
-			" count is bigger than configured max: %d",
-			CONFIG_LTE_NEIGHBOR_CELLS_MAX);
-	}
-
-	/* Neighboring cells */
-	for (size_t i = 0; i < cells->ncells_count; i++) {
-		size_t start_idx =
-			AT_NCELLMEAS_PRE_NCELLS_PARAMS_COUNT + i * AT_NCELLMEAS_N_PARAMS_COUNT;
-
-		/* EARFCN */
-		err = at_parser_num_get(&parser, start_idx + AT_NCELLMEAS_N_EARFCN_INDEX,
-					&cells->neighbor_cells[i].earfcn);
-		if (err) {
-			goto clean_exit;
-		}
-
-		/* Physical cell ID */
-		err = at_parser_num_get(&parser, start_idx + AT_NCELLMEAS_N_PHYS_CELL_ID_INDEX,
-					&cells->neighbor_cells[i].phys_cell_id);
-		if (err) {
-			goto clean_exit;
-		}
-
-		/* RSRP */
-		err = at_parser_num_get(&parser, start_idx + AT_NCELLMEAS_N_RSRP_INDEX, &tmp);
-		if (err) {
-			goto clean_exit;
-		}
-
-		cells->neighbor_cells[i].rsrp = tmp;
-
-		/* RSRQ */
-		err = at_parser_num_get(&parser, start_idx + AT_NCELLMEAS_N_RSRQ_INDEX, &tmp);
-		if (err) {
-			goto clean_exit;
-		}
-
-		cells->neighbor_cells[i].rsrq = tmp;
-
-		/* Time difference */
-		err = at_parser_num_get(&parser, start_idx + AT_NCELLMEAS_N_TIME_DIFF_INDEX,
-					&cells->neighbor_cells[i].time_diff);
-		if (err) {
-			goto clean_exit;
-		}
+	int curr_index = AT_NCELLMEAS_PRE_NCELLS_PARAMS_COUNT;
+	cells->neighbor_cells = parse_ncellmeas_neighbors(&parser, cells->ncells_count, &curr_index);
+	if (cells->neighbor_cells == NULL) {
+		LOG_ERR("Failed to parse neighbor cells");
+		err = -EFAULT;
+		goto clean_exit;
 	}
 
 clean_exit:
@@ -966,23 +907,6 @@ static void at_handler_ncellmeas(const char *response)
 		k_sem_give(&scan_cellular_sem_ncellmeas_evt);
 		return;
 	}
-
-	int ncell_count = neighborcell_count_get(response);
-	nrfcloud_cell_data->ncells_count = ncell_count;
-	
-	LOG_DBG("%%NCELLMEAS notification: neighbor cell count: %d", ncell_count);
-	struct lte_lc_ncell *neighbor_cells = NULL;
-
-	if (ncell_count != 0) {
-		neighbor_cells = calloc(ncell_count, sizeof(struct lte_lc_ncell));
-		if (neighbor_cells == NULL) {
-			LOG_ERR("Failed to allocate memory for neighbor cells");
-			k_sem_give(&scan_cellular_sem_ncellmeas_evt);
-			return;
-		}
-	}
-
-	nrfcloud_cell_data->neighbor_cells = neighbor_cells;
 
 	err = parse_ncellmeas(response, nrfcloud_cell_data);
 	switch (err) {
