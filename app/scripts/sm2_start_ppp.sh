@@ -203,8 +203,12 @@ log_dbg "Attach CMUX channel to modem..."
 chat $CHATOPT -t1 '' "AT+CMUX=0" "OK" >$MODEM <$MODEM
 ldattach GSM0710 $MODEM
 
+# AT_CMUX is the channel where setup commands will be sent and converted into PPP
 AT_CMUX=$(ls /dev/gsmtty* | sort -V | head -n 1)
-log_dbg "AT CMUX:  $AT_CMUX"
+# AT_CMUX_USER is the AT channel that host can use after PPP is set up
+AT_CMUX_USER=$(ls /dev/gsmtty* | sort -V | head -n 2 | tail -n 1)
+log_dbg "AT CMUX:  $AT_CMUX_USER"
+log_dbg "PPP CMUX: $AT_CMUX"
 
 MT_CMUX=""
 if [ $TRACE -gt 0 ]; then
