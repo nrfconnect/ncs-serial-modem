@@ -23,7 +23,6 @@ LOG_MODULE_REGISTER(sm_httpc, CONFIG_SM_LOG_LEVEL);
 #define HTTP_URL_MAX_LEN          512
 #define HTTP_HOST_MAX_LEN         256
 #define HTTP_PATH_MAX_LEN         256
-#define HTTP_REQUEST_BODY_MAX_LEN CONFIG_SM_DATAMODE_BUF_SIZE
 #define HTTP_EXTRA_HEADERS_SIZE   512
 #define HTTP_RESPONSE_TIMEOUT_MS  CONFIG_SM_HTTPC_RESPONSE_TIMEOUT_MS
 #define HTTP_MAX_REQUESTS         NRF_MODEM_MAX_SOCKET_COUNT
@@ -883,12 +882,6 @@ static int http_datamode_callback(uint8_t op, const uint8_t *data, int len, uint
 	int err = 0;
 
 	if (op == DATAMODE_SEND) {
-		if ((flags & SM_DATAMODE_FLAGS_MORE_DATA) != 0) {
-			LOG_ERR("Data mode buffer overflow");
-			exit_datamode_handler(sm_at_host_get_current(), -EOVERFLOW);
-			return -EOVERFLOW;
-		}
-
 		if (!datamode_req) {
 			LOG_ERR("No request for data mode");
 			exit_datamode_handler(sm_at_host_get_current(), -EINVAL);
@@ -1066,9 +1059,8 @@ STATIC int handle_at_httpcreq(enum at_parser_cmd_type cmd_type, struct at_parser
 			if (at_parser_num_get(parser, next_param_idx, &tmp) == 0) {
 				if (method == HTTP_POST || method == HTTP_PUT) {
 					body_len = tmp;
-					if (body_len < 0 || body_len > HTTP_REQUEST_BODY_MAX_LEN) {
-						LOG_ERR("Invalid body_len: %d (max %d)", body_len,
-							HTTP_REQUEST_BODY_MAX_LEN);
+					if (body_len < 0) {
+						LOG_ERR("Invalid body_len: %d", body_len);
 						http_close_request(req);
 						return -EINVAL;
 					}
