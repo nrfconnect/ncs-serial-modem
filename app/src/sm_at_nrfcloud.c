@@ -22,6 +22,16 @@
 
 LOG_MODULE_REGISTER(sm_nrfcloud, CONFIG_SM_LOG_LEVEL);
 
+static K_SEM_DEFINE(sem_date_time, 0, 1);
+static struct modem_pipe *nrfcloud_pipe;
+
+static char nrfcloud_device_id[NRF_CLOUD_CLIENT_ID_MAX_LEN];
+
+bool sm_nrf_cloud_ready;
+bool sm_nrf_cloud_send_location;
+
+#if defined(CONFIG_SM_NRF_CLOUD_LOCATION)
+
 /* NCELLMEAS notification parameters */
 #define AT_NCELLMEAS_STATUS_INDEX	     1
 #define AT_NCELLMEAS_STATUS_VALUE_FAIL	     1
@@ -39,11 +49,6 @@ LOG_MODULE_REGISTER(sm_nrfcloud, CONFIG_SM_LOG_LEVEL);
 #define AT_NCELLMEAS_NCELLS_PARAMS_COUNT     5
 #define AT_NCELLMEAS_GCI_CELL_PARAMS_COUNT   12
 
-static K_SEM_DEFINE(sem_date_time, 0, 1);
-static struct modem_pipe *nrfcloud_pipe;
-
-#if defined(CONFIG_SM_NRF_CLOUD_LOCATION)
-
 /* Whether cellular positioning is requested and if so, which. */
 static uint8_t nrfcloud_cell_count;
 
@@ -53,8 +58,16 @@ static bool nrfcloud_wifi_pos;
 /* Whether a location request is currently being sent to nRF Cloud. */
 static bool nrfcloud_sending_loc_req;
 
-static struct k_work nrfcloud_loc_req_work;
-static struct k_work nrfcloud_conn_work;
+static uint8_t search_type;
+static uint8_t gci_count;
+
+static void nrfcloud_loc_req_work_fn(struct k_work *work);
+static void nrfcloud_conn_work_fn(struct k_work *work);
+
+K_WORK_DEFINE(nrfcloud_loc_req_work, nrfcloud_loc_req_work_fn);
+K_WORK_DEFINE(nrfcloud_conn_work, nrfcloud_conn_work_fn);
+/* Signals completion of an AT%NCELLMEAS measurement (%NCELLMEAS URC). */
+K_SEM_DEFINE(scan_cellular_sem_ncellmeas_evt, 0, 1);
 
 /* Parameters saved before submitting connection work. */
 static bool nrfcloud_connect;
@@ -70,9 +83,6 @@ static struct wifi_scan_info nrfcloud_wifi_data;
 
 #define SCAN_CELLULAR_RRC_IDLE_WAIT_TIME 10
 
-/* Signals completion of an AT+NCELLMEAS measurement (%NCELLMEAS URC). */
-static struct k_sem scan_cellular_sem_ncellmeas_evt;
-
 static K_SEM_DEFINE(entered_rrc_idle, 1, 1);
 
 static void scan_cellular_timeout_backup_work_fn(struct k_work *work);
@@ -80,17 +90,333 @@ K_WORK_DELAYABLE_DEFINE(scan_cellular_timeout_backup_work, scan_cellular_timeout
 
 #endif /* CONFIG_SM_NRF_CLOUD_LOCATION */
 
-static char nrfcloud_device_id[NRF_CLOUD_CLIENT_ID_MAX_LEN];
+static int do_cloud_send_msg(const char *message, int len)
+{
+	int err;
+	const char *resource = "msg/d2c";
 
-bool sm_nrf_cloud_ready;
-bool sm_nrf_cloud_send_location;
+	err = nrf_cloud_coap_post(resource, NULL, message, len, COAP_CONTENT_FORMAT_APP_JSON, true,
+				  NULL, NULL);
+	if (err) {
+		LOG_ERR("nrf_cloud_coap_post JSON message send failed, error: %d", err);
+	}
+
+	return err;
+}
+
+static void on_cloud_ready(void)
+{
+	sm_nrf_cloud_ready = true;
+	urc_send_to(nrfcloud_pipe, "\r\n#XNRFCLOUD: %d,%d\r\n", sm_nrf_cloud_ready,
+		    sm_nrf_cloud_send_location);
+}
+
+static void on_cloud_disconnected(void)
+{
+	sm_nrf_cloud_ready = false;
+	urc_send_to(nrfcloud_pipe, "\r\n#XNRFCLOUD: %d,%d\r\n", sm_nrf_cloud_ready,
+		    sm_nrf_cloud_send_location);
+}
+
+static void date_time_event_handler(const struct date_time_evt *evt)
+{
+	switch (evt->type) {
+	case DATE_TIME_OBTAINED_MODEM:
+	case DATE_TIME_OBTAINED_NTP:
+	case DATE_TIME_OBTAINED_EXT:
+		LOG_DBG("DATE_TIME OBTAINED");
+		k_sem_give(&sem_date_time);
+		break;
+	case DATE_TIME_NOT_OBTAINED:
+		LOG_INF("DATE_TIME_NOT_OBTAINED");
+		break;
+	default:
+		break;
+	}
+}
+
+static int nrf_cloud_datamode_callback(uint8_t op, const uint8_t *data, int len, uint8_t flags)
+{
+	int ret = 0;
+
+	if (op == DATAMODE_SEND) {
+		if ((flags & SM_DATAMODE_FLAGS_MORE_DATA) != 0) {
+			LOG_ERR("Data mode buffer overflow");
+			exit_datamode_handler(sm_at_host_get_current(), -EOVERFLOW);
+			return -EOVERFLOW;
+		}
+		ret = do_cloud_send_msg(data, len);
+		if (ret < 0) {
+			LOG_ERR("Send failed: %d", ret);
+			return ret;
+		}
+		/* Return the amount of data sent. */
+		return len;
+
+	} else if (op == DATAMODE_EXIT) {
+		LOG_DBG("Data mode exit");
+	}
+
+	return 0;
+}
+
+static void nrfcloud_conn_work_fn(struct k_work *work)
+{
+	int err;
+
+	if (nrfcloud_connect) {
+		LOG_DBG("Connecting to nRF Cloud.");
+		err = nrf_cloud_coap_connect(NULL);
+		if (err) {
+			LOG_ERR("Cloud connection failed, error: %d", err);
+			urc_send_to(nrfcloud_pipe, "\r\n#XNRFCLOUD: %d,%d\r\n", 0,
+				    nrfcloud_conn_send_location);
+			return;
+		}
+		sm_nrf_cloud_send_location = nrfcloud_conn_send_location;
+		/* A-GNSS & P-GPS needs date_time, trigger to update current time */
+		date_time_update_async(date_time_event_handler);
+		if (k_sem_take(&sem_date_time, K_SECONDS(10)) != 0) {
+			LOG_WRN("Failed to get current time");
+		}
+		on_cloud_ready();
+	} else {
+		LOG_DBG("Disconnecting from nRF Cloud.");
+		err = nrf_cloud_coap_disconnect();
+		if (err) {
+			LOG_ERR("Cloud disconnection failed, error: %d", err);
+			urc_send_to(nrfcloud_pipe, "\r\n#XNRFCLOUD: %d,%d\r\n", 1,
+				    sm_nrf_cloud_send_location);
+			return;
+		}
+		on_cloud_disconnected();
+	}
+}
+
+SM_AT_CMD_CUSTOM(xnrfcloud, "AT#XNRFCLOUD", handle_at_nrf_cloud);
+static int handle_at_nrf_cloud(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+			       uint32_t param_count)
+{
+	enum sm_nrfcloud_operation {
+		SM_NRF_CLOUD_DISCONNECT,
+		SM_NRF_CLOUD_CONNECT,
+		SM_NRF_CLOUD_SEND,
+	};
+	int err = -EINVAL;
+	uint16_t op;
+	uint16_t send_location = 0;
+
+	switch (cmd_type) {
+	case AT_PARSER_CMD_TYPE_SET:
+		nrfcloud_pipe = sm_at_host_get_current_pipe();
+		err = at_parser_num_get(parser, 1, &op);
+		if (err < 0) {
+			return err;
+		}
+		if (op == SM_NRF_CLOUD_CONNECT && !sm_nrf_cloud_ready) {
+			if (param_count > 2) {
+				err = at_parser_num_get(parser, 2, &send_location);
+				if (send_location != 0 && send_location != 1) {
+					err = -EINVAL;
+				}
+				if (err < 0) {
+					return err;
+				}
+			}
+
+			nrfcloud_connect = true;
+			nrfcloud_conn_send_location = send_location;
+			k_work_submit_to_queue(&sm_work_q, &nrfcloud_conn_work);
+			err = 0;
+		} else if (op == SM_NRF_CLOUD_SEND && sm_nrf_cloud_ready) {
+			/* enter data mode */
+			err = enter_datamode(nrf_cloud_datamode_callback, 0);
+		} else if (op == SM_NRF_CLOUD_DISCONNECT && sm_nrf_cloud_ready) {
+			nrfcloud_connect = false;
+			k_work_submit_to_queue(&sm_work_q, &nrfcloud_conn_work);
+			err = 0;
+		} else {
+			err = -EINVAL;
+		} break;
+
+	case AT_PARSER_CMD_TYPE_READ: {
+		rsp_send("\r\n#XNRFCLOUD: %d,%d,%d,\"%s\"\r\n", sm_nrf_cloud_ready,
+			sm_nrf_cloud_send_location, CONFIG_NRF_CLOUD_SEC_TAG, nrfcloud_device_id);
+		err = 0;
+	} break;
+
+	case AT_PARSER_CMD_TYPE_TEST:
+		rsp_send("\r\n#XNRFCLOUD: (%d,%d,%d),<send_location>\r\n",
+			SM_NRF_CLOUD_DISCONNECT, SM_NRF_CLOUD_CONNECT, SM_NRF_CLOUD_SEND);
+		err = 0;
+		break;
+
+	default:
+		break;
+	}
+
+	return err;
+}
+
+static void sm_at_nrfcloud_init(int ret, void *ctx)
+{
+	static bool initialized;
+	int err;
+
+	if (initialized) {
+		return;
+	}
+	initialized = true;
+
+	err = nrf_cloud_coap_init();
+	if (err) {
+		LOG_ERR("Failed to initialize nRF Cloud CoAP library: %d", err);
+		return;
+	}
+
+	nrf_cloud_client_id_get(nrfcloud_device_id, sizeof(nrfcloud_device_id));
+}
+NRF_MODEM_LIB_ON_INIT(sm_nrfcloud_init_hook, sm_at_nrfcloud_init, NULL);
+
+/****************************************************************/
+/* Cellular positioning, i.e., %NCELLMEAS notification handling */
+/****************************************************************/
 
 #if defined(CONFIG_SM_NRF_CLOUD_LOCATION)
 
-static int parse_ncellmeas_gci(const char *at_response, struct lte_lc_cells_info *cells);
+SM_AT_CMD_CUSTOM(xnrfcloudpos, "AT#XNRFCLOUDPOS", handle_at_nrf_cloud_pos);
+static int handle_at_nrf_cloud_pos(enum at_parser_cmd_type cmd_type,
+				   struct at_parser *parser, uint32_t param_count)
+{
+	int err;
+	uint16_t cell_count = 0;
+	uint16_t wifi_pos = 0;
 
-static uint8_t search_type;
-static uint8_t gci_count;
+	if (cmd_type != AT_PARSER_CMD_TYPE_SET) {
+		return -ENOTSUP;
+	}
+
+	if (!sm_nrf_cloud_ready) {
+		LOG_ERR("Not connected to nRF Cloud.");
+		return -ENOTCONN;
+	}
+
+	if (nrfcloud_sending_loc_req) {
+		/* Avoid potential concurrency issues writing to global variables. */
+		LOG_ERR("nRF Cloud location request sending already ongoing.");
+		return -EBUSY;
+	}
+
+	if (param_count < WIFI_APS_BEGIN_IDX) {
+		return -EINVAL;
+	}
+
+	err = at_parser_num_get(parser, 1, &cell_count);
+	if (err) {
+		return err;
+	}
+
+	err = at_parser_num_get(parser, 2, &wifi_pos);
+	if (err) {
+		return err;
+	}
+
+	if (cell_count > 15 || wifi_pos > 1) {
+		return -EINVAL;
+	}
+
+	if (!cell_count && !wifi_pos) {
+		LOG_ERR("At least one of cellular/Wi-Fi information must be included.");
+		return -EINVAL;
+	}
+
+	if (!wifi_pos && param_count > WIFI_APS_BEGIN_IDX) {
+		/* No Wi-Fi AP allowed if no Wi-Fi positioning. */
+		return -E2BIG;
+	}
+
+	if (wifi_pos) {
+		nrfcloud_wifi_data.ap_info = malloc(
+			sizeof(*nrfcloud_wifi_data.ap_info) * (param_count - WIFI_APS_BEGIN_IDX));
+		if (!nrfcloud_wifi_data.ap_info) {
+			return -ENOMEM;
+		}
+		/* Parse the AP parameters. */
+		nrfcloud_wifi_data.cnt = 0;
+		for (unsigned int param_idx = WIFI_APS_BEGIN_IDX; param_idx < param_count;
+		++param_idx) {
+			struct wifi_scan_result *const ap =
+				&nrfcloud_wifi_data.ap_info[nrfcloud_wifi_data.cnt];
+			char mac_addr_str[WIFI_MAC_ADDR_STR_LEN + 1];
+			unsigned int mac_addr[WIFI_MAC_ADDR_LEN];
+			int32_t rssi = NRF_CLOUD_LOCATION_WIFI_OMIT_RSSI;
+			size_t len;
+
+			++nrfcloud_wifi_data.cnt;
+
+			/* Parse the MAC address. */
+			len = sizeof(mac_addr_str);
+			err = util_string_get(parser, param_idx, mac_addr_str, &len);
+			if (!err && (len != strlen(mac_addr_str)
+				|| sscanf(mac_addr_str, WIFI_MAC_ADDR_TEMPLATE,
+						&mac_addr[0], &mac_addr[1], &mac_addr[2],
+						&mac_addr[3], &mac_addr[4], &mac_addr[5])
+					!= WIFI_MAC_ADDR_LEN)) {
+				err = -EBADMSG; /* A different error code to differentiate. */
+			}
+			if (err) {
+				LOG_ERR("MAC address %u malformed (%d).",
+					nrfcloud_wifi_data.cnt, err);
+				break;
+			}
+			for (unsigned int i = 0; i != WIFI_MAC_ADDR_LEN; ++i) {
+				ap->mac[i] = mac_addr[i];
+			}
+			ap->mac_length = WIFI_MAC_ADDR_LEN;
+
+			/* Parse the RSSI, if present. */
+			if (!at_parser_num_get(parser, param_idx + 1, &rssi)) {
+				++param_idx;
+				const int rssi_min = -128;
+				const int rssi_max = 0;
+
+				if (rssi < rssi_min || rssi > rssi_max) {
+					err = -EINVAL;
+					LOG_ERR("RSSI %u out of bounds ([%d,%d]).",
+						nrfcloud_wifi_data.cnt, rssi_min, rssi_max);
+					break;
+				}
+			}
+			ap->rssi = rssi;
+
+			ap->band     = 0;
+			ap->security = WIFI_SECURITY_TYPE_UNKNOWN;
+			ap->mfp      = WIFI_MFP_UNKNOWN;
+			/* CONFIG_NRF_CLOUD_WIFI_LOCATION_ENCODE_OPT excludes the other members. */
+		}
+
+		if (nrfcloud_wifi_data.cnt < NRF_CLOUD_LOCATION_WIFI_AP_CNT_MIN) {
+			err = -EINVAL;
+			LOG_ERR("Insufficient access point count (got %u, min %u).",
+				nrfcloud_wifi_data.cnt, NRF_CLOUD_LOCATION_WIFI_AP_CNT_MIN);
+		}
+		if (err) {
+			k_free(nrfcloud_wifi_data.ap_info);
+			return err;
+		}
+	}
+
+	nrfcloud_cell_count = cell_count;
+	nrfcloud_wifi_pos = wifi_pos;
+
+	nrfcloud_sending_loc_req = true;
+	if (cell_count >= 1) {
+		scan_cellular_execute(cell_count);
+	} else {
+		k_work_submit_to_queue(&sm_work_q, &nrfcloud_loc_req_work);
+	}
+	return 0;
+}
 
 int string_to_int(const char *str_buf, int base, int *output)
 {
@@ -896,334 +1222,3 @@ static void at_handler_ncellmeas(const char *response)
 	k_sem_give(&scan_cellular_sem_ncellmeas_evt);
 }
 #endif /* CONFIG_SM_NRF_CLOUD_LOCATION */
-
-static int do_cloud_send_msg(const char *message, int len)
-{
-	int err;
-	const char *resource = "msg/d2c";
-
-	err = nrf_cloud_coap_post(resource, NULL, message, len, COAP_CONTENT_FORMAT_APP_JSON, true,
-				  NULL, NULL);
-	if (err) {
-		LOG_ERR("nrf_cloud_coap_post JSON message send failed, error: %d", err);
-	}
-
-	return err;
-}
-
-static void on_cloud_ready(void)
-{
-	sm_nrf_cloud_ready = true;
-	urc_send_to(nrfcloud_pipe, "\r\n#XNRFCLOUD: %d,%d\r\n", sm_nrf_cloud_ready,
-		    sm_nrf_cloud_send_location);
-}
-
-static void on_cloud_disconnected(void)
-{
-	sm_nrf_cloud_ready = false;
-	urc_send_to(nrfcloud_pipe, "\r\n#XNRFCLOUD: %d,%d\r\n", sm_nrf_cloud_ready,
-		    sm_nrf_cloud_send_location);
-}
-
-static void date_time_event_handler(const struct date_time_evt *evt)
-{
-	switch (evt->type) {
-	case DATE_TIME_OBTAINED_MODEM:
-	case DATE_TIME_OBTAINED_NTP:
-	case DATE_TIME_OBTAINED_EXT:
-		LOG_DBG("DATE_TIME OBTAINED");
-		k_sem_give(&sem_date_time);
-		break;
-	case DATE_TIME_NOT_OBTAINED:
-		LOG_INF("DATE_TIME_NOT_OBTAINED");
-		break;
-	default:
-		break;
-	}
-}
-
-static int nrf_cloud_datamode_callback(uint8_t op, const uint8_t *data, int len, uint8_t flags)
-{
-	int ret = 0;
-
-	if (op == DATAMODE_SEND) {
-		if ((flags & SM_DATAMODE_FLAGS_MORE_DATA) != 0) {
-			LOG_ERR("Data mode buffer overflow");
-			exit_datamode_handler(sm_at_host_get_current(), -EOVERFLOW);
-			return -EOVERFLOW;
-		}
-		ret = do_cloud_send_msg(data, len);
-		if (ret < 0) {
-			LOG_ERR("Send failed: %d", ret);
-			return ret;
-		}
-		/* Return the amount of data sent. */
-		return len;
-
-	} else if (op == DATAMODE_EXIT) {
-		LOG_DBG("Data mode exit");
-	}
-
-	return 0;
-}
-
-static void conn_wk(struct k_work *work)
-{
-	int err;
-
-	if (nrfcloud_connect) {
-		LOG_DBG("Connecting to nRF Cloud.");
-		err = nrf_cloud_coap_connect(NULL);
-		if (err) {
-			LOG_ERR("Cloud connection failed, error: %d", err);
-			urc_send_to(nrfcloud_pipe, "\r\n#XNRFCLOUD: %d,%d\r\n", 0,
-				    nrfcloud_conn_send_location);
-			return;
-		}
-		sm_nrf_cloud_send_location = nrfcloud_conn_send_location;
-		/* A-GNSS & P-GPS needs date_time, trigger to update current time */
-		date_time_update_async(date_time_event_handler);
-		if (k_sem_take(&sem_date_time, K_SECONDS(10)) != 0) {
-			LOG_WRN("Failed to get current time");
-		}
-		on_cloud_ready();
-	} else {
-		LOG_DBG("Disconnecting from nRF Cloud.");
-		err = nrf_cloud_coap_disconnect();
-		if (err) {
-			LOG_ERR("Cloud disconnection failed, error: %d", err);
-			urc_send_to(nrfcloud_pipe, "\r\n#XNRFCLOUD: %d,%d\r\n", 1,
-				    sm_nrf_cloud_send_location);
-			return;
-		}
-		on_cloud_disconnected();
-	}
-}
-
-SM_AT_CMD_CUSTOM(xnrfcloud, "AT#XNRFCLOUD", handle_at_nrf_cloud);
-static int handle_at_nrf_cloud(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
-			       uint32_t param_count)
-{
-	enum sm_nrfcloud_operation {
-		SM_NRF_CLOUD_DISCONNECT,
-		SM_NRF_CLOUD_CONNECT,
-		SM_NRF_CLOUD_SEND,
-	};
-	int err = -EINVAL;
-	uint16_t op;
-	uint16_t send_location = 0;
-
-	switch (cmd_type) {
-	case AT_PARSER_CMD_TYPE_SET:
-		nrfcloud_pipe = sm_at_host_get_current_pipe();
-		err = at_parser_num_get(parser, 1, &op);
-		if (err < 0) {
-			return err;
-		}
-		if (op == SM_NRF_CLOUD_CONNECT && !sm_nrf_cloud_ready) {
-			if (param_count > 2) {
-				err = at_parser_num_get(parser, 2, &send_location);
-				if (send_location != 0 && send_location != 1) {
-					err = -EINVAL;
-				}
-				if (err < 0) {
-					return err;
-				}
-			}
-
-			nrfcloud_connect = true;
-			nrfcloud_conn_send_location = send_location;
-			k_work_submit_to_queue(&sm_work_q, &nrfcloud_conn_work);
-			err = 0;
-		} else if (op == SM_NRF_CLOUD_SEND && sm_nrf_cloud_ready) {
-			/* enter data mode */
-			err = enter_datamode(nrf_cloud_datamode_callback, 0);
-		} else if (op == SM_NRF_CLOUD_DISCONNECT && sm_nrf_cloud_ready) {
-			nrfcloud_connect = false;
-			k_work_submit_to_queue(&sm_work_q, &nrfcloud_conn_work);
-			err = 0;
-		} else {
-			err = -EINVAL;
-		} break;
-
-	case AT_PARSER_CMD_TYPE_READ: {
-		rsp_send("\r\n#XNRFCLOUD: %d,%d,%d,\"%s\"\r\n", sm_nrf_cloud_ready,
-			sm_nrf_cloud_send_location, CONFIG_NRF_CLOUD_SEC_TAG, nrfcloud_device_id);
-		err = 0;
-	} break;
-
-	case AT_PARSER_CMD_TYPE_TEST:
-		rsp_send("\r\n#XNRFCLOUD: (%d,%d,%d),<send_location>\r\n",
-			SM_NRF_CLOUD_DISCONNECT, SM_NRF_CLOUD_CONNECT, SM_NRF_CLOUD_SEND);
-		err = 0;
-		break;
-
-	default:
-		break;
-	}
-
-	return err;
-}
-
-#if defined(CONFIG_SM_NRF_CLOUD_LOCATION)
-
-SM_AT_CMD_CUSTOM(xnrfcloudpos, "AT#XNRFCLOUDPOS", handle_at_nrf_cloud_pos);
-static int handle_at_nrf_cloud_pos(enum at_parser_cmd_type cmd_type,
-				   struct at_parser *parser, uint32_t param_count)
-{
-	int err;
-	uint16_t cell_count = 0;
-	uint16_t wifi_pos = 0;
-
-	if (cmd_type != AT_PARSER_CMD_TYPE_SET) {
-		return -ENOTSUP;
-	}
-
-	if (!sm_nrf_cloud_ready) {
-		LOG_ERR("Not connected to nRF Cloud.");
-		return -ENOTCONN;
-	}
-
-	if (nrfcloud_sending_loc_req) {
-		/* Avoid potential concurrency issues writing to global variables. */
-		LOG_ERR("nRF Cloud location request sending already ongoing.");
-		return -EBUSY;
-	}
-
-	if (param_count < WIFI_APS_BEGIN_IDX) {
-		return -EINVAL;
-	}
-
-	err = at_parser_num_get(parser, 1, &cell_count);
-	if (err) {
-		return err;
-	}
-
-	err = at_parser_num_get(parser, 2, &wifi_pos);
-	if (err) {
-		return err;
-	}
-
-	if (cell_count > 15 || wifi_pos > 1) {
-		return -EINVAL;
-	}
-
-	if (!cell_count && !wifi_pos) {
-		LOG_ERR("At least one of cellular/Wi-Fi information must be included.");
-		return -EINVAL;
-	}
-
-	if (!wifi_pos && param_count > WIFI_APS_BEGIN_IDX) {
-		/* No Wi-Fi AP allowed if no Wi-Fi positioning. */
-		return -E2BIG;
-	}
-
-	if (wifi_pos) {
-		nrfcloud_wifi_data.ap_info = malloc(
-			sizeof(*nrfcloud_wifi_data.ap_info) * (param_count - WIFI_APS_BEGIN_IDX));
-		if (!nrfcloud_wifi_data.ap_info) {
-			return -ENOMEM;
-		}
-		/* Parse the AP parameters. */
-		nrfcloud_wifi_data.cnt = 0;
-		for (unsigned int param_idx = WIFI_APS_BEGIN_IDX; param_idx < param_count;
-		++param_idx) {
-			struct wifi_scan_result *const ap =
-				&nrfcloud_wifi_data.ap_info[nrfcloud_wifi_data.cnt];
-			char mac_addr_str[WIFI_MAC_ADDR_STR_LEN + 1];
-			unsigned int mac_addr[WIFI_MAC_ADDR_LEN];
-			int32_t rssi = NRF_CLOUD_LOCATION_WIFI_OMIT_RSSI;
-			size_t len;
-
-			++nrfcloud_wifi_data.cnt;
-
-			/* Parse the MAC address. */
-			len = sizeof(mac_addr_str);
-			err = util_string_get(parser, param_idx, mac_addr_str, &len);
-			if (!err && (len != strlen(mac_addr_str)
-				|| sscanf(mac_addr_str, WIFI_MAC_ADDR_TEMPLATE,
-						&mac_addr[0], &mac_addr[1], &mac_addr[2],
-						&mac_addr[3], &mac_addr[4], &mac_addr[5])
-					!= WIFI_MAC_ADDR_LEN)) {
-				err = -EBADMSG; /* A different error code to differentiate. */
-			}
-			if (err) {
-				LOG_ERR("MAC address %u malformed (%d).",
-					nrfcloud_wifi_data.cnt, err);
-				break;
-			}
-			for (unsigned int i = 0; i != WIFI_MAC_ADDR_LEN; ++i) {
-				ap->mac[i] = mac_addr[i];
-			}
-			ap->mac_length = WIFI_MAC_ADDR_LEN;
-
-			/* Parse the RSSI, if present. */
-			if (!at_parser_num_get(parser, param_idx + 1, &rssi)) {
-				++param_idx;
-				const int rssi_min = -128;
-				const int rssi_max = 0;
-
-				if (rssi < rssi_min || rssi > rssi_max) {
-					err = -EINVAL;
-					LOG_ERR("RSSI %u out of bounds ([%d,%d]).",
-						nrfcloud_wifi_data.cnt, rssi_min, rssi_max);
-					break;
-				}
-			}
-			ap->rssi = rssi;
-
-			ap->band     = 0;
-			ap->security = WIFI_SECURITY_TYPE_UNKNOWN;
-			ap->mfp      = WIFI_MFP_UNKNOWN;
-			/* CONFIG_NRF_CLOUD_WIFI_LOCATION_ENCODE_OPT excludes the other members. */
-		}
-
-		if (nrfcloud_wifi_data.cnt < NRF_CLOUD_LOCATION_WIFI_AP_CNT_MIN) {
-			err = -EINVAL;
-			LOG_ERR("Insufficient access point count (got %u, min %u).",
-				nrfcloud_wifi_data.cnt, NRF_CLOUD_LOCATION_WIFI_AP_CNT_MIN);
-		}
-		if (err) {
-			k_free(nrfcloud_wifi_data.ap_info);
-			return err;
-		}
-	}
-
-	nrfcloud_cell_count = cell_count;
-	nrfcloud_wifi_pos = wifi_pos;
-
-	nrfcloud_sending_loc_req = true;
-	if (cell_count >= 1) {
-		scan_cellular_execute(cell_count);
-	} else {
-		k_work_submit_to_queue(&sm_work_q, &nrfcloud_loc_req_work);
-	}
-	return 0;
-}
-
-#endif /* CONFIG_SM_NRF_CLOUD_LOCATION */
-
-static void sm_at_nrfcloud_init(int ret, void *ctx)
-{
-	static bool initialized;
-	int err;
-
-	if (initialized) {
-		return;
-	}
-	initialized = true;
-
-	err = nrf_cloud_coap_init();
-	if (err) {
-		LOG_ERR("Failed to initialize nRF Cloud CoAP library: %d", err);
-		return;
-	}
-
-	k_work_init(&nrfcloud_conn_work, conn_wk);
-#if defined(CONFIG_SM_NRF_CLOUD_LOCATION)
-	k_work_init(&nrfcloud_loc_req_work, nrfcloud_loc_req_work_fn);
-	k_sem_init(&scan_cellular_sem_ncellmeas_evt, 0, 1);
-#endif
-	nrf_cloud_client_id_get(nrfcloud_device_id, sizeof(nrfcloud_device_id));
-}
-NRF_MODEM_LIB_ON_INIT(sm_nrfcloud_init_hook, sm_at_nrfcloud_init, NULL);

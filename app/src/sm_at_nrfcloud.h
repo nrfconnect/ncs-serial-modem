@@ -29,5 +29,7 @@ extern bool sm_nrf_cloud_send_location;
  */
 int get_single_cell_info(struct lte_lc_cell *const cell_inf);
 
+void scan_cellular_execute(uint8_t cell_count);
+
 /** @} */
 #endif /* SM_AT_NRFCLOUD_ */
