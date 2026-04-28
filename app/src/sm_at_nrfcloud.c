@@ -3,7 +3,6 @@
  *
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
-#if defined(CONFIG_SM_NRF_CLOUD)
 
 #include <zephyr/kernel.h>
 #include <stdio.h>
@@ -720,6 +719,7 @@ static int parse_ncellmeas(const char *at_response, struct lte_lc_cells_info *ce
 	int err, status, tmp;
 	struct at_parser parser;
 	size_t count = 0;
+	int curr_index = AT_NCELLMEAS_PRE_NCELLS_PARAMS_COUNT;
 
 	__ASSERT_NO_MSG(at_response != NULL);
 	__ASSERT_NO_MSG(cells != NULL);
@@ -856,39 +856,15 @@ static int parse_ncellmeas(const char *at_response, struct lte_lc_cells_info *ce
 	if (cells->ncells_count == 0) {
 		goto clean_exit;
 	}
-	int curr_index = AT_NCELLMEAS_PRE_NCELLS_PARAMS_COUNT;
+
 	cells->neighbor_cells = parse_ncellmeas_neighbors(&parser, cells->ncells_count, &curr_index);
 	if (cells->neighbor_cells == NULL) {
 		LOG_ERR("Failed to parse neighbor cells");
 		err = -EFAULT;
-		goto clean_exit;
 	}
 
 clean_exit:
 	return err;
-}
-
-static void at_handler_ncellmeas_gci(const char *response)
-{
-	int err;
-	const char *resp = response;
-
-	__ASSERT_NO_MSG(response != NULL);
-	//__ASSERT_NO_MSG(gci_count != 0); TODO
-
-	LOG_DBG("%%NCELLMEAS GCI notification parsing starts");
-
-	err = parse_ncellmeas_gci(resp, nrfcloud_cell_data);
-	switch (err) {
-	case 0: /* Fall through */
-	case 1:
-		LOG_DBG("Neighbor cell count: %d, GCI cells count: %d", nrfcloud_cell_data->ncells_count,
-			nrfcloud_cell_data->gci_cells_count);
-		break;
-	default:
-		LOG_ERR("Parsing of neighbor cells failed, err: %d", err);
-		break;
-	}
 }
 
 static void at_handler_ncellmeas(const char *response)
@@ -903,19 +879,17 @@ static void at_handler_ncellmeas(const char *response)
 	}
 
 	if (search_type > 2) {
-		at_handler_ncellmeas_gci(response);
-		k_sem_give(&scan_cellular_sem_ncellmeas_evt);
-		return;
+		err = parse_ncellmeas_gci(response, nrfcloud_cell_data);
+	} else {
+		err = parse_ncellmeas(response, nrfcloud_cell_data);
 	}
-
-	err = parse_ncellmeas(response, nrfcloud_cell_data);
 	switch (err) {
 	case 0: /* Fall through */
 	case 1:
-		LOG_WRN("Neighbor cells parsed successfully");
+		LOG_DBG("NCELLMEAS parsed successfully, err: %d", err);
 		break;
 	default:
-		LOG_ERR("Parsing of neighbor cells failed, err: %d", err);
+		LOG_ERR("NCELLMEAS parsing failed, err: %d", err);
 		break;
 	}
 
@@ -1253,5 +1227,3 @@ static void sm_at_nrfcloud_init(int ret, void *ctx)
 	nrf_cloud_client_id_get(nrfcloud_device_id, sizeof(nrfcloud_device_id));
 }
 NRF_MODEM_LIB_ON_INIT(sm_nrfcloud_init_hook, sm_at_nrfcloud_init, NULL);
-
-#endif /* CONFIG_SM_NRF_CLOUD */
