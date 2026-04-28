@@ -13,6 +13,7 @@
  * @{
  */
 #include <stdbool.h>
+#include <modem/lte_lc.h>
 
 /* Whether the connection to nRF Cloud is ready. */
 extern bool sm_nrf_cloud_ready;
@@ -21,15 +22,13 @@ extern bool sm_nrf_cloud_ready;
 extern bool sm_nrf_cloud_send_location;
 
 /**
- * @brief Get information about the current cell.
- * @param[out] cell_inf Cell information structure to be filled.
+ * @brief Execute cellular positioning.
  *
- * @retval 0 If the operation was successful.
- *           Otherwise, a (negative) error code is returned.
+ * @param[in] cell_count Number of cells to search for.
+ * @param[in] cell_data Cell data structure to be filled.
+ *            NULL means that the function will allocate the memory.
  */
-int get_single_cell_info(struct lte_lc_cell *const cell_inf);
-
-void scan_cellular_execute(uint8_t cell_count);
+void scan_cellular_execute(uint8_t cell_count, struct lte_lc_cells_info *cell_data);
 
 /** @} */
 #endif /* SM_AT_NRFCLOUD_ */

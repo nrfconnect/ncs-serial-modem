@@ -15,7 +15,6 @@
 #include "nrf_cloud_coap_transport.h"
 #include <modem/at_parser.h>
 #include <modem/nrf_modem_lib.h>
-#include <modem/modem_info.h>
 #include "sm_util.h"
 #include "sm_at_host.h"
 #include "sm_at_nrfcloud.h"
@@ -81,6 +80,11 @@ static struct lte_lc_cells_info *nrfcloud_cell_data;
 /* nRF Cloud location request Wi-Fi data. */
 static struct wifi_scan_info nrfcloud_wifi_data;
 
+/**
+ * Waiting time (in seconds) of RRC connection going into idle mode. Because GCI search
+ * cannot scan GCI cells during RRC connected mode, we will wait for the RRC idle mode before
+ * initiating GCI search.
+ */
 #define SCAN_CELLULAR_RRC_IDLE_WAIT_TIME 10
 
 static K_SEM_DEFINE(entered_rrc_idle, 1, 1);
@@ -236,7 +240,7 @@ static int handle_at_nrf_cloud(enum at_parser_cmd_type cmd_type, struct at_parse
 			k_work_submit_to_queue(&sm_work_q, &nrfcloud_conn_work);
 			err = 0;
 		} else {
-			err = -EINVAL;
+			err = -EBUSY;
 		} break;
 
 	case AT_PARSER_CMD_TYPE_READ: {
@@ -411,7 +415,7 @@ static int handle_at_nrf_cloud_pos(enum at_parser_cmd_type cmd_type,
 
 	nrfcloud_sending_loc_req = true;
 	if (cell_count >= 1) {
-		scan_cellular_execute(cell_count);
+		scan_cellular_execute(cell_count, NULL);
 	} else {
 		k_work_submit_to_queue(&sm_work_q, &nrfcloud_loc_req_work);
 	}
@@ -510,20 +514,22 @@ static void cleanup_nrfcloud_cell_data(void)
 	nrfcloud_cell_data = NULL;
 }
 
-void scan_cellular_execute(uint8_t cell_count)
+void scan_cellular_execute(uint8_t cell_count, struct lte_lc_cells_info *cell_data)
 {
 	int err;
 	uint8_t ncellmeas3_cell_count;
 
-	/* Allocate main cell data structure.
-	 * Neighbor cells structure is only allocated when they are found.
-	 */
-	nrfcloud_cell_data = calloc(1, sizeof(struct lte_lc_cells_info));
-	if (nrfcloud_cell_data == NULL) {
-		LOG_ERR("Failed to allocate memory for the nRF Cloud cell data");
-		return;
+	nrfcloud_cell_data = cell_data;
+	if (cell_data == NULL) {
+		/* Allocate main cell data structure.
+		 * Neighbor cells structure is only allocated when they are found.
+		 */
+		nrfcloud_cell_data = calloc(1, sizeof(struct lte_lc_cells_info));
+		if (nrfcloud_cell_data == NULL) {
+			LOG_ERR("Failed to allocate memory for the nRF Cloud cell data");
+			return;
+		}
 	}
-
 	nrfcloud_cell_data->current_cell.id = LTE_LC_CELL_EUTRAN_ID_INVALID;
 	nrfcloud_cell_data->ncells_count = 0;
 	nrfcloud_cell_data->gci_cells_count = 0;
@@ -640,7 +646,8 @@ end:
 	at_monitor_pause(&sm_ncellmeas);
 	if (err == 0) {
 		k_work_submit_to_queue(&sm_work_q, &nrfcloud_loc_req_work);
-	} else {
+	} else if (cell_data == NULL) {
+		/* If cell_data is not provided, cleanup the cell data in error cases */
 		cleanup_nrfcloud_cell_data();
 	}
 	k_work_cancel_delayable(&scan_cellular_timeout_backup_work);
@@ -651,31 +658,6 @@ static void scan_cellular_timeout_backup_work_fn(struct k_work *work)
 	ARG_UNUSED(work);
 
 	k_sem_reset(&scan_cellular_sem_ncellmeas_evt);
-}
-
-/* TODO: Remove use of modem info completely */
-int get_single_cell_info(struct lte_lc_cell *const cell_inf)
-{
-	int err;
-	struct modem_param_info modem_inf;
-
-	err = modem_info_params_init(&modem_inf);
-	if (err) {
-		LOG_ERR("Could not initialize modem info module, error: %d", err);
-		return err;
-	}
-	err = modem_info_params_get(&modem_inf);
-	if (err) {
-		LOG_ERR("Could not obtain information from modem, error: %d", err);
-		return err;
-	}
-	cell_inf->mcc = modem_inf.network.mcc.value;
-	cell_inf->mnc = modem_inf.network.mnc.value;
-	cell_inf->tac = modem_inf.network.area_code.value;
-	cell_inf->id = modem_inf.network.cellid_dec;
-	cell_inf->rsrp = modem_inf.network.rsrp.value;
-
-	return 0;
 }
 
 static void nrfcloud_loc_req_work_fn(struct k_work *work)
