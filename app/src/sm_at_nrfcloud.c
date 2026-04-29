@@ -518,6 +518,7 @@ void scan_cellular_execute(uint8_t cell_count, struct lte_lc_cells_info *cell_da
 {
 	int err;
 	uint8_t ncellmeas3_cell_count;
+	int rrc_mode;
 
 	nrfcloud_cell_data = cell_data;
 	if (cell_data == NULL) {
@@ -563,25 +564,28 @@ void scan_cellular_execute(uint8_t cell_count, struct lte_lc_cells_info *cell_da
 		goto end;
 	}
 
-	/* TODO: RRC idle not monitored */
 	/* GCI searches are not done when in RRC connected mode. We are waiting for
 	 * device to enter RRC idle mode unless it's there already.
+	 * We'll poll for the RRC connection release every second for 10 seconds.
+	 * We could order CSCON notifications but this would require handling of
+	 * SM subscription of CSCON and host subscription so that
+	 * we send the notifications correctly to the host.
 	 */
-	LOG_DBG("%s", k_sem_count_get(&entered_rrc_idle) == 0 ?
-		"Waiting for the RRC connection release..." :
-		"RRC already in idle mode");
-
-	if (k_sem_take(&entered_rrc_idle, K_SECONDS(SCAN_CELLULAR_RRC_IDLE_WAIT_TIME)) != 0) {
-		/* If semaphore is reset while waiting, the position request was canceled */
-		if (!nrfcloud_sending_loc_req) {
-			goto end;
+	for (int i = 0; i < 10; i++) {
+		err = sm_util_at_scanf("AT+CSCON?", "+CSCON: %*d,%d", &rrc_mode);
+		if (err == 1) {
+			if (rrc_mode == 0) {
+				break;
+			}
+			LOG_DBG("Waiting for RRC connection release");
+			k_sleep(K_SECONDS(1));
+		} else {
+			/* If AT+CSCON fails, we just go ahead and perform the GCI searches */
+			LOG_ERR("+CSCON failed %d", err);
+			break;
 		}
-		/* The wait for RRC idle timed out */
-		LOG_WRN("RRC connection was not released in %d seconds.",
-			SCAN_CELLULAR_RRC_IDLE_WAIT_TIME);
-		goto end;
 	}
-	k_sem_give(&entered_rrc_idle);
+
 
 	/*****
 	 * 2nd: GCI history search to get GCI cells we can quickly search and measure.
