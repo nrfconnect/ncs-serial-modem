@@ -272,15 +272,9 @@ ppp_start() {
 	set -x
 	check_devices_or_exit
 	pppd $AT_CMUX ${PPP_OPTIONS} connect "${CONNECT_CMD}"
-	if [ "$?" -eq 5 ]; then
-		echo "pppd terminated with signal, shutting down modem..."
-		shutdown_modem
-		test -O $PIDFILE && rm -f $PIDFILE
-		exit 0
-	fi
-	sleep 1
-	# restart PPP
-	#ppp_start
+	echo "pppd terminated, shutting down modem..."
+	shutdown_modem
+	test -O $PIDFILE && rm -f $PIDFILE
 }
 
 export AT_CMUX
