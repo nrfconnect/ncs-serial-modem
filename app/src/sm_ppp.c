@@ -543,10 +543,13 @@ static void subscribe_cgev_notifications(void)
 
 static void at_notif_on_cgev(const char *notify)
 {
-	char *str;
+	char *str = NULL;
+	char *str_pdn_act;
+	char *str_pdn_resumed;
 	char *endptr;
 	uint8_t cid;
 	char cgev_pdn_act[] = "+CGEV: ME PDN ACT";
+	char cgev_pdn_resumed[] = "+CGEV: ME PDN RESUMED";
 
 	if (!sm_ppp_auto_start) {
 		/* Auto-start disabled, ignore all notifications */
@@ -559,21 +562,33 @@ static void at_notif_on_cgev(const char *notify)
 		return;
 	}
 
-	/* Only activation of PPP PDN is monitored here.
+	/* Only activation or resuming of PPP PDN is monitored here.
 	 * Deactivation of PPP PDN or detach from network will cause PPP socket to get closed
 	 * from where stopping of PPP is triggered.
 	 */
-	str = strstr(notify, cgev_pdn_act);
-	if (str != NULL) {
+	str_pdn_act = strstr(notify, cgev_pdn_act);
+	if (str_pdn_act != NULL) {
+		str = str_pdn_act;
 		str += strlen(cgev_pdn_act);
+	} else {
+		str_pdn_resumed = strstr(notify, cgev_pdn_resumed);
+		if (str_pdn_resumed != NULL) {
+			str = str_pdn_resumed;
+			str += strlen(cgev_pdn_resumed);
+		}
+	}
+
+	/* If PDN is activated or resumed, start PPP */
+	if (str != NULL) {
 		if (*str == ' ') {
 			str++;
 			cid = (uint8_t)strtoul(str, &endptr, 10);
 			if (endptr != str && cid == ppp_pdn_cid) {
-				LOG_INF("PPP PDN (%d) activated.", ppp_pdn_cid);
+				LOG_INF("PPP PDN (%d) %s.", ppp_pdn_cid, str_pdn_act != NULL ? "activated" : "resumed");
 				delegate_ppp_event(PPP_START, PPP_REASON_NETWORK);
 			}
 		}
+		return;
 	}
 }
 
