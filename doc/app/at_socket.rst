@@ -633,6 +633,26 @@ Syntax
     It can be retrieved after the DTLS handshake.
     See `NRF_SO_SEC_DTLS_CID_STATUS <nrfxlib_dtls_cid_status_>`_ for more details regarding the returned values.
 
+  * ``16`` - ``AT_TLS_DTLS_CONN_SAVE`` (set-only).
+    Write-only socket option to save DTLS connection.
+
+    * ``<value>`` must be set to ``0`` to save the DTLS connection state.
+
+    After this option is successfully called, you must call ``AT_TLS_DTLS_CONN_LOAD`` before continuing to communicate on the socket.
+
+    This is only supported by the following modem firmware:
+      * mfw_nrf91x1
+      * mfw_nrf9151-ntn
+
+  * ``17`` - ``AT_TLS_DTLS_CONN_LOAD`` (set-only).
+    Write-only socket option to load DTLS connection.
+
+    * ``<value>`` must be set to ``1`` to load the previously saved DTLS connection state.
+
+    This is only supported by the following modem firmware:
+      * mfw_nrf91x1
+      * mfw_nrf9151-ntn
+
   * ``18`` - ``AT_TLS_DTLS_HANDSHAKE_TIMEO``.
 
     * ``<value>`` is an integer that indicates the DTLS handshake timeout in seconds.
@@ -647,10 +667,9 @@ Syntax
       * ``1`` - ``DTLS_FRAG_EXT_512_ENABLED``.
       * ``2`` - ``DTLS_FRAG_EXT_1024_ENABLED``.
 
-      This is only supported by the following modem firmware:
-
-        * mfw_nrf91x1 v2.0.4 or later
-        * mfw_nrf9151-ntn
+    This is only supported by the following modem firmware:
+      * mfw_nrf91x1 v2.0.4 or later
+      * mfw_nrf9151-ntn
 
 See `nRF socket options <nrfxlib_nrf_sockets_>`_ for explanation of the supported options.
 
