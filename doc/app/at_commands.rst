@@ -45,6 +45,7 @@ The modem specific AT commands are documented in the `nRF91x1 AT Commands Refere
    at_mqtt
    at_nrfcloud
    at_ppp
+   at_provisioning
    at_sms
    at_socket
    at_trace
