@@ -571,6 +571,119 @@ Test command
 
 The test command is not supported.
 
+B1 active slot #XB1SLOT
+=======================
+
+Query which MCUboot second-stage (B1) bank is currently active (``s0`` or ``s1``).
+
+This command is only available when the firmware is built with the NSIB (B0) and MCUboot (B1) as a second-stage bootloader.
+
+Read command
+------------
+
+::
+
+   AT#XB1SLOT?
+
+Response syntax
+~~~~~~~~~~~~~~~
+
+::
+
+   #XB1SLOT: <active_slot>
+
+* ``<active_slot>`` — ``0`` if bank ``s0`` is active, ``1`` if bank ``s1`` is active.
+
+Example
+~~~~~~~
+
+::
+
+   AT#XB1SLOT?
+
+   #XB1SLOT: 0
+
+   OK
+
+Test command
+------------
+
+::
+
+   AT#XB1SLOT=?
+
+Response syntax
+~~~~~~~~~~~~~~~
+
+::
+   #XB1SLOT: <active_slot>
+
+Example
+~~~~~~~
+
+::
+
+   AT#XB1SLOT=?
+   #XB1SLOT: <active_slot>
+   OK
+
+B1 firmware version #XB1VER
+============================
+
+Query the firmware version of the currently active MCUboot second-stage (B1) bank.
+The version is a single integer set at build time via ``CONFIG_FW_INFO_FIRMWARE_VERSION``, used by NSIB as a downgrade-protection counter.
+
+This command is only available when the firmware is built with the NSIB (B0) and MCUboot (B1) as a second-stage bootloader.
+
+Read command
+------------
+
+::
+
+   AT#XB1VER?
+
+Response syntax
+~~~~~~~~~~~~~~~
+
+::
+
+   #XB1VER: <version>
+
+* ``<version>`` — unsigned integer, the ``fw_info.version`` of the active B1 slot.
+
+Example
+~~~~~~~
+
+::
+
+   AT#XB1VER?
+
+   #XB1VER: 1
+
+   OK
+
+Test command
+------------
+
+::
+
+   AT#XB1VER=?
+
+Response syntax
+~~~~~~~~~~~~~~~
+
+::
+   #XB1VER: <version>
+
+Example
+~~~~~~~
+
+::
+
+   AT#XB1VER=?
+   #XB1VER: <version>
+   OK
+
 Modem fault #XMODEM
 ===================
 

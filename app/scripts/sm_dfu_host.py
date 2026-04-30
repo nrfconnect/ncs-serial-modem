@@ -204,11 +204,18 @@ def parse_chunks_cbor(filepath: str, chunk_size: int = 4096) -> tuple[list, list
 DFU_TYPE_APP = 0
 DFU_TYPE_DELTA = 1
 DFU_TYPE_FULL = 2
+DFU_TYPE_MCUBOOT_B1 = 3
 
 
 def dfu_init(dfu_type: int, size: int = None) -> bool:
-    """Initialize DFU. Size required for APP/DELTA. FULL reboots device."""
+    """Initialize DFU. Size required for APP/DELTA/MCUBOOT_B1. FULL reboots device."""
     if dfu_type == DFU_TYPE_APP:
+        if size is None:
+            return False
+        print(f"AT#XDFUINIT={dfu_type},{size}")
+        send_command("AT#XDFUINIT", dfu_type, size)
+        expected, timeout = "OK", 5.0
+    elif dfu_type == DFU_TYPE_MCUBOOT_B1:
         if size is None:
             return False
         print(f"AT#XDFUINIT={dfu_type},{size}")
@@ -305,6 +312,53 @@ def do_dfu_app(filepath: str, retries: int = 3) -> bool:
         return False
 
     print("OK: Application DFU complete. Reboot to activate.")
+    return True
+
+
+def do_dfu_mcuboot_b1(filepath: str, retries: int = 3) -> bool:
+    """Perform MCUboot second-stage (B1) DFU.
+
+    The image must be the signed candidate for the *inactive* s0/s1 bank.
+    """
+    chunks = parse_chunks_bin(filepath)
+    total_size = sum(len(data) for _, data in chunks)
+    total_chunks = len(chunks)
+
+    print(
+        "MCUboot B1 DFU: ensure this .bin is the inactive-slot signed image "
+        "(s0 vs s1 package from your NCS build output)."
+    )
+    print(f"MCUboot B1 DFU: {total_size:,} bytes in {total_chunks} chunks")
+
+    if not dfu_init(DFU_TYPE_MCUBOOT_B1, total_size):
+        print("\nERROR: Init failed (is NSIB + MCUboot enabled?)")
+        return False
+
+    bytes_sent = 0
+    start_time = time.time()
+
+    for i, (addr, data) in enumerate(chunks, 1):
+        success = False
+        urc = ""
+        for _ in range(retries):
+            success, urc = dfu_write(DFU_TYPE_MCUBOOT_B1, addr, data)
+            if success:
+                break
+        if not success:
+            print(f"\nERROR: Chunk {i} failed after {retries} retries")
+            return False
+
+        bytes_sent += len(data)
+        cmd = f"AT#XDFUWRITE={DFU_TYPE_MCUBOOT_B1},{addr},{len(data)} -> {urc}"
+        print_progress("MCUboot B1", i, total_chunks, bytes_sent, total_size, start_time, cmd)
+
+    print()
+
+    if not dfu_apply(DFU_TYPE_MCUBOOT_B1):
+        print("ERROR: Apply failed")
+        return False
+
+    print("OK: MCUboot B1 DFU apply complete. Reboot to run the new B1. Validate the version increase with AT#XB1VER?.")
     return True
 
 
@@ -458,8 +512,11 @@ def main() -> int:
     parser.add_argument("--port", required=True, help="Serial port")
     parser.add_argument("--baudrate", required=True, type=int, help="Baud rate")
     parser.add_argument("--file", help="Firmware file path")
-    parser.add_argument("--type", choices=["application", "modem-delta", "modem-full"],
-                        help="DFU type")
+    parser.add_argument(
+        "--type",
+        choices=["application", "modem-delta", "modem-full", "mcuboot-b1"],
+        help="DFU type",
+    )
     parser.add_argument("--ping", action="store_true", help="Ping device (AT)")
     parser.add_argument("--reset", action="store_true", help="Reset device (AT#XRESET)")
     parser.add_argument("--modem-reset", action="store_true",
@@ -491,7 +548,7 @@ def main() -> int:
         elif args.reset:
             do_reset()
             success = True
-        elif getattr(args, 'modem_reset', False):
+        elif getattr(args, "modem_reset", False):
             do_modem_reset()
             success = True
         else:
@@ -504,6 +561,8 @@ def main() -> int:
 
             if args.type == "application":
                 success = do_dfu_app(str(filepath))
+            elif args.type == "mcuboot-b1":
+                success = do_dfu_mcuboot_b1(str(filepath))
             elif args.type == "modem-delta":
                 success = do_dfu_delta(str(filepath))
             elif args.type == "modem-full":

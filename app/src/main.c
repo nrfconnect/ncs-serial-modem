@@ -67,7 +67,7 @@ void nrf_modem_fault_handler(struct nrf_modem_fault_info *fault_info)
 
 static void on_modem_dfu_res(int dfu_res, void *ctx)
 {
-	sm_fota_type = DFU_TARGET_IMAGE_TYPE_MODEM_DELTA;
+	sm_fota_type = SM_FOTA_TYPE_MFW;
 	sm_fota_stage = FOTA_STAGE_COMPLETE;
 	sm_fota_status = FOTA_STATUS_ERROR;
 	sm_fota_info = dfu_res;
@@ -130,7 +130,7 @@ static void check_app_fota_status(void)
 		sm_fota_status = ret ? FOTA_STATUS_ERROR : FOTA_STATUS_OK;
 		break;
 	}
-	sm_fota_type = DFU_TARGET_IMAGE_TYPE_MCUBOOT;
+	sm_fota_type = SM_FOTA_TYPE_APP;
 	sm_fota_stage = FOTA_STAGE_COMPLETE;
 }
 
@@ -251,7 +251,7 @@ static int sm_main(void)
 #if defined(CONFIG_SM_FULL_FOTA)
 	if (sm_modem_full_fota) {
 		sm_finish_modem_full_fota();
-		sm_fota_type = DFU_TARGET_IMAGE_TYPE_FULL_MODEM;
+		sm_fota_type = SM_FOTA_TYPE_FULL_MFW;
 	}
 #endif
 
@@ -268,6 +268,8 @@ static int sm_main(void)
 			goto exit_reboot;
 		}
 	}
+
+	sm_fota_mcuboot_bl_boot_check();
 
 	check_app_fota_status();
 

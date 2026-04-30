@@ -15,6 +15,8 @@
 #include <zephyr/sys/util.h>
 #include <zephyr/types.h>
 #include <dfu/dfu_target.h>
+#include <tfm/tfm_ioctl_api.h>
+#include <pm_config.h>
 #include <modem/at_parser.h>
 #include <modem/lte_lc.h>
 #include <modem/modem_jwt.h>
@@ -196,7 +198,7 @@ static void sm_modemreset(void)
 
 	ret = nrf_modem_lib_init();
 
-	if (sm_fota_type & DFU_TARGET_IMAGE_TYPE_ANY_MODEM) {
+	if (sm_fota_type == SM_FOTA_TYPE_MFW || sm_fota_type == SM_FOTA_TYPE_FULL_MFW) {
 		sm_fota_post_process();
 	}
 
@@ -319,4 +321,66 @@ STATIC int handle_ate1(enum at_parser_cmd_type cmd_type, struct at_parser *, uin
 	sm_at_host_echo(true);
 
 	return 0;
+}
+
+SM_AT_CMD_CUSTOM(xb1slot, "AT#XB1SLOT", handle_at_xb1slot);
+STATIC int handle_at_xb1slot(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+			     uint32_t param_count)
+{
+	ARG_UNUSED(parser);
+	ARG_UNUSED(param_count);
+
+#if !defined(PM_S1_ADDRESS)
+	return -ENOTSUP;
+#else
+	switch (cmd_type) {
+	case AT_PARSER_CMD_TYPE_READ: {
+		bool s0_active = false;
+		int err = tfm_platform_s0_active(PM_S0_ADDRESS, PM_S1_ADDRESS, &s0_active);
+
+		if (err != 0) {
+			return err;
+		}
+		rsp_send("\r\n#XB1SLOT: %u\r\n", s0_active ? 0U : 1U);
+		return 0;
+	}
+	case AT_PARSER_CMD_TYPE_TEST:
+		rsp_send("\r\n#XB1SLOT: <active_slot>\r\n");
+		return 0;
+	default:
+		return -EINVAL;
+	}
+#endif
+}
+
+SM_AT_CMD_CUSTOM(xb1ver, "AT#XB1VER", handle_at_xb1ver);
+STATIC int handle_at_xb1ver(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+			    uint32_t param_count)
+{
+	ARG_UNUSED(parser);
+	ARG_UNUSED(param_count);
+
+#if !defined(PM_S1_ADDRESS)
+	return -ENOTSUP;
+#else
+	switch (cmd_type) {
+	case AT_PARSER_CMD_TYPE_READ: {
+		uint32_t version = 0;
+		int err = sm_util_b1_active_version(&version);
+
+		if (err) {
+			LOG_ERR("Failed to read B1 fw_info: %d", err);
+			return err;
+		}
+
+		rsp_send("\r\n#XB1VER: %u\r\n", version);
+		return 0;
+	}
+	case AT_PARSER_CMD_TYPE_TEST:
+		rsp_send("\r\n#XB1VER: <version>\r\n");
+		return 0;
+	default:
+		return -EINVAL;
+	}
+#endif
 }

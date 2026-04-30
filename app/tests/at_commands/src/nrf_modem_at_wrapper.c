@@ -28,6 +28,8 @@ extern int handle_at_datactrl_wrapper_xdatactrl(char *buf, size_t len, char *at_
 extern int handle_at_clac_wrapper_xclac(char *buf, size_t len, char *at_cmd);
 extern int handle_ate0_wrapper_ate0(char *buf, size_t len, char *at_cmd);
 extern int handle_ate1_wrapper_ate1(char *buf, size_t len, char *at_cmd);
+extern int handle_at_xb1slot_wrapper_xb1slot(char *buf, size_t len, char *at_cmd);
+extern int handle_at_xb1ver_wrapper_xb1ver(char *buf, size_t len, char *at_cmd);
 
 int nrf_modem_at_cmd(void *buf, size_t buf_size, const char *fmt, ...)
 {
@@ -60,6 +62,10 @@ int nrf_modem_at_cmd(void *buf, size_t buf_size, const char *fmt, ...)
 		ret = handle_ate0_wrapper_ate0((char *)buf, buf_size, at_cmd);
 	} else if (strncasecmp(at_cmd, "ATE1", 4) == 0) {
 		ret = handle_ate1_wrapper_ate1((char *)buf, buf_size, at_cmd);
+	} else if (strncasecmp(at_cmd, "AT#XB1SLOT", 10) == 0) {
+		ret = handle_at_xb1slot_wrapper_xb1slot((char *)buf, buf_size, at_cmd);
+	} else if (strncasecmp(at_cmd, "AT#XB1VER", 9) == 0) {
+		ret = handle_at_xb1ver_wrapper_xb1ver((char *)buf, buf_size, at_cmd);
 	} else {
 		/* Unknown command - return error */
 		ret = -NRF_EINVAL;
