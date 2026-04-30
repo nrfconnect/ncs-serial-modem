@@ -1,0 +1,119 @@
+#
+# Copyright (c) 2026 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+
+config MODEM_NRF91M1
+	bool "Nordic nRF91m1 modem support"
+	default y
+	depends on DT_HAS_NORDIC_NRF91M1_ENABLED
+	select MODEM_CELLULAR
+	help
+	  Modem driver for Nordic nRF91 series running
+	  the Serial LTE Modem application version 2.0 or later.
+
+if MODEM_NRF91M1
+
+choice
+	prompt "Request eDRX"
+	default MODEM_NRF91M1_EDRX_NO
+
+config MODEM_NRF91M1_EDRX_NO
+	bool "No eDRX"
+
+config MODEM_NRF91M1_EDRX_512
+	bool "5.12 s eDRX cycle"
+
+config MODEM_NRF91M1_EDRX_1024
+	bool "10.24 s eDRX cycle"
+
+config MODEM_NRF91M1_EDRX_2048
+	bool "20.48 s eDRX cycle"
+
+config MODEM_NRF91M1_EDRX_MANUAL
+	bool "Define eDRX value manually"
+
+endchoice # Request eDRX
+
+config MODEM_NRF91M1_EDRX_MANUAL_VALUE
+	string "eDRX value for AT+CEDRXS command"
+	default "0010"
+	depends on MODEM_NRF91M1_EDRX_MANUAL
+	help
+	  String. Half a byte in 4-bit format.
+	  See AT manual for AT+CEDRXS command for details.
+
+choice
+	prompt "Set custom paging time window"
+	default MODEM_NRF91M1_PTW_DEFAULT
+	depends on !MODEM_NRF91M1_EDRX_NO
+
+config MODEM_NRF91M1_PTW_DEFAULT
+	bool "Default paging time window"
+
+config MODEM_NRF91M1_PTW_128S
+	bool "1.28 s paging time window"
+
+config MODEM_NRF91M1_PTW_256S
+	bool "2.56 s paging time window"
+
+config MODEM_NRF91M1_PTW_512S
+	bool "5.12 s paging time window"
+
+config MODEM_NRF91M1_PTW_1024S
+	bool "10.24 s paging time window"
+
+config MODEM_NRF91M1_PTW_MANUAL
+	bool "Define paging time window value manually"
+
+endchoice # Set custom paging time window
+
+config MODEM_NRF91M1_PTW_MANUAL_VALUE
+	string "Paging time window value for AT%XPTW command"
+	default "0011"
+	depends on MODEM_NRF91M1_PTW_MANUAL
+	help
+	  String. Half a byte in 4-bit format.
+	  See AT manual for AT%XPTW command for details.
+
+choice
+	prompt "Request PSM"
+	default MODEM_NRF91M1_PSM_NO
+
+config MODEM_NRF91M1_PSM_NO
+	bool "No PSM"
+
+config MODEM_NRF91M1_PSM_10S
+	bool "10 s active time"
+
+config MODEM_NRF91M1_PSM_20S
+	bool "20 s active time"
+
+config MODEM_NRF91M1_PSM_1M
+	bool "1 min active time"
+
+endchoice # Request PSM
+
+choice
+	prompt "PSM periodic TAU"
+	default MODEM_NRF91M1_PSM_TAU_1H
+	depends on !MODEM_NRF91M1_PSM_NO
+
+config MODEM_NRF91M1_PSM_TAU_1H
+	bool "1 h periodic TAU"
+
+config MODEM_NRF91M1_PSM_TAU_6H
+	bool "6 h periodic TAU"
+
+config MODEM_NRF91M1_PSM_TAU_12H
+	bool "12 h periodic TAU"
+
+endchoice # PSM periodic TAU
+
+config MODEM_NRF91M1_ENABLE_UART_LOGGING
+	bool "Enable UART logging in the modem"
+	help
+	  Use AT#XLOG=1 command to enable UART logging in the modem.
+	  Debug logs are sent from the secondary UART.
+
+endif # MODEM_NRF91M1
