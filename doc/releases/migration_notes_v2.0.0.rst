@@ -18,6 +18,12 @@ The following changes are mandatory to make your application work in the same wa
 * Full FOTA - When compiling, rename ``overlay-full_fota.conf`` to ``overlay-full-fota.conf`` and add ``PM_STATIC_YML_FILE=pm_static_nrf9151dk_nrf9151_ns_full_fota.yml`` to the build configuration.
   See :ref:`SM_AT_FOTA` for more information.
 
+* ``AT#XNRFCLOUDPOS``:
+
+  * Changed ``<cell_pos>`` parameter to ``<cell_count>``. The meaning changes from no cell positioning, single-cell or multi-cell to the number of cells to beincluded in the location request.
+    ``0`` means that cellular positioning is not requested at all.
+  * The ``AT#XNRFCLOUDPOS`` command has been updated to use the ``AT%NCELLMEAS`` command internally so the host must not use it anymore.
+
 Informational changes
 *********************
 

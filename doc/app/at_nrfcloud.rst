@@ -44,25 +44,25 @@ Syntax
 
    AT#XNRFCLOUD=<op>[,<send_location>]
 
-The ``<op>`` parameter can have the following integer values:
+* The ``<op>`` parameter can have the following integer values:
 
-* ``0`` - Disconnect from the nRF Cloud service.
-* ``1`` - Connect to the nRF Cloud service.
-* ``2`` - Send a message in the JSON format to the nRF Cloud service.
+  * ``0`` - Disconnect from the nRF Cloud service.
+  * ``1`` - Connect to the nRF Cloud service.
+  * ``2`` - Send a message in the JSON format to the nRF Cloud service.
 
-When ``<op>`` is ``2``, |SM| enters :ref:`sm_data_mode`.
+  When ``<op>`` is ``2``, |SM| enters :ref:`sm_data_mode`.
 
-The ``<send_location>`` parameter is used only when the value of ``<op>`` is ``1``.
-It can have the following integer values:
+* The ``<send_location>`` parameter is used only when the value of ``<op>`` is ``1``.
+  It can have the following integer values:
 
-* ``0`` - The device location is not sent to nRF Cloud.
-  This is the default behavior if the parameter is omitted.
-* ``1`` - The device location is sent to nRF Cloud.
+  * ``0`` - The device location is not sent to nRF Cloud.
+    This is the default behavior if the parameter is omitted.
+  * ``1`` - The device location is sent to nRF Cloud.
 
-.. note::
-   The location is sent to the nRF Cloud whenever a fix is produced by the GNSS module.
-   You must use the :ref:`#XGNSS <SM_AT_GNSS>` AT command to start GNSS either in single-fix or periodic navigation mode.
-   The interval between fixes must be at least 5 seconds.
+  .. note::
+     The location is sent to the nRF Cloud whenever a fix is produced by the GNSS module.
+     You must use the :ref:`#XGNSS <SM_AT_GNSS>` AT command to start GNSS either in single-fix or periodic navigation mode.
+     The interval between fixes must be at least 5 seconds.
 
 Unsolicited notification
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -192,33 +192,32 @@ Syntax
 
 ::
 
-   AT#XNRFCLOUDPOS=<cell_pos>,<wifi_pos>[,<MAC 1>[,<RSSI 1>],<MAC 2>[,<RSSI 2>][,<MAC 3>[...]]]
+   AT#XNRFCLOUDPOS=<cell_count>,<wifi_pos>[,<MAC 1>[,<RSSI 1>],<MAC 2>[,<RSSI 2>][,<MAC 3>[...]]]
 
-The ``<cell_pos>`` parameter can have the following integer values:
+* The ``<cell_count>`` parameter indicates the number of cells to include in the location request.
+  The value range is ``0`` to ``15``. A good suggested value for cellular positioning is ``4``.
+  ``0`` means that no cellular network information will be included in the location request.
+  The |SM| uses the ``AT%NCELLMEAS`` command to retrieve the cellular network information, and depending on the value of ``<cell_count>``, it may use the command multiple times.
 
-* ``0`` - Do not include cellular network information in the location request.
-* ``1`` - Use single-cell cellular network information (only the serving cell).
-* ``2`` - Use multi-cell cellular network information (the serving and possibly neighboring cells).
-  To use this option, you must first issue the ``AT%NCELLMEAS`` command and wait for its result notification.
+  .. note::
 
-  The cellular network information included in the location request will be the one received from the ``AT%NCELLMEAS`` command.
-  This means that, for the most up-to-date location information, you should use the command as close to sending the location request as possible.
-  Also, keep in mind that whenever you send a location request in single-cell mode, any previously saved multi-cell cellular network information is invalidated.
+     Since the |SM| uses the ``AT%NCELLMEAS`` command internally, the host must not use the ``AT%NCELLMEAS`` command during ``#XNRFCLOUDPOS`` command execution.
+     You may still use ``AT%NCELLMEAS`` command before or after ``#XNRFCLOUDPOS`` command execution for your own purposes.
 
-The ``<wifi_pos>`` parameter can have the following integer values:
+* The ``<wifi_pos>`` parameter can have the following integer values:
 
-* ``0`` - Do not include Wi-Fi access point information in the location request.
-* ``1`` - Use Wi-Fi access point information.
-  The access points must be given as additional parameters to the command.
-  The minimum number of access points to provide is two (``NRF_CLOUD_LOCATION_WIFI_AP_CNT_MIN``), and the maximum is limited by the AT command buffer size (:ref:`CONFIG_SM_AT_BUF_SIZE <CONFIG_SM_AT_BUF_SIZE>`).
+  * ``0`` - Do not include Wi-Fi access point information in the location request.
+  * ``1`` - Use Wi-Fi access point information.
+    The access points must be given as additional parameters to the command.
+    The minimum number of access points to provide is two (``NRF_CLOUD_LOCATION_WIFI_AP_CNT_MIN``), and the maximum is limited by the AT command buffer size (:ref:`CONFIG_SM_AT_BUF_SIZE <CONFIG_SM_AT_BUF_SIZE>`).
 
-The ``<MAC x>`` parameter is a string.
-It indicates the MAC address of a Wi-Fi access point and must be formatted as ``%02x:%02x:%02x:%02x:%02x:%02x`` (``WIFI_MAC_ADDR_TEMPLATE``).
+* The ``<MAC x>`` parameter is a string.
+  It indicates the MAC address of a Wi-Fi access point and must be formatted as ``%02x:%02x:%02x:%02x:%02x:%02x`` (``WIFI_MAC_ADDR_TEMPLATE``).
 
-The ``<RSSI x>`` parameter is an optional integer.
-It indicates the signal strength of a Wi-Fi access point in dBm, between ``-128`` and ``0``.
-If provided, it must follow the MAC address parameter of the access point.
-Providing the RSSI parameters helps improve the accuracy of the Wi-Fi location.
+* The ``<RSSI x>`` parameter is an optional integer.
+  It indicates the signal strength of a Wi-Fi access point in dBm, between ``-128`` and ``0``.
+  If provided, it must follow the MAC address parameter of the access point.
+  Providing the RSSI parameters helps improve the accuracy of the Wi-Fi location.
 
 Unsolicited notification
 ~~~~~~~~~~~~~~~~~~~~~~~~

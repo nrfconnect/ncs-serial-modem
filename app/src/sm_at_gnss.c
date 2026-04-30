@@ -336,9 +336,8 @@ static void agnss_requestor(struct k_work *)
 						     sizeof(agnss_rest_data_buf), 0};
 	struct lte_lc_cells_info net_info = {0};
 
-	err = get_single_cell_info(&net_info.current_cell);
-	if (err) {
-		LOG_ERR("Failed to obtain single-cell cellular network information (%d).", err);
+	scan_cellular_execute(1, &net_info);
+	if (net_info.current_cell.id == LTE_LC_CELL_EUTRAN_ID_INVALID) {
 		return;
 	}
 	request.net_info = &net_info;
