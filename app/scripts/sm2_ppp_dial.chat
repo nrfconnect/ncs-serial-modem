@@ -21,7 +21,7 @@ ABORT +CNEC_ESM:
 #
 # Check AT channel
 #
-TIMEOUT 1
+TIMEOUT 2
 ''
 AT OK
 
