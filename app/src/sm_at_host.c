@@ -1272,7 +1272,7 @@ static size_t cmd_rx_handler(struct sm_at_host_ctx *ctx, uint8_t c)
 		} else {
 			ctx->prev_character = '\0';
 		}
-		break;
+		goto handle_echo;
 	default:
 		break;
 	}
