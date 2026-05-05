@@ -168,13 +168,13 @@ static int rx_enable(void)
 
 	buf = buf_alloc();
 	if (!buf) {
-		LOG_DBG("Failed to allocate RX buffer");
+		LOG_ERR("Failed to allocate RX buffer");
 		return -ENOMEM;
 	}
 
 	ret = uart_rx_enable(uart_dev, buf->buf, sizeof(buf->buf), UART_RX_TIMEOUT_US);
-	if (ret) {
-		LOG_WRN("uart_rx_enable failed: %d", ret);
+	if (ret && ret != -EBUSY) {
+		LOG_ERR("uart_rx_enable failed: %d", ret);
 		buf_unref(buf->buf);
 		return ret;
 	}
@@ -208,7 +208,10 @@ static int rx_disable(void)
 	}
 
 	/* Wait until RX is actually disabled. */
-	k_sem_take(&uart_disabled_sem, K_MSEC(100));
+	err = k_sem_take(&uart_disabled_sem, K_MSEC(100));
+	if (err) {
+		LOG_ERR("UART RX disable timeout: %d", err);
+	}
 	atomic_clear_bit(&uart_state, SM_AT_CLIENT_RX_ENABLED_BIT);
 
 	return 0;
@@ -451,9 +454,6 @@ static void reschedule_disable(void)
 	if (dtr_config.active && dtr_config.automatic) {
 		/* Restart the inactivity timer. */
 		k_work_reschedule(&dtr_uart_disable_work, dtr_config.inactivity);
-	} else {
-		/* Stop the inactivity timer. */
-		k_work_cancel_delayable(&dtr_uart_disable_work);
 	}
 }
 
@@ -913,21 +913,24 @@ int sm_at_client_send_data(const uint8_t *const data, size_t datalen)
 	return tx_write(data, datalen, true);
 }
 
-void sm_at_client_configure_dtr_uart(bool automatic, k_timeout_t inactivity)
+void sm_at_client_automatic_dtr_uart(k_timeout_t inactivity)
 {
 	if (!initialized) {
 		LOG_ERR("AT client not initialized");
 		return;
 	}
 
-	dtr_config.automatic = automatic;
+	dtr_config.automatic = true;
 	dtr_config.inactivity = inactivity;
 
-	if (dtr_config.automatic && !dtr_config.active && !ring_buf_is_empty(&tx_buf)) {
-		/* If automatic DTR UART is enabled and there is data to send, enable DTR UART. */
+	if (!dtr_config.active && !ring_buf_is_empty(&tx_buf)) {
+		/* Automatic mode enabled with pending TX data: trigger enable. */
 		k_work_submit(&dtr_uart_enable_work);
-	} else {
-		reschedule_disable();
+	}
+
+	if (dtr_config.active) {
+		/* Restart the inactivity timer. */
+		k_work_reschedule(&dtr_uart_disable_work, dtr_config.inactivity);
 	}
 }
 
@@ -938,7 +941,8 @@ void sm_at_client_disable_dtr_uart(void)
 		return;
 	}
 
-	sm_at_client_configure_dtr_uart(false, K_NO_WAIT);
+	dtr_config.automatic = false;
+	k_work_cancel(&dtr_uart_enable_work);
 	k_work_reschedule(&dtr_uart_disable_work, K_NO_WAIT);
 }
 
@@ -949,7 +953,8 @@ void sm_at_client_enable_dtr_uart(void)
 		return;
 	}
 
-	sm_at_client_configure_dtr_uart(false, K_NO_WAIT);
+	dtr_config.automatic = false;
+	k_work_cancel_delayable(&dtr_uart_disable_work);
 	k_work_submit(&dtr_uart_enable_work);
 }
 
@@ -993,7 +998,7 @@ int sm_at_client_shell_smsh_dtr_uart_auto(const struct shell *shell, size_t argc
 		return -EINVAL;
 	}
 
-	sm_at_client_configure_dtr_uart(true, K_MSEC(timeout));
+	sm_at_client_automatic_dtr_uart(K_MSEC(timeout));
 
 	shell_print(shell, "Automatic DTR UART. Inactivity timeout %u ms", timeout);
 
