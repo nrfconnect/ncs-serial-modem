@@ -96,11 +96,9 @@ int sm_at_client_register_ri_handler(sm_ri_handler_t handler);
  * If automatic DTR UART handling is enabled, the library will enable DTR UART when RI
  * signal is detected, and disable it after inactivity timeout.
  *
- * @param automatic If true, DTR UART is automatically managed by the library.
- * @param inactivity Inactivity timeout for DTR UART disablement. Only used if @p
- * automatic is true.
+ * @param inactivity Inactivity timeout for DTR UART disablement.
  */
-void sm_at_client_configure_dtr_uart(bool automatic, k_timeout_t inactivity);
+void sm_at_client_automatic_dtr_uart(k_timeout_t inactivity);
 
 /**
  * @brief Disable DTR UART
