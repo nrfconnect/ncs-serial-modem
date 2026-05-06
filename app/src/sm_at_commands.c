@@ -31,6 +31,7 @@
 #include "sm_at_fota.h"
 #include "sm_version.h"
 #include "sm_at_nrfcloud.h"
+#include "sm_log.h"
 
 LOG_MODULE_REGISTER(sm_at, CONFIG_SM_LOG_LEVEL);
 
@@ -161,7 +162,7 @@ FUNC_NORETURN void sm_reset(void)
 {
 	sm_at_host_uninit();
 	sm_power_off_modem();
-	log_flush();
+	sm_log_flush();
 	sys_reboot(SYS_REBOOT_COLD);
 }
 

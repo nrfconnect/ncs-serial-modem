@@ -19,6 +19,7 @@
 #include "sm_util.h"
 #include "sm_ctrl_pin.h"
 #include "sm_uart_handler.h"
+#include "sm_log.h"
 
 LOG_MODULE_REGISTER(sm, CONFIG_SM_LOG_LEVEL);
 
@@ -291,7 +292,7 @@ static int sm_main(void)
 	return ret;
 
 exit_reboot:
-	log_flush();
+	sm_log_flush();
 	sys_reboot(SYS_REBOOT_COLD);
 }
 SYS_INIT(sm_main, APPLICATION, 100);

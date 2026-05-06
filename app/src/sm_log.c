@@ -69,6 +69,15 @@ static bool uart_is_active(void)
 	return state == PM_DEVICE_STATE_ACTIVE;
 }
 
+void sm_log_flush(void)
+{
+	const struct log_backend *log_be = log_backend_get_by_name("log_backend_uart");
+
+	if (log_be && log_be->cb && log_be->cb->initialized) {
+		log_flush();
+	}
+}
+
 SM_AT_CMD_CUSTOM(xlog, "AT#XLOG", handle_at_log);
 STATIC int handle_at_log(enum at_parser_cmd_type cmd_type, struct at_parser *parser, uint32_t)
 {

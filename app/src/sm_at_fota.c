@@ -24,6 +24,7 @@
 #include "sm_at_host.h"
 #include "sm_at_fota.h"
 #include "sm_defines.h"
+#include "sm_log.h"
 
 LOG_MODULE_REGISTER(sm_fota, CONFIG_SM_LOG_LEVEL);
 
@@ -582,7 +583,7 @@ FUNC_NORETURN static void handle_full_fota_activation_fail(int ret)
 		LOG_INF("External flash erase succeeded");
 
 	LOG_WRN("Rebooting...");
-	log_flush();
+	sm_log_flush();
 	sys_reboot(SYS_REBOOT_COLD);
 }
 

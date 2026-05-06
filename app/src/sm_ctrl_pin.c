@@ -15,6 +15,7 @@
 #include "sm_defines.h"
 #include "sm_util.h"
 #include "sm_ctrl_pin.h"
+#include "sm_log.h"
 
 LOG_MODULE_REGISTER(sm_ctrl_pin, CONFIG_SM_LOG_LEVEL);
 
@@ -101,7 +102,7 @@ void sm_ctrl_pin_enter_sleep_no_uninit(bool at_host_power_off)
 	}
 
 	LOG_INF("Entering sleep. No uninit.");
-	log_flush();
+	sm_log_flush();
 
 	k_sleep(K_MSEC(100));
 
@@ -155,7 +156,7 @@ void sm_ctrl_pin_enter_idle(void)
 void sm_ctrl_pin_enter_shutdown(void)
 {
 	LOG_INF("Entering shutdown.");
-	log_flush();
+	sm_log_flush();
 	k_sleep(K_MSEC(100));
 
 	nrf_regulators_system_off(NRF_REGULATORS_NS);

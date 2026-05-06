@@ -2108,7 +2108,6 @@ SYS_INIT(sm_at_host_init, APPLICATION, 0);
 void sm_at_host_uninit(void)
 {
 	/* TODO: implement this */
-	LOG_ERR("at_host uninit not yet implemented");
 }
 
 SM_AT_CMD_CUSTOM(xdatactrl, "AT#XDATACTRL", handle_at_datactrl);
