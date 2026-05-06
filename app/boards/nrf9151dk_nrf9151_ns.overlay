@@ -8,6 +8,7 @@
 	chosen {
 		ncs,sm-uart = &dtr_uart0;
 		nordic,pm-ext-flash = &gd25wb256;
+		zephyr,console = &uart1;
 	};
 };
 
@@ -68,4 +69,12 @@
  */
 &i2c2 {
 	status = "disabled";
+};
+
+/* Enable UART1 as the shared backend for Zephyr logs and modem traces (VCOM1 on the DK).
+ * Modem traces require 1 000 000 baud. Hardware flow control is not used.
+ */
+&uart1 {
+	status = "okay";
+	current-speed = <1000000>;
 };

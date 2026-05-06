@@ -13,7 +13,8 @@ Trace AT commands
 
 This page describes the AT commands for controlling the shared UART trace backend.
 
-These commands are only available when the application is built with the :file:`overlay-trace-backend-uart.conf` and :file:`overlay-trace-backend-uart.overlay` configuration overlays.
+The ``AT#XLOG`` command is always available in the default build.
+The ``AT#XTRACE`` command requires building with the :file:`overlay-trace-backend-uart.conf` configuration overlay.
 See :ref:`sm_logging_uart_backend` for a full description of the feature.
 
 The Zephyr application log backend (``AT#XLOG``) and the modem trace backend (``AT#XTRACE``) share a single UART.

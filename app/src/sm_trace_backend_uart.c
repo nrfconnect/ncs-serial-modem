@@ -11,11 +11,6 @@
  * This backend uses uart_tx (async DMA).  The two are mutually exclusive in
  * time: AT#XLOG and AT#XTRACE each refuse to enable if the other is active.
  *
- * AT#XLOG=1   enable Zephyr application log backend
- * AT#XLOG=0   disable Zephyr application log backend
- * AT#XTRACE=1 enable modem trace backend
- * AT#XTRACE=0 disable modem trace backend
- *
  * The UART is suspended when backends are off and resumed when either
  * is enabled.  No baud-rate switching is performed; both sides run at the
  * baud rate configured in the devicetree (1 000 000 baud on the nRF9151 DK).
@@ -24,7 +19,6 @@
 #include <zephyr/drivers/uart.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
-#include <zephyr/logging/log_ctrl.h>
 #include <zephyr/pm/device.h>
 #include <modem/trace_backend.h>
 
@@ -41,9 +35,9 @@ LOG_MODULE_REGISTER(sm_trace_backend_uart, CONFIG_MODEM_TRACE_BACKEND_LOG_LEVEL)
 /* Timeout per individual UART TX attempt. */
 #define UART_TX_WAIT_TIME_MS 1000
 
-/* UART device for the log backend is used both for Zephyr logs and modem traces. */
-#define TRACE_UART_DEVICE_NODE DT_CHOSEN(zephyr_console)
-static const struct device *const trace_uart_dev = DEVICE_DT_GET(TRACE_UART_DEVICE_NODE);
+/* Zephyr console UART is used both for application logs and modem traces. */
+#define UART_DEVICE_NODE DT_CHOSEN(zephyr_console)
+static const struct device *const uart_dev = DEVICE_DT_GET(UART_DEVICE_NODE);
 
 /* Synchronizes trace_backend_write() with activate/deactivate. */
 static K_SEM_DEFINE(tx_sem, 0, 1);
@@ -56,11 +50,8 @@ static volatile size_t tx_bytes;
 
 static trace_backend_processed_cb trace_processed_callback;
 
-/* Track which backend is currently using the UART. */
-static bool log_active;
 static bool trace_active;
 
-/* UART async callback — only called when trace backend is active. */
 static void uart_callback(const struct device *dev, struct uart_event *evt, void *user_data)
 {
 	ARG_UNUSED(dev);
@@ -85,20 +76,12 @@ static int trace_backend_init(trace_backend_processed_cb trace_processed_cb)
 		return -EFAULT;
 	}
 
-	if (!device_is_ready(trace_uart_dev)) {
+	if (!device_is_ready(uart_dev)) {
 		LOG_ERR("UART device not ready");
 		return -ENODEV;
 	}
 
 	trace_processed_callback = trace_processed_cb;
-
-	/* Suspend UART at startup it can be resumed in runtime. */
-	int ret = pm_device_action_run(trace_uart_dev, PM_DEVICE_ACTION_SUSPEND);
-
-	if (ret && ret != -EALREADY) {
-		LOG_ERR("Failed to %s UART device: %d", "suspend", ret);
-		return ret;
-	}
 
 	return 0;
 }
@@ -121,7 +104,7 @@ static int trace_backend_write(const void *data, size_t len)
 
 	k_sem_take(&tx_sem, K_FOREVER);
 
-	ret = uart_tx(trace_uart_dev, (const uint8_t *)data, chunk,
+	ret = uart_tx(uart_dev, (const uint8_t *)data, chunk,
 		      UART_TX_WAIT_TIME_MS * USEC_PER_MSEC);
 	if (ret) {
 		LOG_ERR("uart_tx failed: %d", ret);
@@ -161,7 +144,7 @@ static int trace_backend_activate(void)
 	/* Register the async callback. The log backend never calls
 	 * uart_callback_set (it uses polling), so this is the sole owner.
 	 */
-	ret = uart_callback_set(trace_uart_dev, uart_callback, NULL);
+	ret = uart_callback_set(uart_dev, uart_callback, NULL);
 	if (ret) {
 		LOG_ERR("Failed to set UART callback: %d", ret);
 		return ret;
@@ -191,7 +174,7 @@ static int trace_backend_deactivate(void)
 
 	/* Wait for any in-flight write to release tx_sem. */
 	if (k_sem_take(&tx_sem, K_MSEC(UART_TX_WAIT_TIME_MS)) != 0) {
-		uart_tx_abort(trace_uart_dev);
+		uart_tx_abort(uart_dev);
 		k_sem_take(&tx_sem, K_FOREVER);
 	}
 
@@ -204,17 +187,19 @@ static int trace_backend_deactivate(void)
 
 static int uart_suspend(void)
 {
-	int ret = pm_device_action_run(trace_uart_dev, PM_DEVICE_ACTION_SUSPEND);
+	int ret = pm_device_action_run(uart_dev, PM_DEVICE_ACTION_SUSPEND);
 
 	if (ret && ret != -EALREADY) {
 		LOG_ERR("Failed to %s UART device: %d", "suspend", ret);
+		return ret;
 	}
-	return ret;
+
+	return 0;
 }
 
 static int uart_resume(void)
 {
-	int ret = pm_device_action_run(trace_uart_dev, PM_DEVICE_ACTION_RESUME);
+	int ret = pm_device_action_run(uart_dev, PM_DEVICE_ACTION_RESUME);
 
 	if (ret && ret != -EALREADY) {
 		LOG_ERR("Failed to %s UART device: %d", "resume", ret);
@@ -223,57 +208,16 @@ static int uart_resume(void)
 	return 0;
 }
 
-SM_AT_CMD_CUSTOM(xlog, "AT#XLOG", handle_at_log);
-STATIC int handle_at_log(enum at_parser_cmd_type cmd_type, struct at_parser *parser, uint32_t)
+static bool uart_is_active(void)
 {
-	const struct log_backend *log_be = log_backend_get_by_name("log_backend_uart");
+	enum pm_device_state state = PM_DEVICE_STATE_OFF;
+	int err = pm_device_state_get(uart_dev, &state);
 
-	if (!log_be) {
-		return -ENODEV;
+	if (err) {
+		LOG_ERR("Failed to get UART device state (%d).", err);
+		return false;
 	}
-
-	if (cmd_type == AT_PARSER_CMD_TYPE_SET) {
-		int mode;
-		int ret = at_parser_num_get(parser, 1, &mode);
-
-		if (ret || (mode < 0) || (mode > 1)) {
-			return -EINVAL;
-		}
-		if (trace_active) {
-			return -EBUSY;
-		}
-		if (mode == (int)log_active) {
-			return 0;
-		}
-
-		if (mode == 1) {
-			ret = uart_resume();
-			if (ret) {
-				return ret;
-			}
-			if (!log_be->cb->initialized) {
-				log_backend_init(log_be);
-			}
-			log_backend_enable(log_be, log_be->cb->ctx, CONFIG_LOG_DEFAULT_LEVEL);
-			log_active = true;
-		} else {
-			log_backend_disable(log_be);
-			ret = uart_suspend();
-			if (ret) {
-				return ret;
-			}
-			log_active = false;
-		}
-		return 0;
-	} else if (cmd_type == AT_PARSER_CMD_TYPE_READ) {
-		rsp_send("\r\n#XLOG: %d\r\n", (int)log_active);
-		return 0;
-	} else if (cmd_type == AT_PARSER_CMD_TYPE_TEST) {
-		rsp_send("\r\n#XLOG: (0,1)\r\n");
-		return 0;
-	}
-
-	return -EINVAL;
+	return state == PM_DEVICE_STATE_ACTIVE;
 }
 
 SM_AT_CMD_CUSTOM(xtrace, "AT#XTRACE", handle_at_trace);
@@ -286,11 +230,13 @@ STATIC int handle_at_trace(enum at_parser_cmd_type cmd_type, struct at_parser *p
 		if (ret || (mode < 0) || (mode > 1)) {
 			return -EINVAL;
 		}
-		if (log_active) {
-			return -EBUSY;
-		}
+
 		if (mode == (int)trace_active) {
 			return 0;
+		}
+
+		if (mode == 1 && uart_is_active()) {
+			return -EBUSY;
 		}
 
 		if (mode == 1) {
@@ -325,3 +271,20 @@ STATIC int handle_at_trace(enum at_parser_cmd_type cmd_type, struct at_parser *p
 
 	return -EINVAL;
 }
+
+static int sm_trace_backend_uart_init(void)
+{
+	/* Allow UART to be active if CONFIG_LOG_BACKEND_UART_AUTOSTART=y */
+	if (!IS_ENABLED(CONFIG_LOG_BACKEND_UART_AUTOSTART)) {
+		/* Start the trace backend disabled. */
+		if (uart_suspend()) {
+			LOG_ERR("Failed to suspend UART trace backend");
+			sm_init_failed = true;
+			return -EFAULT;
+		}
+	}
+
+	return 0;
+}
+
+SYS_INIT(sm_trace_backend_uart_init, POST_KERNEL, CONFIG_APPLICATION_INIT_PRIORITY);

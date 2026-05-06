@@ -21,6 +21,7 @@ target_sources(app PRIVATE src/sm_at_icmp.c)
 target_sources(app PRIVATE src/sm_at_fota.c)
 target_sources(app PRIVATE src/sm_at_dfu.c)
 target_sources(app PRIVATE src/sm_uart_handler.c)
+target_sources(app PRIVATE src/sm_log.c)
 # NORDIC SDK APP END
 target_sources_ifdef(CONFIG_SM_SMS app PRIVATE src/sm_at_sms.c)
 target_sources_ifdef(CONFIG_SM_PPP app PRIVATE src/sm_ppp.c)

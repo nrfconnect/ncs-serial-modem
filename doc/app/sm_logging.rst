@@ -13,46 +13,47 @@ Logs often refer to the |SM| application logging while the modem logs are referr
 Application logging
 *******************
 
-|SM| uses the SEGGER Real-Time Transfer (RTT) for application logging by default.
-You can view the RTT logs with an RTT client such as ``J-Link RTT Viewer``.
-See `Testing and optimization`_ for instructions on how to view the logs.
+|SM| outputs application logs over ``UART1`` (VCOM1 on the nRF9151 DK) by default.
+The UART is kept suspended at startup and activated at runtime using the ``AT#XLOG=1`` command.
+This avoids any UART power overhead when logs are not needed.
+See :ref:`SM_AT_trace` for the full command reference.
 
 .. note::
    The negative error codes that are visible in logs are *errno* codes defined in `nrf_errno.h`_.
-
-By default, the |SM| uses the ``UART0`` for sending and receiving AT commands.
-If a different UART is used, the application log can be output through ``UART0`` while AT commands are sent and received through the other UART.
-To switch to ``UART0`` output for application logs, change the following options in the :file:`prj.conf` file::
-
-   # Segger RTT
-   CONFIG_USE_SEGGER_RTT=n
-   CONFIG_RTT_CONSOLE=n
-   CONFIG_UART_CONSOLE=y
-   CONFIG_LOG_BACKEND_RTT=n
-   CONFIG_LOG_BACKEND_UART=y
 
 The default logging level for the |SM| is ``CONFIG_SM_LOG_LEVEL_INF``.
 You can get more verbose logs by setting the ``CONFIG_SM_LOG_LEVEL_DBG`` Kconfig option.
 
 TF-M logging must use the same UART as the application. For more details, see `shared TF-M logging`_.
 
-Modem traces
-************
+.. _sm_logging_rtt:
 
-To send modem traces over UART on an nRF91 Series DK, configuration must be added for the UART device in the devicetree and Kconfig.
-This is done by adding the `modem trace UART snippet`_ (``-Dapp_SNIPPET=nrf91-modem-trace-uart``) when building and programming.
+Enabling RTT logs
+=================
 
-Use the `Cellular Monitor app`_ for capturing and analyzing modem traces.
+RTT logging is disabled by default.
+To switch from UART1 back to SEGGER RTT, add the following to your :file:`prj.conf`::
+
+   # Disable UART logging
+   CONFIG_UART_CONSOLE=n
+   CONFIG_LOG_BACKEND_UART=n
+
+   # Enable Segger RTT
+   CONFIG_USE_SEGGER_RTT=y
+   CONFIG_RTT_CONSOLE=y
+   CONFIG_LOG_BACKEND_RTT=y
+   # Optional: increase the buffer so that boot logs are not lost before RTT Viewer connects.
+   CONFIG_SEGGER_RTT_BUFFER_SIZE_UP=2048
+
+You can view the RTT logs with an RTT client such as ``J-Link RTT Viewer``.
+See `Testing and optimization`_ for instructions.
+
 
 .. note::
 
-   When measuring power consumption while the modem is active, the modem traces must not be active.
-   If the build includes modem traces, the traces must be deactivated with ``AT%XMODEMTRACE=0``, before taking measurements.
-   Active traces show approximately 700 uA overhead on the power consumption.
-
-   If ``hw-flow-control`` is enabled for the trace UART in the devicetree (it is disabled by default), the same approximately 700 uA overhead is present even when the traces are deactivated using ``AT%XMODEMTRACE=0``.
-   ``hw-flow-control`` prevents the trace UART from sending, when there is no reader for the data.
-   This prevents the trace UART from suspending, as it cannot empty its buffers.
+   `nRF9151 anomaly 36`_ locks the debug port when the application reaches a low power state (<3 uA current consumption).
+   This takes place when DTR is deasserted and the RTT client, such as J-Link RTT Viewer, is not connected.
+   Since the RTT backend relies on the debug port, the RTT client must be connected before the application enters a low power state to avoid this issue.
 
 .. note::
 
@@ -68,20 +69,22 @@ Use the `Cellular Monitor app`_ for capturing and analyzing modem traces.
 Shared UART log and trace backend
 **********************************
 
-The |SM| application supports a shared UART backend that routes both Zephyr application logs and modem traces to the same physical UART (``UART1``, VCOM1 on the nRF9151 DK).
+The |SM| application routes Zephyr application logs to ``UART1`` (VCOM1 on the nRF9151 DK) by default.
 The baud rate of the shared UART is set to 1000000 to support the high data rate required for modem traces.
 
 Configuration
 =============
 
-To use the shared UART backend, build the |SM| application with the Kconfig and devicetree overlays:
+Application log output over ``UART1`` is included in the default build.
+
+To also enable the modem trace backend (``AT#XTRACE``), build with the Kconfig overlay:
 
 .. code-block:: console
 
-   west build -p -b nrf9151dk/nrf9151/ns -- -DEXTRA_CONF_FILE="overlay-trace-backend-uart.conf" -DEXTRA_DTC_OVERLAY_FILE="overlay-trace-backend-uart.overlay"
+   west build -p -b nrf9151dk/nrf9151/ns -- -DEXTRA_CONF_FILE="overlay-trace-backend-uart.conf"
 
-After flashing, both backends are disabled by default, and the UART is suspended.
-Use the ``AT#XLOG`` and ``AT#XTRACE`` AT commands to activate them at runtime.
+After flashing, the UART is suspended at startup.
+Use ``AT#XLOG=1`` to activate application logs and ``AT#XTRACE=1`` to activate modem traces.
 See :ref:`SM_AT_trace` for the full command reference.
 
 .. note::

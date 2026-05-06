@@ -15,6 +15,11 @@ Required changes
 
 The following changes are mandatory to make your application work in the same way as in previous releases.
 
+* Application logging backend changed from RTT to UART — The default application log backend has changed from SEGGER RTT to UART1 (VCOM1 on the nRF9151 DK).
+  The UART is suspended at startup and activated at runtime with ``AT#XLOG=1``.
+  See :ref:`SM_AT_trace` for the full command reference.
+  If you cannot move to UART logs, see :ref:`sm_logging_rtt` for how to re-enable RTT logs.
+
 * Full FOTA - When compiling, rename ``overlay-full_fota.conf`` to ``overlay-full-fota.conf`` and add ``PM_STATIC_YML_FILE=pm_static_nrf9151dk_nrf9151_ns_full_fota.yml`` to the build configuration.
   See :ref:`SM_AT_FOTA` for more information.
 
