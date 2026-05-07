@@ -54,6 +54,14 @@ enum sm_gnss_operation {
 	GNSS_START,
 };
 
+/** #XGNSS cloud_assistance values. */
+enum sm_gnss_cloud_assistance {
+	GNSS_CLOUD_ASSIST_NONE      = 0,
+	GNSS_CLOUD_ASSIST_SLM_NRF   = 1, /* SLM-side nRF Cloud A-GNSS/P-GPS */
+	GNSS_CLOUD_ASSIST_HOST_FWD  = 2, /* Forward AGNSS_REQ to host via URC */
+	GNSS_CLOUD_ASSIST_MAX
+};
+
 #if defined(CONFIG_SM_NRF_CLOUD)
 
 #if defined(CONFIG_NRF_CLOUD_AGNSS)
@@ -66,6 +74,9 @@ static struct gps_pgps_request pgps_coap_request;
 #endif
 
 #endif /* CONFIG_SM_NRF_CLOUD */
+
+/* Forwarder work for cloud_assistance == GNSS_CLOUD_ASSIST_HOST_FWD. */
+static struct k_work agnss_host_fwd_work;
 
 static struct k_work gnss_fix_send_work;
 
@@ -171,6 +182,14 @@ static void on_gnss_evt_agnss_req(void)
 		return;
 	}
 	gnss_gps_req_to_send = false;
+
+	if (gnss_cloud_assistance == GNSS_CLOUD_ASSIST_HOST_FWD) {
+		/* Forward request to host as #XAGNSS URC; the host owns the cloud
+		 * connection and the eventual nrf_modem_gnss_agnss_write() pushes.
+		 */
+		k_work_submit_to_queue(&sm_work_q, &agnss_host_fwd_work);
+		return;
+	}
 
 #if defined(CONFIG_SM_NRF_CLOUD)
 
@@ -473,6 +492,286 @@ static void pgps_event_handler(struct nrf_cloud_pgps_event *event)
 
 #endif /* CONFIG_SM_NRF_CLOUD */
 
+/* -------------------------------------------------------------------------
+ * Host-forward A-GNSS support
+ *
+ * When AT#XGNSS is started with cloud_assistance = 2, this SLM does not own
+ * any cloud connection: it simply forwards NRF_MODEM_GNSS_EVT_AGNSS_REQ to
+ * the host as a #XAGNSS URC, then accepts AT#XAGNSS=<len>,<type> + raw bytes
+ * back from the host and feeds them to the modem via nrf_modem_gnss_agnss_write().
+ *
+ * URC format (matches nrf_modem_gnss_agnss_data_frame):
+ *   #XAGNSS: <data_flags>,<sysN>[,<sys_id>,<sv_mask_ephe>,<sv_mask_alm>]*sysN
+ * ---------------------------------------------------------------------- */
+
+static void agnss_host_forwarder(struct k_work *)
+{
+	struct nrf_modem_gnss_agnss_data_frame req;
+	int err;
+	char line[256];
+	int off;
+	int rem;
+
+	err = nrf_modem_gnss_read(&req, sizeof(req), NRF_MODEM_GNSS_DATA_AGNSS_REQ);
+	if (err) {
+		LOG_ERR("Failed to read A-GNSS request to forward (%d).", err);
+		return;
+	}
+
+	if (req.system_count > NRF_MODEM_GNSS_MAX_SYSTEMS) {
+		LOG_ERR("A-GNSS request system_count=%u exceeds bound %u",
+			req.system_count, NRF_MODEM_GNSS_MAX_SYSTEMS);
+		return;
+	}
+
+	off = 0;
+	rem = (int)sizeof(line);
+
+	int n = snprintf(line + off, rem, "\r\n#XAGNSS: %u,%u",
+			 req.data_flags, req.system_count);
+	if (n < 0 || n >= rem) {
+		LOG_ERR("A-GNSS URC header truncated.");
+		return;
+	}
+	off += n;
+	rem -= n;
+
+	for (uint8_t i = 0; i < req.system_count; i++) {
+		n = snprintf(line + off, rem, ",%u,%llu,%llu",
+			     req.system[i].system_id,
+			     (unsigned long long)req.system[i].sv_mask_ephe,
+			     (unsigned long long)req.system[i].sv_mask_alm);
+		if (n < 0 || n >= rem) {
+			LOG_ERR("A-GNSS URC body truncated at system %u.", i);
+			return;
+		}
+		off += n;
+		rem -= n;
+	}
+
+	n = snprintf(line + off, rem, "\r\n");
+	if (n < 0 || n >= rem) {
+		LOG_ERR("A-GNSS URC tail truncated.");
+		return;
+	}
+
+	urc_send_to(gnss_pipe, "%s", line);
+	LOG_INF("Forwarded AGNSS_REQ: data_flags=0x%08x systems=%u",
+		req.data_flags, req.system_count);
+}
+
+/* Per-write context for AT#XAGNSS=<len>,<type>.  Single-shot: the host serializes
+ * its calls (host shim holds at_cmd_mutex through the entire transaction).
+ */
+#define SM_AGNSS_WRITE_BUF_SZ 4096
+static uint8_t  agnss_write_buf[SM_AGNSS_WRITE_BUF_SZ];
+static size_t   agnss_write_expected_len;
+static size_t   agnss_write_received_len;
+static uint16_t agnss_write_type;
+
+static int xagnss_datamode_callback(uint8_t op, const uint8_t *data, int len, uint8_t flags)
+{
+	int err;
+
+	switch (op) {
+	case DATAMODE_SEND:
+		if (data == NULL || len <= 0) {
+			LOG_ERR("AGNSS chunk invalid (data=%p len=%d)", (void *)data, len);
+			return -EINVAL;
+		}
+		if (flags & SM_DATAMODE_FLAGS_MORE_DATA) {
+			LOG_ERR("AGNSS data buffer overflow.");
+			exit_datamode_handler(sm_at_host_get_current(), -EOVERFLOW);
+			return -EOVERFLOW;
+		}
+		if (agnss_write_received_len + (size_t)len > agnss_write_expected_len) {
+			LOG_ERR("AGNSS chunk overruns expected length.");
+			exit_datamode_handler(sm_at_host_get_current(), -EMSGSIZE);
+			return -EMSGSIZE;
+		}
+		memcpy(agnss_write_buf + agnss_write_received_len, data, (size_t)len);
+		agnss_write_received_len += (size_t)len;
+		return len;
+
+	case DATAMODE_EXIT:
+		if (agnss_write_received_len != agnss_write_expected_len) {
+			LOG_WRN("AGNSS short payload: %zu/%zu",
+				agnss_write_received_len, agnss_write_expected_len);
+			return -EIO;
+		}
+		err = nrf_modem_gnss_agnss_write(agnss_write_buf,
+						 (int32_t)agnss_write_received_len,
+						 agnss_write_type);
+		if (err) {
+			LOG_WRN("nrf_modem_gnss_agnss_write(type=%u, len=%zu) failed: %d",
+				agnss_write_type, agnss_write_received_len, err);
+			return err;
+		}
+		LOG_DBG("AGNSS injected: type=%u len=%zu",
+			agnss_write_type, agnss_write_received_len);
+		return 0;
+
+	default:
+		return 0;
+	}
+}
+
+SM_AT_CMD_CUSTOM(xagnss, "AT#XAGNSS", handle_at_xagnss);
+static int handle_at_xagnss(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+			    uint32_t param_count)
+{
+	int err;
+	uint32_t len;
+	uint16_t type;
+
+	switch (cmd_type) {
+	case AT_PARSER_CMD_TYPE_SET:
+		if (param_count != 3) {
+			return -EINVAL;
+		}
+		err = at_parser_num_get(parser, 1, &len);
+		if (err) {
+			return err;
+		}
+		err = at_parser_num_get(parser, 2, &type);
+		if (err) {
+			return err;
+		}
+		if (len == 0 || len > sizeof(agnss_write_buf)) {
+			LOG_ERR("AGNSS write length %u out of range (max %zu).",
+				len, sizeof(agnss_write_buf));
+			return -EINVAL;
+		}
+
+		agnss_write_expected_len = (size_t)len;
+		agnss_write_received_len = 0;
+		agnss_write_type = type;
+
+		err = enter_datamode(xagnss_datamode_callback, (size_t)len);
+		if (err) {
+			LOG_ERR("Failed to enter AGNSS data mode: %d", err);
+			return err;
+		}
+		return 0;
+
+	case AT_PARSER_CMD_TYPE_TEST:
+		rsp_send("\r\n#XAGNSS: <len>,<type>\r\n");
+		return 0;
+
+	default:
+		return -EINVAL;
+	}
+}
+
+/* AT#XAGNSSP=<len> - bulk nRF Cloud A-GNSS blob push.
+ *
+ * The host (running the Zephyr modem proxy) hands the entire nRF Cloud
+ * A-GNSS payload to the SLM verbatim and the SLM calls
+ * nrf_cloud_agnss_process() locally.  This avoids the host/SLM struct-
+ * padding hazard of per-type AT#XAGNSS, where uninitialized stack padding
+ * inside ephemeris/UTC structs causes the modem to reject writes with
+ * -EINVAL.
+ *
+ * The buffer is large enough to hold a full GPS+QZSS A-GNSS payload with
+ * integrity in a single CMUX transfer.
+ */
+#define SM_AGNSSP_BUF_SZ 8192
+static uint8_t agnssp_buf[SM_AGNSSP_BUF_SZ];
+static size_t  agnssp_expected_len;
+static size_t  agnssp_received_len;
+
+static int xagnssp_datamode_callback(uint8_t op, const uint8_t *data, int len, uint8_t flags)
+{
+	switch (op) {
+	case DATAMODE_SEND:
+		if (data == NULL || len <= 0) {
+			LOG_ERR("AGNSSP chunk invalid (data=%p len=%d)", (void *)data, len);
+			return -EINVAL;
+		}
+		if (flags & SM_DATAMODE_FLAGS_MORE_DATA) {
+			LOG_ERR("AGNSSP buffer overflow.");
+			exit_datamode_handler(sm_at_host_get_current(), -EOVERFLOW);
+			return -EOVERFLOW;
+		}
+		if (agnssp_received_len + (size_t)len > agnssp_expected_len) {
+			LOG_ERR("AGNSSP chunk overruns expected length.");
+			exit_datamode_handler(sm_at_host_get_current(), -EMSGSIZE);
+			return -EMSGSIZE;
+		}
+		memcpy(agnssp_buf + agnssp_received_len, data, (size_t)len);
+		agnssp_received_len += (size_t)len;
+		return len;
+
+	case DATAMODE_EXIT:
+		if (agnssp_received_len != agnssp_expected_len) {
+			LOG_WRN("AGNSSP short payload: %zu/%zu",
+				agnssp_received_len, agnssp_expected_len);
+			return -EIO;
+		}
+#if defined(CONFIG_NRF_CLOUD_AGNSS)
+		{
+			int err = nrf_cloud_agnss_process((const char *)agnssp_buf,
+							  agnssp_received_len);
+
+			if (err) {
+				LOG_WRN("nrf_cloud_agnss_process(len=%zu) failed: %d",
+					agnssp_received_len, err);
+				return err;
+			}
+			LOG_INF("AGNSSP processed: %zu bytes", agnssp_received_len);
+			return 0;
+		}
+#else
+		LOG_WRN("AGNSSP received but CONFIG_NRF_CLOUD_AGNSS=n");
+		return -ENOTSUP;
+#endif
+
+	default:
+		return 0;
+	}
+}
+
+SM_AT_CMD_CUSTOM(xagnssp, "AT#XAGNSSP", handle_at_xagnssp);
+static int handle_at_xagnssp(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+			     uint32_t param_count)
+{
+	int err;
+	uint32_t len;
+
+	switch (cmd_type) {
+	case AT_PARSER_CMD_TYPE_SET:
+		if (param_count != 2) {
+			return -EINVAL;
+		}
+		err = at_parser_num_get(parser, 1, &len);
+		if (err) {
+			return err;
+		}
+		if (len == 0 || len > sizeof(agnssp_buf)) {
+			LOG_ERR("AGNSSP length %u out of range (max %zu).",
+				len, sizeof(agnssp_buf));
+			return -EINVAL;
+		}
+
+		agnssp_expected_len = (size_t)len;
+		agnssp_received_len = 0;
+
+		err = enter_datamode(xagnssp_datamode_callback, (size_t)len);
+		if (err) {
+			LOG_ERR("Failed to enter AGNSSP data mode: %d", err);
+			return err;
+		}
+		return 0;
+
+	case AT_PARSER_CMD_TYPE_TEST:
+		rsp_send("\r\n#XAGNSSP: <len>\r\n");
+		return 0;
+
+	default:
+		return -EINVAL;
+	}
+}
+
 #if defined(CONFIG_SM_LOG_LEVEL_DBG)
 static void on_gnss_evt_nmea(void)
 {
@@ -740,24 +1039,27 @@ static int handle_at_gnss(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 
 			err = at_parser_num_get(
 				parser, CLOUD_ASSISTANCE_IDX, &gnss_cloud_assistance);
-			if (err || gnss_cloud_assistance > 1) {
+			if (err || gnss_cloud_assistance >= GNSS_CLOUD_ASSIST_MAX) {
 				return -EINVAL;
 			}
-			if (!IS_ENABLED(CONFIG_NRF_CLOUD_AGNSS) &&
-			    !IS_ENABLED(CONFIG_NRF_CLOUD_PGPS)
-			&& gnss_cloud_assistance) {
-				LOG_ERR("A-GNSS and/or P-GPS must be enabled during compilation.");
-				return -ENOTSUP;
-			}
-
-			if (gnss_cloud_assistance
+			/* Mode 2 (host-forward) does not need any nRF Cloud bits compiled
+			 * in or any cloud connection on this side: the host owns the
+			 * cloud transaction and pushes assistance data back via AT#XAGNSS.
+			 */
+			if (gnss_cloud_assistance == GNSS_CLOUD_ASSIST_SLM_NRF) {
+				if (!IS_ENABLED(CONFIG_NRF_CLOUD_AGNSS) &&
+				    !IS_ENABLED(CONFIG_NRF_CLOUD_PGPS)) {
+					LOG_ERR("A-GNSS and/or P-GPS must be enabled "
+						"during compilation.");
+					return -ENOTSUP;
+				}
 #if defined(CONFIG_SM_NRF_CLOUD)
-			&& !sm_nrf_cloud_ready
+				if (!sm_nrf_cloud_ready) {
+					LOG_ERR("Connection to nRF Cloud is needed for "
+						"starting A-GNSS/P-GPS.");
+					return -ENOTCONN;
+				}
 #endif
-			) {
-				LOG_ERR(
-					"Connection to nRF Cloud is needed for starting A-GNSS/P-GPS.");
-				return -ENOTCONN;
 			}
 
 			err = at_parser_num_get(parser, INTERVAL_IDX, &interval);
@@ -827,7 +1129,7 @@ static int handle_at_gnss(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 		break;
 
 	case AT_PARSER_CMD_TYPE_TEST:
-		rsp_send("\r\n#XGNSS: (%d,%d),(0,1),<interval>,<timeout>\r\n",
+		rsp_send("\r\n#XGNSS: (%d,%d),(0,1,2),<interval>,<timeout>\r\n",
 			GNSS_STOP, GNSS_START);
 		break;
 
@@ -894,6 +1196,7 @@ static int sm_at_gnss_init(void)
 #endif /* CONFIG_NRF_CLOUD_PGPS */
 #endif /* CONFIG_SM_NRF_CLOUD */
 	k_work_init(&gnss_fix_send_work, gnss_fix_sender);
+	k_work_init(&agnss_host_fwd_work, agnss_host_forwarder);
 
 	return 0;
 }
