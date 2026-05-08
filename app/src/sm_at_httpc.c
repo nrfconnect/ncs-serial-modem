@@ -482,6 +482,15 @@ static void http_send_data(struct http_request *req, const uint8_t *data, int le
 	data_send(req->pipe, data, len);
 }
 
+/*
+ * Detect HTTP/1.1 chunked transfer EOF marker in a body data buffer.
+ * The final chunk is always "0\r\n\r\n" (zero-length chunk, RFC 9112 §7.1.1).
+ */
+static bool chunked_eof(const uint8_t *data, int len)
+{
+	return len >= 5 && memcmp(data + len - 5, "0\r\n\r\n", 5) == 0;
+}
+
 /* Parse HTTP status code from response buffer */
 static int parse_http_status_code(const char *buf, int *status_code)
 {
@@ -616,12 +625,14 @@ static bool http_headers_complete(struct http_request *req, char *header_end,
 	}
 
 	/*
-	 * All body bytes arrived piggybacked with the headers and
-	 * content-length is satisfied.  With keep-alive connections
-	 * there is no subsequent EOF to trigger the completion check
-	 * in the RECEIVING_BODY path, so finish here instead.
+	 * Finish early when all body data is already in hand (piggybacked):
+	 * either content-length is satisfied, or chunked terminator was received.
+	 * With keep-alive connections there is no subsequent EOF to trigger the
+	 * completion check in the RECEIVING_BODY path.
 	 */
-	if (req->content_length >= 0 && req->bytes_sent >= req->content_length) {
+	if ((req->content_length >= 0 && req->bytes_sent >= req->content_length) ||
+	    (req->content_length < 0 &&
+	     chunked_eof(req->recv_buf + body_offset, body_len))) {
 		http_finish_request(req);
 		return true;
 	}
@@ -697,11 +708,31 @@ static void http_process_request(struct http_request *req, uint8_t events)
 		/* POLLHUP without POLLIN before headers are received is an error:
 		 * the server closed the connection before sending a valid response.
 		 */
-		if ((events & NRF_POLLHUP) && !(events & NRF_POLLIN) &&
-		    !req->headers_complete) {
-			LOG_ERR("HTTP %d: Connection closed before headers (POLLHUP)", req->fd);
-			http_fail_request(req);
-			return;
+		if (events & NRF_POLLHUP) {
+			if (!req->headers_complete) {
+				/* Server closed before headers arrived */
+				LOG_ERR("HTTP %d: Connection closed before headers (POLLHUP)",
+					req->fd);
+				http_fail_request(req);
+				return;
+			}
+			if (!(events & NRF_POLLIN)) {
+				/* POLLHUP alone during body reception: server closed cleanly
+				 * after all data.  Treat as EOF.
+				 */
+				if (req->state == HTTP_STATE_RECEIVING_BODY) {
+					if (req->content_length > 0 &&
+					    req->total_received < req->content_length)
+						LOG_WRN("HTTP %d: Incomplete - %d/%d bytes",
+							req->fd, req->total_received,
+							req->content_length);
+					http_finish_request(req);
+					return;
+				}
+				/* In RECEIVING_HEADERS, fall through to the POLLIN
+				 * handler which may drain remaining bytes.
+				 */
+			}
 		}
 
 		/* Handle POLLIN */
@@ -786,14 +817,18 @@ static void http_process_request(struct http_request *req, uint8_t events)
 					xapoll_stop(sock);
 					return;
 				}
+				bool body_done = chunked_eof(req->recv_buf, req->recv_buf_len);
+
 				http_send_data(req, req->recv_buf, req->recv_buf_len);
 				req->recv_buf_len = 0;
 
-				/* Finish if content-length satisfied, or if the connection
-				 * is already closing (POLLHUP co-fired) — no point re-arming
-				 * POLLIN on a closing socket; nrf_recv would return EAGAIN.
+				/* Finish if:
+				 *  - content-length satisfied (known-length transfer)
+				 *  - chunked terminator "0\r\n\r\n" just received
+				 *  - POLLHUP co-fired (connection closing)
 				 */
-				if ((req->content_length > 0 &&
+				if (body_done ||
+				    (req->content_length > 0 &&
 				     req->bytes_sent >= req->content_length) ||
 				    (events & NRF_POLLHUP)) {
 					http_finish_request(req);

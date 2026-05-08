@@ -109,7 +109,7 @@ Unsolicited notification
 * The ``<status_code>`` parameter is an integer.
   It contains the HTTP status code returned by the server.
 * The ``<content_length>`` parameter is an integer.
-  It contains the value of the ``Content-Length`` response header, or ``-1`` when no such header is present.
+  It contains the value of the ``Content-Length`` response header, or ``-1`` when the server uses chunked transfer encoding or does not provide a content length.
 
 ``#XHTTPCDATA`` is emitted in automatic mode for each received body chunk::
 
@@ -124,6 +124,14 @@ The notification line is terminated with ``\r\n`` and the raw body bytes follow 
 * The ``<length>`` parameter is an integer.
   It contains the number of body bytes in this chunk.
 
+.. note::
+
+   When the server uses ``Transfer-Encoding: chunked``, the body bytes delivered via ``#XHTTPCDATA`` include the raw chunked framing.
+   Each chunk consists of a size line (hexadecimal length followed by ``\r\n``), the chunk data, and a trailing ``\r\n``.
+   The final zero-length chunk ``0\r\n\r\n`` is also forwarded.
+   The host strips this framing to recover the original body content.
+   The ``<total_bytes>`` field in ``#XHTTPCSTAT`` reflects the raw wire byte count, including chunked framing, not the decoded body length.
+
 ``#XHTTPCSTAT`` is emitted when the request completes, fails, or is cancelled::
 
    #XHTTPCSTAT: <handle>,<status_code>,<total_bytes>
@@ -134,6 +142,7 @@ The notification line is terminated with ``\r\n`` and the raw body bytes follow 
   It contains the HTTP status code on success, or ``-1`` on failure, cancel, or timeout.
 * The ``<total_bytes>`` parameter is an integer.
    On successful completion, failure, or timeout, it contains the total number of response body bytes received by the HTTP client.
+   For chunked transfer encoding this includes the raw framing bytes (chunk-size lines, ``\r\n`` separators, and the final ``0\r\n\r\n`` terminator).
    On cancel (``status_code=-1`` from ``AT#XHTTPCCANCEL``), it contains the number of response body bytes already delivered to the host.
 
 .. note::
@@ -235,6 +244,28 @@ HTTP HEAD (no body — ``#XHTTPCSTAT`` follows immediately after ``#XHTTPCHEAD``
 
    #XHTTPCSTAT: 0,200,0
 
+HTTP POST with chunked response (``content_length=-1``):
+
+::
+
+   AT#XHTTPCREQ=0,<url>,1,1,1024
+   #XHTTPCREQ: 0
+   OK
+   <1024 bytes payload>
+   #XDATAMODE: 0
+
+   #XHTTPCHEAD: 0,200,-1
+
+   #XHTTPCDATA: 0,0,1132
+   460\r\n{"args":{},"data":"<1024 bytes>","url":"..."}\r\n0\r\n\r\n
+
+   #XHTTPCSTAT: 0,200,1132
+
+.. note::
+
+   The 1132 raw bytes break down as chunked framing: ``460\r\n`` (chunk-size 1120 decimal in hex, 5 bytes), 1120 bytes of JSON body, ``\r\n`` (chunk trailer, 2 bytes), and ``0\r\n\r\n`` (final zero-length chunk, 5 bytes).
+   Strip this framing to recover the 1120-byte JSON body.
+
 Test command
 ------------
 
@@ -313,9 +344,13 @@ When the socket buffer is temporarily empty (EAGAIN)::
   It contains the number of body bytes delivered in this pull.
   A value of ``0`` means the socket buffer is currently empty.
 
-When all body bytes have been delivered, ``#XHTTPCSTAT`` is sent as a URC after
-the final ``OK``. This happens either when the server closes the connection, or
-when the ``Content-Length`` bytes have all been forwarded.
+When all body bytes have been delivered, ``#XHTTPCSTAT`` is sent as a URC after the final ``OK``.
+This happens either when the server closes the connection, when the ``Content-Length`` bytes have all been forwarded, or when the chunked transfer ``0\r\n\r\n`` terminator is received.
+
+.. note::
+
+   When the server uses ``Transfer-Encoding: chunked`` (``content_length=-1`` in ``#XHTTPCHEAD``), the bytes returned by ``#XHTTPCDATA`` include raw chunked framing.
+   See the note under ``#XHTTPCDATA`` in the ``AT#XHTTPCREQ`` section.
 
 .. note::
 
