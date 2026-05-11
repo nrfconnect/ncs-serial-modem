@@ -81,4 +81,4 @@ set(includes
   "${PROJECT_SOURCE_DIR}/../stubs"
 )
 
-target_include_directories(app PRIVATE ${includes})
+target_include_directories(app BEFORE PRIVATE ${includes})
