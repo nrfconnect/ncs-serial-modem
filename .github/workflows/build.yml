@@ -76,12 +76,12 @@ jobs:
           ./nrfutil toolchain-manager launch --chdir serial_modem -- west twister -T . -v --inline-logs --overflow-as-errors --integration --exclude-tag exclude_integration
 
       - name: Build Serial Modem nightly
-        if: ${{ github.event_name == 'schedule' || inputs.trigger_source == 'release-workflow' }}
+        if: ${{ github.event_name == 'schedule' || inputs.trigger_source == 'release-workflow' || github.event_name == 'workflow_dispatch' }}
         run: |
           ./nrfutil toolchain-manager launch --chdir serial_modem -- west twister -T . -v --inline-logs --overflow-as-errors --all
 
       - name: Zip build artifacts
-        if: ${{ github.event_name == 'schedule' || inputs.trigger_source == 'release-workflow' }}
+        if: ${{ github.event_name == 'schedule' || inputs.trigger_source == 'release-workflow' || github.event_name == 'workflow_dispatch' }}
         working-directory: serial_modem
         run: |
           mkdir -p artifacts
@@ -135,14 +135,14 @@ jobs:
           zip_artifacts "sm_ppp_shell" "${NRF54L15DK_DIR}/sm_ppp_shell/sample.sm_ppp_shell" "sm_ppp_shell_${VERSION}_nrf54l15dk" 1
 
       - name: Upload artifacts
-        if: ${{ github.event_name == 'schedule' || inputs.trigger_source == 'release-workflow' }}
+        if: ${{ github.event_name == 'schedule' || inputs.trigger_source == 'release-workflow' || github.event_name == 'workflow_dispatch' }}
         uses: actions/upload-artifact@v4
         with:
           path: |
             serial_modem/artifacts/*
 
       - name: Upload artifact extras
-        if: ${{ inputs.trigger_source == 'release-workflow' }}
+        if: ${{ inputs.trigger_source == 'release-workflow' || github.event_name == 'workflow_dispatch' }}
         uses: actions/upload-artifact@v4
         with:
           name: artifact_extras
