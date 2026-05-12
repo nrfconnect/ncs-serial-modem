@@ -39,8 +39,14 @@ The artifacts are zipped and contain build files such as:
      - The unsigned application binary (MCUboot + application) to be flashed with Programmer or nRF Util.
    * - ``.signed.bin``
      - Signed application only binary to be used in FOTA/DFU.
-   * - ``_dfu.zip``
+   * - ``_mcuboot_s0.signed.bin``
+     - Signed MCUboot binary for S0 slot to be used in FOTA/DFU.
+   * - ``_mcuboot_s1.signed.bin``
+     - Signed MCUboot binary for S1 slot to be used in FOTA/DFU.
+   * - ``_dfu_application.zip``
      - Signed application only binary zipped with metadata used by nRF Cloud for FOTA/DFU.
+   * - ``_dfu_mcuboot.zip``
+     - Signed MCUboot binary for S0 and S1 slots zipped with metadata used by nRF Cloud for FOTA/DFU.
    * - ``.elf``
      - Application image symbols for debugging purposes.
    * - ``.dts``
