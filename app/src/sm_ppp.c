@@ -367,6 +367,7 @@ static int ppp_start(void)
 	modem_ppp_attach(&ppp_module, ppp_pipe);
 
 	net_if_carrier_on(ppp_iface);
+	net_if_dormant_off(ppp_iface);
 
 	ppp_state = PPP_STATE_RUNNING;
 
@@ -433,6 +434,7 @@ static int ppp_stop(enum ppp_reason reason)
 	}
 
 	net_if_carrier_off(ppp_iface);
+	net_if_dormant_on(ppp_iface);
 
 	close_ppp_sockets();
 
