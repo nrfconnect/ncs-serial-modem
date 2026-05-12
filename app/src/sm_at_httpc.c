@@ -1237,6 +1237,7 @@ static int pull_data(int socket_fd, int pull_len)
 {
 	struct http_request *req;
 	int ret;
+	int last_sent = 0; /* Bytes forwarded to host in this call. Used for chunked EOF check */
 
 	k_mutex_lock(&http_mutex, K_FOREVER);
 	req = find_request(socket_fd);
@@ -1277,6 +1278,7 @@ static int pull_data(int socket_fd, int pull_len)
 		if (req->recv_buf_len > 0) {
 			memmove(req->recv_buf, req->recv_buf + send_len, req->recv_buf_len);
 		}
+		last_sent = send_len;
 		goto check_complete;
 	}
 
@@ -1308,9 +1310,23 @@ static int pull_data(int socket_fd, int pull_len)
 	rsp_send("\r\n#XHTTPCDATA: %d,%d,%d\r\n", req->fd, req->bytes_sent, ret);
 	req->bytes_sent += ret;
 	data_send(req->pipe, req->recv_buf, ret);
+	last_sent = ret;
 
 check_complete:
 	if (req->content_length > 0 && req->bytes_sent >= req->content_length) {
+		http_finish_request(req);
+		k_mutex_unlock(&http_mutex);
+		return 0;
+	}
+
+	/* For chunked transfer (no Content-Length), detect the terminal "0\r\n\r\n"
+	 * marker in the last forwarded block.  Only check when recv_buf is fully
+	 * drained (recv_buf_len == 0): if a partial drain left bytes in the buffer,
+	 * the terminator may still be in the remaining data, not at the end of what
+	 * was just sent.
+	 */
+	if (req->content_length < 0 && req->recv_buf_len == 0 &&
+	    last_sent > 0 && chunked_eof(req->recv_buf, last_sent)) {
 		http_finish_request(req);
 		k_mutex_unlock(&http_mutex);
 		return 0;
