@@ -1,0 +1,11 @@
+# Copyright (c) 2026 Nordic Semiconductor
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+
+# Build against a PR that contains upstream modem fixes
+
+manifest:
+  projects:
+    - name: nrf
+      url: https://github.com/nrfconnect/sdk-nrf.git
+      revision: pull/28730/head
+      import: true
