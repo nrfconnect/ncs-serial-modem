@@ -87,8 +87,8 @@ jobs:
           mkdir -p artifacts
           mkdir -p artifacts_extras
           VERSION=${{ github.event.release.tag_name || github.ref_name || 'unknown-version' }}
-          NRF9151DK_DIR=twister-out/nrf9151dk_nrf9151_ns/zephyr/serial_modem/app
-          NRF54L15DK_DIR=twister-out/nrf54l15dk_nrf54l15_cpuapp/zephyr/serial_modem/samples
+          NRF9151DK_DIR=twister-out/nrf9151dk_nrf9151_ns/zephyr_gnu/serial_modem/app
+          NRF54L15DK_DIR=twister-out/nrf54l15dk_nrf54l15_cpuapp/zephyr_gnu/serial_modem/samples
 
           # Create release bundle: merged.hex, Kconfig, signed images, elf, DFU zip
           zip_artifacts() {
