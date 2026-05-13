@@ -134,7 +134,7 @@ The notification line is terminated with ``\r\n`` and the raw body bytes follow 
 
 ``#XHTTPCSTAT`` is emitted when the request completes, fails, or is cancelled::
 
-   #XHTTPCSTAT: <handle>,<status_code>,<total_bytes>
+   #XHTTPCSTAT: <handle>,<status_code>,<total_bytes>,<connection_close>
 
 * The ``<handle>`` parameter is an integer.
   It identifies the socket.
@@ -144,6 +144,10 @@ The notification line is terminated with ``\r\n`` and the raw body bytes follow 
    On successful completion, failure, or timeout, it contains the total number of response body bytes received by the HTTP client.
    For chunked transfer encoding this includes the raw framing bytes (chunk-size lines, ``\r\n`` separators, and the final ``0\r\n\r\n`` terminator).
    On cancel (``status_code=-1`` from ``AT#XHTTPCCANCEL``), it contains the number of response body bytes already delivered to the host.
+* The ``<connection_close>`` parameter is an integer.
+  It is ``1`` when the server includes a ``Connection: close`` header in its response, indicating that the TCP connection will be closed after this response.
+  It is ``0`` otherwise (keep-alive connection).
+  When ``<connection_close>`` is ``1``, the host must close the socket with ``AT#XCLOSE`` and open a new connection before issuing the next request.
 
 .. note::
 
@@ -169,7 +173,7 @@ HTTP GET (automatic mode):
    #XHTTPCDATA: 0,0,261
    <261 bytes>
 
-   #XHTTPCSTAT: 0,200,261
+   #XHTTPCSTAT: 0,200,261,0
 
 HTTP GET (manual mode):
 
@@ -186,7 +190,7 @@ HTTP GET (manual mode):
    <261 bytes>
    OK
 
-   #XHTTPCSTAT: 0,200,261
+   #XHTTPCSTAT: 0,200,261,0
 
 HTTP POST with JSON body and custom header:
 
@@ -203,9 +207,11 @@ HTTP POST with JSON body and custom header:
    #XHTTPCDATA: 0,0,432
    <432 bytes>
 
-   #XHTTPCSTAT: 0,200,432
+   #XHTTPCSTAT: 0,200,432,0
 
 HTTP GET with Range header (``body_len=0`` is required as a placeholder when headers follow a GET):
+
+In this example the server returns ``connection_close=1``, so the host must close and reopen the socket before the next request.
 
 ::
 
@@ -218,7 +224,7 @@ HTTP GET with Range header (``body_len=0`` is required as a placeholder when hea
    #XHTTPCDATA: 0,0,128
    <128 bytes>
 
-   #XHTTPCSTAT: 0,206,128
+   #XHTTPCSTAT: 0,206,128,0
 
    AT#XHTTPCREQ=0,<url>,0,1,0,"Range: bytes=128-255"
    #XHTTPCREQ: 0
@@ -229,8 +235,11 @@ HTTP GET with Range header (``body_len=0`` is required as a placeholder when hea
    #XHTTPCDATA: 0,0,128
    <128 bytes>
 
-   #XHTTPCSTAT: 0,206,128
+   #XHTTPCSTAT: 0,206,128,1
 
+   AT#XCLOSE=0
+   #XCLOSE: 0,0
+   OK
 
 HTTP HEAD (no body — ``#XHTTPCSTAT`` follows immediately after ``#XHTTPCHEAD``):
 
@@ -242,7 +251,7 @@ HTTP HEAD (no body — ``#XHTTPCSTAT`` follows immediately after ``#XHTTPCHEAD``
 
    #XHTTPCHEAD: 0,200,261
 
-   #XHTTPCSTAT: 0,200,0
+   #XHTTPCSTAT: 0,200,0,0
 
 HTTP POST with chunked response (``content_length=-1``):
 
@@ -259,7 +268,7 @@ HTTP POST with chunked response (``content_length=-1``):
    #XHTTPCDATA: 0,0,1132
    460\r\n{"args":{},"data":"<1024 bytes>","url":"..."}\r\n0\r\n\r\n
 
-   #XHTTPCSTAT: 0,200,1132
+   #XHTTPCSTAT: 0,200,1132,0
 
 .. note::
 
@@ -372,7 +381,7 @@ Example
    <256 bytes>
    OK
 
-   #XHTTPCSTAT: 0,200,512
+   #XHTTPCSTAT: 0,200,512,0
 
 Test command
 ------------
@@ -412,7 +421,7 @@ The timer resets each time data is sent or received:
 * Receiving response headers or body bytes.
 * Pulling a body chunk in manual mode (``AT#XHTTPCDATA``).
 
-If no such activity occurs within the configured window, the request is aborted and ``#XHTTPCSTAT: <handle>,-1,<total_bytes>`` is emitted.
+If no such activity occurs within the configured window, the request is aborted and ``#XHTTPCSTAT: <handle>,-1,<total_bytes>,<connection_close>`` is emitted.
 The timeout is enforced by a background timer that fires independently of normal socket poll events, so a server that stalls silently (no TCP RST or FIN) is also detected.
 
 HTTP request cancel #XHTTPCCANCEL
@@ -435,7 +444,7 @@ Syntax
 * The ``<handle>`` parameter is an integer.
   It identifies the socket of the request to cancel.
 
-An unsolicited ``#XHTTPCSTAT: <handle>,-1,<total_bytes>`` notification is emitted after cancellation, where ``<total_bytes>`` is the number of response body bytes already delivered to the host.
+An unsolicited ``#XHTTPCSTAT: <handle>,-1,<total_bytes>,<connection_close>`` notification is emitted after cancellation, where ``<total_bytes>`` is the number of response body bytes already delivered to the host.
 
 Example
 ~~~~~~~
@@ -444,7 +453,7 @@ Example
 
    AT#XHTTPCCANCEL=0
    OK
-   #XHTTPCSTAT: 0,-1,0
+   #XHTTPCSTAT: 0,-1,0,0
 
 Test command
 ------------
