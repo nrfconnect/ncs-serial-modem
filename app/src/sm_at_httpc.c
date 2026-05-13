@@ -82,6 +82,7 @@ struct http_request {
 	struct modem_pipe *pipe;    /* AT pipe that created this request */
 	bool manual_mode;           /* Manual mode: body not auto-received, host pulls chunks */
 	int bytes_sent;             /* Response-body bytes sent to the host */
+	bool connection_close;      /* Server sent "Connection: close" header */
 };
 
 static const char * const http_method_str[] = {
@@ -105,6 +106,7 @@ static bool http_headers_complete(struct http_request *req, char *header_end,
 				  struct sm_socket *sock, bool hup);
 static int parse_http_status_code(const char *buf, int *status_code);
 static int parse_content_length(const char *buf, const char *header_end, int *length);
+static bool parse_connection_close(const char *buf, const char *header_end);
 static void http_timeout_work_fn(struct k_work *work);
 
 static K_MUTEX_DEFINE(http_mutex);
@@ -433,20 +435,22 @@ static void http_close_request(struct http_request *req)
 /* Send error via XHTTPCSTAT with -1 status code */
 static void http_send_error(struct http_request *req)
 {
-	urc_send_to(req->pipe, "\r\n#XHTTPCSTAT: %d,-1,%d\r\n", req->fd, req->total_received);
+	urc_send_to(req->pipe, "\r\n#XHTTPCSTAT: %d,-1,%d,%d\r\n", req->fd,
+		 req->total_received, (int)req->connection_close);
 }
 
 /* Send status URC */
 static void http_send_status(struct http_request *req)
 {
-	urc_send_to(req->pipe, "\r\n#XHTTPCSTAT: %d,%d,%d\r\n", req->fd, req->status_code,
-		 req->total_received);
+	urc_send_to(req->pipe, "\r\n#XHTTPCSTAT: %d,%d,%d,%d\r\n", req->fd, req->status_code,
+		 req->total_received, (int)req->connection_close);
 }
 
 /* Send cancel status URC with bytes already delivered to host */
 static void http_send_cancel_status(struct http_request *req)
 {
-	urc_send_to(req->pipe, "\r\n#XHTTPCSTAT: %d,-1,%d\r\n", req->fd, req->bytes_sent);
+	urc_send_to(req->pipe, "\r\n#XHTTPCSTAT: %d,-1,%d,%d\r\n", req->fd,
+		 req->bytes_sent, (int)req->connection_close);
 }
 
 /* Send error and close request */
@@ -511,6 +515,19 @@ static int parse_http_status_code(const char *buf, int *status_code)
 	return 0;
 }
 
+/* Parse Connection: close header from response buffer */
+static bool parse_connection_close(const char *buf, const char *header_end)
+{
+	const char *p;
+
+	p = strstr(buf, "Connection: close");
+	if (!p) {
+		p = strstr(buf, "connection: close");
+	}
+
+	return p != NULL && p < header_end;
+}
+
 /* Parse Content-Length header from response buffer */
 static int parse_content_length(const char *buf, const char *header_end, int *length)
 {
@@ -561,6 +578,11 @@ static bool http_headers_complete(struct http_request *req, char *header_end,
 		LOG_INF("HTTP %d: Content-Length=%d", req->fd, req->content_length);
 	} else {
 		LOG_DBG("HTTP %d: No Content-Length header", req->fd);
+	}
+
+	req->connection_close = parse_connection_close((char *)req->recv_buf, header_end);
+	if (req->connection_close) {
+		LOG_INF("HTTP %d: Server sent Connection: close", req->fd);
 	}
 
 	req->headers_complete = true;
@@ -707,22 +729,26 @@ static void http_process_request(struct http_request *req, uint8_t events)
 	case HTTP_STATE_RECEIVING_BODY:
 		/* POLLHUP without POLLIN before headers are received is an error:
 		 * the server closed the connection before sending a valid response.
+		 * When POLLIN co-fires, data may still be in the socket buffer (e.g.
+		 * a server with Connection: close that sends headers and closes
+		 * simultaneously); fall through to the POLLIN handler to drain it.
 		 */
 		if (events & NRF_POLLHUP) {
-			if (!req->headers_complete) {
-				/* Server closed before headers arrived */
+			if (!req->headers_complete && !(events & NRF_POLLIN)) {
+				/* Server closed before headers arrived and no data to read */
 				LOG_ERR("HTTP %d: Connection closed before headers (POLLHUP)",
 					req->fd);
 				http_fail_request(req);
 				return;
 			}
-			if (!(events & NRF_POLLIN)) {
+			if (req->headers_complete && !(events & NRF_POLLIN)) {
 				/* POLLHUP alone during body reception: server closed cleanly
-				 * after all data.  Treat as EOF.
+				 * after all data. Treat as EOF.
 				 */
 				if (req->state == HTTP_STATE_RECEIVING_BODY) {
 					if (req->content_length > 0 &&
-					    req->total_received < req->content_length)
+					    req->total_received < req->content_length &&
+					    !req->connection_close)
 						LOG_WRN("HTTP %d: Incomplete - %d/%d bytes",
 							req->fd, req->total_received,
 							req->content_length);
@@ -768,7 +794,8 @@ static void http_process_request(struct http_request *req, uint8_t events)
 
 				/* Check if we received all expected data */
 				if (req->content_length > 0 &&
-				    req->total_received < req->content_length) {
+				    req->total_received < req->content_length &&
+				    !req->connection_close) {
 					LOG_WRN("HTTP %d: Incomplete transfer - received %d/%d "
 						"bytes",
 						req->fd, req->total_received,
