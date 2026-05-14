@@ -8,7 +8,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <zephyr/net/socket.h>
-#include <nrf_socket.h>
 #include "sm_util.h"
 #include "sm_at_host.h"
 

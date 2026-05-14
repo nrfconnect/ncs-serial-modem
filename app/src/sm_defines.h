@@ -7,7 +7,6 @@
 #ifndef SM_DEFINES_
 #define SM_DEFINES_
 
-#include <nrf_socket.h>
 #include "sm_trap_macros.h"
 
 #define INVALID_SOCKET       -1
@@ -24,7 +23,7 @@ enum {
 #define SM_AT_MAX_RSP_LEN   2100
 
 /** The maximum allowed length of data send/receive through the Serial Modem */
-#define SM_MAX_MESSAGE_SIZE NRF_SOCKET_TLS_MAX_MESSAGE_SIZE
+#define SM_MAX_MESSAGE_SIZE 2048
 
 #define SM_MAX_URL          128  /** max size of URL string */
 #define SM_MAX_USERNAME     32   /** max size of username in login */

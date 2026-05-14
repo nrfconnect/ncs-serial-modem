@@ -10,6 +10,7 @@
 #include <zephyr/sys/util.h>
 #include <zephyr/net/http/parser_url.h>
 #include <nrf_socket.h>
+#include <zephyr/net/socket.h>
 #include <modem/at_parser.h>
 #include <stdio.h>
 #include <string.h>
@@ -374,7 +375,7 @@ static int http_start_request(struct http_request *req)
 		return -EINVAL;
 	}
 
-	ret = set_xapoll_events(sock, NRF_POLLOUT | NRF_POLLIN);
+	ret = set_xapoll_events(sock, ZSOCK_POLLOUT | ZSOCK_POLLIN);
 	if (ret) {
 		LOG_ERR("Failed to set XAPOLL events: %d", ret);
 		return ret;
@@ -692,12 +693,12 @@ static int http_recv_read(struct http_request *req, struct sm_socket *sock)
 {
 	int ret;
 
-	ret = nrf_recv(req->fd, req->recv_buf + req->recv_buf_len,
-		       HTTP_RECV_BUF_SIZE - req->recv_buf_len - 1, NRF_MSG_DONTWAIT);
+	ret = zsock_recv(req->fd, req->recv_buf + req->recv_buf_len,
+		       HTTP_RECV_BUF_SIZE - req->recv_buf_len - 1, MSG_DONTWAIT);
 
 	if (ret < 0) {
 		if (errno == EAGAIN || errno == EWOULDBLOCK) {
-			set_xapoll_events(sock, NRF_POLLIN);
+			set_xapoll_events(sock, ZSOCK_POLLIN);
 			return -1;
 		}
 		if (errno == ETIMEDOUT) {
@@ -726,7 +727,7 @@ static void http_process_recv_headers(struct http_request *req, struct sm_socket
 	char *header_end = strstr((char *)req->recv_buf, "\r\n\r\n");
 
 	if (header_end) {
-		if (http_headers_complete(req, header_end, sock, events & NRF_POLLHUP)) {
+		if (http_headers_complete(req, header_end, sock, events & ZSOCK_POLLHUP)) {
 			return;
 		}
 		req->need_rearm_pollin = true;
@@ -750,7 +751,7 @@ static void http_process_recv_body(struct http_request *req, struct sm_socket *s
 	if (req->manual_mode) {
 		/*
 		 * POLLIN fired in body state after xapoll_stop (race).
-		 * nrf_recv already consumed bytes from the socket buffer
+		 * zsock_recv already consumed bytes from the socket buffer
 		 * into recv_buf and incremented total_received. Keep
 		 * recv_buf intact so the host can pull it; do NOT reset
 		 * recv_buf_len or the data is silently lost.
@@ -767,7 +768,7 @@ static void http_process_recv_body(struct http_request *req, struct sm_socket *s
 	/* Finish if content-length satisfied, chunked EOF, or connection closing. */
 	if (body_done ||
 	    (req->content_length > 0 && req->bytes_sent >= req->content_length) ||
-	    (events & NRF_POLLHUP)) {
+	    (events & ZSOCK_POLLHUP)) {
 		http_finish_request(req);
 		return;
 	}
@@ -791,14 +792,14 @@ static void http_process_request(struct http_request *req, uint8_t events)
 		req->state, events, k_uptime_get(), req->timeout_timestamp);
 
 	/* POLLERR/POLLNVAL are always fatal; POLLHUP is handled per-state below. */
-	if (events & (NRF_POLLERR | NRF_POLLNVAL)) {
+	if (events & (ZSOCK_POLLERR | ZSOCK_POLLNVAL)) {
 		LOG_ERR("HTTP %d: Socket error (events=0x%x)", req->fd, events);
 		http_fail_request(req);
 		return;
 	}
 
 	/* POLLHUP during sending means the server closed the connection unexpectedly. */
-	if ((events & NRF_POLLHUP) && req->state == HTTP_STATE_SENDING_REQUEST) {
+	if ((events & ZSOCK_POLLHUP) && req->state == HTTP_STATE_SENDING_REQUEST) {
 		LOG_ERR("HTTP %d: Connection closed during send (events=0x%x)", req->fd,
 			events);
 		http_fail_request(req);
@@ -808,14 +809,14 @@ static void http_process_request(struct http_request *req, uint8_t events)
 	switch (req->state) {
 	case HTTP_STATE_SENDING_REQUEST:
 		/* Handle writable socket */
-		if (events & NRF_POLLOUT) {
-			ret = nrf_send(req->fd, req->send_ptr, req->send_remaining,
-				       NRF_MSG_DONTWAIT);
+		if (events & ZSOCK_POLLOUT) {
+			ret = zsock_send(req->fd, req->send_ptr, req->send_remaining,
+				       MSG_DONTWAIT);
 
 			if (ret < 0) {
 				if (errno == EAGAIN || errno == EWOULDBLOCK) {
 					/* Need to wait for next POLLOUT */
-					set_xapoll_events(sock, NRF_POLLOUT | NRF_POLLIN);
+					set_xapoll_events(sock, ZSOCK_POLLOUT | ZSOCK_POLLIN);
 					return;
 				}
 				LOG_ERR("Send failed: %d", errno);
@@ -830,10 +831,10 @@ static void http_process_request(struct http_request *req, uint8_t events)
 				/* All headers sent, now wait for response */
 				req->state = HTTP_STATE_RECEIVING_HEADERS;
 				req->recv_buf_len = 0;
-				set_xapoll_events(sock, NRF_POLLIN);
+				set_xapoll_events(sock, ZSOCK_POLLIN);
 			} else {
 				/* More to send */
-				set_xapoll_events(sock, NRF_POLLOUT | NRF_POLLIN);
+				set_xapoll_events(sock, ZSOCK_POLLOUT | ZSOCK_POLLIN);
 			}
 		}
 		break;
@@ -843,14 +844,14 @@ static void http_process_request(struct http_request *req, uint8_t events)
 		 * POLLHUP without POLLIN: closed before any response. When POLLIN
 		 * arrives at the same time, drain the socket buffer (e.g. Connection: close).
 		 */
-		if ((events & NRF_POLLHUP) && !(events & NRF_POLLIN)) {
+		if ((events & ZSOCK_POLLHUP) && !(events & ZSOCK_POLLIN)) {
 			LOG_ERR("HTTP %d: Connection closed before headers (POLLHUP)",
 				req->fd);
 			http_fail_request(req);
 			return;
 		}
 
-		if (!(events & NRF_POLLIN)) {
+		if (!(events & ZSOCK_POLLIN)) {
 			return;
 		}
 
@@ -871,13 +872,13 @@ static void http_process_request(struct http_request *req, uint8_t events)
 
 	case HTTP_STATE_RECEIVING_BODY:
 		/* POLLHUP alone: server closed cleanly after sending body. */
-		if ((events & NRF_POLLHUP) && !(events & NRF_POLLIN)) {
+		if ((events & ZSOCK_POLLHUP) && !(events & ZSOCK_POLLIN)) {
 			http_warn_incomplete_transfer(req);
 			http_finish_request(req);
 			return;
 		}
 
-		if (!(events & NRF_POLLIN)) {
+		if (!(events & ZSOCK_POLLIN)) {
 			return;
 		}
 
@@ -948,7 +949,7 @@ static int http_send_request_headers(struct http_request *req)
 	/* Send headers synchronously (blocking) */
 	sent = 0;
 	while (sent < ret) {
-		n = nrf_send(req->fd, req->send_buf + sent, ret - sent, 0);
+		n = zsock_send(req->fd, req->send_buf + sent, ret - sent, 0);
 		if (n < 0) {
 			return -errno;
 		}
@@ -983,7 +984,7 @@ static int http_datamode_callback(uint8_t op, const uint8_t *data, int len, uint
 		int sent = 0;
 
 		while (sent < len) {
-			int ret = nrf_send(datamode_req->fd, data + sent, len - sent, 0);
+			int ret = zsock_send(datamode_req->fd, data + sent, len - sent, 0);
 
 			if (ret < 0) {
 				int err_code = -errno;
@@ -1026,7 +1027,7 @@ static int http_datamode_callback(uint8_t op, const uint8_t *data, int len, uint
 					datamode_req->recv_buf_len = 0;
 					datamode_req->timeout_timestamp =
 						k_uptime_get() + HTTP_RESPONSE_TIMEOUT_MS;
-					err = set_xapoll_events(sock, NRF_POLLIN);
+					err = set_xapoll_events(sock, ZSOCK_POLLIN);
 					if (err) {
 						LOG_ERR("Failed to arm XAPOLL: %d", err);
 						http_fail_request(datamode_req);
@@ -1339,7 +1340,7 @@ static int pull_data(int socket_fd, int pull_len)
 	}
 
 	/* Do one non-blocking recv and send to host */
-	ret = nrf_recv(req->fd, req->recv_buf, pull_len, NRF_MSG_DONTWAIT);
+	ret = zsock_recv(req->fd, req->recv_buf, pull_len, MSG_DONTWAIT);
 
 	if (ret < 0) {
 		if (errno == EAGAIN || errno == EWOULDBLOCK) {

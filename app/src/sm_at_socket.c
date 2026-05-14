@@ -81,7 +81,7 @@ struct sm_send_ntf {
 };
 
 static struct sm_socket {
-	int type;                        /* NRF_SOCK_STREAM or NRF_SOCK_DGRAM */
+	int type;                        /* SOCK_STREAM or SOCK_DGRAM */
 	uint16_t role;                   /* Client or Server */
 	sec_tag_t sec_tag;               /* Security tag of the credential */
 	int family;                      /* Socket address family */
@@ -117,7 +117,7 @@ static void init_socket(struct sm_socket *socket)
 	socket->type = 0;
 	socket->role = AT_SOCKET_ROLE_CLIENT;
 	socket->sec_tag = SEC_TAG_TLS_INVALID;
-	socket->family = NRF_AF_UNSPEC;
+	socket->family = AF_UNSPEC;
 	socket->fd = INVALID_SOCKET;
 	socket->cid = 0;
 	socket->local_port = 0;
@@ -171,10 +171,10 @@ static int bind_to_pdn(struct sm_socket *sock)
 			return pdn_id;
 		}
 
-		ret = nrf_setsockopt(sock->fd, NRF_SOL_SOCKET, NRF_SO_BINDTOPDN, &pdn_id,
+		ret = zsock_setsockopt(sock->fd, SOL_SOCKET, SO_BINDTOPDN, &pdn_id,
 				     sizeof(int));
 		if (ret < 0) {
-			LOG_ERR("nrf_setsockopt(%d) error: %d", NRF_SO_BINDTOPDN, -errno);
+			LOG_ERR("zsock_setsockopt(%d) error: %d", SO_BINDTOPDN, -errno);
 			ret = -errno;
 		}
 	}
@@ -183,7 +183,7 @@ static int bind_to_pdn(struct sm_socket *sock)
 }
 
 /* Called in IRQ context */
-static void poll_cb(struct nrf_pollfd *pollfd)
+static void poll_cb(const struct socket_ncs_pollcb_params *pollfd)
 {
 	LOG_DBG("Poll event fd %d, revents 0x%x", pollfd->fd, pollfd->revents);
 
@@ -216,16 +216,16 @@ static int set_so_poll_cb(struct sm_socket *socket, uint8_t events)
 
 	LOG_DBG("Set poll cb for socket %d, events %d", socket->fd, events);
 
-	struct nrf_modem_pollcb pcb = {
+	struct socket_ncs_pollcb pcb = {
 		.callback = poll_cb,
 		.events = events,
 		.oneshot = true,
 	};
 
-	err = nrf_setsockopt(socket->fd, NRF_SOL_SOCKET, NRF_SO_POLLCB, &pcb, sizeof(pcb));
+	err = zsock_setsockopt(socket->fd, SOL_SOCKET, SO_POLLCB, &pcb, sizeof(pcb));
 	if (err < 0) {
-		LOG_ERR("nrf_setsockopt(%d,%d,%d) error: %d", socket->fd, NRF_SOL_SOCKET,
-			NRF_SO_POLLCB, -errno);
+		LOG_ERR("zsock_setsockopt(%d,%d,%d) error: %d", socket->fd, SOL_SOCKET,
+			SO_POLLCB, -errno);
 		return -errno;
 	}
 	return 0;
@@ -242,13 +242,13 @@ static void auto_reception(struct sm_socket *sock)
 		return;
 	}
 
-	if (sock->connected || sock->type == NRF_SOCK_RAW) {
-		err = do_recv(sock, 0, NRF_MSG_DONTWAIT,
+	if (sock->connected || sock->type == SOCK_RAW) {
+		err = do_recv(sock, 0, MSG_DONTWAIT,
 			      sock->async_poll.adr_hex ? AT_SOCKET_MODE_HEX
 						      : AT_SOCKET_MODE_UNFORMATTED,
 			      sizeof(sm_data_buf));
 	} else {
-		err = do_recvfrom(sock, 0, NRF_MSG_DONTWAIT,
+		err = do_recvfrom(sock, 0, MSG_DONTWAIT,
 				  sock->async_poll.adr_hex ? AT_SOCKET_MODE_HEX
 							  : AT_SOCKET_MODE_UNFORMATTED,
 				  sizeof(sm_data_buf));
@@ -381,29 +381,29 @@ void sm_at_socket_poll_work_handler(struct k_work *work)
 			}
 
 			/* If HTTP client requests POLLIN re-arm, restore it before clearing */
-			if (http_needs_rearm && (revents & NRF_POLLIN)) {
-				sock->async_poll.xapoll_events |= NRF_POLLIN;
-				sock->async_poll.events |= NRF_POLLIN;  /* MUST also restore */
+			if (http_needs_rearm && (revents & ZSOCK_POLLIN)) {
+				sock->async_poll.xapoll_events |= ZSOCK_POLLIN;
+				sock->async_poll.events |= ZSOCK_POLLIN;  /* MUST also restore */
 				/* Clear POLLIN from revents to prevent line 374 from clearing it
 				 * from events
 				 */
-				revents &= ~NRF_POLLIN;
+				revents &= ~ZSOCK_POLLIN;
 			}
 		}
 
 		/* Remove POLLOUT from poll, until send is done. */
-		if (revents & NRF_POLLOUT) {
-			sock->async_poll.events &= ~NRF_POLLOUT;
+		if (revents & ZSOCK_POLLOUT) {
+			sock->async_poll.events &= ~ZSOCK_POLLOUT;
 		}
 
 		/* Prevent further poll activations for socket. */
-		if (revents & (NRF_POLLERR | NRF_POLLNVAL | NRF_POLLHUP)) {
+		if (revents & (ZSOCK_POLLERR | ZSOCK_POLLNVAL | ZSOCK_POLLHUP)) {
 			sock->async_poll.disable = true;
 		}
 
 		/* Remove POLLIN from poll, until recv is done. */
-		if (revents & NRF_POLLIN) {
-			sock->async_poll.events &= ~NRF_POLLIN;
+		if (revents & ZSOCK_POLLIN) {
+			sock->async_poll.events &= ~ZSOCK_POLLIN;
 
 			/* Automatic data reception may reactivate POLLIN. */
 			if (((at_and_idle && (sock->async_poll.adr_flags & SM_ADR_AT_MODE)) ||
@@ -423,11 +423,11 @@ void sm_at_socket_poll_work_handler(struct k_work *work)
 		if (data_mode) {
 			int err = 0;
 
-			if (revents & NRF_POLLERR) {
+			if (revents & ZSOCK_POLLERR) {
 				err = -EIO;
-			} else if (revents & NRF_POLLNVAL) {
+			} else if (revents & ZSOCK_POLLNVAL) {
 				err = -ENETDOWN;
-			} else if (revents & NRF_POLLHUP) {
+			} else if (revents & ZSOCK_POLLHUP) {
 				err = -ECONNRESET;
 			}
 			if (err) {
@@ -455,13 +455,13 @@ static void send_cb_fn(struct k_work *work)
 			}
 			urc_send_to(socks[i].pipe, "\r\n#XSENDNTF: %d,%d,%d\r\n", socks[i].fd,
 				    status, bytes_sent);
-			update_poll_events(&socks[i], NRF_POLLOUT, true);
+			update_poll_events(&socks[i], ZSOCK_POLLOUT, true);
 		}
 	}
 }
 
 /* Called in IRQ context */
-static void send_cb(const struct nrf_modem_sendcb_params *params)
+static void send_cb(const struct socket_ncs_sendcb_params *params)
 {
 	static K_WORK_DEFINE(work, send_cb_fn);
 
@@ -499,14 +499,14 @@ static int set_so_send_cb(struct sm_socket *socket)
 
 	LOG_DBG("Set send cb for socket %d", socket->fd);
 
-	struct nrf_modem_sendcb pcb = {
+	struct socket_ncs_sendcb pcb = {
 		.callback = send_cb,
 	};
 
-	err = nrf_setsockopt(socket->fd, NRF_SOL_SOCKET, NRF_SO_SENDCB, &pcb, sizeof(pcb));
+	err = zsock_setsockopt(socket->fd, SOL_SOCKET, SO_SENDCB, &pcb, sizeof(pcb));
 	if (err < 0) {
-		LOG_ERR("nrf_setsockopt(%d,%d,%d) error: %d", socket->fd, NRF_SOL_SOCKET,
-			NRF_SO_SENDCB, -errno);
+		LOG_ERR("zsock_setsockopt(%d,%d,%d) error: %d", socket->fd, SOL_SOCKET,
+			SO_SENDCB, -errno);
 
 		return -errno;
 	}
@@ -529,10 +529,10 @@ static int clear_so_send_cb(struct sm_socket *socket)
 
 	LOG_DBG("Clear send cb for socket %d", socket->fd);
 
-	err = nrf_setsockopt(socket->fd, NRF_SOL_SOCKET, NRF_SO_SENDCB, NULL, 0);
+	err = zsock_setsockopt(socket->fd, SOL_SOCKET, SO_SENDCB, NULL, 0);
 	if (err < 0) {
-		LOG_ERR("nrf_setsockopt(%d,%d,%d) error: %d", socket->fd, NRF_SOL_SOCKET,
-			NRF_SO_SENDCB, -errno);
+		LOG_ERR("zsock_setsockopt(%d,%d,%d) error: %d", socket->fd, SOL_SOCKET,
+			SO_SENDCB, -errno);
 		err = -errno;
 	}
 
@@ -544,44 +544,44 @@ static int clear_so_send_cb(struct sm_socket *socket)
 static int do_socket_open(struct sm_socket *sock)
 {
 	int ret = 0;
-	int proto = NRF_IPPROTO_TCP;
+	int proto = IPPROTO_TCP;
 
-	if (sock->family != NRF_AF_INET && sock->family != NRF_AF_INET6 &&
-	    sock->family != NRF_AF_PACKET) {
+	if (sock->family != AF_INET && sock->family != AF_INET6 &&
+	    sock->family != AF_PACKET) {
 		LOG_ERR("Socket family %d not supported", sock->family);
 		return -ENOTSUP;
 	}
 
-	if (sock->type == NRF_SOCK_RAW || sock->family == NRF_AF_PACKET) {
-		if (sock->type != NRF_SOCK_RAW || sock->family != NRF_AF_PACKET)  {
+	if (sock->type == SOCK_RAW || sock->family == AF_PACKET) {
+		if (sock->type != SOCK_RAW || sock->family != AF_PACKET)  {
 			LOG_ERR("Raw socket: Family and type must match");
 			return -EINVAL;
 		}
 	}
 
-	if (sock->type == NRF_SOCK_STREAM) {
-		ret = nrf_socket(sock->family, NRF_SOCK_STREAM, NRF_IPPROTO_TCP);
-	} else if (sock->type == NRF_SOCK_DGRAM) {
-		ret = nrf_socket(sock->family, NRF_SOCK_DGRAM, NRF_IPPROTO_UDP);
-		proto = NRF_IPPROTO_UDP;
-	} else if (sock->type == NRF_SOCK_RAW) {
-		ret = nrf_socket(sock->family, NRF_SOCK_RAW, NRF_IPPROTO_RAW);
-		proto = NRF_IPPROTO_IP;
+	if (sock->type == SOCK_STREAM) {
+		ret = zsock_socket(sock->family, SOCK_STREAM, IPPROTO_TCP);
+	} else if (sock->type == SOCK_DGRAM) {
+		ret = zsock_socket(sock->family, SOCK_DGRAM, IPPROTO_UDP);
+		proto = IPPROTO_UDP;
+	} else if (sock->type == SOCK_RAW) {
+		ret = zsock_socket(sock->family, SOCK_RAW, IPPROTO_RAW);
+		proto = IPPROTO_IP;
 	} else {
 		LOG_ERR("Socket type %d not supported", sock->type);
 		return -ENOTSUP;
 	}
 	if (ret < 0) {
-		LOG_ERR("nrf_socket() error: %d", -errno);
+		LOG_ERR("zsock_socket() error: %d", -errno);
 		return -errno;
 	}
 
 	sock->fd = ret;
 	struct timeval tmo = {.tv_sec = SOCKET_SEND_TMO_SEC};
 
-	ret = nrf_setsockopt(sock->fd, NRF_SOL_SOCKET, NRF_SO_SNDTIMEO, &tmo, sizeof(tmo));
+	ret = zsock_setsockopt(sock->fd, SOL_SOCKET, SO_SNDTIMEO, &tmo, sizeof(tmo));
 	if (ret) {
-		LOG_ERR("nrf_setsockopt(%d) error: %d", NRF_SO_SNDTIMEO, -errno);
+		LOG_ERR("zsock_setsockopt(%d) error: %d", SO_SNDTIMEO, -errno);
 		ret = -errno;
 		goto error;
 	}
@@ -605,12 +605,13 @@ static int do_socket_open(struct sm_socket *sock)
 	sock->async_poll.adr_hex = poll_ctx->adr_hex;
 	sock->async_poll.xapoll_events_requested = poll_ctx->xapoll_events_requested;
 	update_poll_events(
-		sock, NRF_POLLIN | NRF_POLLOUT | NRF_POLLERR | NRF_POLLHUP | NRF_POLLNVAL, true);
+		sock, ZSOCK_POLLIN | ZSOCK_POLLOUT | ZSOCK_POLLERR | ZSOCK_POLLHUP | ZSOCK_POLLNVAL,
+		true);
 
 	return 0;
 
 error:
-	nrf_close(sock->fd);
+	zsock_close(sock->fd);
 	sock->fd = INVALID_SOCKET;
 	return ret;
 }
@@ -618,30 +619,30 @@ error:
 static int do_secure_socket_open(struct sm_socket *sock, int peer_verify)
 {
 	int ret = 0;
-	int proto = sock->type == NRF_SOCK_STREAM ? NRF_SPROTO_TLS1v2 : NRF_SPROTO_DTLS1v2;
+	int proto = sock->type == SOCK_STREAM ? IPPROTO_TLS_1_2 : IPPROTO_DTLS_1_2;
 
-	if (sock->family != NRF_AF_INET && sock->family != NRF_AF_INET6) {
+	if (sock->family != AF_INET && sock->family != AF_INET6) {
 		LOG_ERR("Socket family %d not supported", sock->family);
 		return -ENOTSUP;
 	}
 
-	if (sock->type != NRF_SOCK_STREAM && sock->type != NRF_SOCK_DGRAM) {
+	if (sock->type != SOCK_STREAM && sock->type != SOCK_DGRAM) {
 		LOG_ERR("Socket type %d not supported", sock->type);
 		return -ENOTSUP;
 	}
 
-	ret = nrf_socket(sock->family, sock->type, proto);
+	ret = zsock_socket(sock->family, sock->type, proto);
 	if (ret < 0) {
-		LOG_ERR("nrf_socket() error: %d", -errno);
+		LOG_ERR("zsock_socket() error: %d", -errno);
 		return -errno;
 	}
 	sock->fd = ret;
 
 	struct timeval tmo = {.tv_sec = SOCKET_SEND_TMO_SEC};
 
-	ret = nrf_setsockopt(sock->fd, NRF_SOL_SOCKET, NRF_SO_SNDTIMEO, &tmo, sizeof(tmo));
+	ret = zsock_setsockopt(sock->fd, SOL_SOCKET, SO_SNDTIMEO, &tmo, sizeof(tmo));
 	if (ret) {
-		LOG_ERR("nrf_setsockopt(%d) error: %d", NRF_SO_SNDTIMEO, -errno);
+		LOG_ERR("zsock_setsockopt(%d) error: %d", SO_SNDTIMEO, -errno);
 		ret = -errno;
 		goto error;
 	}
@@ -653,19 +654,19 @@ static int do_secure_socket_open(struct sm_socket *sock, int peer_verify)
 	}
 	sec_tag_t sec_tag_list[1] = { sock->sec_tag };
 
-	ret = nrf_setsockopt(sock->fd, NRF_SOL_SECURE, NRF_SO_SEC_TAG_LIST, sec_tag_list,
+	ret = zsock_setsockopt(sock->fd, SOL_TLS, TLS_SEC_TAG_LIST, sec_tag_list,
 			       sizeof(sec_tag_t));
 	if (ret) {
-		LOG_ERR("nrf_setsockopt(%d) error: %d", NRF_SO_SEC_TAG_LIST, -errno);
+		LOG_ERR("zsock_setsockopt(%d) error: %d", TLS_SEC_TAG_LIST, -errno);
 		ret = -errno;
 		goto error;
 	}
 
 	/* Set up (D)TLS peer verification */
-	ret = nrf_setsockopt(sock->fd, NRF_SOL_SECURE, NRF_SO_SEC_PEER_VERIFY, &peer_verify,
+	ret = zsock_setsockopt(sock->fd, SOL_TLS, TLS_PEER_VERIFY, &peer_verify,
 			       sizeof(peer_verify));
 	if (ret) {
-		LOG_ERR("nrf_setsockopt(%d) error: %d", NRF_SO_SEC_PEER_VERIFY, -errno);
+		LOG_ERR("zsock_setsockopt(%d) error: %d", TLS_PEER_VERIFY, -errno);
 		ret = -errno;
 		goto error;
 	}
@@ -683,12 +684,13 @@ static int do_secure_socket_open(struct sm_socket *sock, int peer_verify)
 	sock->async_poll.adr_hex = poll_ctx->adr_hex;
 	sock->async_poll.xapoll_events_requested = poll_ctx->xapoll_events_requested;
 	update_poll_events(
-		sock, NRF_POLLIN | NRF_POLLOUT | NRF_POLLERR | NRF_POLLHUP | NRF_POLLNVAL, true);
+		sock, ZSOCK_POLLIN | ZSOCK_POLLOUT | ZSOCK_POLLERR | ZSOCK_POLLHUP | ZSOCK_POLLNVAL,
+		true);
 
 	return 0;
 
 error:
-	nrf_close(sock->fd);
+	zsock_close(sock->fd);
 	sock->fd = INVALID_SOCKET;
 	return ret;
 }
@@ -701,9 +703,9 @@ static int do_socket_close(struct sm_socket *sock)
 		return 0;
 	}
 
-	ret = nrf_close(sock->fd);
+	ret = zsock_close(sock->fd);
 	if (ret) {
-		LOG_WRN("nrf_close() error: %d", -errno);
+		LOG_WRN("zsock_close() error: %d", -errno);
 		ret = -errno;
 	}
 
@@ -718,44 +720,44 @@ static int at_sockopt_to_sockopt(enum at_sockopt at_option, int *level, int *opt
 {
 	switch (at_option) {
 	case AT_SO_REUSEADDR:
-		*level = NRF_SOL_SOCKET;
-		*option = NRF_SO_REUSEADDR;
+		*level = SOL_SOCKET;
+		*option = SO_REUSEADDR;
 		break;
 	case AT_SO_RCVTIMEO:
-		*level = NRF_SOL_SOCKET;
-		*option = NRF_SO_RCVTIMEO;
+		*level = SOL_SOCKET;
+		*option = SO_RCVTIMEO;
 		break;
 	case AT_SO_SNDTIMEO:
-		*level = NRF_SOL_SOCKET;
-		*option = NRF_SO_SNDTIMEO;
+		*level = SOL_SOCKET;
+		*option = SO_SNDTIMEO;
 		break;
 	case AT_SO_SILENCE_ALL:
-		*level = NRF_IPPROTO_ALL;
-		*option = NRF_SO_SILENCE_ALL;
+		*level = IPPROTO_ALL;
+		*option = SO_SILENCE_ALL;
 		break;
 	case AT_SO_IP_ECHO_REPLY:
-		*level = NRF_IPPROTO_IP;
-		*option = NRF_SO_IP_ECHO_REPLY;
+		*level = IPPROTO_IP;
+		*option = SO_IP_ECHO_REPLY;
 		break;
 	case AT_SO_IPV6_ECHO_REPLY:
-		*level = NRF_IPPROTO_IPV6;
-		*option = NRF_SO_IPV6_ECHO_REPLY;
+		*level = IPPROTO_IPV6;
+		*option = SO_IPV6_ECHO_REPLY;
 		break;
 	case AT_SO_IPV6_DELAYED_ADDR_REFRESH:
-		*level = NRF_IPPROTO_IPV6;
-		*option = NRF_SO_IPV6_DELAYED_ADDR_REFRESH;
+		*level = IPPROTO_IPV6;
+		*option = SO_IPV6_DELAYED_ADDR_REFRESH;
 		break;
 	case AT_SO_BINDTOPDN:
-		*level = NRF_SOL_SOCKET;
-		*option = NRF_SO_BINDTOPDN;
+		*level = SOL_SOCKET;
+		*option = SO_BINDTOPDN;
 		break;
 	case AT_SO_RAI:
-		*level = NRF_SOL_SOCKET;
-		*option = NRF_SO_RAI;
+		*level = SOL_SOCKET;
+		*option = SO_RAI;
 		break;
 	case AT_SO_TCP_SRV_SESSTIMEO:
-		*level = NRF_IPPROTO_TCP;
-		*option = NRF_SO_TCP_SRV_SESSTIMEO;
+		*level = IPPROTO_TCP;
+		*option = SO_TCP_SRV_SESSTIMEO;
 		break;
 
 	default:
@@ -779,15 +781,15 @@ static int sockopt_set(struct sm_socket *sock, enum at_sockopt at_option, int at
 	}
 
 	/* Options with special handling. */
-	if (level == NRF_SOL_SOCKET && (option == NRF_SO_RCVTIMEO || option == NRF_SO_SNDTIMEO)) {
+	if (level == SOL_SOCKET && (option == SO_RCVTIMEO || option == SO_SNDTIMEO)) {
 		tmo.tv_sec = at_value;
 		value = &tmo;
 		len = sizeof(tmo);
 	}
 
-	ret = nrf_setsockopt(sock->fd, level, option, value, len);
+	ret = zsock_setsockopt(sock->fd, level, option, value, len);
 	if (ret) {
-		LOG_ERR("nrf_setsockopt(%d,%d,%d) error: %d", sock->fd, level, option, -errno);
+		LOG_ERR("zsock_setsockopt(%d,%d,%d) error: %d", sock->fd, level, option, -errno);
 	}
 
 	return ret;
@@ -804,24 +806,24 @@ static int sockopt_get(struct sm_socket *sock, enum at_sockopt at_option)
 	}
 
 	/* Options with special handling. */
-	if (level == NRF_SOL_SOCKET && (option == NRF_SO_RCVTIMEO || option == NRF_SO_SNDTIMEO)) {
+	if (level == SOL_SOCKET && (option == SO_RCVTIMEO || option == SO_SNDTIMEO)) {
 		struct timeval tmo;
 
 		len = sizeof(struct timeval);
-		ret = nrf_getsockopt(sock->fd, level, option, &tmo, &len);
+		ret = zsock_getsockopt(sock->fd, level, option, &tmo, &len);
 		if (ret == 0) {
 			rsp_send("\r\n#XSOCKETOPT: %d,%ld\r\n", sock->fd, (long)tmo.tv_sec);
 		}
 	} else {
 		/* Default */
-		ret = nrf_getsockopt(sock->fd, level, option, &value, &len);
+		ret = zsock_getsockopt(sock->fd, level, option, &value, &len);
 		if (ret == 0) {
 			rsp_send("\r\n#XSOCKETOPT: %d,%d\r\n", sock->fd, value);
 		}
 	}
 
 	if (ret) {
-		LOG_ERR("nrf_getsockopt(%d,%d,%d) error: %d", sock->fd, level, option, -errno);
+		LOG_ERR("zsock_getsockopt(%d,%d,%d) error: %d", sock->fd, level, option, -errno);
 	}
 
 	return ret;
@@ -829,35 +831,35 @@ static int sockopt_get(struct sm_socket *sock, enum at_sockopt at_option)
 
 static int at_sec_sockopt_to_sockopt(enum at_sec_sockopt at_option, int *level, int *option)
 {
-	*level = NRF_SOL_SECURE;
+	*level = SOL_TLS;
 
 	switch (at_option) {
 	case AT_TLS_HOSTNAME:
-		*option = NRF_SO_SEC_HOSTNAME;
+		*option = TLS_HOSTNAME;
 		break;
 	case AT_TLS_CIPHERSUITE_USED:
-		*option = NRF_SO_SEC_CIPHERSUITE_USED;
+		*option = TLS_CIPHERSUITE_USED;
 		break;
 	case AT_TLS_PEER_VERIFY:
-		*option = NRF_SO_SEC_PEER_VERIFY;
+		*option = TLS_PEER_VERIFY;
 		break;
 	case AT_TLS_SESSION_CACHE:
-		*option = NRF_SO_SEC_SESSION_CACHE;
+		*option = TLS_SESSION_CACHE;
 		break;
 	case AT_TLS_SESSION_CACHE_PURGE:
-		*option = NRF_SO_SEC_SESSION_CACHE_PURGE;
+		*option = TLS_SESSION_CACHE_PURGE;
 		break;
 	case AT_TLS_DTLS_CID:
-		*option = NRF_SO_SEC_DTLS_CID;
+		*option = TLS_DTLS_CID;
 		break;
 	case AT_TLS_DTLS_CID_STATUS:
-		*option = NRF_SO_SEC_DTLS_CID_STATUS;
+		*option = TLS_DTLS_CID_STATUS;
 		break;
 	case AT_TLS_DTLS_HANDSHAKE_TIMEO:
-		*option = NRF_SO_SEC_DTLS_HANDSHAKE_TIMEO;
+		*option = TLS_DTLS_HANDSHAKE_TIMEO;
 		break;
 	case AT_TLS_DTLS_FRAG_EXT:
-		*option = NRF_SO_SEC_DTLS_FRAG_EXT;
+		*option = TLS_DTLS_FRAG_EXT;
 		break;
 	default:
 		LOG_WRN("Unsupported option: %d", at_option);
@@ -878,7 +880,7 @@ static int sec_sockopt_set(struct sm_socket *sock, enum at_sec_sockopt at_option
 	}
 
 	/* Options with special handling. */
-	if (level == ZSOCK_SOL_TLS && option == ZSOCK_TLS_HOSTNAME) {
+	if (level == SOL_TLS && option == TLS_HOSTNAME) {
 		if (sm_util_casecmp(value, "NULL")) {
 			value = NULL;
 			len = 0;
@@ -887,9 +889,9 @@ static int sec_sockopt_set(struct sm_socket *sock, enum at_sec_sockopt at_option
 		return -EINVAL;
 	}
 
-	ret = nrf_setsockopt(sock->fd, level, option, value, len);
+	ret = zsock_setsockopt(sock->fd, level, option, value, len);
 	if (ret) {
-		LOG_ERR("nrf_setsockopt(%d,%d,%d) error: %d", sock->fd, level, option, -errno);
+		LOG_ERR("zsock_setsockopt(%d,%d,%d) error: %d", sock->fd, level, option, -errno);
 	}
 
 	return ret;
@@ -906,29 +908,29 @@ static int sec_sockopt_get(struct sm_socket *sock, enum at_sec_sockopt at_option
 	}
 
 	/* Options with special handling. */
-	if (level == NRF_SOL_SECURE && option == NRF_SO_SEC_CIPHERSUITE_USED) {
-		ret = nrf_getsockopt(sock->fd, level, option, &value, &len);
+	if (level == SOL_TLS && option == TLS_CIPHERSUITE_USED) {
+		ret = zsock_getsockopt(sock->fd, level, option, &value, &len);
 		if (ret == 0) {
 			rsp_send("\r\n#XSSOCKETOPT: %d,0x%x\r\n", sock->fd, value);
 		}
-	} else if (level == NRF_SOL_SECURE && option == NRF_SO_SEC_HOSTNAME) {
+	} else if (level == SOL_TLS && option == TLS_HOSTNAME) {
 		char hostname[SM_MAX_URL] = {0};
 
 		len = sizeof(hostname);
-		ret = nrf_getsockopt(sock->fd, level, option, &hostname, &len);
+		ret = zsock_getsockopt(sock->fd, level, option, &hostname, &len);
 		if (ret == 0) {
 			rsp_send("\r\n#XSSOCKETOPT: %d,%s\r\n", sock->fd, hostname);
 		}
 	} else {
 		/* Default */
-		ret = nrf_getsockopt(sock->fd, level, option, &value, &len);
+		ret = zsock_getsockopt(sock->fd, level, option, &value, &len);
 		if (ret == 0) {
 			rsp_send("\r\n#XSSOCKETOPT: %d,%d\r\n", sock->fd, value);
 		}
 	}
 
 	if (ret) {
-		LOG_ERR("nrf_getsockopt(%d,%d,%d) error: %d", sock->fd, level, option, -errno);
+		LOG_ERR("zsock_getsockopt(%d,%d,%d) error: %d", sock->fd, level, option, -errno);
 	}
 
 	return ret;
@@ -938,8 +940,8 @@ static int bind_to_local_addr(struct sm_socket *sock, uint16_t port)
 {
 	int ret;
 
-	if (sock->family == NRF_AF_INET) {
-		char ipv4_addr[NRF_INET_ADDRSTRLEN];
+	if (sock->family == AF_INET) {
+		char ipv4_addr[INET_ADDRSTRLEN];
 
 		util_get_ip_addr(sock->cid, ipv4_addr, NULL);
 		if (!*ipv4_addr) {
@@ -947,25 +949,25 @@ static int bind_to_local_addr(struct sm_socket *sock, uint16_t port)
 			return -ENETDOWN;
 		}
 
-		struct nrf_sockaddr_in local = {
-			.sin_family = NRF_AF_INET,
+		struct sockaddr_in local = {
+			.sin_family = AF_INET,
 			.sin_port = net_htons(port)
 		};
 
-		if (nrf_inet_pton(NRF_AF_INET, ipv4_addr, &local.sin_addr) != 1) {
+		if (zsock_inet_pton(AF_INET, ipv4_addr, &local.sin_addr) != 1) {
 			LOG_ERR("Parse local IPv4 address failed: %d", -errno);
 			return -EINVAL;
 		}
 
-		ret = nrf_bind(sock->fd, (struct nrf_sockaddr *)&local,
-			       sizeof(struct nrf_sockaddr_in));
+		ret = zsock_bind(sock->fd, (struct sockaddr *)&local,
+			       sizeof(struct sockaddr_in));
 		if (ret) {
-			LOG_ERR("nrf_bind() sock %d failed: %d", sock->fd, -errno);
+			LOG_ERR("zsock_bind() sock %d failed: %d", sock->fd, -errno);
 			return -errno;
 		}
 		LOG_DBG("bind sock %d to %s", sock->fd, ipv4_addr);
-	} else if (sock->family == NRF_AF_INET6) {
-		char ipv6_addr[NRF_INET6_ADDRSTRLEN];
+	} else if (sock->family == AF_INET6) {
+		char ipv6_addr[INET6_ADDRSTRLEN];
 
 		util_get_ip_addr(sock->cid, NULL, ipv6_addr);
 		if (!*ipv6_addr) {
@@ -973,19 +975,19 @@ static int bind_to_local_addr(struct sm_socket *sock, uint16_t port)
 			return -ENETDOWN;
 		}
 
-		struct nrf_sockaddr_in6 local = {
-			.sin6_family = NRF_AF_INET6,
+		struct sockaddr_in6 local = {
+			.sin6_family = AF_INET6,
 			.sin6_port = net_htons(port)
 		};
 
-		if (nrf_inet_pton(NRF_AF_INET6, ipv6_addr, &local.sin6_addr) != 1) {
+		if (zsock_inet_pton(AF_INET6, ipv6_addr, &local.sin6_addr) != 1) {
 			LOG_ERR("Parse local IPv6 address failed: %d", -errno);
 			return -EINVAL;
 		}
-		ret = nrf_bind(sock->fd, (struct nrf_sockaddr *)&local,
-			       sizeof(struct nrf_sockaddr_in6));
+		ret = zsock_bind(sock->fd, (struct sockaddr *)&local,
+			       sizeof(struct sockaddr_in6));
 		if (ret) {
-			LOG_ERR("nrf_bind() sock %d failed: %d", sock->fd, -errno);
+			LOG_ERR("zsock_bind() sock %d failed: %d", sock->fd, -errno);
 			return -errno;
 		}
 		LOG_DBG("bind sock %d to %s", sock->fd, ipv6_addr);
@@ -1007,15 +1009,15 @@ static int do_connect(struct sm_socket *sock, const char *url, uint16_t port)
 	if (ret) {
 		return -EAGAIN;
 	}
-	if (sa.sa_family == NRF_AF_INET) {
-		ret = nrf_connect(sock->fd, (struct nrf_sockaddr *)&sa,
-				  sizeof(struct nrf_sockaddr_in));
+	if (sa.sa_family == AF_INET) {
+		ret = zsock_connect(sock->fd, (struct sockaddr *)&sa,
+				  sizeof(struct sockaddr_in));
 	} else {
-		ret = nrf_connect(sock->fd, (struct nrf_sockaddr *)&sa,
-				  sizeof(struct nrf_sockaddr_in6));
+		ret = zsock_connect(sock->fd, (struct sockaddr *)&sa,
+				  sizeof(struct sockaddr_in6));
 	}
 	if (ret) {
-		LOG_ERR("nrf_connect() error: %d", -errno);
+		LOG_ERR("zsock_connect() error: %d", -errno);
 		return -errno;
 	}
 
@@ -1051,7 +1053,7 @@ static int do_send(struct sm_socket *sock, const uint8_t *data, int len, int fla
 	uint32_t sent = 0;
 
 	while (sent < len) {
-		ret = nrf_send(sockfd, data + sent, len - sent, flags);
+		ret = zsock_send(sockfd, data + sent, len - sent, flags);
 		if (ret < 0) {
 			LOG_ERR("Sent %u out of %u bytes. (%d)", sent, len, -errno);
 			ret = -errno;
@@ -1067,7 +1069,7 @@ static int do_send(struct sm_socket *sock, const uint8_t *data, int len, int fla
 			 sent);
 	}
 	if (!send_ntf) {
-		update_poll_events(sock, NRF_POLLOUT, true);
+		update_poll_events(sock, ZSOCK_POLLOUT, true);
 	}
 
 	return sent > 0 ? sent : ret;
@@ -1104,14 +1106,14 @@ static int do_recv(struct sm_socket *sock, int timeout, int flags,
 	int sockfd = sock->fd;
 	struct timeval tmo = {.tv_sec = timeout};
 
-	ret = nrf_setsockopt(sock->fd, NRF_SOL_SOCKET, NRF_SO_RCVTIMEO, &tmo, sizeof(tmo));
+	ret = zsock_setsockopt(sock->fd, SOL_SOCKET, SO_RCVTIMEO, &tmo, sizeof(tmo));
 	if (ret) {
-		LOG_ERR("nrf_setsockopt(%d) error: %d", NRF_SO_RCVTIMEO, -errno);
+		LOG_ERR("zsock_setsockopt(%d) error: %d", SO_RCVTIMEO, -errno);
 		return -errno;
 	}
-	ret = nrf_recv(sockfd, (void *)sm_data_buf, data_len, flags);
+	ret = zsock_recv(sockfd, (void *)sm_data_buf, data_len, flags);
 	if (ret < 0) {
-		LOG_WRN("nrf_recv() error: %d", -errno);
+		LOG_WRN("zsock_recv() error: %d", -errno);
 		return -errno;
 	}
 	/**
@@ -1122,7 +1124,7 @@ static int do_recv(struct sm_socket *sock, int timeout, int flags,
 	 * In both cases, treat as normal shutdown by remote
 	 */
 	if (ret == 0) {
-		LOG_WRN("nrf_recv() return 0");
+		LOG_WRN("zsock_recv() return 0");
 	} else {
 		if (!in_datamode(sock->pipe)) {
 			rsp_send("\r\n#XRECV: %d,%d,%d\r\n", sock->fd, mode, ret);
@@ -1138,7 +1140,7 @@ static int do_recv(struct sm_socket *sock, int timeout, int flags,
 		}
 		ret = 0;
 
-		update_poll_events(sock, NRF_POLLIN, true);
+		update_poll_events(sock, ZSOCK_POLLIN, true);
 	}
 
 	return ret;
@@ -1174,19 +1176,18 @@ static int do_sendto(struct sm_socket *sock, const char *url, uint16_t port, con
 	}
 
 	do {
-		ret = nrf_sendto(sock->fd, data + sent, len - sent, flags,
-				 (struct nrf_sockaddr *)&sa,
-				 sa.sa_family == NRF_AF_INET ? sizeof(struct nrf_sockaddr_in)
-							     : sizeof(struct nrf_sockaddr_in6));
+		ret = zsock_sendto(sock->fd, data + sent, len - sent, flags, &sa,
+				   sa.sa_family == AF_INET ? sizeof(struct sockaddr_in)
+							   : sizeof(struct sockaddr_in6));
 		if (ret <= 0) {
 			ret = -errno;
 			break;
 		}
 		sent += ret;
 
-	} while (sock->type != NRF_SOCK_DGRAM && sent < len);
+	} while (sock->type != SOCK_DGRAM && sent < len);
 
-	if (ret >= 0 && sock->type == NRF_SOCK_DGRAM && sent != len) {
+	if (ret >= 0 && sock->type == SOCK_DGRAM && sent != len) {
 		/* Partial send of datagram. */
 		ret = -EAGAIN;
 		sent = 0;
@@ -1203,7 +1204,7 @@ static int do_sendto(struct sm_socket *sock, const char *url, uint16_t port, con
 			 sent);
 	}
 	if (!send_ntf) {
-		update_poll_events(sock, NRF_POLLOUT, true);
+		update_poll_events(sock, ZSOCK_POLLOUT, true);
 	}
 
 	return sent > 0 ? sent : ret;
@@ -1217,15 +1218,15 @@ static int do_recvfrom(struct sm_socket *sock, int timeout, int flags,
 	net_socklen_t addrlen = sizeof(struct net_sockaddr);
 	struct timeval tmo = {.tv_sec = timeout};
 
-	ret = nrf_setsockopt(sock->fd, NRF_SOL_SOCKET, NRF_SO_RCVTIMEO, &tmo, sizeof(tmo));
+	ret = zsock_setsockopt(sock->fd, SOL_SOCKET, SO_RCVTIMEO, &tmo, sizeof(tmo));
 	if (ret) {
-		LOG_ERR("nrf_setsockopt(%d) error: %d", NRF_SO_RCVTIMEO, -errno);
+		LOG_ERR("zsock_setsockopt(%d) error: %d", SO_RCVTIMEO, -errno);
 		return -errno;
 	}
-	ret = nrf_recvfrom(sock->fd, (void *)sm_data_buf, data_len, flags,
-			   (struct nrf_sockaddr *)&remote, &addrlen);
+	ret = zsock_recvfrom(sock->fd, (void *)sm_data_buf, data_len, flags,
+			   (struct sockaddr *)&remote, &addrlen);
 	if (ret < 0) {
-		LOG_ERR("nrf_recvfrom() error: %d", -errno);
+		LOG_ERR("zsock_recvfrom() error: %d", -errno);
 		return -errno;
 	}
 	/**
@@ -1234,10 +1235,10 @@ static int do_recvfrom(struct sm_socket *sock, int timeout, int flags,
 	 * value is 0. Treat as normal case
 	 */
 	if (ret == 0) {
-		LOG_WRN("nrf_recvfrom() return 0");
+		LOG_WRN("zsock_recvfrom() return 0");
 	} else {
 		if (!in_datamode(sock->pipe)) {
-			char peer_addr[NRF_INET6_ADDRSTRLEN] = {0};
+			char peer_addr[INET6_ADDRSTRLEN] = {0};
 			uint16_t peer_port = 0;
 
 			util_get_peer_addr((struct net_sockaddr *)&remote, peer_addr, &peer_port);
@@ -1254,7 +1255,7 @@ static int do_recvfrom(struct sm_socket *sock, int timeout, int flags,
 			data_send(sock->pipe, sm_data_buf, ret);
 		}
 
-		update_poll_events(sock, NRF_POLLIN, true);
+		update_poll_events(sock, ZSOCK_POLLIN, true);
 	}
 
 	return 0;
@@ -1267,7 +1268,7 @@ static int socket_datamode_callback(uint8_t op, const uint8_t *data, int len, ui
 		sm_at_host_get_async_poll_ctx(sm_at_host_get_current_pipe());
 
 	if (op == DATAMODE_SEND) {
-		if (poll_ctx->datamode_sock->type == NRF_SOCK_DGRAM &&
+		if (poll_ctx->datamode_sock->type == SOCK_DGRAM &&
 		    (flags & SM_DATAMODE_FLAGS_MORE_DATA) != 0) {
 			LOG_ERR("Data mode buffer overflow");
 			exit_datamode_handler(sm_at_host_get_current(), -EOVERFLOW);
@@ -1359,8 +1360,8 @@ STATIC int handle_at_socket(enum at_parser_cmd_type cmd_type, struct at_parser *
 
 	case AT_PARSER_CMD_TYPE_TEST:
 		rsp_send("\r\n#XSOCKET: <handle>,(%d,%d,%d),(%d,%d,%d),(%d,%d),<cid>\r\n",
-			NRF_AF_INET, NRF_AF_INET6, NRF_AF_PACKET,
-			NRF_SOCK_STREAM, NRF_SOCK_DGRAM, NRF_SOCK_RAW,
+			AF_INET, AF_INET6, AF_PACKET,
+			SOCK_STREAM, SOCK_DGRAM, SOCK_RAW,
 			AT_SOCKET_ROLE_CLIENT, AT_SOCKET_ROLE_SERVER);
 		err = 0;
 		break;
@@ -1452,8 +1453,8 @@ STATIC int handle_at_secure_socket(enum at_parser_cmd_type cmd_type,
 	case AT_PARSER_CMD_TYPE_TEST:
 		rsp_send("\r\n#XSSOCKET: <handle>,(%d,%d),(%d,%d),(%d,%d),"
 			 "<sec_tag>,<peer_verify>,<cid>\r\n",
-			NRF_AF_INET, NRF_AF_INET6,
-			NRF_SOCK_STREAM, NRF_SOCK_DGRAM,
+			AF_INET, AF_INET6,
+			SOCK_STREAM, SOCK_DGRAM,
 			AT_SOCKET_ROLE_CLIENT, AT_SOCKET_ROLE_SERVER);
 		err = 0;
 		break;
@@ -1782,7 +1783,7 @@ STATIC int handle_at_send(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 			poll_ctx->datamode_sock = sock;
 			err = enter_datamode(socket_datamode_callback, data_len);
 			if (!err && sock->async_poll.adr_flags & SM_ADR_DATA_MODE) {
-				update_poll_events(sock, NRF_POLLIN, false);
+				update_poll_events(sock, ZSOCK_POLLIN, false);
 			}
 		} else {
 			return -EINVAL;
@@ -1935,7 +1936,7 @@ STATIC int handle_at_sendto(enum at_parser_cmd_type cmd_type, struct at_parser *
 			poll_ctx->datamode_sock = sock;
 			err = enter_datamode(socket_datamode_callback, data_len);
 			if (!err && sock->async_poll.adr_flags & SM_ADR_DATA_MODE) {
-				update_poll_events(sock, NRF_POLLIN, false);
+				update_poll_events(sock, ZSOCK_POLLIN, false);
 			}
 		} else {
 			return -EINVAL;
@@ -2011,22 +2012,22 @@ static int do_listen(struct sm_socket *sock)
 {
 	int ret;
 
-	if (sock->type != NRF_SOCK_STREAM || sock->local_port == 0 ||
+	if (sock->type != SOCK_STREAM || sock->local_port == 0 ||
 	    sock->sec_tag != SEC_TAG_TLS_INVALID) {
 		return -EOPNOTSUPP;
 	}
 
 	/* Set the socket to non-blocking mode, so accept() won't block. */
-	ret = nrf_fcntl(sock->fd, NRF_F_SETFL, NRF_O_NONBLOCK);
+	ret = zsock_fcntl(sock->fd, ZVFS_F_SETFL, ZVFS_O_NONBLOCK);
 	if (ret) {
-		LOG_ERR("nrf_fcntl() failed: %d", -errno);
+		LOG_ERR("zsock_fcntl() failed: %d", -errno);
 		return -errno;
 	}
 
 	/* nRF modem ignores the backlog parameter. Backlog in modem is fixed to 2. */
-	ret = nrf_listen(sock->fd, 2);
+	ret = zsock_listen(sock->fd, 2);
 	if (ret) {
-		LOG_ERR("nrf_listen() failed: %d", -errno);
+		LOG_ERR("zsock_listen() failed: %d", -errno);
 		return -errno;
 	}
 
@@ -2083,30 +2084,30 @@ static int do_accept(struct sm_socket *sock)
 	int ret;
 	struct net_sockaddr remote;
 	net_socklen_t addrlen = sizeof(struct net_sockaddr);
-	char peer_addr[NRF_INET6_ADDRSTRLEN] = {0};
+	char peer_addr[INET6_ADDRSTRLEN] = {0};
 	uint16_t peer_port = 0;
 	struct async_poll_ctx *poll_ctx = poll_ctx_from_sock(sock);
 
-	if (sock->type != NRF_SOCK_STREAM || !sock->listen) {
+	if (sock->type != SOCK_STREAM || !sock->listen) {
 		return -EOPNOTSUPP;
 	}
 
-	ret = nrf_accept(sock->fd, (struct nrf_sockaddr *)&remote, (nrf_socklen_t *)&addrlen);
+	ret = zsock_accept(sock->fd, (struct sockaddr *)&remote, (socklen_t *)&addrlen);
 	if (ret < 0) {
-		LOG_ERR("nrf_accept() failed: %d", -errno);
+		LOG_ERR("zsock_accept() failed: %d", -errno);
 		return -errno;
 	}
 
 	struct sm_socket *new_sock = find_avail_socket();
 	if (new_sock == NULL) {
 		LOG_ERR("Max socket count reached, closing accepted socket");
-		nrf_close(ret);
+		zsock_close(ret);
 		return -EINVAL;
 	}
 	init_socket(new_sock);
 	new_sock->fd = ret;
 	new_sock->family = remote.sa_family;
-	new_sock->type = NRF_SOCK_STREAM;
+	new_sock->type = SOCK_STREAM;
 	new_sock->role = AT_SOCKET_ROLE_CLIENT;
 	new_sock->cid = sock->cid;
 	new_sock->connected = true;
@@ -2120,11 +2121,12 @@ static int do_accept(struct sm_socket *sock)
 	new_sock->async_poll.adr_hex = poll_ctx->adr_hex;
 	new_sock->async_poll.xapoll_events_requested = poll_ctx->xapoll_events_requested;
 	update_poll_events(new_sock,
-			   NRF_POLLIN | NRF_POLLOUT | NRF_POLLERR | NRF_POLLHUP | NRF_POLLNVAL,
+			   ZSOCK_POLLIN | ZSOCK_POLLOUT | ZSOCK_POLLERR | ZSOCK_POLLHUP |
+				   ZSOCK_POLLNVAL,
 			   true);
 
 	/* Restore POLLIN for listening socket. */
-	update_poll_events(sock, NRF_POLLIN, true);
+	update_poll_events(sock, ZSOCK_POLLIN, true);
 
 	return 0;
 }
@@ -2167,11 +2169,11 @@ STATIC int handle_at_getaddrinfo(enum at_parser_cmd_type cmd_type, struct at_par
 				 uint32_t param_count)
 {
 	int err = -EINVAL;
-	char hostname[ZSOCK_NI_MAXHOST];
+	char hostname[NI_MAXHOST];
 	char host[SM_MAX_URL];
 	int size = SM_MAX_URL;
-	struct nrf_addrinfo *result;
-	struct nrf_addrinfo *res;
+	struct zsock_addrinfo *result;
+	struct zsock_addrinfo *res;
 	char rsp_buf[256];
 
 	switch (cmd_type) {
@@ -2182,19 +2184,19 @@ STATIC int handle_at_getaddrinfo(enum at_parser_cmd_type cmd_type, struct at_par
 		}
 		if (param_count == 3) {
 			/* DNS query with designated address family */
-			struct nrf_addrinfo hints = {
-				.ai_family = NRF_AF_UNSPEC
+			struct zsock_addrinfo hints = {
+				.ai_family = AF_UNSPEC
 			};
 			err = at_parser_num_get(parser, 2, &hints.ai_family);
 			if (err) {
 				return err;
 			}
-			if (hints.ai_family < 0  || hints.ai_family > NRF_AF_INET6) {
+			if (hints.ai_family < 0  || hints.ai_family > AF_INET6) {
 				return -EINVAL;
 			}
-			err = nrf_getaddrinfo(host, NULL, &hints, &result);
+			err = zsock_getaddrinfo(host, NULL, &hints, &result);
 		} else if (param_count == 2) {
-			err = nrf_getaddrinfo(host, NULL, NULL, &result);
+			err = zsock_getaddrinfo(host, NULL, NULL, &result);
 		} else {
 			return -EINVAL;
 		}
@@ -2209,17 +2211,17 @@ STATIC int handle_at_getaddrinfo(enum at_parser_cmd_type cmd_type, struct at_par
 		sprintf(rsp_buf, "\r\n#XGETADDRINFO: \"");
 		/* loop over all returned results and do inverse lookup */
 		for (res = result; res != NULL; res = res->ai_next) {
-			if (res->ai_family == NRF_AF_INET) {
-				struct nrf_sockaddr_in *host =
-					(struct nrf_sockaddr_in *)result->ai_addr;
+			if (res->ai_family == AF_INET) {
+				struct sockaddr_in *host =
+					(struct sockaddr_in *)res->ai_addr;
 
-				nrf_inet_ntop(NRF_AF_INET, &host->sin_addr, hostname,
+				zsock_inet_ntop(AF_INET, &host->sin_addr, hostname,
 					      sizeof(hostname));
-			} else if (res->ai_family == NRF_AF_INET6) {
-				struct nrf_sockaddr_in6 *host =
-					(struct nrf_sockaddr_in6 *)result->ai_addr;
+			} else if (res->ai_family == AF_INET6) {
+				struct sockaddr_in6 *host =
+					(struct sockaddr_in6 *)res->ai_addr;
 
-				nrf_inet_ntop(NRF_AF_INET6, &host->sin6_addr, hostname,
+				zsock_inet_ntop(AF_INET6, &host->sin6_addr, hostname,
 					      sizeof(hostname));
 			} else {
 				continue;
@@ -2232,7 +2234,7 @@ STATIC int handle_at_getaddrinfo(enum at_parser_cmd_type cmd_type, struct at_par
 		}
 		strcat(rsp_buf, "\"\r\n");
 		rsp_send("%s", rsp_buf);
-		nrf_freeaddrinfo(result);
+		zsock_freeaddrinfo(result);
 		break;
 
 	default:
@@ -2273,7 +2275,7 @@ static void xapoll_read_response(void)
 		    socks[i].pipe == pipe) {
 			rsp_send("\r\n#XAPOLL: %d,%d\r\n", socks[i].fd,
 				 socks[i].async_poll.xapoll_events_requested &
-					 ~(NRF_POLLERR | NRF_POLLHUP | NRF_POLLNVAL));
+					 ~(ZSOCK_POLLERR | ZSOCK_POLLHUP | ZSOCK_POLLNVAL));
 		}
 	}
 }
@@ -2349,12 +2351,12 @@ STATIC int handle_at_xapoll(enum at_parser_cmd_type cmd_type, struct at_parser *
 		if (err) {
 			return err;
 		}
-		if (events & ~(NRF_POLLIN | NRF_POLLOUT)) {
+		if (events & ~(ZSOCK_POLLIN | ZSOCK_POLLOUT)) {
 			LOG_ERR("Invalid poll events: %d", events);
 			return -EINVAL;
 		}
 		/* Libmodem always returns these. */
-		events |= NRF_POLLERR | NRF_POLLHUP | NRF_POLLNVAL;
+		events |= ZSOCK_POLLERR | ZSOCK_POLLHUP | ZSOCK_POLLNVAL;
 
 		err = set_xapoll_events(sock, events);
 		break;
@@ -2421,7 +2423,7 @@ STATIC int handle_at_recvcfg(enum at_parser_cmd_type cmd_type, struct at_parser 
 			sock->pipe = pipe;
 			sock->async_poll.adr_flags = flags;
 			sock->async_poll.adr_hex = hex_mode != 0;
-			err = update_poll_events(sock, NRF_POLLIN, false);
+			err = update_poll_events(sock, ZSOCK_POLLIN, false);
 		} else {
 			/* Apply to all sockets in this context */
 			poll_ctx->adr_flags = flags;
@@ -2430,7 +2432,7 @@ STATIC int handle_at_recvcfg(enum at_parser_cmd_type cmd_type, struct at_parser 
 				if (socks[i].fd != INVALID_SOCKET && socks[i].pipe == pipe) {
 					socks[i].async_poll.adr_flags = poll_ctx->adr_flags;
 					socks[i].async_poll.adr_hex = poll_ctx->adr_hex;
-					err = update_poll_events(&socks[i], NRF_POLLIN, false);
+					err = update_poll_events(&socks[i], ZSOCK_POLLIN, false);
 					if (err) {
 						return err;
 					}
