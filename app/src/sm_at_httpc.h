@@ -20,7 +20,7 @@
  * @brief Notify HTTP client of poll events (called from socket layer)
  *
  * @param fd Socket file descriptor
- * @param events Poll events (NRF_POLLIN, etc.)
+ * @param events Poll events (ZSOCK_POLLIN, etc.)
  * @return true if HTTP client needs POLLIN re-armed after callback
  */
 bool sm_at_httpc_poll_event(int fd, uint8_t events);

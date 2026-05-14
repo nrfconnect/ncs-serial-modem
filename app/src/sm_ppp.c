@@ -302,14 +302,14 @@ static void ppp_retrieve_pdn_info(struct ppp_context *const ctx)
 #if defined(CONFIG_LTE_LC_DNS_FALLBACK_ADDRESS)
 		} else {
 			/* Use fallback DNS addresses from LTE_LC module */
-			(void)nrf_inet_pton(NRF_AF_INET, CONFIG_LTE_LC_DNS_FALLBACK_ADDRESS,
+			(void)zsock_inet_pton(AF_INET, CONFIG_LTE_LC_DNS_FALLBACK_ADDRESS,
 					    &ctx->ipcp.peer_options.dns1_address);
 			ctx->ipcp.my_options.dns1_address = ctx->ipcp.peer_options.dns1_address;
 		}
 #elif defined(CONFIG_DNS_SERVER1)
 		} else {
 			/* Use fallback DNS addresses from Zephyr */
-			(void)nrf_inet_pton(NRF_AF_INET, CONFIG_DNS_SERVER1,
+			(void)zsock_inet_pton(AF_INET, CONFIG_DNS_SERVER1,
 					    &ctx->ipcp.peer_options.dns1_address);
 			ctx->ipcp.my_options.dns1_address = ctx->ipcp.peer_options.dns1_address;
 		}
