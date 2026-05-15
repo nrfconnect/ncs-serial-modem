@@ -376,6 +376,7 @@ static int ppp_start(void)
 	}
 
 	net_if_carrier_on(ppp_iface);
+	net_if_dormant_off(ppp_iface);
 
 	ppp_state = PPP_STATE_RUNNING;
 
@@ -405,6 +406,7 @@ static int ppp_stop(enum ppp_reason reason)
 		return 0;
 	}
 	ppp_state = PPP_STATE_STOPPING;
+	close_ppp_sockets();
 
 	/* When CMUX is used, PPP connection may recover on the same pipe,
 	 * on other cases, it will be closed and pipe is returned to AT mode.
@@ -414,13 +416,19 @@ static int ppp_stop(enum ppp_reason reason)
 		at_monitor_pause(&sm_ppp_on_cgev);
 	}
 
-	/* Bring the interface down before releasing pipes and carrier.
-	 * This is needed for LCP to notify the remote endpoint that the link is going down.
-	 */
-	int ret = net_if_down(ppp_iface);
+	if (net_if_is_admin_up(ppp_iface)) {
+		/* Bring the interface down before releasing pipes and carrier.
+		 * This is needed for LCP to notify the remote endpoint that the link is going down.
+		 */
+		int ret = net_if_down(ppp_iface);
 
-	if (ret) {
-		LOG_WRN("Failed to bring PPP interface down (%d).", ret);
+		if (ret) {
+			LOG_WRN("Failed to bring PPP interface down (%d).", ret);
+				/* Retry later */
+				net_if_dormant_on(ppp_iface);
+				delegate_ppp_event(PPP_STOP, reason);
+				return ret;
+		}
 	}
 
 	modem_ppp_release(&ppp_module);
@@ -429,7 +437,7 @@ static int ppp_stop(enum ppp_reason reason)
 		sm_cmux_release(CMUX_PPP_CHANNEL);
 	} else {
 		modem_pipe_close(ppp_pipe, K_SECONDS(CONFIG_SM_MODEM_PIPE_TIMEOUT));
-		ret = sm_uart_handler_enable();
+		int ret = sm_uart_handler_enable();
 
 		if (ret) {
 			LOG_ERR("Failed to enable PPP UART handler (%d).", ret);
@@ -438,8 +446,7 @@ static int ppp_stop(enum ppp_reason reason)
 	}
 
 	net_if_carrier_off(ppp_iface);
-
-	close_ppp_sockets();
+	net_if_dormant_on(ppp_iface);
 
 	ppp_state = PPP_STATE_STOPPED;
 	ppp_pipe = NULL;
@@ -655,7 +662,7 @@ static int sm_ppp_init(void)
 	k_thread_create(&ppp_data_passing_thread_id, ppp_data_passing_thread_stack,
 			K_THREAD_STACK_SIZEOF(ppp_data_passing_thread_stack),
 			ppp_data_passing_thread, NULL, NULL, NULL,
-			K_PRIO_COOP(10), 0, K_NO_WAIT);
+			K_LOWEST_APPLICATION_THREAD_PRIO, 0, K_NO_WAIT);
 	k_thread_name_set(&ppp_data_passing_thread_id, "ppp_data_passing");
 
 	ppp_iface = modem_ppp_get_iface(&ppp_module);
@@ -798,6 +805,7 @@ static void ppp_data_passing_thread(void*, void*, void*)
 				} else {
 					LOG_DBG("Connection down. Stop.");
 				}
+				ppp_state = PPP_STATE_STOPPING;
 				delegate_ppp_event(PPP_STOP, PPP_REASON_NETWORK);
 				continue;
 			}
@@ -840,7 +848,7 @@ static void ppp_data_passing_thread(void*, void*, void*)
 				LOG_ERR("Only sent %zd out of %zd bytes to %s socket.",
 					send_ret, len, ppp_socket_names[dst]);
 			} else {
-				LOG_DBG("Forwarded %zd bytes to %s socket.",
+				LOG_DBG_RATELIMIT_RATE(5000, "Forwarded %zd bytes to %s socket.",
 					send_ret, ppp_socket_names[dst]);
 			}
 		}

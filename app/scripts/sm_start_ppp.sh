@@ -131,7 +131,7 @@ linkname nrf91
 local
 passive
 persist
-holdoff 5
+holdoff 10
 nodetach
 noauth
 novj
