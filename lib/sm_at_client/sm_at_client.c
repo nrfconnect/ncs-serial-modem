@@ -173,7 +173,10 @@ static int rx_enable(void)
 	}
 
 	ret = uart_rx_enable(uart_dev, buf->buf, sizeof(buf->buf), UART_RX_TIMEOUT_US);
-	if (ret && ret != -EBUSY) {
+	if (ret == -EBUSY) {
+		LOG_WRN("UART RX already enabled");
+		buf_unref(buf->buf);
+	} else if (ret) {
 		LOG_ERR("uart_rx_enable failed: %d", ret);
 		buf_unref(buf->buf);
 		return ret;
