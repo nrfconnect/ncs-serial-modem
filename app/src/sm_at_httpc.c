@@ -104,6 +104,12 @@ static void http_finish_request(struct http_request *req);
 static int http_start_request(struct http_request *req);
 static bool http_headers_complete(struct http_request *req, char *header_end,
 				  struct sm_socket *sock, bool hup);
+static void http_warn_incomplete_transfer(const struct http_request *req);
+static int http_recv_read(struct http_request *req, struct sm_socket *sock);
+static void http_process_recv_headers(struct http_request *req, struct sm_socket *sock,
+				      uint8_t events);
+static void http_process_recv_body(struct http_request *req, struct sm_socket *sock,
+				    uint8_t events);
 static int parse_http_status_code(const char *buf, int *status_code);
 static int parse_content_length(const char *buf, const char *header_end, int *length);
 static bool parse_connection_close(const char *buf, const char *header_end);
@@ -635,8 +641,9 @@ static bool http_headers_complete(struct http_request *req, char *header_end,
 	LOG_DBG("HTTP %d: Headers complete, status %d", req->fd, req->status_code);
 
 	/*
-	 * If POLLHUP co-fired the connection is already closing; finish now
-	 * rather than re-arming POLLIN on a socket that will never fire again.
+	 * If POLLHUP arrived together with POLLIN, the connection is already
+	 * closing; finish now rather than re-arming POLLIN on a socket that
+	 * will never fire again.
 	 */
 	if (hup) {
 		if (req->content_length > 0 && req->bytes_sent < req->content_length)
@@ -660,6 +667,112 @@ static bool http_headers_complete(struct http_request *req, char *header_end,
 	}
 
 	return false;
+}
+
+static void http_warn_incomplete_transfer(const struct http_request *req)
+{
+	if (req->content_length > 0 &&
+	    req->total_received < req->content_length &&
+	    !req->connection_close) {
+		LOG_WRN("HTTP %d: Incomplete transfer - received %d/%d bytes",
+			req->fd, req->total_received, req->content_length);
+	}
+}
+
+/*
+ * Read from the socket into recv_buf. On success, updates recv_buf_len,
+ * total_received, and the idle timeout.
+ *
+ * Returns:  >0  bytes read
+ *            0  EOF (connection closed)
+ *           -1  EAGAIN (POLLIN re-armed)
+ *       -errno  other recv error (caller should fail the request)
+ */
+static int http_recv_read(struct http_request *req, struct sm_socket *sock)
+{
+	int ret;
+
+	ret = nrf_recv(req->fd, req->recv_buf + req->recv_buf_len,
+		       HTTP_RECV_BUF_SIZE - req->recv_buf_len - 1, NRF_MSG_DONTWAIT);
+
+	if (ret < 0) {
+		if (errno == EAGAIN || errno == EWOULDBLOCK) {
+			set_xapoll_events(sock, NRF_POLLIN);
+			return -1;
+		}
+		if (errno == ETIMEDOUT) {
+			LOG_ERR("Recv timed out");
+			return -ETIMEDOUT;
+		}
+		LOG_ERR("Recv failed: %d", errno);
+		return -errno;
+	}
+
+	if (ret == 0) {
+		return 0;
+	}
+
+	req->recv_buf_len += ret;
+	req->recv_buf[req->recv_buf_len] = '\0';
+	req->total_received += ret;
+	req->timeout_timestamp = k_uptime_get() + HTTP_RESPONSE_TIMEOUT_MS;
+
+	return ret;
+}
+
+static void http_process_recv_headers(struct http_request *req, struct sm_socket *sock,
+				      uint8_t events)
+{
+	char *header_end = strstr((char *)req->recv_buf, "\r\n\r\n");
+
+	if (header_end) {
+		if (http_headers_complete(req, header_end, sock, events & NRF_POLLHUP)) {
+			return;
+		}
+		req->need_rearm_pollin = true;
+		return;
+	}
+
+	if (req->recv_buf_len >= HTTP_RECV_BUF_SIZE - 1) {
+		LOG_ERR("HTTP headers too large");
+		http_fail_request(req);
+		return;
+	}
+
+	req->need_rearm_pollin = true;
+}
+
+static void http_process_recv_body(struct http_request *req, struct sm_socket *sock,
+				    uint8_t events)
+{
+	bool body_done;
+
+	if (req->manual_mode) {
+		/*
+		 * POLLIN fired in body state after xapoll_stop (race).
+		 * nrf_recv already consumed bytes from the socket buffer
+		 * into recv_buf and incremented total_received. Keep
+		 * recv_buf intact so the host can pull it; do NOT reset
+		 * recv_buf_len or the data is silently lost.
+		 */
+		xapoll_stop(sock);
+		return;
+	}
+
+	body_done = chunked_eof(req->recv_buf, req->recv_buf_len);
+
+	http_send_data(req, req->recv_buf, req->recv_buf_len);
+	req->recv_buf_len = 0;
+
+	/* Finish if content-length satisfied, chunked EOF, or connection closing. */
+	if (body_done ||
+	    (req->content_length > 0 && req->bytes_sent >= req->content_length) ||
+	    (events & NRF_POLLHUP)) {
+		http_finish_request(req);
+		return;
+	}
+
+	req->need_rearm_pollin = true;
 }
 
 /* Process HTTP request state machine (event-driven via XAPOLL) */
@@ -726,146 +839,62 @@ static void http_process_request(struct http_request *req, uint8_t events)
 		break;
 
 	case HTTP_STATE_RECEIVING_HEADERS:
-	case HTTP_STATE_RECEIVING_BODY:
-		/* POLLHUP without POLLIN before headers are received is an error:
-		 * the server closed the connection before sending a valid response.
-		 * When POLLIN co-fires, data may still be in the socket buffer (e.g.
-		 * a server with Connection: close that sends headers and closes
-		 * simultaneously); fall through to the POLLIN handler to drain it.
+		/*
+		 * POLLHUP without POLLIN: closed before any response. When POLLIN
+		 * arrives at the same time, drain the socket buffer (e.g. Connection: close).
 		 */
-		if (events & NRF_POLLHUP) {
-			if (!req->headers_complete && !(events & NRF_POLLIN)) {
-				/* Server closed before headers arrived and no data to read */
-				LOG_ERR("HTTP %d: Connection closed before headers (POLLHUP)",
-					req->fd);
-				http_fail_request(req);
-				return;
-			}
-			if (req->headers_complete && !(events & NRF_POLLIN)) {
-				/* POLLHUP alone during body reception: server closed cleanly
-				 * after all data. Treat as EOF.
-				 */
-				if (req->state == HTTP_STATE_RECEIVING_BODY) {
-					if (req->content_length > 0 &&
-					    req->total_received < req->content_length &&
-					    !req->connection_close)
-						LOG_WRN("HTTP %d: Incomplete - %d/%d bytes",
-							req->fd, req->total_received,
-							req->content_length);
-					http_finish_request(req);
-					return;
-				}
-				/* In RECEIVING_HEADERS, fall through to the POLLIN
-				 * handler which may drain remaining bytes.
-				 */
-			}
+		if ((events & NRF_POLLHUP) && !(events & NRF_POLLIN)) {
+			LOG_ERR("HTTP %d: Connection closed before headers (POLLHUP)",
+				req->fd);
+			http_fail_request(req);
+			return;
 		}
 
-		/* Handle POLLIN */
-		if (events & (NRF_POLLIN)) {
-			ret = nrf_recv(req->fd, req->recv_buf + req->recv_buf_len,
-				       HTTP_RECV_BUF_SIZE - req->recv_buf_len - 1,
-				       NRF_MSG_DONTWAIT);
-
-			if (ret < 0) {
-				if (errno == EAGAIN || errno == EWOULDBLOCK) {
-					/* Socket buffer empty - re-arm POLLIN to wait for more data
-					 */
-					set_xapoll_events(sock, NRF_POLLIN);
-					return;
-				}
-				if (errno == ETIMEDOUT) {
-					LOG_ERR("Recv timed out");
-					http_fail_request(req);
-					return;
-				}
-				LOG_ERR("Recv failed: %d", errno);
-				http_fail_request(req);
-				return;
-			}
-
-			if (ret == 0) {
-				/* Connection closed by server (EOF) */
-				if (!req->headers_complete) {
-					/* Closed before headers arrived */
-					http_fail_request(req);
-					return;
-				}
-
-				/* Check if we received all expected data */
-				if (req->content_length > 0 &&
-				    req->total_received < req->content_length &&
-				    !req->connection_close) {
-					LOG_WRN("HTTP %d: Incomplete transfer - received %d/%d "
-						"bytes",
-						req->fd, req->total_received,
-						req->content_length);
-				}
-
-				http_finish_request(req);
-				return;
-			}
-
-			/* Data received - update idle timeout */
-			req->recv_buf_len += ret;
-			req->recv_buf[req->recv_buf_len] = '\0';
-			req->total_received += ret;
-			req->timeout_timestamp = k_uptime_get() + HTTP_RESPONSE_TIMEOUT_MS;
-
-			if (req->state == HTTP_STATE_RECEIVING_HEADERS) {
-				/* Look for end of headers */
-				char *header_end = strstr((char *)req->recv_buf, "\r\n\r\n");
-
-				if (header_end) {
-					if (http_headers_complete(req, header_end, sock,
-								  events & NRF_POLLHUP)) {
-						return;
-					}
-					req->need_rearm_pollin = true;
-					return;
-				}
-
-				/* Check if buffer is full */
-				if (req->recv_buf_len >= HTTP_RECV_BUF_SIZE - 1) {
-					LOG_ERR("HTTP headers too large");
-					http_fail_request(req);
-					return;
-				}
-			} else {
-				/* Receiving body */
-				if (req->manual_mode) {
-					/*
-					 * POLLIN fired in body state after xapoll_stop (race).
-					 * nrf_recv already consumed bytes from the socket buffer
-					 * into recv_buf and incremented total_received. Keep
-					 * recv_buf intact so the host can pull it; do NOT reset
-					 * recv_buf_len or the data is silently lost.
-					 */
-					xapoll_stop(sock);
-					return;
-				}
-				bool body_done = chunked_eof(req->recv_buf, req->recv_buf_len);
-
-				http_send_data(req, req->recv_buf, req->recv_buf_len);
-				req->recv_buf_len = 0;
-
-				/* Finish if:
-				 *  - content-length satisfied (known-length transfer)
-				 *  - chunked terminator "0\r\n\r\n" just received
-				 *  - POLLHUP co-fired (connection closing)
-				 */
-				if (body_done ||
-				    (req->content_length > 0 &&
-				     req->bytes_sent >= req->content_length) ||
-				    (events & NRF_POLLHUP)) {
-					http_finish_request(req);
-					return;
-				}
-			}
-
-			/* Set flag for socket layer to re-arm POLLIN for continuous reception */
-			req->need_rearm_pollin = true;
+		if (!(events & NRF_POLLIN)) {
+			return;
 		}
+
+		ret = http_recv_read(req, sock);
+		if (ret < 0) {
+			if (ret != -1) {
+				http_fail_request(req);
+			}
+			return;
+		}
+		if (ret == 0) {
+			http_fail_request(req);
+			return;
+		}
+
+		http_process_recv_headers(req, sock, events);
+		break;
+
+	case HTTP_STATE_RECEIVING_BODY:
+		/* POLLHUP alone: server closed cleanly after sending body. */
+		if ((events & NRF_POLLHUP) && !(events & NRF_POLLIN)) {
+			http_warn_incomplete_transfer(req);
+			http_finish_request(req);
+			return;
+		}
+
+		if (!(events & NRF_POLLIN)) {
+			return;
+		}
+
+		ret = http_recv_read(req, sock);
+		if (ret < 0) {
+			if (ret != -1) {
+				http_fail_request(req);
+			}
+			return;
+		}
+		if (ret == 0) {
+			http_warn_incomplete_transfer(req);
+			http_finish_request(req);
+			return;
+		}
+
+		http_process_recv_body(req, sock, events);
 		break;
 
 	case HTTP_STATE_IDLE:
