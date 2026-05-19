@@ -321,8 +321,8 @@ static void agnss_requestor(struct k_work *)
 	int err;
 	struct nrf_modem_gnss_agnss_data_frame req;
 	static char agnss_rest_data_buf[NRF_CLOUD_AGNSS_MAX_DATA_SIZE];
-	struct nrf_cloud_rest_agnss_request request = {
-		NRF_CLOUD_REST_AGNSS_REQ_CUSTOM,
+	struct nrf_cloud_coap_agnss_request request = {
+		NRF_CLOUD_COAP_AGNSS_REQ_CUSTOM,
 		&req,
 	};
 
@@ -332,7 +332,7 @@ static void agnss_requestor(struct k_work *)
 		return;
 	}
 
-	struct nrf_cloud_rest_agnss_result result = {agnss_rest_data_buf,
+	struct nrf_cloud_coap_agnss_result result = {agnss_rest_data_buf,
 						     sizeof(agnss_rest_data_buf), 0};
 	struct lte_lc_cells_info net_info = {0};
 
@@ -345,7 +345,7 @@ static void agnss_requestor(struct k_work *)
 
 	err = nrf_cloud_coap_agnss_data_get(&request, &result);
 	if (err) {
-		LOG_ERR("Failed to request A-GNSS data via REST (%d).", err);
+		LOG_ERR("Failed to request A-GNSS data via CoAP (%d).", err);
 		return;
 	}
 
@@ -375,7 +375,7 @@ static void pgps_requestor(struct k_work *)
 static void pgps_coap_requestor(struct k_work *)
 {
 	int err;
-	struct nrf_cloud_rest_pgps_request request = {.pgps_req = &pgps_coap_request};
+	struct nrf_cloud_coap_pgps_request request = {.pgps_req = &pgps_coap_request};
 	struct nrf_cloud_pgps_result file_location = {0};
 	static char host[64];
 	static char path[128];
