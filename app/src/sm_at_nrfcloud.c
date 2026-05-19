@@ -290,7 +290,7 @@ static void loc_req_wk(struct k_work *work)
 	}
 
 	struct nrf_cloud_location_result result = {0};
-	const struct nrf_cloud_rest_location_request request = {
+	const struct nrf_cloud_coap_location_request request = {
 		.config = NULL,
 		.cell_info = nrfcloud_cell_pos ? &nrfcloud_cell_data : NULL,
 		.wifi_info = nrfcloud_wifi_pos ? &nrfcloud_wifi_data : NULL};
