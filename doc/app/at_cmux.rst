@@ -122,6 +122,11 @@ Example
 CMUX setup #XCMUX
 =================
 
+.. note::
+
+   ``AT#XCMUX`` is a compatibility command for Serial Modem v1.x.x and is not recommended for new designs.
+   Use the standard ``AT+CMUX=0`` command instead.
+
 The ``#XCMUX`` command manages the configuration of CMUX over the serial link.
 
 Set command
@@ -156,10 +161,10 @@ This means that after successfully running this command, you must set up the CMU
 The AT channel will be available at the configured address.
 You can send an empty ``AT`` command to make sure that the protocol is set up properly.
 
-.. note::
+.. caution::
 
-   This command can be run when CMUX is already running to change the address of the AT channel.
-   However, this is not allowed when PPP is running.
+   Using ``AT#XCMUX`` to switch the AT command channel at runtime is error-prone and not recommended.
+   The channel switching might run out of sync with automatic PPP startup and recovery enabled by ``AT#XPPP=1``.
 
 Read command
 ------------
