@@ -53,3 +53,33 @@
 &gpio1 {
 	status = "okay";
 };
+
+/* Using default SRAM partitions from nrf54l15_cpuapp_partition.dtsi */
+
+/*
+ * RRAM partition layout for nRF54L15 DK (disable MCUboot)
+ *
+ * 0x0000_0000  slot0 (primary app)          (1492 kB)
+ * 0x0017_5000  Non-secure storage           ( 32 kB)
+ */
+
+/delete-node/ &boot_partition;
+/delete-node/ &slot0_partition;
+/delete-node/ &slot1_partition;
+/delete-node/ &storage_partition;
+
+&cpuapp_rram {
+	partitions {
+		slot0_partition: partition@0 {
+			compatible = "zephyr,mapped-partition";
+			label = "image-0";
+			reg = <0x0 DT_SIZE_K(1492)>;
+		};
+
+		storage_partition: partition@175000 {
+			compatible = "zephyr,mapped-partition";
+			label = "storage";
+			reg = <0x000175000 DT_SIZE_K(32)>;
+		};
+	};
+};
