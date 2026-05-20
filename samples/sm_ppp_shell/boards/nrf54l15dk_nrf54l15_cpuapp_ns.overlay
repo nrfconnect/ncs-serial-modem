@@ -53,3 +53,7 @@
 &gpio1 {
 	status = "okay";
 };
+
+/* Using default RRAM and SRAM partitions from nrf54l15_cpuapp_ns_partition.dtsi.
+ * The nrf54l15_cpuapp_ns_partition.dtsi does not define partition for MCUboot by default.
+ */
