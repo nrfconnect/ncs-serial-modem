@@ -95,6 +95,12 @@ Example
 Control PPP #XPPP
 =================
 
+.. note::
+
+   ``AT#XPPP`` is a compatibility command for Serial Modem v1.x.x and is not recommended for new designs.
+   It depends on the channel assignment configured by the ``AT#XCMUX`` command.
+   Use the standard ``AT+CGDATA`` command instead.
+
 Set command
 -----------
 
@@ -312,7 +318,7 @@ For the process described here, |SM|'s UARTs must be connected to the Linux host
 
    .. code-block:: console
 
-      $ sudo pppd noauth <UART_dev> <baud_rate> local crtscts debug noipdefault connect "/usr/sbin/chat -v -t60 '' AT+CFUN=1 OK AT#XPPP=1 '#XPPP: 1,'" disconnect "/usr/sbin/chat -v -t10 '' AT+CFUN=0 OK" nodetach
+      $ sudo pppd noauth <UART_dev> <baud_rate> local crtscts debug noipdefault connect "/usr/sbin/chat -v -t60 '' AT+CFUN=1 OK AT+CGDATA CONNECT" nodetach
 
    Replace ``<UART_dev>`` by the device file assigned to the Serial Modem's UART and ``<baud_rate>`` by the baud rate of the UART.
    Typically, the device file assigned to it is :file:`/dev/ttyACM0` for an nRF9151 DK.

@@ -29,7 +29,7 @@ PPP and CMUX
    :alt: CMUX multiplexes AT and PPP over one UART.
    :align: center
 
-   CMUX multiplexes AT (DLC1) and PPP (DLC2) over one UART.
+   CMUX multiplexes AT and PPP over one UART using separate DLC channels.
 
 |SM| supports PPP both with or without CMUX (GSM 07.10 multiplexing).
 This allows you to choose the setup that best fits your use case.
@@ -39,8 +39,10 @@ PPP without CMUX
 ================
 
 Without CMUX, PPP runs on the current UART.
-Once PPP starts, the UART is in PPP data mode and cannot be used for AT commands until PPP is terminated.
-This also means that no more AT notifications are delivered over that UART while PPP is active.
+Send ``AT+CFUN=1`` to activate the modem, then ``AT+CGDATA`` to start PPP.
+The modem responds with ``CONNECT`` and the UART immediately enters PPP data mode.
+You cannot use the UART for AT commands until PPP is terminated by LCP negotiation.
+No AT notifications are delivered over the UART while PPP is active.
 
 Example
 -------
@@ -48,29 +50,36 @@ Example
 Switching UART from AT mode to PPP mode and back:
 
 .. figure:: ../images/ppp-uart-sequence.svg
-   :alt: PPP session without CMUX.
+   :alt: PPP session without CMUX using AT+CGDATA.
    :align: center
 
    PPP session without CMUX.
+
+.. _ppp_with_cmux:
 
 PPP with CMUX
 =============
 
 With CMUX, AT traffic and PPP traffic can share a single UART by using separate CMUX channels.
 
-By default, |SM| uses the AT channel on DLC channel 1 and PPP on DLC channel 2.
-If you want PPP on DLC channel 1, start CMUX with ``AT#XCMUX=2`` before starting PPP. This moves the AT-channel to DLC channel 2.
+Start CMUX with ``AT+CMUX=0``, then issue ``AT+CGDATA`` on the chosen DLC channel to start PPP on that channel.
+The following example uses DLC channel 1 for PPP and DLC channel 2 for AT commands, with ``AT#XCMUXURC=2`` directing URCs to DLC channel 2.
 
 Example
 -------
 
-Start CMUX, then start PPP on DLC channel 2 while keeping AT on DLC channel 1:
+Send ``AT#XCMUXURC=2`` to route URCs to DLC channel 2, start CMUX with ``AT+CMUX=0``, then start PPP on DLC channel 1 using ``AT+CGDATA``:
 
 .. figure:: ../images/ppp-cmux-sequence.svg
-    :alt: PPP session with CMUX showing split into DLC1 (AT) and DLC2 (PPP).
+    :alt: PPP session with CMUX showing DLC1 (PPP) and DLC2 (AT), with URCs routed to DLC2.
     :align: center
 
-    PPP session with CMUX.
+    PPP on DLC1, AT commands and URCs on DLC2.
+
+.. note::
+
+   The ``AT#XCMUXURC=2`` is optional, but it is recommended to route URCs to a static channel.
+   When the URC channel is not selected, URCs are sent to the first open AT channel, which is not in data mode.
 
 
 Use case: Linux host
@@ -109,15 +118,16 @@ Option A: PPP over CMUX (recommended)
 =====================================
 
 |SM| provides start and stop scripts for Linux in the application's :file:`scripts` directory.
+The :file:`sm2_start_ppp.sh` script uses standard 3GPP AT commands (``AT+CMUX`` and ``AT+CGDATA``) and is the recommended way to establish a PPP connection over CMUX.
 If needed, adjust the serial port settings with command line parameters.
-Run ``sm_start_ppp.sh -h`` to see all available options.
+Run ``sm2_start_ppp.sh -h`` to see all available options.
 Default settings assume that the modem is available at ``/dev/ttyACM0`` with a baud rate of ``115200``.
 
 1. Start the connection (requires superuser privileges for PPPD and CMUX):
 
    .. code-block:: shell
 
-      $ sudo scripts/sm_start_ppp.sh [-s serial_port] [-b baud_rate] [-t timeout]
+      $ sudo scripts/sm2_start_ppp.sh [-s serial_port] [-b baud_rate] [-t timeout]
 
 #. Verify that the PPP interface is up (for example, with ``ip addr show ppp0``) and test connectivity.
 
@@ -156,7 +166,7 @@ This setup is useful for quick testing, but the UART cannot be used for AT comma
 
    .. code-block:: console
 
-      $ sudo pppd noauth <UART_dev> <baud_rate> local crtscts debug noipdefault connect "/usr/sbin/chat -v -t60 '' AT+CFUN=1 OK AT#XPPP=1 '#XPPP: 1,'" disconnect "/usr/sbin/chat -v -t10 '' AT+CFUN=0 OK" nodetach
+      $ sudo pppd noauth <UART_dev> <baud_rate> local crtscts debug noipdefault connect "/usr/sbin/chat -v -t60 '' AT+CFUN=1 OK AT+CGDATA CONNECT" nodetach
 
    Replace ``<UART_dev>`` by the device file assigned to the Serial Modem's UART and ``<baud_rate>`` by the baud rate of the UART.
    Typically, the device file assigned to it is :file:`/dev/ttyACM0` for an nRF9151 DK.
@@ -176,8 +186,8 @@ This setup is useful for quick testing, but the UART cannot be used for AT comma
 
 #. Terminate the PPP connection with CTRL+C in the terminal where ``pppd`` is running or ``sudo poff`` in another terminal.
 
-Use case: Zephyr host (Zephyr-compatible modem)
-***********************************************
+Use case: Zephyr host
+*********************
 
 This section describes how to use |SM| as a modem that is controlled by Zephyr's cellular modem driver.
 The controlling chip runs a Zephyr application, which uses Zephyr's native IP stack.
@@ -192,19 +202,18 @@ The controlling chip runs a Zephyr application, which uses Zephyr's native IP st
    * Power saving feature requires UART with DTR and RI pins connected between the controlling chip and the SiP.
      See :ref:`uart_configuration` for more information.
    * System mode is not configured. See the `%XSYSTEMMODE`_ command in the AT command Reference Guide for more details.
-   * The Zephyr cellular modem driver is written with the expectation that the PPP session starts on the DLC channel used for AT commands, which is DLC channel 1 by default.
 
 Example
 =======
 
-The Zephyr modem driver requires the AT channel and PPP channel to be switched so that the PPP starts at DLC channel 1, while the AT channel is moved to DLC channel 2.
-This is achieved by starting CMUX with ``AT#XCMUX=2`` before the network is attached and starting the PPP.
+The Zephyr modem driver sends ``AT+CMUX=0`` to start the CMUX, then uses DLC channel 1 for AT commands and DLC channel 2 for PPP.
+The dial script issues ``AT+CGDATA`` on DLC channel 2, which starts PPP on that channel and leaves DLC channel 1 free for AT commands and URCs.
 
 .. figure:: ../images/ppp-zephyr-sequence.svg
-    :alt: PPP session with CMUX showing Zephyr host control.
+    :alt: PPP session with CMUX using standard AT+CMUX and AT+CGDATA commands from a Zephyr host.
     :align: center
 
-    The Zephyr modem driver does extra DLC channel switching when starting the PPP session.
+    Zephyr modem driver uses DLC1 as the AT command channel and starts PPP on DLC2 using AT+CGDATA.
 
 Configuration
 =============
@@ -231,6 +240,28 @@ In particular:
 * :file:`boards/nrf54l15dk_nrf54l15_cpuapp.overlay` - Configure UART (pins, baud rate), DTR and RI pins used between the MCU and the SiP.
 
 Depending on your hardware, a devicetree overlay is needed to describe the modem UART and power control pins.
+The modem node in the overlay must use ``compatible = "nordic,nrf91-sm-v2"`` to select the |SM| modem driver:
+
+.. code-block:: devicetree
+
+   &uart0 {
+       status = "okay";
+       current-speed = <115200>;
+       hw-flow-control;
+
+       modem: modem {
+           compatible = "nordic,nrf91-sm-v2";
+           status = "okay";
+           mdm-ring-gpios = <&gpio0 0 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+           mdm-dtr-gpios  = <&gpio0 1 GPIO_ACTIVE_LOW>;
+           cmux-enable-runtime-power-save;
+           cmux-close-pipe-on-power-save;
+           cmux-idle-timeout-ms = <5000>;
+           autostarts;
+       };
+   };
+
+The ``nordic,nrf91-sm-v2`` binding is compatible with |SM| application v2.0.0 and later.
 Devicetree settings also control the CMUX power-saving behavior.
 
 Flashing and running
@@ -241,9 +272,10 @@ When the Zephyr's modem driver starts up, it will perform the following steps:
 
 * Enable the UART interface.
 * Enable notifications and query modem information.
-* Enable CMUX.
+* Configure URCs to DLC channel 1 with ``AT#XCMUXURC=1``.
+* Enable CMUX with ``AT+CMUX=0``.
 * Set the modem to normal mode with ``AT+CFUN=1``.
-* Start PPP.
+* Start PPP on DLC channel 2 with ``AT+CGDATA``.
 
 The Zephyr host can then use standard Zephyr networking APIs to use the PPP link for network communication.
 Only exception for normal network interfaces is that the PPP interface cannot be automatically started at boot.
@@ -254,6 +286,21 @@ You must start the PPP interface manually when required.
         struct net_if *ppp_iface = net_if_get_default();
         net_if_up(ppp_iface);
 
+Using legacy nrf91-slm Zephyr driver
+====================================
+
+Zephyr provides an older upstream cellular modem driver that uses ``compatible = "nordic,nrf91-slm"``.
+It was developed for the Serial LTE Modem (SLM) sample application and is not recommended for new designs.
+
+Unlike the ``nordic,nrf91-sm-v2`` driver, the legacy ``nrf91-slm`` driver uses the proprietary ``AT#XCMUX=2`` command to switch the AT command channel to DLC channel 2 at runtime and ``AT#XPPP=1`` to allow PPP to start automatically on the secondary DLC channel.
+This approach is unreliable in various recovery scenarios, because PPP startup and AT channel switching might run out of sync, leading to a loss of AT control.
+
+.. figure:: ../images/ppp-zephyr-sequence-legacy.svg
+    :alt: Legacy PPP session with CMUX using AT#XCMUX=1 and AT#XCMUX=2 commands from a Zephyr host.
+    :align: center
+
+    Legacy ``nrf91-slm`` driver starts CMUX using ``AT#XCMUX=1``, then uses ``AT#XCMUX=2`` to switch the AT channel to DLC2 and starts PPP on DLC1.
+
 Operational notes
 *****************
 
@@ -261,16 +308,7 @@ Operational notes
   Manually configuring the APN is typically not required.
 
 * nRF91 Series SiP automatically restarts a network scan when connectivity is lost.
-  Manual dial-up scripts are typically not required for recovery.
+  Manual dial-up scripts are typically not required for LTE connection recovery.
 
-* |SM| uses only one AT channel.
-  Therefore, the controlling chip must use only one CMUX channel for AT commands and notifications.
-
-* CMUX channel allocation (by default, allocating DLC channel 1 to PPP and DLC channel 2 to AT) is controlled by ``AT#XCMUX``.
-  See :ref:`SM_AT_CMUX` for details.
-
-* PPP link start/stop behavior and recovery from network loss depend on how PPP is configured and which CMUX channel is used.
-  See :ref:`SM_AT_PPP` for the ``#XPPP`` status notification format and PPP termination behavior.
-
-*  You might encounter a packet domain event (``+CGEV: IPV6 FAIL 0``) indicating a failure in obtaining an IPv6 address.
-   You can ignore this since not all carriers provide IPv6 address for default PDN.
+* When you use the proprietary ``AT#XCMUX=1`` and ``AT#XPPP=1`` commands, CMUX channel allocation is static (by default, allocating DLC channel 1 to PPP and DLC channel 2 to AT).
+  See :ref:`SM_AT_CMUX` and :ref:`SM_AT_PPP` for details.
