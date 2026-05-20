@@ -133,23 +133,37 @@ STATIC int handle_at_log(enum at_parser_cmd_type cmd_type, struct at_parser *par
 	return -EINVAL;
 }
 
+/* Whether bootloader mode is enabled. */
+extern bool sm_bootloader_mode_enabled;
+
 static int sm_log_init(void)
 {
-	if (!IS_ENABLED(CONFIG_LOG_BACKEND_UART) ||
-	    !IS_ENABLED(CONFIG_LOG_BACKEND_UART_AUTOSTART)) {
-		/* Start with UART log backend disabled. */
-		if (uart_suspend()) {
-			LOG_ERR("Failed to suspend UART log backend");
-			sm_init_failed = true;
-			return -EFAULT;
-		}
-	} else {
+	if (sm_bootloader_mode_enabled) {
+		/* Keep the logging (and logging UART) enabled in bootloader mode */
 		log_active = true;
+		return 0;
+	}
+
+	const struct log_backend *log_be = log_backend_get_by_name("log_backend_uart");
+
+	if (log_be) {
+		LOG_DBG("Use AT#XLOG=1 to enable UART logging");
+		sm_log_flush();
+		log_backend_disable(log_be);
+	}
+
+	/* Suspend the UART device that is shared by application log and modem trace */
+	int ret = uart_suspend();
+
+	if (ret) {
+		urc_send(SM_SYNC_ERR_STR);
+		return ret;
 	}
 
 	return 0;
 }
 
-SYS_INIT(sm_log_init, POST_KERNEL, CONFIG_APPLICATION_INIT_PRIORITY);
+/* Runs after application initialization */
+SYS_INIT(sm_log_init, APPLICATION, 101);
 
 #endif /* DT_HAS_CHOSEN(zephyr_console) */

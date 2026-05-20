@@ -19,7 +19,8 @@ See :ref:`sm_logging_uart_backend` for a full description of the feature.
 
 The Zephyr application log backend (``AT#XLOG``) and the modem trace backend (``AT#XTRACE``) share a single UART.
 They are mutually exclusive: enabling one while the other is active returns an error.
-The trace UART is suspended when neither backend is active and resumed automatically when either backend is enabled.
+During boot, the UART outputs logs from B0, MCUboot, and the application.
+After initialization, the UART is suspended when no backend is active and resumed when at least one backend is enabled.
 
 The trace UART is configured at 1000000 baud rate to support the high data rate required for the modem traces.
 Trace data is available through the UART1 interface (VCOM1 on the nRF9151 DK).

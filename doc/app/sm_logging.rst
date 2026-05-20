@@ -13,9 +13,10 @@ Logs often refer to the |SM| application logging while the modem logs are referr
 Application logging
 *******************
 
-|SM| outputs application logs over ``UART1`` (VCOM1 on the nRF9151 DK) by default.
-The UART is kept suspended at startup and activated at runtime using the ``AT#XLOG=1`` command.
-This avoids any UART power overhead when logs are not needed.
+|SM| outputs B0, MCUboot, and application logs over ``UART1`` (VCOM1 on the nRF9151 DK) during boot.
+After the application is initialized, the log backend is disabled, and the UART is suspended.
+Use ``AT#XLOG=1`` to enable application logs and resume the UART.
+This avoids UART power overhead when logs are not needed during normal operation.
 See :ref:`SM_AT_trace` for the full command reference.
 
 .. note::
@@ -83,7 +84,7 @@ To also enable the modem trace backend (``AT#XTRACE``), build with the Kconfig o
 
    west build -p -b nrf9151dk/nrf9151/ns -- -DEXTRA_CONF_FILE="overlay-trace-backend-uart.conf"
 
-After flashing, the UART is suspended at startup.
+After the application is initialized, the UART is suspended.
 Use ``AT#XLOG=1`` to activate application logs and ``AT#XTRACE=1`` to activate modem traces.
 See :ref:`SM_AT_trace` for the full command reference.
 

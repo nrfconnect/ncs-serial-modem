@@ -271,20 +271,3 @@ STATIC int handle_at_trace(enum at_parser_cmd_type cmd_type, struct at_parser *p
 
 	return -EINVAL;
 }
-
-static int sm_trace_backend_uart_init(void)
-{
-	/* Allow UART to be active if CONFIG_LOG_BACKEND_UART_AUTOSTART=y */
-	if (!IS_ENABLED(CONFIG_LOG_BACKEND_UART_AUTOSTART)) {
-		/* Start the trace backend disabled. */
-		if (uart_suspend()) {
-			LOG_ERR("Failed to suspend UART trace backend");
-			sm_init_failed = true;
-			return -EFAULT;
-		}
-	}
-
-	return 0;
-}
-
-SYS_INIT(sm_trace_backend_uart_init, POST_KERNEL, CONFIG_APPLICATION_INIT_PRIORITY);
