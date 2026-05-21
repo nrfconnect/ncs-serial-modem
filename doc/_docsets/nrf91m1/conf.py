@@ -31,6 +31,8 @@ exclude_patterns = docset_exclude_patterns(DOCSET) + [  # noqa: F405
     # Pages that do not apply to the nRF91M1 go here.
 ]
 
+latex_documents = docset_latex_documents(DOCSET)  # noqa: F405
+
 html_theme_options["docset"] = DOCSET  # noqa: F405
 
 # Lets this docset link into the main docset with :external+main:. The mapping
