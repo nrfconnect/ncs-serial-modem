@@ -13,6 +13,7 @@ directory next to the other docsets, and every docset must declare the same
 latter.
 """
 
+import sys
 from pathlib import Path
 
 from sphinx.cmd.build import get_parser
@@ -25,16 +26,39 @@ ALL_DOCSETS = {
     "nrf91m1": ("nRF91M1 AT Commands", "index_nrf91m1"),
 }
 
+# PDF filename produced for each docset (without extension).
+# Used as the LaTeX output filename and as the copy target in the HTML tree.
+PDF_FILENAMES = {
+    "main": "serial_modem_documentation",
+    "nrf91m1": "nrf91m1_cellular_at_commands",
+}
+
+# PDF filename produced for each docset (without extension).
+# Used as the LaTeX output filename and as the copy target in the HTML tree.
+PDF_TITLES = {
+    "main": "Serial Modem Documentation",
+    "nrf91m1": "nRF91M1 Cellular AT Commands",
+}
+
 
 def get_builddir() -> Path:
     """Return the documentation build directory.
 
-    Docsets are built into ``<build>/html/<docset>``, so the build directory is
-    two levels above the Sphinx output directory.
+    Docsets are built into ``<build>/<format>/<docset>``, so the build
+    directory is two levels above the Sphinx output directory.
     """
 
-    args = get_parser().parse_args()
-    return (Path(args.outputdir) / ".." / "..").resolve()
+    argv = sys.argv[1:]
+
+    # The PDF build runs sphinx-build in make mode, whose command line the
+    # regular parser rejects. Make mode takes its arguments in a fixed order,
+    # "-M <builder> <sourcedir> <outputdir>", before any option.
+    if argv[:1] == ["-M"]:
+        outputdir = Path(argv[3])
+    else:
+        outputdir = Path(get_parser().parse_args().outputdir)
+
+    return (outputdir / ".." / "..").resolve()
 
 
 def get_intersphinx_mapping(docset: str) -> tuple[str, str] | None:
