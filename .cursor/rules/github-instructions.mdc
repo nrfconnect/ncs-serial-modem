@@ -1,0 +1,14 @@
+---
+description: Load project instructions from .github/
+alwaysApply: true
+---
+
+# Project instructions (.github/)
+
+At the start of every task in this repo, read and follow:
+
+- `.github/copilot-instructions.md`
+- `.github/instructions/C-CODE.instructions.md`
+- `.github/instructions/DOC.instructions.md`
+
+Treat those files as authoritative. Re-read them when they may be stale.
