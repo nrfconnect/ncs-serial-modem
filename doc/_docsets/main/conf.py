@@ -15,7 +15,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).absolute().parents[1]))
 
 from conf_common import *  # noqa: F401,F403
-from conf_common import docsets, docset_exclude_patterns, html_theme_options
+from conf_common import docsets, docset_exclude_patterns, html_theme_options, \
+	docset_latex_documents, docset_html_context
 
 DOCSET = "main"
 
@@ -27,4 +28,7 @@ exclude_patterns = docset_exclude_patterns(DOCSET) + [
     "app/nrf91m1_intro.rst",
 ]
 
+latex_documents = docset_latex_documents(DOCSET)
+
 html_theme_options["docset"] = DOCSET
+html_context = docset_html_context(DOCSET)
