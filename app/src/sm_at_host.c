@@ -1037,13 +1037,13 @@ static int sm_at_send_internal(struct sm_at_host_ctx *ctx, const uint8_t *data, 
 	if (urc) {
 		if (ctx == NULL) {
 			ctx = sm_at_host_get_urc_ctx();
-			LOG_DBG("URC: %s", (const char *)data);
 			if (!ctx) {
 				/* Safe to assume that already buffered URCs are outdated as well */
 				ring_buf_reset(&urc_buf);
-				LOG_DBG("No context available for URC");
+				LOG_DBG("No context available for URC: %s", (const char *)data);
 				return -EIO;
 			}
+			LOG_DBG("URC default pipe=%p: %s", ctx->pipe, (const char *)data);
 			ret = ring_buf_put(&urc_buf, data, len);
 			if (ret < len) {
 				LOG_ERR("URC buffer full, dropped %d bytes", len - ret);
@@ -1052,6 +1052,7 @@ static int sm_at_send_internal(struct sm_at_host_ctx *ctx, const uint8_t *data, 
 				return -EIO;
 			}
 		} else {
+			LOG_DBG("URC to pipe=%p: %s", ctx->pipe, (const char *)data);
 			/* Pipe specific URC */
 			struct urc_msg *msg = calloc(1, sizeof(struct urc_msg) + len + 1);
 
