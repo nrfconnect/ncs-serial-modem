@@ -30,6 +30,7 @@ extensions = [
     'sphinx_togglebutton',
     "sphinxcontrib.jquery",
     "sphinx_copybutton",
+    'sphinx.ext.imgconverter',
 ]
 
 templates_path = ['_templates']
@@ -60,3 +61,67 @@ rst_epilog = """
 .. include:: /links.txt
 .. include:: /shortcuts.txt
 """
+
+# -- Options for LaTeX output -------------------------------------------------
+
+latex_engine = 'xelatex'
+
+latex_use_xindy = False
+
+# 'colorrows' is required for the TableRowColorHeader setting below to apply.
+latex_table_style = ['booktabs', 'colorrows']
+
+latex_elements = {
+    'papersize': 'a4paper',
+    'pointsize': '11pt',
+    # 'oneside' drops the blank verso pages; 'openany' lets chapters start on
+    # either side instead of forcing them onto a right-hand page.
+    'extraclassoptions': 'openany,oneside',
+    'sphinxsetup': 'TableRowColorHeader={RGB}{0,162,198}',
+    "preamble": r"""
+\usepackage{sectsty}
+
+\definecolor{nordicblue}{RGB}{0,162,198}
+
+% hyperref is already loaded at this point, so these settings win. Without
+% colorlinks it frames every link with a border instead of tinting the text.
+\hypersetup{colorlinks=true, allcolors=nordicblue, pdfborder={0 0 0}}
+
+\chapterfont{\color{nordicblue}}
+\sectionfont{\color{nordicblue}}
+\subsectionfont{\color{nordicblue}}
+
+% \fancypagestyle replaces a style outright, so Sphinx's page numbers and
+% running heads are restated here alongside the footer logo. 'normal' covers
+% body pages and 'plain' the contents pages; the title page uses 'empty' and
+% therefore has no footer at all.
+\makeatletter
+\newcommand{\nordicfooterlogo}{\includegraphics[height=5mm]{logo.png}}
+\fancypagestyle{normal}{
+  \fancyhf{}
+  \fancyfoot[L]{\nordicfooterlogo}
+  \fancyfoot[C]{{\py@HeaderFamily\nouppercase{\rightmark}}}
+  \fancyfoot[R]{{\py@HeaderFamily\thepage}}
+  \fancyhead[R]{{\py@HeaderFamily \@title\sphinxheadercomma\py@release}}
+  \renewcommand{\headrulewidth}{0.4pt}
+  \renewcommand{\footrulewidth}{0.4pt}
+}
+\fancypagestyle{plain}{
+  \fancyhf{}
+  \fancyfoot[L]{\nordicfooterlogo}
+  \fancyfoot[R]{{\py@HeaderFamily\thepage}}
+  \renewcommand{\headrulewidth}{0pt}
+  \renewcommand{\footrulewidth}{0.4pt}
+}
+\makeatother
+"""
+}
+
+latex_logo = "images/logo.png"
+
+latex_documents = [
+    ('index', 'ncs-serial-modem.tex', f'{project} Documentation',
+     author, 'manual'),
+]
+
+figure_align = 'H'

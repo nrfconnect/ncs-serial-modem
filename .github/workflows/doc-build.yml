@@ -45,6 +45,12 @@ jobs:
           sudo tar xf doxygen-${DOXYGEN_VERSION}.linux.bin.tar.gz -C /opt
           echo "/opt/doxygen-${DOXYGEN_VERSION}/bin" >> $GITHUB_PATH
 
+      - name: Install LaTeX
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y texlive-full
+          sudo apt-get install -y inkscape
+
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
@@ -53,6 +59,9 @@ jobs:
           cache-dependency-path: doc/requirements.txt
           pip-install: |
             -r doc/requirements.txt
+
+      - name: Install Python deps
+        run: pip install sphinx sphinxcontrib-svg2pdfconverter
 
       - name: Check version
         run: |
@@ -72,6 +81,7 @@ jobs:
         run: |
           doxygen
           sphinx-build -M html . build
+          make latexpdf
 
       - name: Prepare Azure upload
         run: |
@@ -106,3 +116,10 @@ jobs:
           retention-days: 5
           path: |
             publish/*
+
+      - name: Upload PDF artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sphinx-pdf
+          retention-days: 5
+          path: doc/_build_sphinx/latex/ncs-serial-modem.pdf
