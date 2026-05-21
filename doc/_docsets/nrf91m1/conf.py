@@ -22,7 +22,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).absolute().parents[1]))
 
 from conf_common import *  # noqa: F401,F403
-from conf_common import docsets, docset_exclude_patterns, html_theme_options
+from conf_common import docsets, docset_exclude_patterns, html_theme_options, \
+    docset_latex_documents, docset_html_context
 
 DOCSET = "nrf91m1"
 
@@ -41,7 +42,10 @@ exclude_patterns = docset_exclude_patterns(DOCSET) + [
     "uart_configuration.rst",
 ]
 
+latex_documents = docset_latex_documents(DOCSET)
+
 html_theme_options["docset"] = DOCSET
+html_context = docset_html_context(DOCSET)
 
 # Lets this docset link into the main docset with :external+main:. The mapping
 # is only available once the main docset has been built, which is why
