@@ -11,14 +11,15 @@
 #include <string.h>
 #include <stdarg.h>
 
-#include "nrf_socket.h"
 #include "sm_at_host.h"
 #include "uart_stub.h"
 
 /* CMock-generated mocks */
-#include "cmock_nrf_socket.h"
 #include "cmock_nrf_modem_at.h"
+#include "cmock_nrf_socket.h"
 #include "zephyr/net/cmock_socket.h"
+
+#include <zephyr/posix/fcntl.h>
 
 /* Minimal DNS error codes for tests */
 #ifndef DNS_EAI_NONAME
@@ -33,7 +34,7 @@ extern const char *get_captured_response(void);
 extern size_t get_captured_response_len(void);
 extern void clear_captured_response(void);
 
-/* Helper callbacks for mocking nrf_getsockopt with output parameters */
+/* Helper callbacks for mocking zsock_getsockopt with output parameters */
 static int mock_getsockopt_timeval_callback(int socket, int level, int option_name,
 					    void *option_value, net_socklen_t *option_len,
 					    int num_calls)
@@ -100,18 +101,18 @@ static char *mock_zsock_inet_ntop_192_168_0_100_callback(
 	return dst;
 }
 
-static int mock_nrf_accept_with_peer_callback(int socket, struct nrf_sockaddr *restrict address,
-					      nrf_socklen_t *restrict address_len, int num_calls)
+static int mock_zsock_accept_with_peer_callback(int sock, struct net_sockaddr *addr,
+					      net_socklen_t *addrlen, int cmock_num_calls)
 {
 	/* Populate the address structure with peer information */
-	struct nrf_sockaddr_in *addr_in = (struct nrf_sockaddr_in *)address;
+	struct net_sockaddr_in *addr_in = (struct net_sockaddr_in *)addr;
 
-	addr_in->sin_family = NRF_AF_INET;
-	addr_in->sin_port = nrf_htons(5555); /* Port 5555 in network byte order */
-	addr_in->sin_addr.s_addr = nrf_htonl(0xC0A80064); /* 192.168.0.100 */
+	addr_in->sin_family = AF_INET;
+	addr_in->sin_port = htons(5555); /* Port 5555 in network byte order */
+	addr_in->sin_addr.s_addr = htonl(0xC0A80064); /* 192.168.0.100 */
 
-	if (address_len) {
-		*address_len = sizeof(struct nrf_sockaddr_in);
+	if (addrlen) {
+		*addrlen = sizeof(struct sockaddr_in);
 	}
 
 	return 7; /* Return new socket fd */
@@ -127,9 +128,9 @@ void tearDown(void)
 {
 	/* This is run after EACH test */
 	/* Reset any stubs to prevent interference between tests */
-	__cmock_nrf_getsockopt_Stub(NULL);
+	__cmock_zsock_getsockopt_Stub(NULL);
 	__cmock_zsock_inet_ntop_Stub(NULL);
-	__cmock_nrf_accept_Stub(NULL);
+	__cmock_zsock_accept_Stub(NULL);
 }
 
 /*
@@ -142,9 +143,9 @@ void test_xsocket_read_operation(void)
 	const char *response;
 
 	/* Create first socket: IPv4 TCP client (fd=1) */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 1);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 1);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
 	send_at_command("AT#XSOCKET=1,1,0\r\n");
 	response = get_captured_response();
 	TEST_ASSERT_TRUE(strstr(response, "#XSOCKET: 1,1,6") != NULL);
@@ -152,9 +153,9 @@ void test_xsocket_read_operation(void)
 
 	clear_captured_response();
 	/* Create second socket: IPv6 UDP client (fd=2) */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET6, NRF_SOCK_DGRAM, NRF_IPPROTO_UDP, 2);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET6, SOCK_DGRAM, IPPROTO_UDP, 2);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
 	send_at_command("AT#XSOCKET=2,2,0\r\n");
 	response = get_captured_response();
 	TEST_ASSERT_TRUE(strstr(response, "#XSOCKET: 2,2,17") != NULL);
@@ -162,9 +163,9 @@ void test_xsocket_read_operation(void)
 
 	clear_captured_response();
 	/* Create third socket: IPv4 TCP server (fd=3) */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 3);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 3);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
 	send_at_command("AT#XSOCKET=1,1,1\r\n");
 	response = get_captured_response();
 	TEST_ASSERT_TRUE(strstr(response, "#XSOCKET: 3,1,6") != NULL);
@@ -185,11 +186,11 @@ void test_xsocket_read_operation(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close all sockets */
-	__cmock_nrf_close_ExpectAndReturn(1, 0);
+	__cmock_zsock_close_ExpectAndReturn(1, 0);
 	send_at_command("AT#XCLOSE=1\r\n");
-	__cmock_nrf_close_ExpectAndReturn(2, 0);
+	__cmock_zsock_close_ExpectAndReturn(2, 0);
 	send_at_command("AT#XCLOSE=2\r\n");
-	__cmock_nrf_close_ExpectAndReturn(3, 0);
+	__cmock_zsock_close_ExpectAndReturn(3, 0);
 	send_at_command("AT#XCLOSE=3\r\n");
 }
 
@@ -242,12 +243,12 @@ void test_xsocket_ipv4_tcp(void)
 
 	/* Initialize AT host and socket subsystem */
 
-	/* Mock nrf_socket to return fd 1 */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 1);
+	/* Mock zsock_socket to return fd 1 */
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 1);
 
 	/* Mock setsockopt calls (send timeout, poll callback) */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 
 	/* Send AT command via sm_at_receive() */
 	send_at_command("AT#XSOCKET=1,1,0\r\n");
@@ -260,7 +261,7 @@ void test_xsocket_ipv4_tcp(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(1, 0);
+	__cmock_zsock_close_ExpectAndReturn(1, 0);
 	send_at_command("AT#XCLOSE=1\r\n");
 }
 
@@ -273,12 +274,12 @@ void test_xsocket_ipv4_udp(void)
 {
 	const char *response;
 
-	/* Mock nrf_socket to return fd 1 */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_DGRAM, NRF_IPPROTO_UDP, 1);
+	/* Mock zsock_socket to return fd 1 */
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_DGRAM, IPPROTO_UDP, 1);
 
 	/* Mock setsockopt calls (send timeout, poll callback) */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 
 	/* Send AT command via sm_at_receive() */
 	send_at_command("AT#XSOCKET=1,2,0\r\n");
@@ -291,7 +292,7 @@ void test_xsocket_ipv4_udp(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(1, 0);
+	__cmock_zsock_close_ExpectAndReturn(1, 0);
 	send_at_command("AT#XCLOSE=1\r\n");
 }
 
@@ -304,12 +305,12 @@ void test_xsocket_ipv6_tcp(void)
 {
 	const char *response;
 
-	/* Mock nrf_socket to return fd 1 */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET6, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 1);
+	/* Mock zsock_socket to return fd 1 */
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET6, SOCK_STREAM, IPPROTO_TCP, 1);
 
 	/* Mock setsockopt calls (send timeout, poll callback) */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 
 	/* Send AT command via sm_at_receive() */
 	send_at_command("AT#XSOCKET=2,1,0\r\n");
@@ -321,7 +322,7 @@ void test_xsocket_ipv6_tcp(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(1, 0);
+	__cmock_zsock_close_ExpectAndReturn(1, 0);
 	send_at_command("AT#XCLOSE=1\r\n");
 }
 
@@ -334,12 +335,12 @@ void test_xsocket_raw(void)
 {
 	const char *response;
 
-	/* Mock nrf_socket to return fd 0 for RAW socket */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_SOCK_RAW, NRF_SOCK_RAW, NRF_IPPROTO_RAW, 0);
+	/* Mock zsock_socket to return fd 0 for RAW socket */
+	__cmock_zsock_socket_ExpectAndReturn(SOCK_RAW, SOCK_RAW, IPPROTO_RAW, 0);
 
 	/* Mock setsockopt calls (send timeout, poll callback) */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 
 	/* Send AT command: family=1(IPv4), type=3(RAW), role=0(client) */
 	send_at_command("AT#XSOCKET=3,3,0\r\n");
@@ -352,7 +353,7 @@ void test_xsocket_raw(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(0, 0);
+	__cmock_zsock_close_ExpectAndReturn(0, 0);
 	send_at_command("AT#XCLOSE=0\r\n");
 }
 
@@ -428,13 +429,13 @@ void test_xsocket_max_sockets(void)
 	/* Create 3 sockets (determined by NRF_MODEM_MAX_SOCKET_COUNT) */
 	for (int i = 0; i < max_sockets; i++) {
 
-		/* Mock nrf_socket to return fd */
-		__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP,
+		/* Mock zsock_socket to return fd */
+		__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP,
 						   i);
 
 		/* Mock setsockopt calls (send timeout, poll callback) */
-		__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-		__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+		__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+		__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 
 		/* Send AT command via sm_at_receive() */
 		send_at_command("AT#XSOCKET=1,1,0\r\n");
@@ -458,7 +459,7 @@ void test_xsocket_max_sockets(void)
 	/* Clean up: close all 3 sockets */
 	for (int i = 0; i < max_sockets; i++) {
 		char send_buf[20];
-		__cmock_nrf_close_ExpectAndReturn(i, 0);
+		__cmock_zsock_close_ExpectAndReturn(i, 0);
 		sprintf(send_buf, "AT#XCLOSE=%d\r\n", i);
 		send_at_command(send_buf);
 	}
@@ -473,11 +474,11 @@ void test_xsocket_with_pdn_cid(void)
 {
 	const char *response;
 
-	/* Mock nrf_socket to return fd 4 */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 4);
+	/* Mock zsock_socket to return fd 4 */
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 4);
 
 	/* Mock setsockopt calls */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
 
 	/* Mock AT%XGETPDNID command for PDN ID retrieval (cid=1 -> pdn_id=1) */
 	const char *pdn_id_resp = "%XGETPDNID: 1\r\nOK\r\n";
@@ -488,8 +489,8 @@ void test_xsocket_with_pdn_cid(void)
 	__cmock_nrf_modem_at_cmd_CMockIgnoreArg_len(__LINE__);
 	__cmock_nrf_modem_at_cmd_CMockIgnoreArg_fmt(__LINE__);
 
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_BINDTOPDN */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Poll callback */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_BINDTOPDN */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Poll callback */
 
 	/* Send AT command: family=1(IPv4), type=1(STREAM), role=0(client), cid=1 */
 	send_at_command("AT#XSOCKET=1,1,0,1\r\n");
@@ -502,7 +503,7 @@ void test_xsocket_with_pdn_cid(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(4, 0);
+	__cmock_zsock_close_ExpectAndReturn(4, 0);
 	send_at_command("AT#XCLOSE=4\r\n");
 }
 
@@ -518,9 +519,9 @@ void test_xbind_operation(void)
 	const char *cgpaddr_resp = "+CGPADDR: 3,\"127.0.0.1\",\"\"\r\nOK\r\n";
 
 	/* Create socket first */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_DGRAM, NRF_IPPROTO_UDP, 0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_DGRAM, IPPROTO_UDP, 0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKET=1,2,0\r\n");
 	/* Verify response contains socket handle and correct type/protocol */
 	response = get_captured_response();
@@ -530,7 +531,7 @@ void test_xbind_operation(void)
 
 	clear_captured_response();
 
-	/* Bind operation - query modem IP, inet_pton, nrf_bind */
+	/* Bind operation - query modem IP, inet_pton, zsock_bind */
 	__cmock_nrf_modem_at_cmd_CMockExpectAnyArgsAndReturn(__LINE__, 0);
 	__cmock_nrf_modem_at_cmd_CMockReturnMemThruPtr_buf(__LINE__, (void *)cgpaddr_resp,
 							   strlen(cgpaddr_resp) + 1);
@@ -538,11 +539,11 @@ void test_xbind_operation(void)
 	__cmock_nrf_modem_at_cmd_CMockIgnoreArg_fmt(__LINE__);
 	/* util_get_ip_addr() validates the IP with zsock_inet_pton */
 	__cmock_zsock_inet_pton_ExpectAnyArgsAndReturn(1);
-	/* bind_to_local_addr() converts the IP with nrf_inet_pton */
-	__cmock_nrf_inet_pton_ExpectAnyArgsAndReturn(1);
-	__cmock_nrf_bind_ExpectAndReturn(0, NULL, sizeof(struct nrf_sockaddr_in), 0);
-	__cmock_nrf_bind_IgnoreArg_address();
-	__cmock_nrf_bind_IgnoreArg_address_len();
+	/* bind_to_local_addr() converts the IP with zsock_inet_pton */
+	__cmock_zsock_inet_pton_ExpectAnyArgsAndReturn(1);
+	__cmock_zsock_bind_ExpectAndReturn(0, NULL, sizeof(struct sockaddr_in), 0);
+	__cmock_zsock_bind_IgnoreArg_addr();
+	__cmock_zsock_bind_IgnoreArg_addrlen();
 
 	/* Execute bind command via sm_at_receive() */
 	send_at_command("AT#XBIND=0,8080\r\n");
@@ -552,7 +553,7 @@ void test_xbind_operation(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(0, 0);
+	__cmock_zsock_close_ExpectAndReturn(0, 0);
 	send_at_command("AT#XCLOSE=0\r\n");
 }
 
@@ -568,9 +569,9 @@ void test_xbind_ipv6_operation(void)
 	const char *cgpaddr_resp = "+CGPADDR: 3,\"2001:db8::1\"\r\nOK\r\n";
 
 	/* Create IPv6 UDP socket first */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET6, NRF_SOCK_DGRAM, NRF_IPPROTO_UDP, 4);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET6, SOCK_DGRAM, IPPROTO_UDP, 4);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKET=2,2,0\r\n");
 	/* Verify response contains socket handle and correct type/protocol */
 	response = get_captured_response();
@@ -580,7 +581,7 @@ void test_xbind_ipv6_operation(void)
 
 	clear_captured_response();
 
-	/* Bind operation - query modem IP, inet_pton, nrf_bind */
+	/* Bind operation - query modem IP, inet_pton, zsock_bind */
 	__cmock_nrf_modem_at_cmd_CMockExpectAnyArgsAndReturn(__LINE__, 0);
 	__cmock_nrf_modem_at_cmd_CMockReturnMemThruPtr_buf(__LINE__, (void *)cgpaddr_resp,
 							   strlen(cgpaddr_resp) + 1);
@@ -588,11 +589,11 @@ void test_xbind_ipv6_operation(void)
 	__cmock_nrf_modem_at_cmd_CMockIgnoreArg_fmt(__LINE__);
 	/* util_get_ip_addr() validates the IP with zsock_inet_pton */
 	__cmock_zsock_inet_pton_ExpectAnyArgsAndReturn(1);
-	/* bind_to_local_addr() converts the IP with nrf_inet_pton */
-	__cmock_nrf_inet_pton_ExpectAnyArgsAndReturn(1);
-	__cmock_nrf_bind_ExpectAndReturn(4, NULL, sizeof(struct nrf_sockaddr_in6), 0);
-	__cmock_nrf_bind_IgnoreArg_address();
-	__cmock_nrf_bind_IgnoreArg_address_len();
+	/* bind_to_local_addr() converts the IP with zsock_inet_pton */
+	__cmock_zsock_inet_pton_ExpectAnyArgsAndReturn(1);
+	__cmock_zsock_bind_ExpectAndReturn(4, NULL, sizeof(struct net_sockaddr_in6), 0);
+	__cmock_zsock_bind_IgnoreArg_addr();
+	__cmock_zsock_bind_IgnoreArg_addrlen();
 
 	/* Execute bind command via sm_at_receive() */
 	send_at_command("AT#XBIND=4,8080\r\n");
@@ -602,7 +603,7 @@ void test_xbind_ipv6_operation(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(4, 0);
+	__cmock_zsock_close_ExpectAndReturn(4, 0);
 	send_at_command("AT#XCLOSE=4\r\n");
 }
 
@@ -615,9 +616,9 @@ void test_xbind_invalid_ip(void)
 
 	/* Ensure socket subsystem is initialized and handle 3 exists */
 
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_DGRAM, NRF_IPPROTO_UDP, 3);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_DGRAM, IPPROTO_UDP, 3);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKET=1,2,0\r\n");
 	clear_captured_response();
 
@@ -636,7 +637,7 @@ void test_xbind_invalid_ip(void)
 	TEST_ASSERT_TRUE(strstr(response, "ERROR") != NULL);
 
 	/* Cleanup */
-	__cmock_nrf_close_ExpectAndReturn(3, 0);
+	__cmock_zsock_close_ExpectAndReturn(3, 0);
 	send_at_command("AT#XCLOSE=3\r\n");
 }
 
@@ -647,9 +648,9 @@ void test_xbind_invalid_port(void)
 
 	/* Ensure socket subsystem is initialized and handle 3 exists */
 
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_DGRAM, NRF_IPPROTO_UDP, 0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_DGRAM, IPPROTO_UDP, 0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKET=1,2,0\r\n");
 	clear_captured_response();
 
@@ -661,7 +662,7 @@ void test_xbind_invalid_port(void)
 	TEST_ASSERT_TRUE(strstr(response, "ERROR") != NULL);
 
 	/* Cleanup */
-	__cmock_nrf_close_ExpectAndReturn(0, 0);
+	__cmock_zsock_close_ExpectAndReturn(0, 0);
 	send_at_command("AT#XCLOSE=0\r\n");
 }
 
@@ -672,9 +673,9 @@ void test_xconnect_invalid_ip(void)
 
 	/* Ensure socket subsystem is initialized and handle 3 exists */
 
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKET=1,1,0\r\n");
 	clear_captured_response();
 
@@ -692,7 +693,7 @@ void test_xconnect_invalid_ip(void)
 	TEST_ASSERT_TRUE(strstr(response, "ERROR") != NULL);
 
 	/* Cleanup */
-	__cmock_nrf_close_ExpectAndReturn(0, 0);
+	__cmock_zsock_close_ExpectAndReturn(0, 0);
 	send_at_command("AT#XCLOSE=0\r\n");
 }
 
@@ -703,9 +704,9 @@ void test_xconnect_invalid_port(void)
 
 	/* Ensure socket subsystem is initialized and handle 3 exists */
 
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKET=1,1,0\r\n");
 	clear_captured_response();
 
@@ -729,7 +730,7 @@ void test_xconnect_invalid_port(void)
 	TEST_ASSERT_TRUE(strstr(response, "ERROR") != NULL);
 
 	/* Cleanup */
-	__cmock_nrf_close_ExpectAndReturn(0, 0);
+	__cmock_zsock_close_ExpectAndReturn(0, 0);
 	send_at_command("AT#XCLOSE=0\r\n");
 }
 
@@ -749,14 +750,14 @@ static int mock_getaddrinfo_success_callback(const char *host, const char *servi
 
 	/* Setup a valid IPv4 address structure */
 	memset(&getaddrinfo_result, 0, sizeof(getaddrinfo_result));
-	getaddrinfo_result.addr.sa_in.sin_family = NRF_AF_INET;
+	getaddrinfo_result.addr.sa_in.sin_family = AF_INET;
 	getaddrinfo_result.addr.sa_in.sin_port = net_htons(80);
 	getaddrinfo_result.addr.sa_in.sin_addr.s_addr = net_htonl(0xC0A80001); /* 192.168.0.1 */
 
 	/* Setup addrinfo structure */
-	getaddrinfo_result.ai.ai_family = NRF_AF_INET;
-	getaddrinfo_result.ai.ai_socktype = NRF_SOCK_STREAM;
-	getaddrinfo_result.ai.ai_protocol = NRF_IPPROTO_TCP;
+	getaddrinfo_result.ai.ai_family = AF_INET;
+	getaddrinfo_result.ai.ai_socktype = SOCK_STREAM;
+	getaddrinfo_result.ai.ai_protocol = IPPROTO_TCP;
 	getaddrinfo_result.ai.ai_addrlen = sizeof(getaddrinfo_result.addr.sa_in);
 	getaddrinfo_result.ai.ai_addr = &getaddrinfo_result.addr.sa;
 
@@ -774,9 +775,9 @@ void test_xconnect_operation(void)
 	const char *response;
 
 	/* Create socket first */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 1);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 1);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKET=1,1,0\r\n");
 	clear_captured_response();
 
@@ -785,8 +786,8 @@ void test_xconnect_operation(void)
 	__cmock_zsock_freeaddrinfo_Expect(NULL);
 	__cmock_zsock_freeaddrinfo_IgnoreArg_ai();
 
-	/* Mock successful nrf_connect */
-	__cmock_nrf_connect_ExpectAnyArgsAndReturn(0);
+	/* Mock successful zsock_connect */
+	__cmock_zsock_connect_ExpectAnyArgsAndReturn(0);
 
 	/* Execute connect command via sm_at_receive() */
 	send_at_command("AT#XCONNECT=1,\"test.server.com\",80\r\n");
@@ -797,7 +798,7 @@ void test_xconnect_operation(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(1, 0);
+	__cmock_zsock_close_ExpectAndReturn(1, 0);
 	send_at_command("AT#XCLOSE=1\r\n");
 }
 
@@ -812,9 +813,9 @@ void test_xlisten_operation(void)
 	const char *cgpaddr_resp = "+CGPADDR: 0,\"10.0.0.1\",\"\"\r\nOK\r\n";
 
 	/* Create TCP server socket first */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 5);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 5);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
 	send_at_command("AT#XSOCKET=1,1,1\r\n"); /* family=1, type=1, role=1 (server) */
 	response = get_captured_response();
 	TEST_ASSERT_TRUE(strstr(response, "#XSOCKET: 5,1,6") != NULL);
@@ -827,18 +828,18 @@ void test_xlisten_operation(void)
 	__cmock_nrf_modem_at_cmd_CMockIgnoreArg_len(__LINE__);
 	__cmock_nrf_modem_at_cmd_CMockIgnoreArg_fmt(__LINE__);
 	__cmock_zsock_inet_pton_ExpectAnyArgsAndReturn(1);
-	__cmock_nrf_inet_pton_ExpectAnyArgsAndReturn(1);
-	__cmock_nrf_bind_ExpectAndReturn(5, NULL, sizeof(struct nrf_sockaddr_in), 0);
-	__cmock_nrf_bind_IgnoreArg_address();
-	__cmock_nrf_bind_IgnoreArg_address_len();
+	__cmock_zsock_inet_pton_ExpectAnyArgsAndReturn(1);
+	__cmock_zsock_bind_ExpectAndReturn(5, NULL, sizeof(struct sockaddr_in), 0);
+	__cmock_zsock_bind_IgnoreArg_addr();
+	__cmock_zsock_bind_IgnoreArg_addrlen();
 	send_at_command("AT#XBIND=5,8080\r\n");
 	response = get_captured_response();
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 	clear_captured_response();
 
 	/* Mock fcntl to set non-blocking mode and listen */
-	__cmock_nrf_fcntl_ExpectAndReturn(5, NRF_F_SETFL, NRF_O_NONBLOCK, 0);
-	__cmock_nrf_listen_ExpectAndReturn(5, 2, 0); /* backlog=2 (fixed in modem) */
+	__cmock_zsock_fcntl_wrapper_ExpectAndReturn(5, F_SETFL, 0);
+	__cmock_zsock_listen_ExpectAndReturn(5, 2, 0); /* backlog=2 (fixed in modem) */
 
 	/* Execute listen command */
 	send_at_command("AT#XLISTEN=5\r\n");
@@ -851,7 +852,7 @@ void test_xlisten_operation(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(5, 0);
+	__cmock_zsock_close_ExpectAndReturn(5, 0);
 	send_at_command("AT#XCLOSE=5\r\n");
 }
 
@@ -865,9 +866,9 @@ void test_xlisten_read_command(void)
 	const char *cgpaddr_resp = "+CGPADDR: 0,\"10.0.0.1\",\"\"\r\nOK\r\n";
 
 	/* Create TCP server socket */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 3);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 3);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKET=1,1,1\r\n");
 	clear_captured_response();
 
@@ -878,16 +879,16 @@ void test_xlisten_read_command(void)
 	__cmock_nrf_modem_at_cmd_CMockIgnoreArg_len(__LINE__);
 	__cmock_nrf_modem_at_cmd_CMockIgnoreArg_fmt(__LINE__);
 	__cmock_zsock_inet_pton_ExpectAnyArgsAndReturn(1);
-	__cmock_nrf_inet_pton_ExpectAnyArgsAndReturn(1);
-	__cmock_nrf_bind_ExpectAndReturn(3, NULL, sizeof(struct nrf_sockaddr_in), 0);
-	__cmock_nrf_bind_IgnoreArg_address();
-	__cmock_nrf_bind_IgnoreArg_address_len();
+	__cmock_zsock_inet_pton_ExpectAnyArgsAndReturn(1);
+	__cmock_zsock_bind_ExpectAndReturn(3, NULL, sizeof(struct sockaddr_in), 0);
+	__cmock_zsock_bind_IgnoreArg_addr();
+	__cmock_zsock_bind_IgnoreArg_addrlen();
 	send_at_command("AT#XBIND=3,9000\r\n");
 	clear_captured_response();
 
 	/* Put socket in listening mode */
-	__cmock_nrf_fcntl_ExpectAndReturn(3, NRF_F_SETFL, NRF_O_NONBLOCK, 0);
-	__cmock_nrf_listen_ExpectAndReturn(3, 2, 0);
+	__cmock_zsock_fcntl_wrapper_ExpectAndReturn(3, F_SETFL, 0);
+	__cmock_zsock_listen_ExpectAndReturn(3, 2, 0);
 	send_at_command("AT#XLISTEN=3\r\n");
 	clear_captured_response();
 
@@ -901,7 +902,7 @@ void test_xlisten_read_command(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(3, 0);
+	__cmock_zsock_close_ExpectAndReturn(3, 0);
 	send_at_command("AT#XCLOSE=3\r\n");
 }
 
@@ -914,9 +915,9 @@ void test_xlisten_not_bound(void)
 	const char *response;
 
 	/* Create TCP server socket but don't bind it */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 2);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 2);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKET=1,1,1\r\n");
 	clear_captured_response();
 
@@ -928,7 +929,7 @@ void test_xlisten_not_bound(void)
 	TEST_ASSERT_TRUE(strstr(response, "ERROR") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(2, 0);
+	__cmock_zsock_close_ExpectAndReturn(2, 0);
 	send_at_command("AT#XCLOSE=2\r\n");
 }
 
@@ -943,9 +944,9 @@ void test_xaccept_operation(void)
 	const char *cgpaddr_resp = "+CGPADDR: 0,\"10.0.0.1\",\"\"\r\nOK\r\n";
 
 	/* Create TCP server socket */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 1);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 1);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKET=1,1,1\r\n");
 	clear_captured_response();
 
@@ -956,25 +957,25 @@ void test_xaccept_operation(void)
 	__cmock_nrf_modem_at_cmd_CMockIgnoreArg_len(__LINE__);
 	__cmock_nrf_modem_at_cmd_CMockIgnoreArg_fmt(__LINE__);
 	__cmock_zsock_inet_pton_ExpectAnyArgsAndReturn(1);
-	__cmock_nrf_inet_pton_ExpectAnyArgsAndReturn(1);
-	__cmock_nrf_bind_ExpectAndReturn(1, NULL, sizeof(struct nrf_sockaddr_in), 0);
-	__cmock_nrf_bind_IgnoreArg_address();
-	__cmock_nrf_bind_IgnoreArg_address_len();
+	__cmock_zsock_inet_pton_ExpectAnyArgsAndReturn(1);
+	__cmock_zsock_bind_ExpectAndReturn(1, NULL, sizeof(struct sockaddr_in), 0);
+	__cmock_zsock_bind_IgnoreArg_addr();
+	__cmock_zsock_bind_IgnoreArg_addrlen();
 	send_at_command("AT#XBIND=1,7000\r\n");
 	clear_captured_response();
 
 	/* Put socket in listening mode */
-	__cmock_nrf_fcntl_ExpectAndReturn(1, NRF_F_SETFL, NRF_O_NONBLOCK, 0);
-	__cmock_nrf_listen_ExpectAndReturn(1, 2, 0);
+	__cmock_zsock_fcntl_wrapper_ExpectAndReturn(1, F_SETFL, 0);
+	__cmock_zsock_listen_ExpectAndReturn(1, 2, 0);
 	send_at_command("AT#XLISTEN=1\r\n");
 	clear_captured_response();
 
 	/* Mock successful accept - returns new socket fd=7 with peer info */
 	/* Use callback to properly populate the address structure */
-	__cmock_nrf_accept_Stub(mock_nrf_accept_with_peer_callback);
+	__cmock_zsock_accept_Stub(mock_zsock_accept_with_peer_callback);
 	__cmock_zsock_inet_ntop_Stub(mock_zsock_inet_ntop_192_168_0_100_callback);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* POLLCB for new socket */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* POLLCB restore for listening socket */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* POLLCB for new socket */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* POLLCB for listening socket */
 
 	/* Execute accept command */
 	send_at_command("AT#XACCEPT=1\r\n");
@@ -986,9 +987,9 @@ void test_xaccept_operation(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close sockets */
-	__cmock_nrf_close_ExpectAndReturn(7, 0);
+	__cmock_zsock_close_ExpectAndReturn(7, 0);
 	send_at_command("AT#XCLOSE=7\r\n");
-	__cmock_nrf_close_ExpectAndReturn(1, 0);
+	__cmock_zsock_close_ExpectAndReturn(1, 0);
 	send_at_command("AT#XCLOSE=1\r\n");
 }
 
@@ -1011,9 +1012,9 @@ void test_xaccept_not_listening(void)
 	clear_captured_response();
 
 	/* Test 2: Create TCP server socket but don't put it in listening mode */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 4);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 4);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKET=1,1,1\r\n"); /* role=1 (server) */
 	clear_captured_response();
 
@@ -1025,7 +1026,7 @@ void test_xaccept_not_listening(void)
 	TEST_ASSERT_TRUE(strstr(response, "ERROR") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(4, 0);
+	__cmock_zsock_close_ExpectAndReturn(4, 0);
 	send_at_command("AT#XCLOSE=4\r\n");
 }
 
@@ -1041,16 +1042,16 @@ void test_xsend_unformatted_string(void)
 	int test_data_len = strlen(test_data);
 
 	/* Create socket first */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 1);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 1);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKET=1,1,0\r\n");
 	clear_captured_response();
 
 	/* Mock successful send - send all data in one call */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Clear send callback */
-	__cmock_nrf_send_ExpectAndReturn(1, NULL, test_data_len, 0, test_data_len);
-	__cmock_nrf_send_IgnoreArg_buffer();
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Clear send callback */
+	__cmock_zsock_send_ExpectAndReturn(1, NULL, test_data_len, 0, test_data_len);
+	__cmock_zsock_send_IgnoreArg_buf();
 
 	/* Execute send command: handle=1, mode=0 (unformatted), flags=0 */
 	send_at_command("AT#XSEND=1,0,0,\"Hello World\"\r\n");
@@ -1062,7 +1063,7 @@ void test_xsend_unformatted_string(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(1, 0);
+	__cmock_zsock_close_ExpectAndReturn(1, 0);
 	send_at_command("AT#XCLOSE=1\r\n");
 }
 
@@ -1078,16 +1079,16 @@ void test_xsend_hex_string(void)
 	int binary_len = 5;
 
 	/* Create socket first */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 4);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 4);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKET=1,1,0\r\n");
 	clear_captured_response();
 
 	/* Mock successful send - send all data in one call */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Clear send callback */
-	__cmock_nrf_send_ExpectAndReturn(4, NULL, binary_len, 0, binary_len);
-	__cmock_nrf_send_IgnoreArg_buffer();
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Clear send callback */
+	__cmock_zsock_send_ExpectAndReturn(4, NULL, binary_len, 0, binary_len);
+	__cmock_zsock_send_IgnoreArg_buf();
 
 	/* Execute send command: handle=4, mode=1 (hex), flags=0 */
 	send_at_command("AT#XSEND=4,1,0,\"48656C6C6F\"\r\n");
@@ -1099,7 +1100,7 @@ void test_xsend_hex_string(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(4, 0);
+	__cmock_zsock_close_ExpectAndReturn(4, 0);
 	send_at_command("AT#XCLOSE=4\r\n");
 }
 
@@ -1115,16 +1116,16 @@ void test_xsend_with_ack_flag(void)
 	int test_data_len = strlen(test_data);
 
 	/* Create socket first */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 4);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 4);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKET=1,1,0\r\n");
 	clear_captured_response();
 
 	/* Mock successful send with ACK flag (0x2000 = 8192) */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Set send callback */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Set send callback */
 	/* Note: flags will be 0 after SM_MSG_SEND_ACK (0x2000=8192 not 512!) is stripped */
-	__cmock_nrf_send_ExpectAnyArgsAndReturn(test_data_len);
+	__cmock_zsock_send_ExpectAnyArgsAndReturn(test_data_len);
 
 	/* Execute send command: handle=4, mode=0 (unformatted), flags=8192 (0x2000,
 	 * SM_MSG_SEND_ACK)
@@ -1138,16 +1139,17 @@ void test_xsend_with_ack_flag(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(4, 0);
+	__cmock_zsock_close_ExpectAndReturn(4, 0);
 	send_at_command("AT#XCLOSE=4\r\n");
 }
 
-/* Helper callback for mocking partial nrf_send */
-static ssize_t mock_nrf_send_partial_callback(int socket, const void *buffer, size_t length,
-					       int flags, int num_calls)
+/* Helper callback for mocking partial zsock_send */
+static ssize_t mock_zsock_send_partial_callback(int sock, const void *buf,
+					       size_t len, int flags,
+					       int cmock_num_calls)
 {
 	/* First call: send 5 bytes out of 13 */
-	if (num_calls == 0) {
+	if (cmock_num_calls == 0) {
 		return 5;
 	}
 	/* Second call: send remaining 8 bytes */
@@ -1156,22 +1158,22 @@ static ssize_t mock_nrf_send_partial_callback(int socket, const void *buffer, si
 
 /*
  * Test: Send data via AT#XSEND with partial send
- * - Tests: Handling when nrf_send() sends less data than requested
+ * - Tests: Handling when zsock_send() sends less data than requested
  */
 void test_xsend_partial_send(void)
 {
 	const char *response;
 
 	/* Create socket first */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKET=1,1,0\r\n");
 	clear_captured_response();
 
 	/* Mock partial send: first call sends 5 bytes, second call sends remaining 8 bytes */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Clear send callback */
-	__cmock_nrf_send_Stub(mock_nrf_send_partial_callback);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Clear send callback */
+	__cmock_zsock_send_Stub(mock_zsock_send_partial_callback);
 
 	/* Execute send command: handle=0, mode=0 (unformatted), flags=0 */
 	send_at_command("AT#XSEND=0,0,0,\"HelloWorld123\"\r\n");
@@ -1183,13 +1185,13 @@ void test_xsend_partial_send(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(0, 0);
+	__cmock_zsock_close_ExpectAndReturn(0, 0);
 	send_at_command("AT#XCLOSE=0\r\n");
 }
 
-/* Helper callback for mocking failed nrf_send with errno */
-static ssize_t mock_nrf_send_error_callback(int socket, const void *buffer, size_t length,
-					    int flags, int num_calls)
+/* Helper callback for mocking failed zsock_send with errno */
+static ssize_t mock_zsock_send_error_callback(int sock, const void *buf, size_t len,
+					      int flags, int cmock_num_calls)
 {
 	/* Set errno to ENOTCONN */
 	errno = ENOTCONN;
@@ -1198,22 +1200,22 @@ static ssize_t mock_nrf_send_error_callback(int socket, const void *buffer, size
 
 /*
  * Test: Send fails with error
- * - Tests: Error handling when nrf_send() fails
+ * - Tests: Error handling when zsock_send() fails
  */
 void test_xsend_error(void)
 {
 	const char *response;
 
 	/* Create socket first */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 4);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 4);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKET=1,1,0\r\n");
 	clear_captured_response();
 
 	/* Mock failed send with ENOTCONN error via callback */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Clear send callback */
-	__cmock_nrf_send_Stub(mock_nrf_send_error_callback);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Clear send callback */
+	__cmock_zsock_send_Stub(mock_zsock_send_error_callback);
 
 	/* Execute send command: should fail */
 	send_at_command("AT#XSEND=4,0,0,\"Test\"\r\n");
@@ -1223,7 +1225,7 @@ void test_xsend_error(void)
 	TEST_ASSERT_TRUE(strstr(response, "ERROR") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(4, 0);
+	__cmock_zsock_close_ExpectAndReturn(4, 0);
 	send_at_command("AT#XCLOSE=4\r\n");
 }
 
@@ -1238,9 +1240,9 @@ void test_xsend_data_mode(void)
 	const char *test_data = "Hello World";
 
 	/* Create socket first */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 1);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 1);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
 	send_at_command("AT#XSOCKET=1,1,0\r\n");
 	clear_captured_response();
 
@@ -1254,8 +1256,8 @@ void test_xsend_data_mode(void)
 
 	/* Send data in data mode - this invokes socket_datamode_callback(DATAMODE_SEND) */
 	/* do_send calls clear_so_send_cb (or set if flags have ack) */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Clear/set send callback */
-	__cmock_nrf_send_ExpectAndReturn(1, test_data, 11, 0, 11);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Clear/set send callback */
+	__cmock_zsock_send_ExpectAndReturn(1, test_data, 11, 0, 11);
 	uart_stub_rx((const uint8_t *)test_data, 11);
 
 	/* Exit data mode with termination pattern */
@@ -1264,7 +1266,7 @@ void test_xsend_data_mode(void)
 	TEST_ASSERT_TRUE(strstr(response, "#XDATAMODE: 0") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(1, 0);
+	__cmock_zsock_close_ExpectAndReturn(1, 0);
 	send_at_command("AT#XCLOSE=1\r\n");
 }
 
@@ -1280,9 +1282,9 @@ void test_xsend_data_mode_partial_quit_string(void)
 	const char *test_data = "Hello++World";
 
 	/* Create socket first */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 1);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 1);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
 	send_at_command("AT#XSOCKET=1,1,0\r\n");
 	clear_captured_response();
 
@@ -1298,8 +1300,8 @@ void test_xsend_data_mode_partial_quit_string(void)
 	 * The default quit string is "+++" so "++" should be treated as data
 	 * This invokes socket_datamode_callback(DATAMODE_SEND)
 	 */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Clear/set send callback */
-	__cmock_nrf_send_ExpectAndReturn(1, test_data, 12, 0, 12);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Clear/set send callback */
+	__cmock_zsock_send_ExpectAndReturn(1, test_data, 12, 0, 12);
 	uart_stub_rx((const uint8_t *)test_data, 12);
 
 	/* Exit data mode with full quit string (+++) */
@@ -1308,7 +1310,7 @@ void test_xsend_data_mode_partial_quit_string(void)
 	TEST_ASSERT_TRUE(strstr(response, "#XDATAMODE: 0") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(1, 0);
+	__cmock_zsock_close_ExpectAndReturn(1, 0);
 	send_at_command("AT#XCLOSE=1\r\n");
 }
 
@@ -1324,9 +1326,9 @@ void test_xsendto_unformatted_string(void)
 	int test_data_len = strlen(test_data);
 
 	/* Create UDP socket first */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_DGRAM, NRF_IPPROTO_UDP, 4);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_DGRAM, IPPROTO_UDP, 4);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKET=1,2,0\r\n");
 	clear_captured_response();
 
@@ -1336,11 +1338,11 @@ void test_xsendto_unformatted_string(void)
 	__cmock_zsock_freeaddrinfo_IgnoreArg_ai();
 
 	/* Mock successful sendto - send all data in one call */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Clear send callback */
-	__cmock_nrf_sendto_ExpectAndReturn(4, NULL, test_data_len, 0, NULL,
-					   sizeof(struct nrf_sockaddr_in), test_data_len);
-	__cmock_nrf_sendto_IgnoreArg_message();
-	__cmock_nrf_sendto_IgnoreArg_dest_addr();
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Clear send callback */
+	__cmock_zsock_sendto_ExpectAndReturn(4, NULL, test_data_len, 0, NULL,
+					   sizeof(struct sockaddr_in), test_data_len);
+	__cmock_zsock_sendto_IgnoreArg_buf();
+	__cmock_zsock_sendto_IgnoreArg_dest_addr();
 
 	/* Execute sendto command: handle=4, mode=0 (unformatted), flags=0 */
 	send_at_command("AT#XSENDTO=4,0,0,\"192.168.1.1\",5000,\"Hello UDP\"\r\n");
@@ -1352,7 +1354,7 @@ void test_xsendto_unformatted_string(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(4, 0);
+	__cmock_zsock_close_ExpectAndReturn(4, 0);
 	send_at_command("AT#XCLOSE=4\r\n");
 }
 
@@ -1368,9 +1370,9 @@ void test_xsendto_hex_string(void)
 	int binary_len = 5;
 
 	/* Create UDP socket first */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_DGRAM, NRF_IPPROTO_UDP, 3);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_DGRAM, IPPROTO_UDP, 3);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKET=1,2,0\r\n");
 	clear_captured_response();
 
@@ -1380,11 +1382,11 @@ void test_xsendto_hex_string(void)
 	__cmock_zsock_freeaddrinfo_IgnoreArg_ai();
 
 	/* Mock successful sendto - send all data in one call */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Clear send callback */
-	__cmock_nrf_sendto_ExpectAndReturn(3, NULL, binary_len, 0, NULL,
-					   sizeof(struct nrf_sockaddr_in), binary_len);
-	__cmock_nrf_sendto_IgnoreArg_message();
-	__cmock_nrf_sendto_IgnoreArg_dest_addr();
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Clear send callback */
+	__cmock_zsock_sendto_ExpectAndReturn(3, NULL, binary_len, 0, NULL,
+					   sizeof(struct sockaddr_in), binary_len);
+	__cmock_zsock_sendto_IgnoreArg_buf();
+	__cmock_zsock_sendto_IgnoreArg_dest_addr();
 
 	/* Execute sendto command: handle=3, mode=1 (hex), flags=0 */
 	send_at_command("AT#XSENDTO=3,1,0,\"192.168.1.1\",5000,\"48656C6C6F\"\r\n");
@@ -1396,7 +1398,7 @@ void test_xsendto_hex_string(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(3, 0);
+	__cmock_zsock_close_ExpectAndReturn(3, 0);
 	send_at_command("AT#XCLOSE=3\r\n");
 }
 
@@ -1412,9 +1414,9 @@ void test_xsendto_with_ack_flag(void)
 	int test_data_len = strlen(test_data);
 
 	/* Create UDP socket first */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_DGRAM, NRF_IPPROTO_UDP, 1);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_DGRAM, IPPROTO_UDP, 1);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKET=1,2,0\r\n");
 	clear_captured_response();
 
@@ -1424,9 +1426,9 @@ void test_xsendto_with_ack_flag(void)
 	__cmock_zsock_freeaddrinfo_IgnoreArg_ai();
 
 	/* Mock successful sendto with ACK flag (0x2000 = 8192) */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Set send callback */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Set send callback */
 	/* Note: flags will be 0 after SM_MSG_SEND_ACK (0x2000=8192) is stripped */
-	__cmock_nrf_sendto_ExpectAnyArgsAndReturn(test_data_len);
+	__cmock_zsock_sendto_ExpectAnyArgsAndReturn(test_data_len);
 
 	/* Execute sendto command: handle=1, mode=0 (unformatted), flags=8192 (0x2000,
 	 * SM_MSG_SEND_ACK)
@@ -1441,14 +1443,14 @@ void test_xsendto_with_ack_flag(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(1, 0);
+	__cmock_zsock_close_ExpectAndReturn(1, 0);
 	send_at_command("AT#XCLOSE=1\r\n");
 }
 
-/* Helper callback for mocking failed nrf_sendto with errno */
-static ssize_t mock_nrf_sendto_error_callback(int socket, const void *message, size_t length,
-					      int flags, const struct nrf_sockaddr *dest_addr,
-					      nrf_socklen_t dest_len, int num_calls)
+/* Helper callback for mocking failed zsock_sendto with errno */
+static ssize_t mock_zsock_sendto_dest_error_callback(int sock, const void *buf, size_t len,
+					      int flags, const struct net_sockaddr *dest_addr,
+					      net_socklen_t addrlen, int cmock_num_calls)
 {
 	/* Set errno to ENETUNREACH */
 	errno = ENETUNREACH;
@@ -1457,16 +1459,16 @@ static ssize_t mock_nrf_sendto_error_callback(int socket, const void *message, s
 
 /*
  * Test: Sendto fails with error
- * - Tests: Error handling when nrf_sendto() fails
+ * - Tests: Error handling when zsock_sendto() fails
  */
 void test_xsendto_error(void)
 {
 	const char *response;
 
 	/* Create UDP socket first */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_DGRAM, NRF_IPPROTO_UDP, 3);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_DGRAM, IPPROTO_UDP, 3);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKET=1,2,0\r\n");
 	clear_captured_response();
 
@@ -1476,8 +1478,8 @@ void test_xsendto_error(void)
 	__cmock_zsock_freeaddrinfo_IgnoreArg_ai();
 
 	/* Mock failed sendto with ENETUNREACH error via callback */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Clear send callback */
-	__cmock_nrf_sendto_Stub(mock_nrf_sendto_error_callback);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Clear send callback */
+	__cmock_zsock_sendto_Stub(mock_zsock_sendto_dest_error_callback);
 
 	/* Execute sendto command: should fail */
 	send_at_command("AT#XSENDTO=3,0,0,\"192.168.1.1\",5000,\"Test\"\r\n");
@@ -1487,7 +1489,7 @@ void test_xsendto_error(void)
 	TEST_ASSERT_TRUE(strstr(response, "ERROR") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(3, 0);
+	__cmock_zsock_close_ExpectAndReturn(3, 0);
 	send_at_command("AT#XCLOSE=3\r\n");
 }
 
@@ -1503,9 +1505,9 @@ void test_xsendto_ipv6(void)
 	int test_data_len = strlen(test_data);
 
 	/* Create IPv6 UDP socket first */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET6, NRF_SOCK_DGRAM, NRF_IPPROTO_UDP, 4);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET6, SOCK_DGRAM, IPPROTO_UDP, 4);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKET=2,2,0\r\n");
 	clear_captured_response();
 
@@ -1515,12 +1517,12 @@ void test_xsendto_ipv6(void)
 	__cmock_zsock_freeaddrinfo_IgnoreArg_ai();
 
 	/* Mock successful sendto - send all data in one call */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Clear send callback */
-	__cmock_nrf_sendto_ExpectAndReturn(4, NULL, test_data_len, 0, NULL,
-					   sizeof(struct nrf_sockaddr_in6), test_data_len);
-	__cmock_nrf_sendto_IgnoreArg_message();
-	__cmock_nrf_sendto_IgnoreArg_dest_addr();
-	__cmock_nrf_sendto_IgnoreArg_dest_len();
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Clear send callback */
+	__cmock_zsock_sendto_ExpectAndReturn(4, NULL, test_data_len, 0, NULL,
+					   sizeof(struct net_sockaddr_in6), test_data_len);
+	__cmock_zsock_sendto_IgnoreArg_buf();
+	__cmock_zsock_sendto_IgnoreArg_dest_addr();
+	__cmock_zsock_sendto_IgnoreArg_addrlen();
 
 	/* Execute sendto command: handle=4, mode=0 (unformatted), flags=0 */
 	send_at_command("AT#XSENDTO=4,0,0,\"2001:db8::1\",5000,\"IPv6 Test\"\r\n");
@@ -1532,7 +1534,7 @@ void test_xsendto_ipv6(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(4, 0);
+	__cmock_zsock_close_ExpectAndReturn(4, 0);
 	send_at_command("AT#XCLOSE=4\r\n");
 }
 
@@ -1547,9 +1549,9 @@ void test_xsendto_data_mode(void)
 	const char *test_data = "Hello World";
 
 	/* Create UDP socket first */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_DGRAM, NRF_IPPROTO_UDP, 2);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_DGRAM, IPPROTO_UDP, 2);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
 	send_at_command("AT#XSOCKET=1,2,0\r\n");
 	clear_captured_response();
 
@@ -1563,9 +1565,9 @@ void test_xsendto_data_mode(void)
 
 	/* Send data in data mode - this invokes socket_datamode_callback(DATAMODE_SEND) */
 	/* do_sendto calls clear_so_send_cb (or set if flags have ack) and DNS resolution */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Clear/set send callback */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Clear/set send callback */
 	__cmock_zsock_getaddrinfo_Stub(mock_getaddrinfo_success_callback);
-	__cmock_nrf_sendto_ExpectAnyArgsAndReturn(11);
+	__cmock_zsock_sendto_ExpectAnyArgsAndReturn(11);
 	__cmock_zsock_freeaddrinfo_ExpectAnyArgs();
 	uart_stub_rx((const uint8_t *)test_data, 11);
 
@@ -1575,19 +1577,19 @@ void test_xsendto_data_mode(void)
 	TEST_ASSERT_TRUE(strstr(response, "#XDATAMODE: 0") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(2, 0);
+	__cmock_zsock_close_ExpectAndReturn(2, 0);
 	send_at_command("AT#XCLOSE=2\r\n");
 }
 
-/* Helper callback for mocking nrf_recv with data */
-static ssize_t mock_nrf_recv_callback(int socket, void *buffer, size_t length, int flags,
-				      int num_calls)
+/* Helper callback for mocking zsock_recv with data */
+static ssize_t mock_zsock_recv_callback(int sock, void *buf, size_t max_len, int flags,
+				      int cmock_num_calls)
 {
 	const char *test_data = "Hello from recv";
 	size_t data_len = strlen(test_data);
 
-	if (length >= data_len) {
-		memcpy(buffer, test_data, data_len);
+	if (max_len >= data_len) {
+		memcpy(buf, test_data, data_len);
 		return data_len;
 	}
 	return -1;
@@ -1603,16 +1605,16 @@ void test_xrecv_unformatted_string(void)
 	const char *response;
 
 	/* Create TCP socket first */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKET=1,1,0\r\n");
 	clear_captured_response();
 
 	/* Mock successful recv - receive data */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Set receive timeout */
-	__cmock_nrf_recv_Stub(mock_nrf_recv_callback);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Poll event update */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Set receive timeout */
+	__cmock_zsock_recv_Stub(mock_zsock_recv_callback);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Poll event update */
 
 	/* Execute recv command: handle=0, mode=0 (unformatted), flags=0, timeout=5 */
 	send_at_command("AT#XRECV=0,0,0,5\r\n");
@@ -1625,20 +1627,20 @@ void test_xrecv_unformatted_string(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(0, 0);
+	__cmock_zsock_close_ExpectAndReturn(0, 0);
 	send_at_command("AT#XCLOSE=0\r\n");
 }
 
-/* Helper callback for mocking nrf_recv with hex data */
-static ssize_t mock_nrf_recv_hex_callback(int socket, void *buffer, size_t length, int flags,
-					  int num_calls)
+/* Helper callback for mocking zsock_recv with hex data */
+static ssize_t mock_zsock_recv_hex_callback(int sock, void *buf, size_t max_len, int flags,
+					  int cmock_num_calls)
 {
 	/* Return binary data: 0x48 0x65 0x6C 0x6C 0x6F = "Hello" */
 	const uint8_t test_data[] = {0x48, 0x65, 0x6C, 0x6C, 0x6F};
 	size_t data_len = sizeof(test_data);
 
-	if (length >= data_len) {
-		memcpy(buffer, test_data, data_len);
+	if (max_len >= data_len) {
+		memcpy(buf, test_data, data_len);
 		return data_len;
 	}
 	return -1;
@@ -1654,16 +1656,16 @@ void test_xrecv_hex_string(void)
 	const char *response;
 
 	/* Create TCP socket first */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 1);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 1);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKET=1,1,0\r\n");
 	clear_captured_response();
 
 	/* Mock successful recv - receive binary data */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Set receive timeout */
-	__cmock_nrf_recv_Stub(mock_nrf_recv_hex_callback);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Poll event update */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Set receive timeout */
+	__cmock_zsock_recv_Stub(mock_zsock_recv_hex_callback);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Poll event update */
 
 	/* Execute recv command: handle=1, mode=1 (hex), flags=0, timeout=5 */
 	send_at_command("AT#XRECV=1,1,0,5\r\n");
@@ -1677,20 +1679,20 @@ void test_xrecv_hex_string(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(1, 0);
+	__cmock_zsock_close_ExpectAndReturn(1, 0);
 	send_at_command("AT#XCLOSE=1\r\n");
 }
 
-/* Helper callback for mocking nrf_recv with limited data */
-static ssize_t mock_nrf_recv_limited_callback(int socket, void *buffer, size_t length, int flags,
-					      int num_calls)
+/* Helper callback for mocking zsock_recv with limited data */
+static ssize_t mock_zsock_recv_limited_callback(int sock, void *buf, size_t max_len, int flags,
+					      int cmock_num_calls)
 {
 	/* Return only 10 bytes even though more could be received */
 	const char *test_data = "0123456789";
 	size_t data_len = 10;
 
-	if (length >= data_len) {
-		memcpy(buffer, test_data, data_len);
+	if (max_len >= data_len) {
+		memcpy(buf, test_data, data_len);
 		return data_len;
 	}
 	return -1;
@@ -1706,16 +1708,16 @@ void test_xrecv_with_data_len(void)
 	const char *response;
 
 	/* Create TCP socket first */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 3);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 3);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKET=1,1,0\r\n");
 	clear_captured_response();
 
 	/* Mock successful recv - receive limited data */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Set receive timeout */
-	__cmock_nrf_recv_Stub(mock_nrf_recv_limited_callback);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Poll event update */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Set receive timeout */
+	__cmock_zsock_recv_Stub(mock_zsock_recv_limited_callback);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Poll event update */
 
 	/* Execute recv command: handle=3, mode=0, flags=0, timeout=5, data_len=10 */
 	send_at_command("AT#XRECV=3,0,0,5,10\r\n");
@@ -1728,13 +1730,13 @@ void test_xrecv_with_data_len(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(3, 0);
+	__cmock_zsock_close_ExpectAndReturn(3, 0);
 	send_at_command("AT#XCLOSE=3\r\n");
 }
 
-/* Helper callback for mocking failed nrf_recv with errno */
-static ssize_t mock_nrf_recv_error_callback(int socket, void *buffer, size_t length, int flags,
-					    int num_calls)
+/* Helper callback for mocking failed zsock_recv with errno */
+static ssize_t mock_zsock_recv_error_callback(int sock, void *buf, size_t max_len, int flags,
+					    int cmock_num_calls)
 {
 	/* Set errno to EAGAIN (timeout) */
 	errno = EAGAIN;
@@ -1743,22 +1745,22 @@ static ssize_t mock_nrf_recv_error_callback(int socket, void *buffer, size_t len
 
 /*
  * Test: Recv fails with error (timeout)
- * - Tests: Error handling when nrf_recv() fails
+ * - Tests: Error handling when zsock_recv() fails
  */
 void test_xrecv_timeout(void)
 {
 	const char *response;
 
 	/* Create TCP socket first */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 2);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 2);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKET=1,1,0\r\n");
 	clear_captured_response();
 
 	/* Mock failed recv with EAGAIN error via callback */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Set receive timeout */
-	__cmock_nrf_recv_Stub(mock_nrf_recv_error_callback);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Set receive timeout */
+	__cmock_zsock_recv_Stub(mock_zsock_recv_error_callback);
 	/* No poll event update mock needed since recv fails */
 
 	/* Execute recv command: should timeout */
@@ -1769,13 +1771,13 @@ void test_xrecv_timeout(void)
 	TEST_ASSERT_TRUE(strstr(response, "ERROR") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(2, 0);
+	__cmock_zsock_close_ExpectAndReturn(2, 0);
 	send_at_command("AT#XCLOSE=2\r\n");
 }
 
-/* Helper callback for mocking nrf_recv returning zero (connection closed) */
-static ssize_t mock_nrf_recv_zero_callback(int socket, void *buffer, size_t length, int flags,
-					   int num_calls)
+/* Helper callback for mocking zsock_recv returning zero (connection closed) */
+static ssize_t mock_zsock_recv_zero_callback(int sock, void *buf, size_t max_len, int flags,
+					   int cmock_num_calls)
 {
 	/* Return 0 to indicate connection closed */
 	return 0;
@@ -1783,22 +1785,22 @@ static ssize_t mock_nrf_recv_zero_callback(int socket, void *buffer, size_t leng
 
 /*
  * Test: Recv returns zero (connection closed)
- * - Tests: Handling when nrf_recv() returns 0 (peer closed connection)
+ * - Tests: Handling when zsock_recv() returns 0 (peer closed connection)
  */
 void test_xrecv_connection_closed(void)
 {
 	const char *response;
 
 	/* Create TCP socket first */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 2);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 2);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKET=1,1,0\r\n");
 	clear_captured_response();
 
 	/* Mock recv returning 0 (connection closed) */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Set receive timeout */
-	__cmock_nrf_recv_Stub(mock_nrf_recv_zero_callback);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Set receive timeout */
+	__cmock_zsock_recv_Stub(mock_zsock_recv_zero_callback);
 
 	/* Execute recv command */
 	send_at_command("AT#XRECV=2,0,0,5\r\n");
@@ -1810,7 +1812,7 @@ void test_xrecv_connection_closed(void)
 	TEST_ASSERT_TRUE(strstr(response, "#XRECV:") == NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(2, 0);
+	__cmock_zsock_close_ExpectAndReturn(2, 0);
 	send_at_command("AT#XCLOSE=2\r\n");
 }
 
@@ -1818,9 +1820,9 @@ void test_xrecv_connection_closed(void)
 static char *mock_zsock_inet_ntop_callback(
 	net_sa_family_t af, const void *src, char *dst, net_socklen_t size, int num_calls)
 {
-	if (af == NRF_AF_INET) {
+	if (af == AF_INET) {
 		strcpy(dst, "192.168.0.1");
-	} else if (af == NRF_AF_INET6) {
+	} else if (af == AF_INET6) {
 		strcpy(dst, "2001:db8::1");
 	}
 	return dst;
@@ -1834,22 +1836,22 @@ static char *mock_zsock_inet_ntop_10_0_0_1_callback(
 	return dst;
 }
 
-/* Helper callback for mocking nrf_recvfrom with data and address */
-static ssize_t mock_nrf_recvfrom_callback(int socket, void *buffer, size_t length, int flags,
-					  struct nrf_sockaddr *address, nrf_socklen_t *address_len,
-					  int num_calls)
+/* Helper callback for mocking zsock_recvfrom with data and address */
+static ssize_t mock_zsock_recvfrom_callback(int sock, void *buf, size_t max_len, int flags,
+					  struct net_sockaddr *src_addr, net_socklen_t *addrlen,
+					  int cmock_num_calls)
 {
 	const char *test_data = "UDP data";
 	size_t data_len = strlen(test_data);
-	struct nrf_sockaddr_in *sa_in = (struct nrf_sockaddr_in *)address;
+	struct net_sockaddr_in *sa_in = (struct net_sockaddr_in *)src_addr;
 
-	if (length >= data_len) {
-		memcpy(buffer, test_data, data_len);
+	if (max_len >= data_len) {
+		memcpy(buf, test_data, data_len);
 		/* Set up source address */
-		sa_in->sin_family = NRF_AF_INET;
+		sa_in->sin_family = AF_INET;
 		sa_in->sin_port = net_htons(8080);
 		sa_in->sin_addr.s_addr = net_htonl(0xC0A80001); /* 192.168.0.1 */
-		*address_len = sizeof(struct nrf_sockaddr_in);
+		*addrlen = sizeof(struct sockaddr_in);
 		return data_len;
 	}
 	return -1;
@@ -1865,17 +1867,17 @@ void test_xrecvfrom_unformatted_string(void)
 	const char *response;
 
 	/* Create UDP socket first */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_DGRAM, NRF_IPPROTO_UDP, 1);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_DGRAM, IPPROTO_UDP, 1);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKET=1,2,0\r\n");
 	clear_captured_response();
 
 	/* Mock successful recvfrom - receive data with source address */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Set receive timeout */
-	__cmock_nrf_recvfrom_Stub(mock_nrf_recvfrom_callback);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Set receive timeout */
+	__cmock_zsock_recvfrom_Stub(mock_zsock_recvfrom_callback);
 	__cmock_zsock_inet_ntop_Stub(mock_zsock_inet_ntop_callback);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Poll event update */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Poll event update */
 
 	/* Execute recvfrom command: handle=1, mode=0 (unformatted), flags=0, timeout=5 */
 	send_at_command("AT#XRECVFROM=1,0,0,5\r\n");
@@ -1890,27 +1892,27 @@ void test_xrecvfrom_unformatted_string(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(1, 0);
+	__cmock_zsock_close_ExpectAndReturn(1, 0);
 	send_at_command("AT#XCLOSE=1\r\n");
 }
 
-/* Helper callback for mocking nrf_recvfrom with hex data */
-static ssize_t mock_nrf_recvfrom_hex_callback(int socket, void *buffer, size_t length, int flags,
-					      struct nrf_sockaddr *address,
-					      nrf_socklen_t *address_len, int num_calls)
+/* Helper callback for mocking zsock_recvfrom with hex data */
+static ssize_t mock_zsock_recvfrom_hex_callback(int sock, void *buf, size_t max_len, int flags,
+					      struct net_sockaddr *src_addr,
+					      net_socklen_t *addrlen, int cmock_num_calls)
 {
 	/* Return binary data: 0x48 0x65 0x6C 0x6C 0x6F = "Hello" */
 	const uint8_t test_data[] = {0x48, 0x65, 0x6C, 0x6C, 0x6F};
 	size_t data_len = sizeof(test_data);
-	struct nrf_sockaddr_in *sa_in = (struct nrf_sockaddr_in *)address;
+	struct net_sockaddr_in *sa_in = (struct net_sockaddr_in *)src_addr;
 
-	if (length >= data_len) {
-		memcpy(buffer, test_data, data_len);
+	if (max_len >= data_len) {
+		memcpy(buf, test_data, data_len);
 		/* Set up source address */
-		sa_in->sin_family = NRF_AF_INET;
+		sa_in->sin_family = AF_INET;
 		sa_in->sin_port = net_htons(9000);
 		sa_in->sin_addr.s_addr = net_htonl(0x0A000001); /* 10.0.0.1 */
-		*address_len = sizeof(struct nrf_sockaddr_in);
+		*addrlen = sizeof(struct sockaddr_in);
 		return data_len;
 	}
 	return -1;
@@ -1926,17 +1928,17 @@ void test_xrecvfrom_hex_string(void)
 	const char *response;
 
 	/* Create UDP socket first */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_DGRAM, NRF_IPPROTO_UDP, 1);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_DGRAM, IPPROTO_UDP, 1);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKET=1,2,0\r\n");
 	clear_captured_response();
 
 	/* Mock successful recvfrom - receive binary data */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Set receive timeout */
-	__cmock_nrf_recvfrom_Stub(mock_nrf_recvfrom_hex_callback);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Set receive timeout */
+	__cmock_zsock_recvfrom_Stub(mock_zsock_recvfrom_hex_callback);
 	__cmock_zsock_inet_ntop_Stub(mock_zsock_inet_ntop_10_0_0_1_callback);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Poll event update */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Poll event update */
 
 	/* Execute recvfrom command: handle=1, mode=1 (hex), flags=0, timeout=5 */
 	send_at_command("AT#XRECVFROM=1,1,0,5\r\n");
@@ -1951,26 +1953,26 @@ void test_xrecvfrom_hex_string(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(1, 0);
+	__cmock_zsock_close_ExpectAndReturn(1, 0);
 	send_at_command("AT#XCLOSE=1\r\n");
 }
 
-/* Helper callback for mocking nrf_recvfrom with IPv6 address */
-static ssize_t mock_nrf_recvfrom_ipv6_callback(int socket, void *buffer, size_t length, int flags,
-					       struct nrf_sockaddr *address,
-					       nrf_socklen_t *address_len, int num_calls)
+/* Helper callback for mocking zsock_recvfrom with IPv6 address */
+static ssize_t mock_zsock_recvfrom_ipv6_callback(int sock, void *buf, size_t max_len, int flags,
+					       struct net_sockaddr *src_addr,
+					       net_socklen_t *addrlen, int cmock_num_calls)
 {
 	const char *test_data = "IPv6 UDP";
 	size_t data_len = strlen(test_data);
-	struct nrf_sockaddr_in6 *sa_in6 = (struct nrf_sockaddr_in6 *)address;
+	struct net_sockaddr_in6 *sa_in6 = (struct net_sockaddr_in6 *)src_addr;
 
-	if (length >= data_len) {
-		memcpy(buffer, test_data, data_len);
+	if (max_len >= data_len) {
+		memcpy(buf, test_data, data_len);
 		/* Set up IPv6 source address */
-		sa_in6->sin6_family = NRF_AF_INET6;
+		sa_in6->sin6_family = AF_INET6;
 		sa_in6->sin6_port = net_htons(7000);
 		/* 2001:db8::1 */
-		*address_len = sizeof(struct nrf_sockaddr_in6);
+		*addrlen = sizeof(struct net_sockaddr_in6);
 		return data_len;
 	}
 	return -1;
@@ -1986,17 +1988,17 @@ void test_xrecvfrom_ipv6(void)
 	const char *response;
 
 	/* Create IPv6 UDP socket first */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET6, NRF_SOCK_DGRAM, NRF_IPPROTO_UDP, 2);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET6, SOCK_DGRAM, IPPROTO_UDP, 2);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKET=2,2,0\r\n");
 	clear_captured_response();
 
 	/* Mock successful recvfrom - receive data with IPv6 source address */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Set receive timeout */
-	__cmock_nrf_recvfrom_Stub(mock_nrf_recvfrom_ipv6_callback);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Set receive timeout */
+	__cmock_zsock_recvfrom_Stub(mock_zsock_recvfrom_ipv6_callback);
 	__cmock_zsock_inet_ntop_Stub(mock_zsock_inet_ntop_callback);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Poll event update */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Poll event update */
 
 	/* Execute recvfrom command: handle=2, mode=0, flags=0, timeout=5 */
 	send_at_command("AT#XRECVFROM=2,0,0,5\r\n");
@@ -2011,27 +2013,27 @@ void test_xrecvfrom_ipv6(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(2, 0);
+	__cmock_zsock_close_ExpectAndReturn(2, 0);
 	send_at_command("AT#XCLOSE=2\r\n");
 }
 
-/* Helper callback for mocking nrf_recvfrom with limited data */
-static ssize_t mock_nrf_recvfrom_limited_callback(int socket, void *buffer, size_t length,
-						   int flags, struct nrf_sockaddr *address,
-						   nrf_socklen_t *address_len, int num_calls)
+/* Helper callback for mocking zsock_recvfrom with limited data */
+static ssize_t mock_zsock_recvfrom_limited_callback(int sock, void *buf, size_t max_len,
+						   int flags, struct net_sockaddr *src_addr,
+						   net_socklen_t *addrlen, int cmock_num_calls)
 {
 	/* Return only 10 bytes */
 	const char *test_data = "0123456789";
 	size_t data_len = 10;
-	struct nrf_sockaddr_in *sa_in = (struct nrf_sockaddr_in *)address;
+	struct net_sockaddr_in *sa_in = (struct net_sockaddr_in *)src_addr;
 
-	if (length >= data_len) {
-		memcpy(buffer, test_data, data_len);
+	if (max_len >= data_len) {
+		memcpy(buf, test_data, data_len);
 		/* Set up source address */
-		sa_in->sin_family = NRF_AF_INET;
+		sa_in->sin_family = AF_INET;
 		sa_in->sin_port = net_htons(5000);
 		sa_in->sin_addr.s_addr = net_htonl(0xC0A80064); /* 192.168.0.100 */
-		*address_len = sizeof(struct nrf_sockaddr_in);
+		*addrlen = sizeof(struct sockaddr_in);
 		return data_len;
 	}
 	return -1;
@@ -2047,17 +2049,17 @@ void test_xrecvfrom_with_data_len(void)
 	const char *response;
 
 	/* Create UDP socket first */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_DGRAM, NRF_IPPROTO_UDP, 0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_DGRAM, IPPROTO_UDP, 0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKET=1,2,0\r\n");
 	clear_captured_response();
 
 	/* Mock successful recvfrom - receive limited data */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Set receive timeout */
-	__cmock_nrf_recvfrom_Stub(mock_nrf_recvfrom_limited_callback);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Set receive timeout */
+	__cmock_zsock_recvfrom_Stub(mock_zsock_recvfrom_limited_callback);
 	__cmock_zsock_inet_ntop_Stub(mock_zsock_inet_ntop_192_168_0_100_callback);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Poll event update */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Poll event update */
 
 	/* Execute recvfrom command: handle=0, mode=0, flags=0, timeout=5, data_len=10 */
 	send_at_command("AT#XRECVFROM=0,0,0,5,10\r\n");
@@ -2072,14 +2074,14 @@ void test_xrecvfrom_with_data_len(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(0, 0);
+	__cmock_zsock_close_ExpectAndReturn(0, 0);
 	send_at_command("AT#XCLOSE=0\r\n");
 }
 
-/* Helper callback for mocking failed nrf_recvfrom with errno */
-static ssize_t mock_nrf_recvfrom_error_callback(int socket, void *buffer, size_t length, int flags,
-						struct nrf_sockaddr *address,
-						nrf_socklen_t *address_len, int num_calls)
+/* Helper callback for mocking failed zsock_recvfrom with errno */
+static ssize_t mock_zsock_recvfrom_error_callback(int sock, void *buf, size_t max_len, int flags,
+						struct net_sockaddr *src_addr,
+						net_socklen_t *addrlen, int cmock_num_calls)
 {
 	/* Set errno to EAGAIN (timeout) */
 	errno = EAGAIN;
@@ -2088,22 +2090,22 @@ static ssize_t mock_nrf_recvfrom_error_callback(int socket, void *buffer, size_t
 
 /*
  * Test: Recvfrom fails with error (timeout)
- * - Tests: Error handling when nrf_recvfrom() fails
+ * - Tests: Error handling when zsock_recvfrom() fails
  */
 void test_xrecvfrom_timeout(void)
 {
 	const char *response;
 
 	/* Create UDP socket first */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_DGRAM, NRF_IPPROTO_UDP, 0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_DGRAM, IPPROTO_UDP, 0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKET=1,2,0\r\n");
 	clear_captured_response();
 
 	/* Mock failed recvfrom with EAGAIN error via callback */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Set receive timeout */
-	__cmock_nrf_recvfrom_Stub(mock_nrf_recvfrom_error_callback);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Set receive timeout */
+	__cmock_zsock_recvfrom_Stub(mock_zsock_recvfrom_error_callback);
 	/* No poll event update mock needed since recvfrom fails */
 
 	/* Execute recvfrom command: should timeout */
@@ -2114,43 +2116,43 @@ void test_xrecvfrom_timeout(void)
 	TEST_ASSERT_TRUE(strstr(response, "ERROR") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(0, 0);
+	__cmock_zsock_close_ExpectAndReturn(0, 0);
 	send_at_command("AT#XCLOSE=0\r\n");
 }
 
-/* Helper callback for mocking nrf_recvfrom returning zero (datagram received) */
-static ssize_t mock_nrf_recvfrom_zero_callback(int socket, void *buffer, size_t length, int flags,
-					       struct nrf_sockaddr *address,
-					       nrf_socklen_t *address_len, int num_calls)
+/* Helper callback for mocking zsock_recvfrom returning zero (datagram received) */
+static ssize_t mock_zsock_recvfrom_zero_callback(int sock, void *buf, size_t max_len, int flags,
+					       struct net_sockaddr *src_addr,
+					       net_socklen_t *addrlen, int cmock_num_calls)
 {
 	/* Return 0 to indicate zero-length datagram received */
-	struct nrf_sockaddr_in *sa_in = (struct nrf_sockaddr_in *)address;
+	struct net_sockaddr_in *sa_in = (struct net_sockaddr_in *)src_addr;
 
-	sa_in->sin_family = NRF_AF_INET;
+	sa_in->sin_family = AF_INET;
 	sa_in->sin_port = net_htons(3000);
 	sa_in->sin_addr.s_addr = net_htonl(0xC0A80002); /* 192.168.0.2 */
-	*address_len = sizeof(struct nrf_sockaddr_in);
+	*addrlen = sizeof(struct sockaddr_in);
 	return 0;
 }
 
 /*
  * Test: Recvfrom returns zero (zero-length datagram)
- * - Tests: Handling when nrf_recvfrom() returns 0 (zero-length datagram)
+ * - Tests: Handling when zsock_recvfrom() returns 0 (zero-length datagram)
  */
 void test_xrecvfrom_zero_length(void)
 {
 	const char *response;
 
 	/* Create UDP socket first */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_DGRAM, NRF_IPPROTO_UDP, 3);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_DGRAM, IPPROTO_UDP, 3);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKET=1,2,0\r\n");
 	clear_captured_response();
 
 	/* Mock recvfrom returning 0 (zero-length datagram) */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Set receive timeout */
-	__cmock_nrf_recvfrom_Stub(mock_nrf_recvfrom_zero_callback);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Set receive timeout */
+	__cmock_zsock_recvfrom_Stub(mock_zsock_recvfrom_zero_callback);
 
 	/* Execute recvfrom command */
 	send_at_command("AT#XRECVFROM=3,0,0,5\r\n");
@@ -2162,7 +2164,7 @@ void test_xrecvfrom_zero_length(void)
 	TEST_ASSERT_TRUE(strstr(response, "#XRECVFROM:") == NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(3, 0);
+	__cmock_zsock_close_ExpectAndReturn(3, 0);
 	send_at_command("AT#XCLOSE=3\r\n");
 }
 
@@ -2176,14 +2178,14 @@ void test_xapoll_start_pollin(void)
 	const char *response;
 
 	/* Create socket first */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB - initial setup */
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB - initial setup */
 	send_at_command("AT#XSOCKET=1,1,0\r\n");
 	clear_captured_response();
 
 	/* Start async polling for POLLIN (value 1) */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB - update for xapoll */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB - update for xapoll */
 	send_at_command("AT#XAPOLL=0,1,1\r\n");
 
 	/* Verify OK response */
@@ -2191,7 +2193,7 @@ void test_xapoll_start_pollin(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(0, 0);
+	__cmock_zsock_close_ExpectAndReturn(0, 0);
 	send_at_command("AT#XCLOSE=0\r\n");
 }
 
@@ -2205,14 +2207,14 @@ void test_xapoll_start_pollout(void)
 	const char *response;
 
 	/* Create socket first */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 2);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 2);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKET=1,1,0\r\n");
 	clear_captured_response();
 
 	/* Start async polling for POLLOUT (value 4) */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Update poll events */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Update poll events */
 	send_at_command("AT#XAPOLL=2,1,4\r\n");
 
 	/* Verify OK response */
@@ -2220,7 +2222,7 @@ void test_xapoll_start_pollout(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(2, 0);
+	__cmock_zsock_close_ExpectAndReturn(2, 0);
 	send_at_command("AT#XCLOSE=2\r\n");
 }
 
@@ -2234,14 +2236,14 @@ void test_xapoll_start_pollin_pollout(void)
 	const char *response;
 
 	/* Create socket first */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 2);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 2);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKET=1,1,0\r\n");
 	clear_captured_response();
 
 	/* Start async polling for POLLIN | POLLOUT (value 5) */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Update poll events */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Update poll events */
 	send_at_command("AT#XAPOLL=2,1,5\r\n");
 
 	/* Verify OK response */
@@ -2249,7 +2251,7 @@ void test_xapoll_start_pollin_pollout(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(2, 0);
+	__cmock_zsock_close_ExpectAndReturn(2, 0);
 	send_at_command("AT#XCLOSE=2\r\n");
 }
 
@@ -2263,14 +2265,14 @@ void test_xapoll_stop_socket(void)
 	const char *response;
 
 	/* Create socket first */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 4);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 4);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKET=1,1,0\r\n");
 	clear_captured_response();
 
 	/* Start async polling first */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Update poll events */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Update poll events */
 	send_at_command("AT#XAPOLL=4,1,1\r\n");
 	clear_captured_response();
 
@@ -2282,7 +2284,7 @@ void test_xapoll_stop_socket(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(4, 0);
+	__cmock_zsock_close_ExpectAndReturn(4, 0);
 	send_at_command("AT#XCLOSE=4\r\n");
 }
 
@@ -2298,17 +2300,17 @@ void test_xapoll_start_all_sockets(void)
 
 	/* Create multiple sockets */
 	for (int i = 0; i < max_sockets; i++) {
-		__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP,
+		__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP,
 						   i);
-		__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-		__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+		__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+		__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 		send_at_command("AT#XSOCKET=1,1,0\r\n");
 		clear_captured_response();
 	}
 
 	/* Start async polling for all sockets (no handle specified) */
 	for (int i = 0; i < max_sockets; i++) {
-		__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Update poll events */
+		__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Update poll events */
 	}
 	send_at_command("AT#XAPOLL=,1,1\r\n");
 
@@ -2319,7 +2321,7 @@ void test_xapoll_start_all_sockets(void)
 	/* Close all sockets */
 	for (int i = 0; i < max_sockets; i++) {
 		char send_buf[20];
-		__cmock_nrf_close_ExpectAndReturn(i, 0);
+		__cmock_zsock_close_ExpectAndReturn(i, 0);
 		sprintf(send_buf, "AT#XCLOSE=%d\r\n", i);
 		send_at_command(send_buf);
 	}
@@ -2337,17 +2339,17 @@ void test_xapoll_stop_all_sockets(void)
 
 	/* Create multiple sockets */
 	for (int i = 0; i < max_sockets; i++) {
-		__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP,
+		__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP,
 						   i);
-		__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-		__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+		__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+		__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 		send_at_command("AT#XSOCKET=1,1,0\r\n");
 		clear_captured_response();
 	}
 
 	/* Start async polling for all sockets first */
 	for (int i = 0; i < max_sockets; i++) {
-		__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Update poll events */
+		__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Update poll events */
 	}
 	send_at_command("AT#XAPOLL=,1,1\r\n");
 	clear_captured_response();
@@ -2362,7 +2364,7 @@ void test_xapoll_stop_all_sockets(void)
 	/* Close all sockets */
 	for (int i = 0; i < max_sockets; i++) {
 		char send_buf[20];
-		__cmock_nrf_close_ExpectAndReturn(i, 0);
+		__cmock_zsock_close_ExpectAndReturn(i, 0);
 		sprintf(send_buf, "AT#XCLOSE=%d\r\n", i);
 		send_at_command(send_buf);
 	}
@@ -2378,14 +2380,14 @@ void test_xapoll_read(void)
 	const char *response;
 
 	/* Create socket first */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 2);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 2);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKET=1,1,0\r\n");
 	clear_captured_response();
 
 	/* Start async polling for POLLIN */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Update poll events */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Update poll events */
 	send_at_command("AT#XAPOLL=2,1,1\r\n");
 	clear_captured_response();
 
@@ -2399,7 +2401,7 @@ void test_xapoll_read(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(2, 0);
+	__cmock_zsock_close_ExpectAndReturn(2, 0);
 	send_at_command("AT#XCLOSE=2\r\n");
 }
 
@@ -2433,9 +2435,9 @@ void test_xapoll_invalid_events(void)
 	const char *response;
 
 	/* Create socket first */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKET=1,1,0\r\n");
 	clear_captured_response();
 
@@ -2447,7 +2449,7 @@ void test_xapoll_invalid_events(void)
 	TEST_ASSERT_TRUE(strstr(response, "ERROR") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(0, 0);
+	__cmock_zsock_close_ExpectAndReturn(0, 0);
 	send_at_command("AT#XCLOSE=0\r\n");
 }
 
@@ -2481,14 +2483,14 @@ void test_xclose_operation(void)
 
 	/* Test 1: Close single socket using handle */
 	/* Create one socket */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 3);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 3);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKET=1,1,0\r\n");
 	clear_captured_response();
 
 	/* Close it using handle */
-	__cmock_nrf_close_ExpectAndReturn(3, 0);
+	__cmock_zsock_close_ExpectAndReturn(3, 0);
 	send_at_command("AT#XCLOSE=3\r\n");
 	send_at_command("AT#XCLOSE=3\r\n");
 
@@ -2501,17 +2503,17 @@ void test_xclose_operation(void)
 	/* Test 2: Close several sockets with one call without handle */
 	/* Create multiple sockets (maximum allowed) */
 	for (int i = 0; i < max_sockets; i++) {
-		__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP,
+		__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP,
 						   i);
-		__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
-		__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+		__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+		__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 		send_at_command("AT#XSOCKET=1,1,0\r\n");
 		clear_captured_response();
 	}
 
 	/* Close all sockets with one command (no handle parameter) */
 	for (int i = 0; i < max_sockets; i++) {
-		__cmock_nrf_close_ExpectAndReturn(i, 0);
+		__cmock_zsock_close_ExpectAndReturn(i, 0);
 	}
 	send_at_command("AT#XCLOSE\r\n");
 
@@ -2526,64 +2528,64 @@ void test_xclose_operation(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 }
 
-/* Helper callback for mocking nrf_inet_ntop (IPv4) */
-static const char *mock_nrf_inet_ntop_ipv4_callback(int af, const void *src, char *dst,
-						    nrf_socklen_t size, int num_calls)
+/* Helper callback for mocking zsock_inet_ntop (IPv4) */
+static char *mock_zsock_inet_ntop_ipv4_callback(net_sa_family_t af, const void *src, char *dst,
+						    net_socklen_t size, int cmock_num_calls)
 {
 	/* Return the IPv4 address string */
 	strcpy(dst, "192.168.0.1");
 	return dst;
 }
 
-/* Helper callback for mocking nrf_inet_ntop (IPv6) */
-static const char *mock_nrf_inet_ntop_ipv6_callback(int af, const void *src, char *dst,
-						    nrf_socklen_t size, int num_calls)
+/* Helper callback for mocking zsock_inet_ntop (IPv6) */
+static char *mock_zsock_inet_ntop_ipv6_callback(net_sa_family_t af, const void *src, char *dst,
+						    net_socklen_t size, int cmock_num_calls)
 {
 	/* Return the IPv6 address string */
 	strcpy(dst, "2001:db8::1");
 	return dst;
 }
 
-/* Helper callback for mocking successful nrf_getaddrinfo (IPv4) */
-static int mock_nrf_getaddrinfo_ipv4_callback(const char *nodename, const char *servname,
-					      const struct nrf_addrinfo *hints,
-					      struct nrf_addrinfo **res, int num_calls)
+/* Helper callback for mocking successful zsock_getaddrinfo (IPv4) */
+static int mock_zsock_getaddrinfo_ipv4_callback(const char *nodename, const char *servname,
+					      const struct zsock_addrinfo *hints,
+					      struct zsock_addrinfo **res, int cmock_num_calls)
 {
 	static struct {
-		struct nrf_addrinfo ai;
-		struct nrf_sockaddr_in sa;
+		struct zsock_addrinfo ai;
+		struct net_sockaddr_in sa;
 	} result;
 
 	/* Setup IPv4 address */
 	memset(&result, 0, sizeof(result));
-	result.sa.sin_family = NRF_AF_INET;
+	result.sa.sin_family = AF_INET;
 	result.sa.sin_addr.s_addr = net_htonl(0xC0A80001); /* 192.168.0.1 */
 
 	/* Setup addrinfo */
-	result.ai.ai_family = NRF_AF_INET;
-	result.ai.ai_socktype = NRF_SOCK_STREAM;
-	result.ai.ai_protocol = NRF_IPPROTO_TCP;
+	result.ai.ai_family = AF_INET;
+	result.ai.ai_socktype = SOCK_STREAM;
+	result.ai.ai_protocol = IPPROTO_TCP;
 	result.ai.ai_addrlen = sizeof(result.sa);
-	result.ai.ai_addr = (struct nrf_sockaddr *)&result.sa;
+	result.ai.ai_addr = (struct net_sockaddr *)&result.sa;
 	result.ai.ai_next = NULL;
 
 	*res = &result.ai;
 	return 0;
 }
 
-/* Helper callback for mocking successful nrf_getaddrinfo (IPv6) */
-static int mock_nrf_getaddrinfo_ipv6_callback(const char *nodename, const char *servname,
-					      const struct nrf_addrinfo *hints,
-					      struct nrf_addrinfo **res, int num_calls)
+/* Helper callback for mocking successful zsock_getaddrinfo (IPv6) */
+static int mock_zsock_getaddrinfo_ipv6_callback(const char *nodename, const char *servname,
+					      const struct zsock_addrinfo *hints,
+					      struct zsock_addrinfo **res, int cmock_num_calls)
 {
 	static struct {
-		struct nrf_addrinfo ai;
-		struct nrf_sockaddr_in6 sa;
+		struct zsock_addrinfo ai;
+		struct net_sockaddr_in6 sa;
 	} result;
 
 	/* Setup IPv6 address (2001:db8::1) */
 	memset(&result, 0, sizeof(result));
-	result.sa.sin6_family = NRF_AF_INET6;
+	result.sa.sin6_family = AF_INET6;
 	result.sa.sin6_addr.s6_addr[0] = 0x20;
 	result.sa.sin6_addr.s6_addr[1] = 0x01;
 	result.sa.sin6_addr.s6_addr[2] = 0x0d;
@@ -2591,11 +2593,11 @@ static int mock_nrf_getaddrinfo_ipv6_callback(const char *nodename, const char *
 	result.sa.sin6_addr.s6_addr[15] = 0x01;
 
 	/* Setup addrinfo */
-	result.ai.ai_family = NRF_AF_INET6;
-	result.ai.ai_socktype = NRF_SOCK_STREAM;
-	result.ai.ai_protocol = NRF_IPPROTO_TCP;
+	result.ai.ai_family = AF_INET6;
+	result.ai.ai_socktype = SOCK_STREAM;
+	result.ai.ai_protocol = IPPROTO_TCP;
 	result.ai.ai_addrlen = sizeof(result.sa);
-	result.ai.ai_addr = (struct nrf_sockaddr *)&result.sa;
+	result.ai.ai_addr = (struct net_sockaddr *)&result.sa;
 	result.ai.ai_next = NULL;
 
 	*res = &result.ai;
@@ -2611,11 +2613,11 @@ void test_xgetaddrinfo_ipv4(void)
 {
 	const char *response;
 
-	/* Mock nrf_getaddrinfo to succeed with IPv4 address */
-	__cmock_nrf_getaddrinfo_Stub(mock_nrf_getaddrinfo_ipv4_callback);
-	__cmock_nrf_inet_ntop_Stub(mock_nrf_inet_ntop_ipv4_callback);
-	__cmock_nrf_freeaddrinfo_Expect(NULL);
-	__cmock_nrf_freeaddrinfo_IgnoreArg_ai();
+	/* Mock zsock_getaddrinfo to succeed with IPv4 address */
+	__cmock_zsock_getaddrinfo_Stub(mock_zsock_getaddrinfo_ipv4_callback);
+	__cmock_zsock_inet_ntop_Stub(mock_zsock_inet_ntop_ipv4_callback);
+	__cmock_zsock_freeaddrinfo_Expect(NULL);
+	__cmock_zsock_freeaddrinfo_IgnoreArg_ai();
 
 	/* Execute XGETADDRINFO command */
 	send_at_command("AT#XGETADDRINFO=\"example.com\"\r\n");
@@ -2635,13 +2637,13 @@ void test_xgetaddrinfo_ipv6(void)
 {
 	const char *response;
 
-	/* Mock nrf_getaddrinfo to succeed with IPv6 address */
-	__cmock_nrf_getaddrinfo_Stub(mock_nrf_getaddrinfo_ipv6_callback);
-	__cmock_nrf_inet_ntop_Stub(mock_nrf_inet_ntop_ipv6_callback);
-	__cmock_nrf_freeaddrinfo_Expect(NULL);
-	__cmock_nrf_freeaddrinfo_IgnoreArg_ai();
+	/* Mock zsock_getaddrinfo to succeed with IPv6 address */
+	__cmock_zsock_getaddrinfo_Stub(mock_zsock_getaddrinfo_ipv6_callback);
+	__cmock_zsock_inet_ntop_Stub(mock_zsock_inet_ntop_ipv6_callback);
+	__cmock_zsock_freeaddrinfo_Expect(NULL);
+	__cmock_zsock_freeaddrinfo_IgnoreArg_ai();
 
-	/* Execute XGETADDRINFO command with IPv6 family (NRF_AF_INET6 = 2) */
+	/* Execute XGETADDRINFO command with IPv6 family (AF_INET6 = 2) */
 	send_at_command("AT#XGETADDRINFO=\"ipv6.example.com\",2\r\n");
 
 	/* Verify response contains IPv6 address */
@@ -2676,8 +2678,8 @@ void test_xgetaddrinfo_dns_failure(void)
 {
 	const char *response;
 
-	/* Mock nrf_getaddrinfo to fail with DNS_EAI_NONAME */
-	__cmock_nrf_getaddrinfo_ExpectAnyArgsAndReturn(DNS_EAI_NONAME);
+	/* Mock zsock_getaddrinfo to fail with DNS_EAI_NONAME */
+	__cmock_zsock_getaddrinfo_ExpectAnyArgsAndReturn(DNS_EAI_NONAME);
 	__cmock_zsock_gai_strerror_CMockExpectAnyArgsAndReturn(__LINE__,
 							       "Name or service not known");
 
@@ -2700,36 +2702,36 @@ void test_xssocket_read_operation(void)
 	const char *response;
 
 	/* Create first secure socket: IPv4 TLS client (fd=1) */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM,
-					   258 /* NRF_SPROTO_TLS1v2 */, 1);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_TAG_LIST */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_PEER_VERIFY */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM,
+					   IPPROTO_TLS_1_2, 1);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_TAG_LIST */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_PEER_VERIFY */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
 	send_at_command("AT#XSSOCKET=1,1,0,42\r\n");
 	response = get_captured_response();
 	TEST_ASSERT_TRUE(strstr(response, "#XSSOCKET: 1") != NULL);
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Create second secure socket: IPv4 DTLS client (fd=2) */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_DGRAM,
-					   273 /* NRF_SPROTO_DTLS1v2 */, 2);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_TAG_LIST */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_PEER_VERIFY */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_DGRAM,
+					   IPPROTO_DTLS_1_2, 2);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_TAG_LIST */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_PEER_VERIFY */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
 	send_at_command("AT#XSSOCKET=1,2,0,16842752\r\n");
 	response = get_captured_response();
 	TEST_ASSERT_TRUE(strstr(response, "#XSSOCKET: 2") != NULL);
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Create third secure socket: IPv6 TLS server (fd=3) */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET6, NRF_SOCK_STREAM,
-					   258 /* NRF_SPROTO_TLS1v2 */, 3);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_TAG_LIST */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_PEER_VERIFY */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET6, SOCK_STREAM,
+					   IPPROTO_TLS_1_2, 3);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_TAG_LIST */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_PEER_VERIFY */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
 	send_at_command("AT#XSSOCKET=2,1,1,42\r\n");
 	response = get_captured_response();
 	TEST_ASSERT_TRUE(strstr(response, "#XSSOCKET: 3") != NULL);
@@ -2750,11 +2752,11 @@ void test_xssocket_read_operation(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close all sockets */
-	__cmock_nrf_close_ExpectAndReturn(1, 0);
+	__cmock_zsock_close_ExpectAndReturn(1, 0);
 	send_at_command("AT#XCLOSE=1\r\n");
-	__cmock_nrf_close_ExpectAndReturn(2, 0);
+	__cmock_zsock_close_ExpectAndReturn(2, 0);
 	send_at_command("AT#XCLOSE=2\r\n");
-	__cmock_nrf_close_ExpectAndReturn(3, 0);
+	__cmock_zsock_close_ExpectAndReturn(3, 0);
 	send_at_command("AT#XCLOSE=3\r\n");
 }
 
@@ -2788,16 +2790,16 @@ void test_xssocket_ipv4_tcp_client(void)
 {
 	const char *response;
 
-	/* Mock nrf_socket to return fd 3 */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM,
-					   258 /* NRF_SPROTO_TLS1v2 */, 3);
+	/* Mock zsock_socket to return fd 3 */
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM,
+					   IPPROTO_TLS_1_2, 3);
 
 	/* Mock setsockopt calls (send timeout, sec_tag_list, peer_verify, poll callback) */
 	/* Note: SO_BINDTOPDN is not called when cid=0 */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_TAG_LIST */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_PEER_VERIFY */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_TAG_LIST */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_PEER_VERIFY */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
 
 	/* Send AT command: family=1(IPv4), type=1(STREAM), role=0(client), sec_tag=42 */
 	send_at_command("AT#XSSOCKET=1,1,0,42\r\n");
@@ -2806,11 +2808,11 @@ void test_xssocket_ipv4_tcp_client(void)
 	response = get_captured_response();
 	TEST_ASSERT_TRUE(strstr(response, "#XSSOCKET:") != NULL);
 	TEST_ASSERT_TRUE(strstr(response, "3,1,258") !=
-			 NULL); /* handle=3, type=1(STREAM), proto=258(TLS) */
+			 NULL); /* handle=3, type=1(STREAM), proto=IPPROTO_TLS_1_2 */
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(3, 0);
+	__cmock_zsock_close_ExpectAndReturn(3, 0);
 	send_at_command("AT#XCLOSE=3\r\n");
 }
 
@@ -2823,15 +2825,15 @@ void test_xssocket_ipv4_dtls_client(void)
 {
 	const char *response;
 
-	/* Mock nrf_socket to return fd 4 */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_DGRAM,
-					   273 /* NRF_SPROTO_DTLS1v2 */, 4);
+	/* Mock zsock_socket to return fd 4 */
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_DGRAM,
+					   IPPROTO_DTLS_1_2, 4);
 
 	/* Mock setsockopt calls */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_TAG_LIST */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_PEER_VERIFY */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_TAG_LIST */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_PEER_VERIFY */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
 
 	/* Send AT command: family=1(IPv4), type=2(DGRAM), role=0(client), sec_tag=16842752 */
 	send_at_command("AT#XSSOCKET=1,2,0,16842752\r\n");
@@ -2840,11 +2842,11 @@ void test_xssocket_ipv4_dtls_client(void)
 	response = get_captured_response();
 	TEST_ASSERT_TRUE(strstr(response, "#XSSOCKET:") != NULL);
 	TEST_ASSERT_TRUE(strstr(response, "4,2,273") !=
-			 NULL); /* handle=4, type=2(DGRAM), proto=273(DTLS) */
+			 NULL); /* handle=4, type=2(DGRAM), proto=IPPROTO_DTLS_1_2 */
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(4, 0);
+	__cmock_zsock_close_ExpectAndReturn(4, 0);
 	send_at_command("AT#XCLOSE=4\r\n");
 }
 
@@ -2857,15 +2859,15 @@ void test_xssocket_ipv6_tcp_client(void)
 {
 	const char *response;
 
-	/* Mock nrf_socket to return fd 1 */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET6, NRF_SOCK_STREAM,
-					   258 /* NRF_SPROTO_TLS1v2 */, 1);
+	/* Mock zsock_socket to return fd 1 */
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET6, SOCK_STREAM,
+					   IPPROTO_TLS_1_2, 1);
 
 	/* Mock setsockopt calls */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Bind to PDN */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_TAG_LIST */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_PEER_VERIFY */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Bind to PDN */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_TAG_LIST */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_PEER_VERIFY */
 
 	/* Send AT command: family=2(IPv6), type=1(STREAM), role=0(client), sec_tag=42 */
 	send_at_command("AT#XSSOCKET=2,1,0,42\r\n");
@@ -2874,11 +2876,11 @@ void test_xssocket_ipv6_tcp_client(void)
 	response = get_captured_response();
 	TEST_ASSERT_TRUE(strstr(response, "#XSSOCKET:") != NULL);
 	TEST_ASSERT_TRUE(strstr(response, "1,1,258") !=
-			 NULL); /* handle=1, type=1, proto=258(TLS) */
+			 NULL); /* handle=1, type=1, proto=IPPROTO_TLS_1_2 */
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(1, 0);
+	__cmock_zsock_close_ExpectAndReturn(1, 0);
 	send_at_command("AT#XCLOSE=1\r\n");
 }
 
@@ -2891,9 +2893,9 @@ void test_xssocket_ipv4_tcp_server(void)
 {
 	const char *response;
 
-	/* Mock nrf_socket to return fd 0 */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM,
-					   258 /* NRF_SPROTO_TLS1v2 */, 0);
+	/* Mock zsock_socket to return fd 0 */
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM,
+					   IPPROTO_TLS_1_2, 0);
 
 	/* Mock setsockopt calls in the expected order:
 	 * 1. SO_SNDTIMEO (SOL_SOCKET)
@@ -2901,10 +2903,10 @@ void test_xssocket_ipv4_tcp_server(void)
 	 * 3. SO_SEC_PEER_VERIFY (SOL_SECURE)
 	 * 4. SO_POLLCB (SOL_SOCKET)
 	 */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_TAG_LIST */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_PEER_VERIFY */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_TAG_LIST */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_PEER_VERIFY */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
 
 	/* Send AT command: family=1(IPv4), type=1(STREAM), role=1(server), sec_tag=42 */
 	send_at_command("AT#XSSOCKET=1,1,1,42\r\n");
@@ -2913,11 +2915,11 @@ void test_xssocket_ipv4_tcp_server(void)
 	response = get_captured_response();
 	TEST_ASSERT_TRUE(strstr(response, "#XSSOCKET:") != NULL);
 	TEST_ASSERT_TRUE(strstr(response, "0,1,258") !=
-			 NULL); /* handle=0, type=1, proto=258(TLS) */
+			 NULL); /* handle=0, type=1, proto=IPPROTO_TLS_1_2 */
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(0, 0);
+	__cmock_zsock_close_ExpectAndReturn(0, 0);
 	send_at_command("AT#XCLOSE=0\r\n");
 }
 
@@ -2930,15 +2932,15 @@ void test_xssocket_custom_peer_verify(void)
 {
 	const char *response;
 
-	/* Mock nrf_socket to return fd 3 */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM,
-					   258 /* NRF_SPROTO_TLS1v2 */, 3);
+	/* Mock zsock_socket to return fd 3 */
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM,
+					   IPPROTO_TLS_1_2, 3);
 
 	/* Mock setsockopt calls */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_TAG_LIST */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_PEER_VERIFY */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_TAG_LIST */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_PEER_VERIFY */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
 
 	/* Send AT command: family=1, type=1, role=0, sec_tag=42, peer_verify=0(none) */
 	send_at_command("AT#XSSOCKET=1,1,0,42,0\r\n");
@@ -2947,11 +2949,11 @@ void test_xssocket_custom_peer_verify(void)
 	response = get_captured_response();
 	TEST_ASSERT_TRUE(strstr(response, "#XSSOCKET:") != NULL);
 	TEST_ASSERT_TRUE(strstr(response, "3,1,258") !=
-			 NULL); /* handle=3, type=1, proto=258(TLS) */
+			 NULL); /* handle=3, type=1, proto=IPPROTO_TLS_1_2 */
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(3, 0);
+	__cmock_zsock_close_ExpectAndReturn(3, 0);
 	send_at_command("AT#XCLOSE=3\r\n");
 }
 
@@ -2964,12 +2966,12 @@ void test_xssocket_with_pdn_cid(void)
 {
 	const char *response;
 
-	/* Mock nrf_socket to return fd 1 */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM,
-					   258 /* NRF_SPROTO_TLS1v2 */, 1);
+	/* Mock zsock_socket to return fd 1 */
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM,
+					   IPPROTO_TLS_1_2, 1);
 
 	/* Mock setsockopt calls (SO_BINDTOPDN is called because cid=1, even though pdn_id=0) */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
 
 	/* Mock AT%XGETPDNID command for PDN ID retrieval (cid=1 -> pdn_id=1) */
 	const char *pdn_id_resp = "%XGETPDNID: 1\r\nOK\r\n";
@@ -2980,10 +2982,10 @@ void test_xssocket_with_pdn_cid(void)
 	__cmock_nrf_modem_at_cmd_CMockIgnoreArg_len(__LINE__);
 	__cmock_nrf_modem_at_cmd_CMockIgnoreArg_fmt(__LINE__);
 
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_BINDTOPDN */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_TAG_LIST */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_PEER_VERIFY */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_BINDTOPDN */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_TAG_LIST */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_PEER_VERIFY */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
 
 	/* Send AT command: family=1, type=1, role=0, sec_tag=42, peer_verify=2, cid=1 */
 	send_at_command("AT#XSSOCKET=1,1,0,42,2,1\r\n");
@@ -2992,11 +2994,11 @@ void test_xssocket_with_pdn_cid(void)
 	response = get_captured_response();
 	TEST_ASSERT_TRUE(strstr(response, "#XSSOCKET:") != NULL);
 	TEST_ASSERT_TRUE(strstr(response, "1,1,258") !=
-			 NULL); /* handle=1, type=1, proto=258(TLS) */
+			 NULL); /* handle=1, type=1, proto=IPPROTO_TLS_1_2 */
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(1, 0);
+	__cmock_zsock_close_ExpectAndReturn(1, 0);
 	send_at_command("AT#XCLOSE=1\r\n");
 }
 
@@ -3031,28 +3033,28 @@ void test_xsocketopt_set_get(void)
 	const char *response;
 
 	/* Create a socket */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 4);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Bind to PDN */
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 4);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Bind to PDN */
 	send_at_command("AT#XSOCKET=1,1,0\r\n");
 	response = get_captured_response();
 	TEST_ASSERT_TRUE(strstr(response, "#XSOCKET: 4") != NULL);
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Set SO_RCVTIMEO (option 20) to 30 seconds */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKETOPT=4,1,20,30\r\n");
 	response = get_captured_response();
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Set SO_SNDTIMEO (option 21) to 60 seconds */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKETOPT=4,1,21,60\r\n");
 	response = get_captured_response();
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Get SO_RCVTIMEO (option 20) - should return 30 */
-	__cmock_nrf_getsockopt_Stub(mock_getsockopt_timeval_callback);
+	__cmock_zsock_getsockopt_Stub(mock_getsockopt_timeval_callback);
 	send_at_command("AT#XSOCKETOPT=4,0,20\r\n");
 	response = get_captured_response();
 	TEST_ASSERT_TRUE(strstr(response, "#XSOCKETOPT: 4,30") != NULL);
@@ -3065,7 +3067,7 @@ void test_xsocketopt_set_get(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(4, 0);
+	__cmock_zsock_close_ExpectAndReturn(4, 0);
 	send_at_command("AT#XCLOSE=4\r\n");
 }
 
@@ -3079,22 +3081,22 @@ void test_xsocketopt_reuseaddr(void)
 	const char *response;
 
 	/* Create a socket */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Bind to PDN */
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Bind to PDN */
 	send_at_command("AT#XSOCKET=1,1,0\r\n");
 	response = get_captured_response();
 	TEST_ASSERT_TRUE(strstr(response, "#XSOCKET: 0") != NULL);
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Set SO_REUSEADDR (option 2) to enabled (1) */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKETOPT=0,1,2,1\r\n");
 	response = get_captured_response();
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(0, 0);
+	__cmock_zsock_close_ExpectAndReturn(0, 0);
 	send_at_command("AT#XCLOSE=0\r\n");
 }
 
@@ -3109,29 +3111,29 @@ void test_xsocketopt_tcp_srv_sesstimeo(void)
 	const char *response;
 
 	/* Create a TCP socket */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Bind to PDN */
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Bind to PDN */
 	send_at_command("AT#XSOCKET=1,1,0\r\n");
 	response = get_captured_response();
 	TEST_ASSERT_TRUE(strstr(response, "#XSOCKET: 0") != NULL);
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Set SO_TCP_SRV_SESSTIMEO (option 55) to 135 */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKETOPT=0,1,55,135\r\n");
 	response = get_captured_response();
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Get SO_TCP_SRV_SESSTIMEO (option 55) - should return 135 */
-	__cmock_nrf_getsockopt_Stub(mock_getsockopt_tcp_srv_sesstimeo_callback);
+	__cmock_zsock_getsockopt_Stub(mock_getsockopt_tcp_srv_sesstimeo_callback);
 	send_at_command("AT#XSOCKETOPT=0,0,55\r\n");
 	response = get_captured_response();
 	TEST_ASSERT_TRUE(strstr(response, "#XSOCKETOPT: 0,135") != NULL);
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Set SO_TCP_SRV_SESSTIMEO (option 55) to 0 */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSOCKETOPT=0,1,55,0\r\n");
 	response = get_captured_response();
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
@@ -3143,7 +3145,7 @@ void test_xsocketopt_tcp_srv_sesstimeo(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(0, 0);
+	__cmock_zsock_close_ExpectAndReturn(0, 0);
 	send_at_command("AT#XCLOSE=0\r\n");
 }
 
@@ -3158,37 +3160,37 @@ void test_xssocketopt_set_get(void)
 	const char *response;
 
 	/* Create a secure socket */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM,
-					   258 /* NRF_SPROTO_TLS1v2 */, 0);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Bind to PDN */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_TAG_LIST */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_PEER_VERIFY */
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM,
+					   IPPROTO_TLS_1_2, 0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Bind to PDN */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_TAG_LIST */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SEC_PEER_VERIFY */
 	send_at_command("AT#XSSOCKET=1,1,0,42\r\n");
 	response = get_captured_response();
 	TEST_ASSERT_TRUE(strstr(response, "#XSSOCKET: 0") != NULL);
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Set TLS_PEER_VERIFY (option 5) to optional (1) */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSSOCKETOPT=0,1,5,1\r\n");
 	response = get_captured_response();
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Set TLS_SESSION_CACHE (option 12) to enabled (1) */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSSOCKETOPT=0,1,12,1\r\n");
 	response = get_captured_response();
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Set TLS_HOSTNAME (option 2) to "test.server.com" */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XSSOCKETOPT=0,1,2,\"test.server.com\"\r\n");
 	response = get_captured_response();
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Get TLS_PEER_VERIFY (option 5) - should return 1 */
-	__cmock_nrf_getsockopt_Stub(mock_getsockopt_int_callback);
+	__cmock_zsock_getsockopt_Stub(mock_getsockopt_int_callback);
 	send_at_command("AT#XSSOCKETOPT=0,0,5\r\n");
 	response = get_captured_response();
 	TEST_ASSERT_TRUE(strstr(response, "#XSSOCKETOPT: 0,1") != NULL);
@@ -3201,14 +3203,14 @@ void test_xssocketopt_set_get(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Get TLS_HOSTNAME (option 2) - should return "test.server.com" */
-	__cmock_nrf_getsockopt_Stub(mock_getsockopt_hostname_callback);
+	__cmock_zsock_getsockopt_Stub(mock_getsockopt_hostname_callback);
 	send_at_command("AT#XSSOCKETOPT=0,0,2\r\n");
 	response = get_captured_response();
 	TEST_ASSERT_TRUE(strstr(response, "#XSSOCKETOPT: 0,test.server.com") != NULL);
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(0, 0);
+	__cmock_zsock_close_ExpectAndReturn(0, 0);
 	send_at_command("AT#XCLOSE=0\r\n");
 }
 
@@ -3263,16 +3265,16 @@ void test_xrecvcfg_read_command(void)
 	const char *response;
 
 	/* Create a socket */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 3);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 3);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
 	send_at_command("AT#XSOCKET=1,1,0\r\n");
 	response = get_captured_response();
 	TEST_ASSERT_TRUE(strstr(response, "#XSOCKET: 3") != NULL);
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Configure receive mode: socket 3, flags=1 (AT_MODE), hex_mode=0 */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* POLLCB update for receive config */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* POLLCB update for receive config */
 	send_at_command("AT#XRECVCFG=3,1,0\r\n");
 	response = get_captured_response();
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
@@ -3284,7 +3286,7 @@ void test_xrecvcfg_read_command(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
-	__cmock_nrf_close_ExpectAndReturn(3, 0);
+	__cmock_zsock_close_ExpectAndReturn(3, 0);
 	send_at_command("AT#XCLOSE=3\r\n");
 }
 
@@ -3298,18 +3300,18 @@ void test_xrecvcfg_set_all_sockets(void)
 	const char *response;
 
 	/* Create first socket */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 1);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 1);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
 	send_at_command("AT#XSOCKET=1,1,0\r\n");
 	response = get_captured_response();
 	TEST_ASSERT_TRUE(strstr(response, "#XSOCKET: 1") != NULL);
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Create second socket */
-	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_DGRAM, NRF_IPPROTO_UDP, 2);
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_DGRAM, IPPROTO_UDP, 2);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
 	send_at_command("AT#XSOCKET=1,2,0\r\n");
 	response = get_captured_response();
 	TEST_ASSERT_TRUE(strstr(response, "#XSOCKET: 2") != NULL);
@@ -3317,8 +3319,8 @@ void test_xrecvcfg_set_all_sockets(void)
 
 	/* Configure receive mode for ALL sockets: flags=1 (AT_MODE), hex_mode=0 */
 	/* Omit handle parameter to apply to all sockets */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* POLLCB update for socket 1 */
-	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* POLLCB update for socket 2 */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* POLLCB update for socket 1 */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* POLLCB update for socket 2 */
 	send_at_command("AT#XRECVCFG=,1,0\r\n");
 	response = get_captured_response();
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
@@ -3331,9 +3333,9 @@ void test_xrecvcfg_set_all_sockets(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close sockets */
-	__cmock_nrf_close_ExpectAndReturn(1, 0);
+	__cmock_zsock_close_ExpectAndReturn(1, 0);
 	send_at_command("AT#XCLOSE=1\r\n");
-	__cmock_nrf_close_ExpectAndReturn(2, 0);
+	__cmock_zsock_close_ExpectAndReturn(2, 0);
 	send_at_command("AT#XCLOSE=2\r\n");
 }
 

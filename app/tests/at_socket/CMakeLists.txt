@@ -42,6 +42,8 @@ target_compile_options(app PRIVATE
   -DCONFIG_SM_UART_TX_BUF_SIZE=256
   # Suppress upstream Zephyr warnings in net_if.h (returns address of local var)
   -Wno-return-local-addr
+  # Enable POSIX-compat socket name aliases (AF_INET, SOL_SOCKET, sockaddr, etc.)
+  -DCONFIG_NET_NAMESPACE_COMPAT_MODE=1
 )
 
 # Generate CMock mocks for external dependencies
