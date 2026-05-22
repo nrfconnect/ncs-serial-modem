@@ -52,33 +52,6 @@ jobs:
             azcopy cp $OUTDIR "${{ vars.NCS_DOC_STORAGE_URL }}addons/addon-serial_modem?$NCS_DOC_SAS_MAIN" --recursive=true
           fi
 
-      - name: Upload Zoomin documentation
-        if: >
-          github.event.workflow_run.head_branch == 'main' &&
-          github.event.workflow_run.head_repository.full_name == github.repository
-        env:
-          NCS_ZOOMIN_KEY: ${{ secrets.ZOOMIN_KEY }}
-        run: |
-          # trust server
-          mkdir -p ~/.ssh
-          ssh-keyscan ${{ vars.NCS_ZOOMIN_SERVER }} >> ~/.ssh/known_hosts
-
-          # prepare key
-          touch zoomin_key
-          chmod 600 zoomin_key
-          echo "${{ secrets.ZOOMIN_KEY }}" > zoomin_key
-
-          # upload files
-          for file in docs/addon-serial_modem*.zip; do
-            sftp -v -i zoomin_key ${{ vars.NCS_ZOOMIN_USER }}@${{ vars.NCS_ZOOMIN_SERVER }} <<EOF
-              cd docs-be.nordicsemi.com/sphinx-html/incoming
-              put ${file}
-              cd ../../../nordic-be-dev.zoominsoftware.io/sphinx-html/incoming
-              put ${file}
-              quit
-          EOF
-          done
-
       - name: Find Comment
         if: ${{ github.event.workflow_run.event == 'pull_request' }}
         uses: peter-evans/find-comment@3eae4d37986fb5a8592848f6a574fdf654e61f9e # v3

@@ -5,18 +5,6 @@ permissions:
 
 on:
   workflow_dispatch:
-    inputs:
-      documentation_tag:
-        type: string
-        required: false
-        default: "latest"
-        description: "Label of the documentation"
-      publish_to_prod:
-        type: boolean
-        default: true
-      publish_to_dev:
-        type: boolean
-        default: true
   pull_request:
     types: [opened, synchronize, reopened]
     branches:
@@ -109,26 +97,6 @@ jobs:
 
           mv "${MONITOR}" "$PUBLISH"
           if [[ -f pr.txt ]]; then mv pr.txt "$PUBLISH"; fi
-
-      - name: Prepare Zoomin upload
-        if: ${{ github.event_name == 'push' }}
-        run: |
-          PUBLISH="$PWD/publish"
-          mkdir -p "$PUBLISH"
-
-          OUTDIR=doc/build/html
-          ARCHIVE="addon-serial_modem_$VERSION.zip"
-
-          cp doc/custom.properties "$OUTDIR/custom.properties"
-          sed -i 's/__VERSION__/'"$VERSION"'/g' "$OUTDIR/custom.properties"
-
-          cp doc/tags.yml "$OUTDIR/tags.yml"
-          sed -i 's/__VERSION__/'"$VERSION"'/g' "$OUTDIR/tags.yml"
-
-          pushd "$OUTDIR"
-          zip -rq "$ARCHIVE" .
-          mv "$ARCHIVE" "$PUBLISH"
-          popd
 
       - name: Store
         if: ${{ !contains(github.event.pull_request.labels.*.name, 'external') || contains(github.event.pull_request.labels.*.name, 'CI-trusted-author') }}
