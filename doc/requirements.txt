@@ -1,6 +1,6 @@
 Sphinx==5.3.0
 breathe==4.35.0
-sphinx-ncs-theme==0.7.4
+sphinx-ncs-theme<2.1
 sphinx-tabs>=3.4
 sphinx-togglebutton>=0.3.2
 Pillow>=9.0.1
