@@ -2544,6 +2544,21 @@ static const char *mock_nrf_inet_ntop_ipv6_callback(int af, const void *src, cha
 	return dst;
 }
 
+/* Helper callback for mocking nrf_inet_ntop with multiple IPv4 addresses */
+static const char *mock_nrf_inet_ntop_ipv4_multi_callback(int af, const void *src, char *dst,
+							  nrf_socklen_t size, int num_calls)
+{
+	const struct nrf_in_addr *addr = src;
+
+	if (af == NRF_AF_INET && addr->s_addr == net_htonl(0xC0A80001)) {
+		strcpy(dst, "192.168.0.1");
+	} else if (af == NRF_AF_INET && addr->s_addr == net_htonl(0x0A000002)) {
+		strcpy(dst, "10.0.0.2");
+	}
+
+	return dst;
+}
+
 /* Helper callback for mocking successful nrf_getaddrinfo (IPv4) */
 static int mock_nrf_getaddrinfo_ipv4_callback(const char *nodename, const char *servname,
 					      const struct nrf_addrinfo *hints,
@@ -2568,6 +2583,41 @@ static int mock_nrf_getaddrinfo_ipv4_callback(const char *nodename, const char *
 	result.ai.ai_next = NULL;
 
 	*res = &result.ai;
+	return 0;
+}
+
+/* Helper callback for mocking successful nrf_getaddrinfo (multiple IPv4 results) */
+static int mock_nrf_getaddrinfo_ipv4_multi_callback(const char *nodename, const char *servname,
+						    const struct nrf_addrinfo *hints,
+						    struct nrf_addrinfo **res, int num_calls)
+{
+	static struct {
+		struct nrf_addrinfo ai[2];
+		struct nrf_sockaddr_in sa[2];
+	} result;
+
+	memset(&result, 0, sizeof(result));
+
+	result.sa[0].sin_family = NRF_AF_INET;
+	result.sa[0].sin_addr.s_addr = net_htonl(0xC0A80001); /* 192.168.0.1 */
+	result.sa[1].sin_family = NRF_AF_INET;
+	result.sa[1].sin_addr.s_addr = net_htonl(0x0A000002); /* 10.0.0.2 */
+
+	result.ai[0].ai_family = NRF_AF_INET;
+	result.ai[0].ai_socktype = NRF_SOCK_STREAM;
+	result.ai[0].ai_protocol = NRF_IPPROTO_TCP;
+	result.ai[0].ai_addrlen = sizeof(result.sa[0]);
+	result.ai[0].ai_addr = (struct nrf_sockaddr *)&result.sa[0];
+	result.ai[0].ai_next = &result.ai[1];
+
+	result.ai[1].ai_family = NRF_AF_INET;
+	result.ai[1].ai_socktype = NRF_SOCK_STREAM;
+	result.ai[1].ai_protocol = NRF_IPPROTO_TCP;
+	result.ai[1].ai_addrlen = sizeof(result.sa[1]);
+	result.ai[1].ai_addr = (struct nrf_sockaddr *)&result.sa[1];
+	result.ai[1].ai_next = NULL;
+
+	*res = &result.ai[0];
 	return 0;
 }
 
@@ -2623,6 +2673,27 @@ void test_xgetaddrinfo_ipv4(void)
 	/* Verify response contains IPv4 address */
 	response = get_captured_response();
 	TEST_ASSERT_TRUE(strstr(response, "#XGETADDRINFO: \"192.168.0.1\"") != NULL);
+	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
+}
+
+/*
+ * Test: Resolve hostname via AT#XGETADDRINFO command with multiple IPv4 results
+ * - Command: AT#XGETADDRINFO="hostname"
+ * - Tests: Iteration uses each addrinfo entry address
+ */
+void test_xgetaddrinfo_ipv4_multiple_results(void)
+{
+	const char *response;
+
+	__cmock_nrf_getaddrinfo_Stub(mock_nrf_getaddrinfo_ipv4_multi_callback);
+	__cmock_nrf_inet_ntop_Stub(mock_nrf_inet_ntop_ipv4_multi_callback);
+	__cmock_nrf_freeaddrinfo_Expect(NULL);
+	__cmock_nrf_freeaddrinfo_IgnoreArg_ai();
+
+	send_at_command("AT#XGETADDRINFO=\"example.com\"\r\n");
+
+	response = get_captured_response();
+	TEST_ASSERT_TRUE(strstr(response, "#XGETADDRINFO: \"192.168.0.1 10.0.0.2\"") != NULL);
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 }
 

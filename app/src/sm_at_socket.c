@@ -2211,13 +2211,13 @@ STATIC int handle_at_getaddrinfo(enum at_parser_cmd_type cmd_type, struct at_par
 		for (res = result; res != NULL; res = res->ai_next) {
 			if (res->ai_family == NRF_AF_INET) {
 				struct nrf_sockaddr_in *host =
-					(struct nrf_sockaddr_in *)result->ai_addr;
+					(struct nrf_sockaddr_in *)res->ai_addr;
 
 				nrf_inet_ntop(NRF_AF_INET, &host->sin_addr, hostname,
 					      sizeof(hostname));
 			} else if (res->ai_family == NRF_AF_INET6) {
 				struct nrf_sockaddr_in6 *host =
-					(struct nrf_sockaddr_in6 *)result->ai_addr;
+					(struct nrf_sockaddr_in6 *)res->ai_addr;
 
 				nrf_inet_ntop(NRF_AF_INET6, &host->sin6_addr, hostname,
 					      sizeof(hostname));
