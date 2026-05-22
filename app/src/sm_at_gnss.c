@@ -7,6 +7,7 @@
 #include <zephyr/kernel.h>
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/sys_clock.h>
 #include <date_time.h>
@@ -320,41 +321,52 @@ static void agnss_requestor(struct k_work *)
 {
 	int err;
 	struct nrf_modem_gnss_agnss_data_frame req;
-	static char agnss_rest_data_buf[NRF_CLOUD_AGNSS_MAX_DATA_SIZE];
 	struct nrf_cloud_coap_agnss_request request = {
 		NRF_CLOUD_COAP_AGNSS_REQ_CUSTOM,
 		&req,
 	};
+	char *agnss_rest_data_buf = calloc(1, NRF_CLOUD_AGNSS_MAX_DATA_SIZE);
+
+	if (!agnss_rest_data_buf) {
+		LOG_ERR("Failed to allocate A-GNSS data buffer.");
+		return;
+	}
 
 	err = read_agnss_req(&req);
 	if (err) {
 		LOG_ERR("Failed to read A-GNSS request (%d).", err);
-		return;
+		goto cleanup;
 	}
 
-	struct nrf_cloud_coap_agnss_result result = {agnss_rest_data_buf,
-						     sizeof(agnss_rest_data_buf), 0};
+	struct nrf_cloud_coap_agnss_result result = {
+		agnss_rest_data_buf,
+		NRF_CLOUD_AGNSS_MAX_DATA_SIZE,
+		0
+	};
 	struct lte_lc_cells_info net_info = {0};
 
 	err = get_single_cell_info(&net_info.current_cell);
 	if (err) {
 		LOG_ERR("Failed to obtain single-cell cellular network information (%d).", err);
-		return;
+		goto cleanup;
 	}
 	request.net_info = &net_info;
 
 	err = nrf_cloud_coap_agnss_data_get(&request, &result);
 	if (err) {
 		LOG_ERR("Failed to request A-GNSS data via CoAP (%d).", err);
-		return;
+		goto cleanup;
 	}
 
 	err = nrf_cloud_agnss_process(result.buf, result.agnss_sz);
 	if (err) {
 		LOG_ERR("Failed to process A-GNSS data, error: %d", err);
-		return;
+		goto cleanup;
 	}
 	LOG_INF("A-GNSS data received via CoAP.");
+
+cleanup:
+	free(agnss_rest_data_buf);
 }
 #endif /* CONFIG_NRF_CLOUD_AGNSS */
 
