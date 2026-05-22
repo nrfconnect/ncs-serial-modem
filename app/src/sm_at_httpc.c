@@ -20,7 +20,7 @@
 
 LOG_MODULE_REGISTER(sm_httpc, CONFIG_SM_LOG_LEVEL);
 
-#define HTTP_RECV_BUF_SIZE        2048
+#define HTTP_RECV_BUF_SIZE        2049 /* 2048 bytes + null terminator for string ops */
 #define HTTP_URL_MAX_LEN          512
 #define HTTP_HOST_MAX_LEN         256
 #define HTTP_PATH_MAX_LEN         256
@@ -82,6 +82,7 @@ struct http_request {
 	int64_t timeout_timestamp;  /* Idle timeout deadline; reset on each send/receive */
 	struct modem_pipe *pipe;    /* AT pipe that created this request */
 	bool manual_mode;           /* Manual mode: body not auto-received, host pulls chunks */
+	bool hex_rx;                /* Deliver response body as ASCII hex string */
 	int bytes_sent;             /* Response-body bytes sent to the host */
 	bool connection_close;      /* Server sent "Connection: close" header */
 };
@@ -481,7 +482,22 @@ static void http_send_headers_complete(struct http_request *req)
 		 req->content_length);
 }
 
-/* Send data URC followed by raw bytes */
+static void http_data_send_hex(struct modem_pipe *pipe, const uint8_t *buf, size_t len)
+{
+	char hex_buf[257];
+	size_t chunk = (sizeof(hex_buf) - 1) / 2;
+	size_t done = 0;
+
+	while (done < len) {
+		size_t n = MIN(chunk, len - done);
+		size_t sz = bin2hex(buf + done, n, hex_buf, sizeof(hex_buf));
+
+		data_send(pipe, hex_buf, sz);
+		done += n;
+	}
+}
+
+/* Send data URC followed by raw bytes or hex string */
 static void http_send_data(struct http_request *req, const uint8_t *data, int len)
 {
 	if (len <= 0) {
@@ -490,7 +506,11 @@ static void http_send_data(struct http_request *req, const uint8_t *data, int le
 
 	urc_send_to(req->pipe, "\r\n#XHTTPCDATA: %d,%d,%d\r\n", req->fd, req->bytes_sent, len);
 	req->bytes_sent += len;
-	data_send(req->pipe, data, len);
+	if (req->hex_rx) {
+		http_data_send_hex(req->pipe, data, (size_t)len);
+	} else {
+		data_send(req->pipe, data, len);
+	}
 }
 
 /*
@@ -1049,7 +1069,10 @@ static int http_datamode_callback(uint8_t op, const uint8_t *data, int len, uint
 	return 0;
 }
 
-/* AT#XHTTPCREQ - Start an HTTP/HTTPS request (async) */
+/**
+ * Start an asynchronous HTTP or HTTPS request on a connected AT socket.
+ * Returns OK immediately; headers arrive as #XHTTPCHEAD and body as #XHTTPCDATA/#XHTTPCSTAT.
+ */
 SM_AT_CMD_CUSTOM(xhttpcreq, "AT#XHTTPCREQ", handle_at_httpcreq);
 STATIC int handle_at_httpcreq(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			      uint32_t param_count)
@@ -1124,7 +1147,6 @@ STATIC int handle_at_httpcreq(enum at_parser_cmd_type cmd_type, struct at_parser
 			return -EINVAL;
 		}
 
-		int body_len = 0;
 		int next_param_idx = 4; /* Next parameter index after method */
 
 		/* Parse optional <auto_reception> flag */
@@ -1141,22 +1163,34 @@ STATIC int handle_at_httpcreq(enum at_parser_cmd_type cmd_type, struct at_parser
 			/* If parse fails (string param), leave next_param_idx unchanged. */
 		}
 
+		/* Parse optional <format> flag */
+		int format = 0; /* default: binary */
+
+		if (param_count > next_param_idx) {
+			if (at_parser_num_get(parser, next_param_idx, &format) == 0) {
+				if (format != 0 && format != 1) {
+					http_close_request(req);
+					return -EINVAL;
+				}
+				next_param_idx++;
+			}
+		}
+
 		/* Parse optional body length (data mode for POST/PUT).
 		 * The parameter slot is always consumed when an integer is present
 		 * so that extra headers start at a consistent index regardless of method.
 		 */
-		if (param_count > next_param_idx) {
-			int tmp = 0;
+		int body_len = 0;
 
-			if (at_parser_num_get(parser, next_param_idx, &tmp) == 0) {
+		if (param_count > next_param_idx) {
+			if (at_parser_num_get(parser, next_param_idx, &body_len) == 0) {
 				if (method == HTTP_POST || method == HTTP_PUT) {
-					body_len = tmp;
 					if (body_len < 0) {
 						LOG_ERR("Invalid body_len: %d", body_len);
 						http_close_request(req);
 						return -EINVAL;
 					}
-				} else if (tmp != 0) {
+				} else if (body_len != 0) {
 					LOG_ERR("body_len must be 0 for method %d", method);
 					http_close_request(req);
 					return -EINVAL;
@@ -1227,6 +1261,8 @@ STATIC int handle_at_httpcreq(enum at_parser_cmd_type cmd_type, struct at_parser
 			LOG_INF("HTTP %d: Manual mode enabled", req->fd);
 		}
 
+		req->hex_rx = (bool)format;
+
 		/* Parse URL */
 		err = http_parse_url_components(url, url_len, req);
 		if (err) {
@@ -1276,7 +1312,7 @@ STATIC int handle_at_httpcreq(enum at_parser_cmd_type cmd_type, struct at_parser
 
 	case AT_PARSER_CMD_TYPE_TEST:
 		rsp_send("\r\n#XHTTPCREQ: <handle>,<url>,<method>"
-			 "[,<auto_reception>[,<body_len>[,<header>]...]]\r\n");
+			 "[,<auto_reception>[,<format>[,<body_len>[,<header>]...]]]\r\n");
 
 		err = 0;
 		break;
@@ -1330,7 +1366,11 @@ static int pull_data(int socket_fd, int pull_len)
 		req->timeout_timestamp = k_uptime_get() + HTTP_RESPONSE_TIMEOUT_MS;
 		rsp_send("\r\n#XHTTPCDATA: %d,%d,%d\r\n", req->fd, req->bytes_sent, send_len);
 		req->bytes_sent += send_len;
-		data_send(req->pipe, req->recv_buf, send_len);
+		if (req->hex_rx) {
+			http_data_send_hex(req->pipe, req->recv_buf, (size_t)send_len);
+		} else {
+			data_send(req->pipe, req->recv_buf, send_len);
+		}
 		req->recv_buf_len -= send_len;
 		if (req->recv_buf_len > 0) {
 			memmove(req->recv_buf, req->recv_buf + send_len, req->recv_buf_len);
@@ -1366,7 +1406,11 @@ static int pull_data(int socket_fd, int pull_len)
 	req->timeout_timestamp = k_uptime_get() + HTTP_RESPONSE_TIMEOUT_MS;
 	rsp_send("\r\n#XHTTPCDATA: %d,%d,%d\r\n", req->fd, req->bytes_sent, ret);
 	req->bytes_sent += ret;
-	data_send(req->pipe, req->recv_buf, ret);
+	if (req->hex_rx) {
+		http_data_send_hex(req->pipe, req->recv_buf, (size_t)ret);
+	} else {
+		data_send(req->pipe, req->recv_buf, ret);
+	}
 	last_sent = ret;
 
 check_complete:

@@ -35,7 +35,7 @@ Syntax
 
 ::
 
-   AT#XHTTPCREQ=<handle>,<url>,<method>[,<auto_reception>[,<body_len>[,<header 1>[,<header 2>[...]]]]]
+   AT#XHTTPCREQ=<handle>,<url>,<method>[,<auto_reception>[,<format>[,<body_len>[,<header 1>[,<header 2>[...]]]]]]
 
 * The ``<handle>`` parameter is an integer.
   It identifies the connected socket handle returned by ``AT#XSOCKET`` or ``AT#XSSOCKET``, and connected by ``AT#XCONNECT``.
@@ -60,6 +60,19 @@ Syntax
   * ``0`` - Manual mode.
     Response body reception is paused after the headers are parsed and ``#XHTTPCHEAD`` is emitted.
     The host must then retrieve body data in chunks using ``AT#XHTTPCDATA`` commands.
+
+* The ``<format>`` parameter is an optional integer.
+  It controls the encoding used to deliver response body bytes to the host.
+  It can accept the following values:
+
+  * ``0`` - Binary (default).
+    Response body bytes are forwarded to the host as raw binary.
+  * ``1`` - Hex string.
+    Response body bytes are encoded as a lower-case ASCII hex string before delivery.
+    Each raw byte becomes two hex characters.
+    The ``<length>`` field in ``#XHTTPCDATA`` always reports the raw byte count.
+    The actual data delivered is ``2×<length>`` ASCII hex characters.
+    Applies to both automatic and manual reception modes.
 
 * The ``<body_len>`` parameter is an optional integer.
   It is required as a placeholder when ``<header>`` parameters follow.
@@ -115,7 +128,9 @@ Unsolicited notification
 
    #XHTTPCDATA: <handle>,<offset>,<length>
 
-The notification line is terminated with ``\r\n`` and the raw body bytes follow immediately with no additional separator.
+The notification line is terminated with ``\r\n``.
+In binary mode (``<format>=0``, default), the raw body bytes follow immediately with no additional separator.
+In hex mode (``<format>=1``), ``2×<length>`` lower-case ASCII hex characters follow instead of raw bytes.
 
 * The ``<handle>`` parameter is an integer.
   It identifies the socket.
@@ -192,11 +207,26 @@ HTTP GET (manual mode):
 
    #XHTTPCSTAT: 0,200,261,0
 
+HTTP GET with hex-encoded response body (``format=1``, automatic mode):
+
+::
+
+   AT#XHTTPCREQ=0,<url>,0,1,1
+   #XHTTPCREQ: 0
+   OK
+
+   #XHTTPCHEAD: 0,200,12
+
+   #XHTTPCDATA: 0,0,12
+   48656c6c6f20576f726c6421
+
+   #XHTTPCSTAT: 0,200,12,0
+
 HTTP POST with JSON body and custom header:
 
 ::
 
-   AT#XHTTPCREQ=0,<url>,1,1,15,"Content-Type: application/json"
+   AT#XHTTPCREQ=0,<url>,1,1,0,15,"Content-Type: application/json"
    #XHTTPCREQ: 0
    OK
    {"key":"value"}
@@ -209,13 +239,13 @@ HTTP POST with JSON body and custom header:
 
    #XHTTPCSTAT: 0,200,432,0
 
-HTTP GET with Range header (``body_len=0`` is required as a placeholder when headers follow a GET):
+HTTP GET data in binary format with Range header (``body_len=0`` is required as a placeholder when ``<header>`` parameters follow):
 
 In this example the server returns ``connection_close=1``, so the host must close and reopen the socket before the next request.
 
 ::
 
-   AT#XHTTPCREQ=0,<url>,0,1,0,"Range: bytes=0-127"
+   AT#XHTTPCREQ=0,<url>,0,1,0,0,"Range: bytes=0-127"
    #XHTTPCREQ: 0
    OK
 
@@ -226,7 +256,7 @@ In this example the server returns ``connection_close=1``, so the host must clos
 
    #XHTTPCSTAT: 0,206,128,0
 
-   AT#XHTTPCREQ=0,<url>,0,1,0,"Range: bytes=128-255"
+   AT#XHTTPCREQ=0,<url>,0,1,0,0,"Range: bytes=128-255"
    #XHTTPCREQ: 0
    OK
 
@@ -257,7 +287,7 @@ HTTP POST with chunked response (``content_length=-1``):
 
 ::
 
-   AT#XHTTPCREQ=0,<url>,1,1,1024
+   AT#XHTTPCREQ=0,<url>,1,1,0,1024
    #XHTTPCREQ: 0
    OK
    <1024 bytes payload>
@@ -292,7 +322,7 @@ Response syntax
 
 ::
 
-   #XHTTPCREQ: <handle>,<url>,<method>[,<auto_reception>[,<body_len>[,<header>]...]]
+   #XHTTPCREQ: <handle>,<url>,<method>[,<auto_reception>[,<format>[,<body_len>[,<header>]...]]]
 
 Example
 ~~~~~~~
@@ -300,7 +330,7 @@ Example
 ::
 
    AT#XHTTPCREQ=?
-   #XHTTPCREQ: <handle>,<url>,<method>[,<auto_reception>[,<body_len>[,<header>]...]]
+   #XHTTPCREQ: <handle>,<url>,<method>[,<auto_reception>[,<format>[,<body_len>[,<header>]...]]]
    OK
 
 HTTP data pull #XHTTPCDATA
