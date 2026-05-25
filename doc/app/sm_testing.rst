@@ -26,7 +26,7 @@ Complete the following steps to test the functionality provided by the :ref:`SM_
       :class: highlight
 
       **AT#XSMVER**
-      #XSMVER: "v0.1.0","3.1.99"
+      #XSMVER: "v1.99.0-67-ga9e396bc3d58","3.3.99"
       OK
 
 #. Retrieve a list of all supported proprietary AT commands.

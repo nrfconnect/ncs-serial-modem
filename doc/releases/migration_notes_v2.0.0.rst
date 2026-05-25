@@ -28,6 +28,15 @@ Informational changes
 
 The following changes are listed for informational purposes, and many hosts will work without any changes.
 
+* Application rollback prevention - Application firmware DFU now uses MCUboot downgrade prevention (``CONFIG_MCUBOOT_DOWNGRADE_PREVENTION``).
+  The device rejects signed application images older than the version currently running.
+  Set :file:`app/VERSION` before each published build; see :ref:`sm_releasing`.
+
+* ``AT#XSMVER`` - No change to the response layout for hosts.
+  ``<sm_version>`` is still a quoted Git-describe-style string (for example ``"v2.0.0-18-g2c85d9224fca"``).
+  Existing parsers can keep using it as in v1.x.x.
+  The ``major.minor.patch`` part now follows :file:`app/VERSION` (same value used for rollback prevention), the ``-N-g<hash>`` suffix still comes from Git.
+
 * Ring Indication (RI) - Change RI from pulse (100 ms) to level triggered, meaning RI stays asserted until the host asserts DTR.
   After the Serial Modem has enabled UART, RI will be deasserted.
 * nRF Cloud transport has been changed from MQTT to CoAP.

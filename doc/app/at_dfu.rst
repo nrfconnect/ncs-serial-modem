@@ -281,9 +281,9 @@ The following example shows a complete application firmware update:
 
 .. code-block:: none
 
-   // Note the current firmware version of the application
+   // Note the current application version (major.minor.patch from app/VERSION)
    AT#XSMVER
-   #XSMVER: "v2.0.0-preview1-7-gdf00f46-dirty","3.3.0-rc1"
+   #XSMVER: "v1.99.0-7-gdf00f46-dirty","3.3.0-rc1"
    OK
 
    // Initialize DFU for application firmware (total size 123456 bytes)
@@ -316,9 +316,9 @@ The following example shows a complete application firmware update:
    OK
    Ready
 
-   // Verify that the application is running the new firmware
+   // Verify the VERSION prefix increased (here 1.99.0 -> 1.99.1)
    AT#XSMVER
-   #XSMVER: "v2.0.0-preview2-8-f0gd0f46-dirty","3.3.0-rc1"
+   #XSMVER: "v1.99.1-8-gf0fd0f46-dirty","3.3.0-rc1"
    OK
 
 Delta modem firmware update

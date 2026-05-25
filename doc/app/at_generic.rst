@@ -155,6 +155,8 @@ Test command
 
 The test command is not supported.
 
+.. _SM_AT_XSMVER:
+
 |SM| version #XSMVER
 =====================
 
@@ -177,9 +179,15 @@ Response syntax
 
 ::
 
-   #XSMVER: <sm_version>,<ncs_version>[,<customer_version>]
+   #XSMVER: "<sm_version>","<ncs_version>"[,"<customer_version>"]
 
-The ``<sm_version>`` parameter is the version of the |SM| application.
+The ``<sm_version>`` parameter is the version of the |SM| application in Git-describe style.
+The ``major.minor.patch`` prefix comes from :file:`app/VERSION`; the optional ``-N-g<hash>`` suffix (and ``-dirty``) comes from ``git describe`` in the application tree.
+Example: ``"v1.99.0-68-gb2d3dde4dfa2"`` uses ``1.99.0`` from :file:`app/VERSION` and ``-68-gb2d3dde4dfa2`` from Git.
+
+Hosts can use that ``major.minor.patch`` prefix to verify that application DFU moved to a newer image (compare ``AT#XSMVER`` before and after update).
+MCUboot applies the same ordering using the sign version from :file:`app/VERSION` (``major.minor.patch+tweak``); the Git suffix is not part of that check.
+See :ref:`sm_releasing` for release version updates.
 
 The ``<ncs_version>`` parameter is a string containing the version of the |NCS|.
 
@@ -192,19 +200,29 @@ The following command example reads the versions:
 
 ::
 
-   // Released build
+   // First v2.0.0 pre-release
    AT#XSMVER
-   #XSMVER: "v0.1.0","3.1.99"
+   #XSMVER: "v1.99.0","3.3.99"
    OK
 
    // Development build
    AT#XSMVER
-   #XSMVER: "v0.1.0-73-g0c2af8c-dirty","3.1.99"
+   #XSMVER: "v1.99.0-67-ga9e396bc3d58","3.3.99"
    OK
 
-   // Released build with customer version
+   // Second v2.0.0 pre-release (VERSION 1.99.1)
    AT#XSMVER
-   #XSMVER: "v0.1.0","3.1.99","Onomondo 2.1.0"
+   #XSMVER: "v1.99.1","3.3.99"
+   OK
+
+   // v2.0.0 release
+   AT#XSMVER
+   #XSMVER: "v2.0.0","3.4.0"
+   OK
+
+   // Pre-release with customer version
+   AT#XSMVER
+   #XSMVER: "v1.99.0","3.3.99","Onomondo 2.1.0"
    OK
 
 Read command
