@@ -16,7 +16,8 @@ endif()
 add_custom_target(
     generate_version_header ALL
     COMMAND ${CMAKE_COMMAND}
-            -D OUTPUT_FILE=${GENERATED_DIR}/sm_version.h
+            -DOUTPUT_FILE=${GENERATED_DIR}/sm_version.h
+            -DVERSION_FILE=${PROJECT_SOURCE_DIR}/VERSION
             -P ${PROJECT_SOURCE_DIR}/cmake/write_sm_version_header.cmake
     BYPRODUCTS ${GENERATED_DIR}/sm_version.h
     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
