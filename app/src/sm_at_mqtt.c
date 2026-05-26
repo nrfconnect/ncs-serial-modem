@@ -96,6 +96,7 @@ static int handle_mqtt_publish_evt(struct mqtt_client *const c, const struct mqt
 	/* MQTT client does not track the packet identifiers, so MQTT_QOS_2_EXACTLY_ONCE
 	 * promise is not kept. This deviates from MQTT v3.1.1.
 	 */
+	sm_at_host_lock(ctx.pipe);
 	urc_send_to(ctx.pipe, "\r\n#XMQTTMSG: %d,%d\r\n",
 		evt->param.publish.message.topic.topic.size,
 		evt->param.publish.message.payload.len);
@@ -111,7 +112,7 @@ static int handle_mqtt_publish_evt(struct mqtt_client *const c, const struct mqt
 	} while (ret >= 0 && size_read < evt->param.publish.message.payload.len);
 	data_send(ctx.pipe, "\r\n", 2);
 
-
+	sm_at_host_unlock(ctx.pipe);
 	return 0;
 }
 
