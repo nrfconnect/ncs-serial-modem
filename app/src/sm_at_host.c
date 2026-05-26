@@ -1489,6 +1489,14 @@ void rsp_send(const char *fmt, ...)
 	struct sm_at_host_ctx *ctx = sm_at_host_get_current();
 	va_list arg_ptr;
 
+	if (!sm_at_ctx_check(ctx)) {
+		return;
+	}
+
+	if (is_idle(ctx)) {
+		flush_pipe_urcs(ctx);
+	}
+
 	va_start(arg_ptr, fmt);
 	rsp_send_internal(ctx, false, fmt, arg_ptr);
 	va_end(arg_ptr);
@@ -1498,6 +1506,14 @@ void rsp_send_to(struct modem_pipe *pipe, const char *fmt, ...)
 {
 	struct sm_at_host_ctx *ctx = sm_at_host_get_ctx_from(pipe);
 	va_list arg_ptr;
+
+	if (!sm_at_ctx_check(ctx)) {
+		return;
+	}
+
+	if (is_idle(ctx)) {
+		flush_pipe_urcs(ctx);
+	}
 
 	va_start(arg_ptr, fmt);
 	rsp_send_internal(ctx, false, fmt, arg_ptr);
