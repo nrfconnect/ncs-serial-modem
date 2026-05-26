@@ -259,7 +259,7 @@ static void auto_reception(struct sm_socket *sock)
 	}
 	if (!in_datamode(sock->pipe)) {
 		/* <CR><LF> after the data. */
-		rsp_send("\r\n");
+		rsp_send_to(sock->pipe, "\r\n");
 	}
 }
 
@@ -1127,7 +1127,7 @@ static int do_recv(struct sm_socket *sock, int timeout, int flags,
 		LOG_WRN("zsock_recv() return 0");
 	} else {
 		if (!in_datamode(sock->pipe)) {
-			rsp_send("\r\n#XRECV: %d,%d,%d\r\n", sock->fd, mode, ret);
+			rsp_send_to(sock->pipe, "\r\n#XRECV: %d,%d,%d\r\n", sock->fd, mode, ret);
 		}
 
 		if (mode == AT_SOCKET_MODE_HEX) {
@@ -1242,7 +1242,7 @@ static int do_recvfrom(struct sm_socket *sock, int timeout, int flags,
 			uint16_t peer_port = 0;
 
 			util_get_peer_addr((struct net_sockaddr *)&remote, peer_addr, &peer_port);
-			rsp_send("\r\n#XRECVFROM: %d,%d,%d,\"%s\",%d\r\n", sock->fd,
+			rsp_send_to(sock->pipe, "\r\n#XRECVFROM: %d,%d,%d,\"%s\",%d\r\n", sock->fd,
 				    mode, ret, peer_addr, peer_port);
 		}
 
