@@ -242,6 +242,8 @@ static void auto_reception(struct sm_socket *sock)
 		return;
 	}
 
+	sm_at_host_lock(sock->pipe);
+
 	if (sock->connected || sock->type == SOCK_RAW) {
 		err = do_recv(sock, 0, MSG_DONTWAIT,
 			      sock->async_poll.adr_hex ? AT_SOCKET_MODE_HEX
@@ -255,12 +257,14 @@ static void auto_reception(struct sm_socket *sock)
 	}
 	if (err) {
 		LOG_ERR("auto_reception() error: %d", err);
+		sm_at_host_unlock(sock->pipe);
 		return;
 	}
 	if (!in_datamode(sock->pipe)) {
 		/* <CR><LF> after the data. */
 		rsp_send_to(sock->pipe, "\r\n");
 	}
+	sm_at_host_unlock(sock->pipe);
 }
 
 static int update_poll_events(struct sm_socket *sock, uint8_t events, bool update_xapoll)
@@ -1126,6 +1130,7 @@ static int do_recv(struct sm_socket *sock, int timeout, int flags,
 	if (ret == 0) {
 		LOG_WRN("zsock_recv() return 0");
 	} else {
+		sm_at_host_lock(sock->pipe);
 		if (!in_datamode(sock->pipe)) {
 			rsp_send_to(sock->pipe, "\r\n#XRECV: %d,%d,%d\r\n", sock->fd, mode, ret);
 		}
@@ -1133,12 +1138,14 @@ static int do_recv(struct sm_socket *sock, int timeout, int flags,
 		if (mode == AT_SOCKET_MODE_HEX) {
 			ret = data_send_hex(sock, sm_data_buf, ret);
 			if (ret) {
+				sm_at_host_unlock(sock->pipe);
 				return ret;
 			}
 		} else {
 			data_send(sock->pipe, sm_data_buf, ret);
 		}
 		ret = 0;
+		sm_at_host_unlock(sock->pipe);
 
 		update_poll_events(sock, ZSOCK_POLLIN, true);
 	}
@@ -1237,6 +1244,7 @@ static int do_recvfrom(struct sm_socket *sock, int timeout, int flags,
 	if (ret == 0) {
 		LOG_WRN("zsock_recvfrom() return 0");
 	} else {
+		sm_at_host_lock(sock->pipe);
 		if (!in_datamode(sock->pipe)) {
 			char peer_addr[INET6_ADDRSTRLEN] = {0};
 			uint16_t peer_port = 0;
@@ -1249,11 +1257,13 @@ static int do_recvfrom(struct sm_socket *sock, int timeout, int flags,
 		if (mode == AT_SOCKET_MODE_HEX) {
 			ret = data_send_hex(sock, sm_data_buf, ret);
 			if (ret) {
+				sm_at_host_unlock(sock->pipe);
 				return ret;
 			}
 		} else {
 			data_send(sock->pipe, sm_data_buf, ret);
 		}
+		sm_at_host_unlock(sock->pipe);
 
 		update_poll_events(sock, ZSOCK_POLLIN, true);
 	}

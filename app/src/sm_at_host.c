@@ -152,7 +152,7 @@ struct sm_at_host_ctx {
 
 	/* AT command reception state (for cmd_rx_handler) */
 	bool inside_quotes;
-	bool executing;
+	atomic_t executing_lock;
 	size_t at_cmd_len;
 	size_t echo_len;
 	uint8_t prev_character;
@@ -442,7 +442,7 @@ static void at_pipe_rx_work_fn(struct k_work *work)
 	}
 
 	/* Do not parse more commands, if we are still executing */
-	if (ctx->executing) {
+	if (atomic_get(&ctx->executing_lock) > 0) {
 		return;
 	}
 
@@ -1168,7 +1168,8 @@ static void cmd_send(struct sm_at_host_ctx *ctx, uint8_t *buf, size_t cmd_length
 	}
 
 	/* Block CMDs & URCs while command is executing, even if idle timer triggers */
-	ctx->executing = true;
+	atomic_inc(&ctx->executing_lock);
+
 	/* Send to modem.
 	 * Reserve space for CRLF in the response buffer.
 	 */
@@ -1178,12 +1179,12 @@ static void cmd_send(struct sm_at_host_ctx *ctx, uint8_t *buf, size_t cmd_length
 	if (err == -AT_COMMAND_CONTINUE_RET) {
 		return;
 	} else if (err == -SILENT_AT_COMMAND_RET) {
-		ctx->executing = false;
+		atomic_dec(&ctx->executing_lock);
 		return;
 	} else if (err < 0) {
 		LOG_ERR("AT command failed: %d", err);
 		rsp_send_error();
-		ctx->executing = false;
+		atomic_dec(&ctx->executing_lock);
 		return;
 	} else if (err > 0) {
 		LOG_ERR("AT command error (%d), type: %d: value: %d", err,
@@ -1204,7 +1205,7 @@ static void cmd_send(struct sm_at_host_ctx *ctx, uint8_t *buf, size_t cmd_length
 			LOG_ERR("AT command response failed: %d", err);
 		}
 	}
-	ctx->executing = false;
+	atomic_dec(&ctx->executing_lock);
 }
 
 void sm_at_host_cmd_done(struct sm_at_host_ctx *ctx)
@@ -1212,12 +1213,26 @@ void sm_at_host_cmd_done(struct sm_at_host_ctx *ctx)
 	if (!sm_at_ctx_check(ctx)) {
 		return;
 	}
-	ctx->executing = false;
 
 	/* Continue processing received data, if there is any */
-	if (is_open(ctx)) {
+	if (atomic_dec(&ctx->executing_lock) == 1 && is_open(ctx)) {
+		sm_at_host_event_notify(ctx, SM_EVENT_URC);
 		k_work_submit_to_queue(&sm_work_q, &ctx->rx_work);
 	}
+}
+
+void sm_at_host_lock_ctx(struct sm_at_host_ctx *ctx)
+{
+	if (!sm_at_ctx_check(ctx)) {
+		LOG_ERR("invalid context");
+		return;
+	}
+
+	if (is_idle(ctx)) {
+		flush_pipe_urcs(ctx);
+	}
+
+	atomic_inc(&ctx->executing_lock);
 }
 
 static size_t cmd_rx_handler(struct sm_at_host_ctx *ctx, uint8_t c)
@@ -1618,7 +1633,8 @@ bool in_at_mode_pipe(struct modem_pipe *pipe)
 bool is_idle_ctx(struct sm_at_host_ctx *ctx)
 {
 	return (sm_at_ctx_check(ctx) && in_at_mode_ctx(ctx) &&
-		ctx->executing == false && k_timer_remaining_ticks(&ctx->idle_timer) == 0);
+		atomic_get(&ctx->executing_lock) == 0 &&
+		k_timer_remaining_ticks(&ctx->idle_timer) == 0);
 }
 
 bool is_idle_pipe(struct modem_pipe *pipe)
@@ -1885,7 +1901,7 @@ static struct sm_at_host_ctx *sm_at_host_create(struct modem_pipe *pipe)
 	ctx = sm_at_host_get_urc_ctx();
 	if (ctx && atomic_ptr_cas(&ctx->pipe, NULL, pipe)) {
 		LOG_DBG("Reusing first AT host instance %p for pipe %p", (void *)ctx, (void *)pipe);
-		ctx->executing = false;
+		atomic_set(&ctx->executing_lock, 0);
 		modem_pipe_attach(pipe, at_pipe_event_handler, ctx);
 		if (urcs_queued) {
 			sm_at_host_event_notify(ctx, SM_EVENT_URC);
