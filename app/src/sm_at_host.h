@@ -342,6 +342,40 @@ static inline void sm_at_host_cmd_done_pipe(struct modem_pipe *pipe)
 			struct modem_pipe * : sm_at_host_cmd_done_pipe \
 			)(X)
 
+/** Lock the AT host context from processing or URC handling.
+ *
+ * This blocks RX handling and URC sending until
+ * sm_at_host_cmd_done() is called.
+ * This is used for sending multiple messages in a row without
+ * interleaving URCs or other command responses.
+ *
+ * AT context have internal refcount to allow nested locks.
+ *
+ * Only safe to call from sm_work_q.
+ */
+void sm_at_host_lock_ctx(struct sm_at_host_ctx *ctx);
+
+/** See sm_at_host_lock_ctx()
+ */
+static inline void sm_at_host_lock_pipe(struct modem_pipe *pipe)
+{
+	return sm_at_host_lock_ctx(sm_at_host_get_ctx_from(pipe));
+}
+
+/** See sm_at_host_lock_ctx()
+ */
+#define sm_at_host_lock(X) \
+		_Generic((X), \
+			struct sm_at_host_ctx * : sm_at_host_lock_ctx, \
+			struct modem_pipe * : sm_at_host_lock_pipe \
+			)(X)
+
+/** Unlock the AT host context from processing or URC handling.
+ *
+ * Alias for sm_at_host_cmd_done() to improve readability when the intention is to block/unblock.
+ */
+#define sm_at_host_unlock(x) cmd_done(x)
+
 /**
  * @brief Submit a work to be executed when the current AT command processing is done.
  *
