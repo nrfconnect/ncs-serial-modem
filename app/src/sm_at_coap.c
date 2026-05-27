@@ -134,6 +134,8 @@ static void coap_close_request(struct coap_request *req)
 		coap_pending_req = NULL;
 	}
 
+	sm_coap_client.fd = -1;
+
 	free(req->staging);
 	free(req->rx_buf);
 	free(req);
@@ -946,6 +948,7 @@ STATIC int handle_at_coap_data(enum at_parser_cmd_type cmd_type, struct at_parse
 
 static int sm_at_coap_init(void)
 {
+	sm_coap_client.fd = -1;
 	return coap_client_init(&sm_coap_client, "sm_coap");
 }
 
