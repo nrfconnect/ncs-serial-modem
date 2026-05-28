@@ -743,6 +743,10 @@ static int at_sockopt_to_sockopt(enum at_sockopt at_option, int *level, int *opt
 		*level = IPPROTO_IPV6;
 		*option = SO_IPV6_ECHO_REPLY;
 		break;
+	case AT_SO_KEEPOPEN:
+		*level = SOL_SOCKET;
+		*option = SO_KEEPOPEN;
+		break;
 	case AT_SO_IPV6_DELAYED_ADDR_REFRESH:
 		*level = IPPROTO_IPV6;
 		*option = SO_IPV6_DELAYED_ADDR_REFRESH;

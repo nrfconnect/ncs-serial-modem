@@ -477,6 +477,11 @@ Syntax
     * ``<value>`` is an integer that indicates whether ICMP echo replies for IPv6 are enabled.
       It is ``0`` for disabled or ``1`` for enabled.
 
+  * ``34`` - ``AT_SO_KEEPOPEN``.
+
+    * ``<value>`` is an integer that indicates whether socket is kept open when the modem enters the flight mode (``+CFUN=4``).
+      It is ``0`` for disabled or ``1`` for enabled.
+
   * ``40`` - ``AT_SO_BINDTOPDN`` (set-only).
 
     * ``<value>`` is an integer that indicates the packet data network ID to bind to.
