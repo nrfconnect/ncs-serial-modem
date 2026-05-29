@@ -127,10 +127,11 @@ Unsolicited notification
 ``#XHTTPCDATA`` is emitted in automatic mode for each received body chunk::
 
    #XHTTPCDATA: <handle>,<offset>,<length>
+   <data>
 
-The notification line is terminated with ``\r\n``.
-In binary mode (``<format>=0``, default), the raw body bytes follow immediately with no additional separator.
-In hex mode (``<format>=1``), ``2×<length>`` lower-case ASCII hex characters follow instead of raw bytes.
+The notification line is terminated with ``\r\n``, the response data follows immediately, and a ``\r\n`` terminator follows the data bytes.
+In binary mode (``<format>=0``, default),  the data is ``<length>`` raw bytes.
+In hex mode (``<format>=1``), the data is ``2×<length>`` lower-case ASCII hex characters.
 
 * The ``<handle>`` parameter is an integer.
   It identifies the socket.
@@ -190,6 +191,10 @@ HTTP GET (automatic mode):
 
    #XHTTPCSTAT: 0,200,261,0
 
+.. note::
+
+   In automatic mode, a ``\r\n`` terminator is appended after the data bytes of each ``#XHTTPCDATA`` notification.
+
 HTTP GET (manual mode):
 
 ::
@@ -221,6 +226,8 @@ HTTP GET with hex-encoded response body (``format=1``, automatic mode):
    48656c6c6f20576f726c6421
 
    #XHTTPCSTAT: 0,200,12,0
+
+The hex string and the line break after it represent the ``2×<length>`` hex characters followed by the ``\r\n`` terminator.
 
 HTTP POST with JSON body and custom header:
 

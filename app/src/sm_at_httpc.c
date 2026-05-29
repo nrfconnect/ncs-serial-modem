@@ -511,6 +511,8 @@ static void http_send_data(struct http_request *req, const uint8_t *data, int le
 	} else {
 		data_send(req->pipe, data, len);
 	}
+	/* CRLF after the data chunk, consistent with socket auto-receive behaviour. */
+	rsp_send_to(req->pipe, "\r\n");
 }
 
 /*
