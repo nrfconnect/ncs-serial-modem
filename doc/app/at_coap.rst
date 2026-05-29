@@ -146,7 +146,7 @@ Unsolicited notification
 
    #XCOAPCDATA: <handle>,<offset>,<length>
 
-The notification line is terminated with ``\r\n`` and the response data follows immediately with no additional separator.
+The notification line is terminated with ``\r\n``, the response data follows immediately, and a ``\r\n`` terminator follows the data bytes.
 In binary mode (default), the data is ``<length>`` raw bytes.
 In hex mode (``<format>=1``), the data is ``2×<length>`` lower-case ASCII hex characters.
 
@@ -221,6 +221,10 @@ CoAP GET (automatic mode, binary):
    AT#XCLOSE=0
    OK
 
+.. note::
+
+   In automatic mode, a ``\r\n`` terminator is appended after the data bytes of each ``#XCOAPCDATA`` notification.
+
 CoAP GET (automatic mode, hex-encoded response, ``format=1``):
 
 ::
@@ -232,6 +236,10 @@ CoAP GET (automatic mode, hex-encoded response, ``format=1``):
    32332e352043656c73697573
 
    #XCOAPCSTAT: 0,69,12
+
+.. note::
+
+   The hex string and the line break after it represent the ``2×<length>`` hex characters followed by the ``\r\n`` terminator.
 
 CoAP GET (manual mode):
 

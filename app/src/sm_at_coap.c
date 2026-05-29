@@ -176,6 +176,8 @@ static void coap_send_data(struct coap_request *req, const uint8_t *payload, siz
 	} else {
 		data_send(req->pipe, payload, payload_len);
 	}
+	/* CRLF after the data chunk, consistent with socket auto-receive behaviour. */
+	rsp_send_to(req->pipe, "\r\n");
 }
 
 /* Notify host that a response block is ready to pull in manual receive mode. */
