@@ -1,0 +1,35 @@
+/*
+ * Copyright (c) 2026 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+ *
+ * Flash partition overlay for nRF9151DK with LwM2M carrier partition.
+ */
+
+/ {
+	chosen {
+		nordic,lwm2m-carrier-partition = &lwm2m_carrier_partition;
+	};
+};
+
+&storage_partition {
+	compatible = "zephyr,mapped-partition";
+	label = "storage";
+	reg = <0x000fd000 0x3000>;
+	ranges = <0x0 0x000fd000 0x3000>;
+	#address-cells = <1>;
+	#size-cells = <1>;
+
+	/* Note: 4kB partition is not recommended for production use due to flash wear. */
+	settings_storage_partition: partition@0 {
+		compatible = "zephyr,mapped-partition";
+		label = "settings-storage";
+		reg = <0x00000000 0x1000>;
+	};
+
+	lwm2m_carrier_partition: partition@1000 {
+		compatible = "zephyr,mapped-partition";
+		label = "lwm2m-carrier";
+		reg = <0x00001000 0x2000>;
+	};
+};

@@ -209,6 +209,14 @@ struct sm_pdn_dynamic_info {
  */
 int sm_util_pdn_dynamic_info_get(uint8_t cid, struct sm_pdn_dynamic_info *pdn_info);
 
+
+/**
+ * @brief Read the currently active bootloader slot.
+ *
+ * @return 0 if the active slot is S0, 1 if the active slot is S1, negative errno on failure.
+ */
+int sm_util_mcuboot_active_slot(void);
+
 /**
  * @brief Read the fw_info version of the currently active MCUboot bootloader slot.
  *

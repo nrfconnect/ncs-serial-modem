@@ -12,11 +12,11 @@
 #include <zephyr/logging/log_ctrl.h>
 #include <zephyr/net/tls_credentials.h>
 #include <zephyr/net/http/parser_url.h>
+#include <zephyr/storage/flash_map.h>
 #include <strings.h>
 #include <zephyr/device.h>
 #include <zephyr/sys/reboot.h>
 #include <net/fota_download.h>
-#include <pm_config.h>
 #include <dfu/dfu_target_full_modem.h>
 #include <dfu/fmfu_fdev.h>
 #include "sm_util.h"
@@ -32,6 +32,10 @@ LOG_MODULE_REGISTER(sm_fota, CONFIG_SM_LOG_LEVEL);
 
 /* Some features need fota_download update */
 #define FOTA_FUTURE_FEATURE	0
+
+#if FIXED_PARTITION_EXISTS(s1_partition)
+#define SM_FOTA_BL_SUPPORTED
+#endif
 
 enum sm_fota_operation {
 	SM_FOTA_STOP = 0,
@@ -275,7 +279,7 @@ static void fota_dl_handler(const struct fota_download_evt *evt)
 		sm_fota_stage = FOTA_STAGE_ACTIVATE;
 		sm_fota_info = 0;
 		sm_modem_full_fota = (sm_fota_type == SM_FOTA_TYPE_FULL_MFW);
-#if defined(PM_S1_ADDRESS)
+#if defined(SM_FOTA_BL_SUPPORTED)
 		sm_fota_bl_pending_validate = (sm_fota_type == SM_FOTA_TYPE_MCUBOOT_BL);
 #endif
 		/* Save, in case reboot by reset */
@@ -341,7 +345,7 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 			break;
 		case SM_FOTA_START_APP:
 		case SM_FOTA_START_MFW:
-#if defined(PM_S1_ADDRESS)
+#if defined(SM_FOTA_BL_SUPPORTED)
 		case SM_FOTA_START_MCUBOOT_BL:
 #endif
 #if defined(CONFIG_SM_FULL_FOTA)
@@ -395,7 +399,7 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 				sm_fota_type = SM_FOTA_TYPE_FULL_MFW;
 			}
 #endif
-#if defined(PM_S1_ADDRESS)
+#if defined(SM_FOTA_BL_SUPPORTED)
 			else if (op == SM_FOTA_START_MCUBOOT_BL) {
 				sm_fota_type = SM_FOTA_TYPE_MCUBOOT_BL;
 
@@ -434,13 +438,13 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 		break;
 
 	case AT_PARSER_CMD_TYPE_TEST:
-#if defined(PM_S1_ADDRESS) && defined(CONFIG_SM_FULL_FOTA)
+#if defined(SM_FOTA_BL_SUPPORTED) && defined(CONFIG_SM_FULL_FOTA)
 		rsp_send("\r\n#XFOTA: "
 			 "(%d,%d,%d,%d,%d,%d,%d)[,<file_url>[,<sec_tag>[,<pdn_id>]]]\r\n",
 			 SM_FOTA_STOP, SM_FOTA_START_APP, SM_FOTA_START_MFW,
 			 SM_FOTA_START_FULL_FOTA, SM_FOTA_START_MCUBOOT_BL, SM_FOTA_MFW_READ,
 			 SM_FOTA_ERASE_MFW);
-#elif defined(PM_S1_ADDRESS)
+#elif defined(SM_FOTA_BL_SUPPORTED)
 		rsp_send("\r\n#XFOTA: (%d,%d,%d,%d,%d,%d)[,<file_url>[,<sec_tag>[,<pdn_id>]]]\r\n",
 			 SM_FOTA_STOP, SM_FOTA_START_APP, SM_FOTA_START_MFW,
 			 SM_FOTA_START_MCUBOOT_BL, SM_FOTA_MFW_READ, SM_FOTA_ERASE_MFW);
@@ -488,7 +492,7 @@ void sm_fota_init_state(void)
 
 void sm_fota_mcuboot_bl_boot_check(void)
 {
-#if defined(PM_S1_ADDRESS)
+#if defined(SM_FOTA_BL_SUPPORTED)
 	if (!sm_fota_bl_pending_validate) {
 		return;
 	}

@@ -6,7 +6,7 @@ tests:
     build_only: true
     extra_args:
       - EXTRA_CONF_FILE="overlay-cmux.conf;overlay-ppp.conf;overlay-trace-backend-uart.conf;overlay-nrf-device-provisioning.conf"
-      - EXTRA_DTC_OVERLAY_FILE="overlay-nrf91m1.overlay"
+      - EXTRA_DTC_OVERLAY_FILE="overlay-nrf91m1.overlay;overlay-trace-backend.overlay"
     extra_configs:
       - CONFIG_SM_LOG_LEVEL_DBG=y
     platform_allow:
@@ -29,8 +29,8 @@ tests:
     sysbuild: true
     build_only: true
     extra_args:
-      - EXTRA_DTC_OVERLAY_FILE="overlay-external-mcu.overlay"
-      - app_SNIPPET=nrf91-modem-trace-uart
+      - EXTRA_CONF_FILE="overlay-trace-backend-uart.conf"
+      - EXTRA_DTC_OVERLAY_FILE="overlay-external-mcu.overlay;overlay-trace-backend.overlay"
     platform_allow:
       - nrf9151dk/nrf9151/ns
   serial_modem.no_dtr:
@@ -65,9 +65,8 @@ tests:
     sysbuild: true
     build_only: true
     extra_args:
-      - EXTRA_CONF_FILE="overlay-cmux.conf;overlay-ppp.conf"
-      - EXTRA_DTC_OVERLAY_FILE="overlay-uart1-hwfc.overlay"
-      - app_SNIPPET=nrf91-modem-trace-uart
+      - EXTRA_CONF_FILE="overlay-cmux.conf;overlay-ppp.conf;overlay-trace-backend-uart.conf"
+      - EXTRA_DTC_OVERLAY_FILE="overlay-trace-backend.overlay"
     extra_configs:
       - CONFIG_SM_LOG_LEVEL_DBG=y
     platform_allow:
@@ -88,9 +87,8 @@ tests:
     sysbuild: true
     build_only: true
     extra_args:
-      - EXTRA_CONF_FILE="overlay-cmux.conf;overlay-ppp.conf"
-      - EXTRA_DTC_OVERLAY_FILE="overlay-external-mcu.overlay;overlay-uart1-hwfc.overlay"
-      - app_SNIPPET=nrf91-modem-trace-uart
+      - EXTRA_CONF_FILE="overlay-cmux.conf;overlay-ppp.conf;overlay-trace-backend-uart.conf"
+      - EXTRA_DTC_OVERLAY_FILE="overlay-external-mcu.overlay;overlay-trace-backend.overlay"
     extra_configs:
       - CONFIG_SM_LOG_LEVEL_DBG=y
     platform_allow:
@@ -101,6 +99,7 @@ tests:
     build_only: true
     extra_args:
       - EXTRA_CONF_FILE="overlay-cmux.conf;overlay-ppp.conf;overlay-trace-backend-cmux.conf"
+      - EXTRA_DTC_OVERLAY_FILE="overlay-trace-backend.overlay"
     platform_allow:
       - nrf9151dk/nrf9151/ns
       - thingy91x/nrf9151/ns
@@ -123,8 +122,7 @@ tests:
     build_only: true
     extra_args:
       - EXTRA_CONF_FILE="overlay-full-fota.conf"
-      - EXTRA_DTC_OVERLAY_FILE="overlay-external-flash.overlay"
-      - PM_STATIC_YML_FILE=pm_static_nrf9151dk_nrf9151_ns_full_fota.yml
+      - EXTRA_DTC_OVERLAY_FILE="overlay-full-fota.overlay"
     extra_configs:
       - CONFIG_SM_DFU_MODEM_FULL=y
     platform_allow:
@@ -132,6 +130,9 @@ tests:
   serial_modem.pgps_agnss:
     sysbuild: true
     build_only: true
+    extra_args:
+      - EXTRA_DTC_OVERLAY_FILE="overlay-pgps.overlay"
+      - mcuboot_EXTRA_DTC_OVERLAY_FILE="${APP_DIR}/overlay-pgps.overlay"
     extra_configs:
       - CONFIG_NRF_CLOUD_PGPS=y
     platform_allow:
@@ -139,6 +140,9 @@ tests:
   serial_modem.pgps_no_agnss:
     sysbuild: true
     build_only: true
+    extra_args:
+      - EXTRA_DTC_OVERLAY_FILE="overlay-pgps.overlay"
+      - mcuboot_EXTRA_DTC_OVERLAY_FILE="${APP_DIR}/overlay-pgps.overlay"
     extra_configs:
       - CONFIG_NRF_CLOUD_PGPS=y
       - CONFIG_NRF_CLOUD_AGNSS=n
@@ -148,7 +152,9 @@ tests:
   serial_modem.lwm2m_carrier:
     sysbuild: true
     build_only: true
-    extra_args: EXTRA_CONF_FILE=overlay-carrier.conf
+    extra_args:
+      - EXTRA_CONF_FILE="overlay-carrier.conf"
+      - EXTRA_DTC_OVERLAY_FILE="overlay-carrier.overlay"
     platform_allow:
       - nrf9151dk/nrf9151/ns
       - thingy91x/nrf9151/ns
@@ -159,6 +165,7 @@ tests:
     build_only: true
     extra_args:
       - EXTRA_CONF_FILE="overlay-carrier.conf;overlay-carrier-softbank.conf"
+      - EXTRA_DTC_OVERLAY_FILE="overlay-carrier.overlay"
       - SB_EXTRA_CONF_FILE=sysbuild-softbank.conf
     platform_allow:
       - nrf9151dk/nrf9151/ns
@@ -166,7 +173,9 @@ tests:
   serial_modem.lwm2m_carrier.lgu:
     sysbuild: true
     build_only: true
-    extra_args: EXTRA_CONF_FILE="overlay-carrier.conf;overlay-carrier-lgu.conf"
+    extra_args:
+      - EXTRA_CONF_FILE="overlay-carrier.conf;overlay-carrier-lgu.conf"
+      - EXTRA_DTC_OVERLAY_FILE="overlay-carrier.overlay"
     platform_allow:
       - nrf9151dk/nrf9151/ns
     tags: exclude_integration
@@ -174,8 +183,8 @@ tests:
     sysbuild: true
     build_only: true
     extra_args:
-      - app_SNIPPET=nrf91-modem-trace-uart
-      - EXTRA_DTC_OVERLAY_FILE="overlay-uart1-hwfc.overlay"
+      - EXTRA_CONF_FILE="overlay-trace-backend-uart.conf"
+      - EXTRA_DTC_OVERLAY_FILE="overlay-trace-backend.overlay"
     extra_configs:
       - CONFIG_SM_LOG_LEVEL_DBG=y
       - CONFIG_DTR_UART_LOG_LEVEL_DBG=y
@@ -198,3 +207,12 @@ tests:
     platform_allow:
       - nrf9151dk/nrf9151/ns
     tags: exclude_integration
+  serial_modem.disable_b0:
+    sysbuild: true
+    build_only: true
+    extra_args:
+      - EXTRA_DTC_OVERLAY_FILE="overlay-disable-b0.overlay"
+      - mcuboot_EXTRA_DTC_OVERLAY_FILE="${APP_DIR}/overlay-disable-b0.overlay"
+      - SB_CONFIG_SECURE_BOOT_APPCORE=n
+    platform_allow:
+      - nrf9151dk/nrf9151/ns
