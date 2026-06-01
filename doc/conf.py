@@ -29,6 +29,7 @@ extensions = [
     'sphinx_togglebutton',
     "sphinxcontrib.jquery",
     "sphinx_copybutton",
+    'sphinx.ext.imgconverter',
 ]
 
 templates_path = ['_templates']
@@ -54,3 +55,21 @@ rst_epilog = """
 .. include:: /links.txt
 .. include:: /shortcuts.txt
 """
+
+# -- Options for LaTeX output -------------------------------------------------
+
+latex_engine = 'xelatex'
+
+latex_use_xindy = False
+
+latex_elements = {
+    'papersize': 'a4paper',
+    'pointsize': '11pt',
+}
+
+latex_documents = [
+    ('index', 'ncs-serial-modem.tex', f'{project} Documentation',
+     author, 'manual'),
+]
+
+figure_align = 'H'
