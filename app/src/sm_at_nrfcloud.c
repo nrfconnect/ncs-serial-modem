@@ -9,8 +9,6 @@
 #include <zephyr/logging/log.h>
 #include <date_time.h>
 #include <net/nrf_cloud.h>
-#include <net/nrf_cloud_agnss.h>
-#include <net/nrf_cloud_pgps.h>
 #include <net/nrf_cloud_coap.h>
 #include "nrf_cloud_coap_transport.h"
 #include <modem/at_parser.h>
