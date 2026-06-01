@@ -96,10 +96,10 @@ The sample provides:
 * Network performance testing using zperf.
 * DNS resolution support.
 * Automatic modem connection management.
-* CMUX (GSM 07.10) multiplexing support.
+* CMUX (GSM 07.10) multiplexing support with user pipes for AT command access.
 * Power management with runtime power saving.
 
-For more information about using the nRF91 Series SiP as a Zephyr-compatible modem, see :ref:`sm_cellular_modem`.
+For more information about using the nRF91 Series SiP as a Zephyr-compatible modem, including how to use user pipes for AT commands alongside PPP, see :ref:`sm_cellular_modem`.
 
 Configuration
 *************
@@ -121,6 +121,7 @@ The CMUX configuration enables:
 * Power save mode that closes CMUX pipes when idle
 * 5 second idle timeout before entering power save
 * MTU size of 127 bytes for optimal performance
+* User pipes on DLC channels 3 and 4 for AT command access (available when the network interface is up)
 
 Building and running
 ********************
