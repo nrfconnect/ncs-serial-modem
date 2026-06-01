@@ -59,7 +59,13 @@ enum sm_gnss_operation {
 
 #if defined(CONFIG_NRF_CLOUD_AGNSS)
 static struct k_work agnss_req_work;
-#endif
+
+#if defined(CONFIG_SM_NRF_CLOUD_LOCATION)
+static K_SEM_DEFINE(agnss_ncellmeas_sem, 0, 1);
+static struct lte_lc_cells_info *agnss_net_info;
+#endif /* CONFIG_SM_NRF_CLOUD_LOCATION */
+#endif /* CONFIG_SM_NRF_CLOUD */
+
 #if defined(CONFIG_NRF_CLOUD_PGPS)
 static struct k_work pgps_req_work;
 static struct k_work pgps_coap_req_work;
@@ -317,6 +323,16 @@ static int read_agnss_req(struct nrf_modem_gnss_agnss_data_frame *req)
 #endif /* CONFIG_NRF_CLOUD_AGNSS || CONFIG_NRF_CLOUD_PGPS */
 
 #if defined(CONFIG_NRF_CLOUD_AGNSS)
+
+#if defined(CONFIG_SM_NRF_CLOUD_LOCATION)
+static void agnss_ncellmeas_done(struct lte_lc_cells_info *cell_data, void *ctx)
+{
+	ARG_UNUSED(ctx);
+	agnss_net_info = cell_data;
+	k_sem_give(&agnss_ncellmeas_sem);
+}
+#endif /* CONFIG_SM_NRF_CLOUD_LOCATION */
+
 static void agnss_requestor(struct k_work *)
 {
 	int err;
@@ -348,7 +364,20 @@ static void agnss_requestor(struct k_work *)
 	};
 
 #if defined(CONFIG_SM_NRF_CLOUD_LOCATION)
-	struct lte_lc_cells_info *net_info = sm_at_nrfcloud_ncellmeas(1, false);
+	/* Start async ncellmeas and wait for the result via semaphore.
+	 * agnss_ncellmeas_done() is called from the AT monitor thread
+	 * (not sm_work_q) for the single-phase case, so giving the semaphore
+	 * does not deadlock this work item.
+	 */
+	struct lte_lc_cells_info *net_info = NULL;
+
+	err = sm_at_nrfcloud_ncellmeas_start(1, false, agnss_ncellmeas_done, NULL);
+	if (err == 0) {
+		/* We will wait for 5 seconds for NCELLMEAS to complete. */
+		k_sem_take(&agnss_ncellmeas_sem, K_SECONDS(5));
+		net_info = agnss_net_info;
+		agnss_net_info = NULL;
+	}
 
 	if (net_info != NULL && net_info->current_cell.id != LTE_LC_CELL_EUTRAN_ID_INVALID) {
 		request.net_info = net_info;

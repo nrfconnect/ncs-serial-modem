@@ -68,16 +68,32 @@ static bool nrfcloud_sending_loc_req;
 static uint8_t ncellmeas_search_type;
 static uint8_t ncellmeas_gci_count;
 
+/* ---------- NCELLMEAS async state machine ---------- */
+
+enum ncellmeas_state {
+	NCELLMEAS_STATE_IDLE,
+	NCELLMEAS_STATE_FIRST_WAIT,    /* AT%NCELLMEAS=1 issued, awaiting URC */
+	NCELLMEAS_STATE_RRC_IDLE_WAIT, /* Polling AT+CSCON? for RRC idle */
+	NCELLMEAS_STATE_SECOND_WAIT,   /* AT%NCELLMEAS=3 issued, awaiting URC */
+	NCELLMEAS_STATE_THIRD_WAIT,    /* AT%NCELLMEAS=4 issued, awaiting URC */
+};
+
+static enum ncellmeas_state ncellmeas_sm_state = NCELLMEAS_STATE_IDLE;
+static uint8_t ncellmeas_req_cell_count;
+static bool ncellmeas_send_loc_req_flag;
+static sm_at_nrfcloud_ncellmeas_done_cb_t ncellmeas_done_cb;
+static void *ncellmeas_done_ctx;
+static uint8_t ncellmeas_rrc_polls;
+
 static void nrfcloud_loc_req_work_fn(struct k_work *work);
 static void sm_at_nrfcloud_ncellmeas_work_fn(struct k_work *work);
-static void ncellmeas_timeout_backup_work_fn(struct k_work *work);
+static void ncellmeas_state_handle_work_fn(struct k_work *work);
+static void ncellmeas_timeout_work_fn(struct k_work *work);
 
 K_WORK_DEFINE(nrfcloud_loc_req_work, nrfcloud_loc_req_work_fn);
 K_WORK_DEFINE(sm_at_nrfcloud_ncellmeas_work, sm_at_nrfcloud_ncellmeas_work_fn);
-K_WORK_DELAYABLE_DEFINE(ncellmeas_timeout_backup_work, ncellmeas_timeout_backup_work_fn);
-
-/* Signals completion of an AT%NCELLMEAS measurement (%NCELLMEAS URC). */
-K_SEM_DEFINE(ncellmeas_sem_ncellmeas_evt, 0, 1);
+K_WORK_DELAYABLE_DEFINE(ncellmeas_state_handle_work, ncellmeas_state_handle_work_fn);
+K_WORK_DELAYABLE_DEFINE(ncellmeas_timeout_backup_work, ncellmeas_timeout_work_fn);
 
 /* nRF Cloud location request cellular data. */
 static struct lte_lc_cells_info *nrfcloud_cell_data;
@@ -428,7 +444,7 @@ STATIC int handle_at_nrf_cloud_pos(enum at_parser_cmd_type cmd_type,
 	return 0;
 }
 
-/* This function has been copied from sdk-nrf nrf/lib/lte_link_control library 
+/* This function has been copied from sdk-nrf nrf/lib/lte_link_control library
  * with version v3.4.0-rc1.
  */
 static int string_to_int(const char *str_buf, int base, int *output)
@@ -451,7 +467,7 @@ static int string_to_int(const char *str_buf, int base, int *output)
 	return 0;
 }
 
-/* This function has been copied from sdk-nrf lte_link_control library 
+/* This function has been copied from sdk-nrf lte_link_control library
  * with version v3.4.0-rc1.
  */
 static int string_param_to_int(struct at_parser *parser, size_t idx, int *output, int base)
@@ -476,7 +492,7 @@ static int string_param_to_int(struct at_parser *parser, size_t idx, int *output
 	return 0;
 }
 
-/* This function has been copied from sdk-nrf lte_link_control library 
+/* This function has been copied from sdk-nrf lte_link_control library
  * with version v3.4.0-rc1.
  */
 static int plmn_param_string_to_mcc_mnc(struct at_parser *parser, size_t idx, int *mcc, int *mnc)
@@ -529,41 +545,71 @@ void sm_at_nrfcloud_ncellmeas_cleanup(struct lte_lc_cells_info *cell_data)
 	free(cell_data);
 }
 
-/* This function has been copied from sdk-nrf location library scan_cellular_execute() function
- * with version v3.4.0-rc1.
+/* Finalise a measurement run; must be called from sm_work_q context. */
+static void ncellmeas_complete(void)
+{
+	k_work_cancel_delayable(&ncellmeas_timeout_backup_work);
+	/* Cancel the RRC poll if it is pending. */
+	k_work_cancel_delayable(&ncellmeas_state_handle_work);
+	at_monitor_pause(&sm_ncellmeas);
+	ncellmeas_sm_state = NCELLMEAS_STATE_IDLE;
+
+	if (ncellmeas_send_loc_req_flag) {
+		k_work_submit_to_queue(&sm_work_q, &nrfcloud_loc_req_work);
+	} else {
+		/* Transfer cell_data ownership to the callback / caller. */
+		struct lte_lc_cells_info *cell_data = nrfcloud_cell_data;
+
+		nrfcloud_cell_data = NULL;
+		nrfcloud_sending_loc_req = false;
+		if (ncellmeas_done_cb) {
+			ncellmeas_done_cb(cell_data, ncellmeas_done_ctx);
+		} else {
+			sm_at_nrfcloud_ncellmeas_cleanup(cell_data);
+		}
+	}
+}
+
+/* This function has been adapted from sdk-nrf location library
+ * scan_cellular_execute() with version v3.4.0-rc1.
+ * The blocking semaphore waits and k_sleep() RRC poll loop have been removed
+ * in favour of the URC-driven state machine.
  */
-struct lte_lc_cells_info *sm_at_nrfcloud_ncellmeas(uint8_t cell_count, bool send_loc_req)
+int sm_at_nrfcloud_ncellmeas_start(uint8_t cell_count, bool send_loc_req,
+				   sm_at_nrfcloud_ncellmeas_done_cb_t cb, void *ctx)
 {
 	int err;
-	uint8_t ncellmeas3_cell_count;
-	int rrc_mode;
-	struct lte_lc_cells_info *cell_data = NULL;
-	struct lte_lc_cell *cells = NULL;
+	struct lte_lc_cells_info *cell_data;
 
 	/* Allocate main cell data structure.
-	 * Neighbor cells structure is only allocated when they are found.
+	 * Neighbor/GCI cells are only allocated when they are found.
 	 */
 	cell_data = calloc(1, sizeof(struct lte_lc_cells_info));
 	if (cell_data == NULL) {
 		LOG_ERR("Failed to allocate memory for the nRF Cloud cell data");
 		if (send_loc_req) {
-			/* Called as this cleans up resources */
 			k_work_submit_to_queue(&sm_work_q, &nrfcloud_loc_req_work);
 		}
-		return NULL;
+		return -ENOMEM;
 	}
 
-	/* This is needed when this is called from sm_at_gnss.c with send_loc_req=true */
 	nrfcloud_sending_loc_req = true;
-
 	cell_data->current_cell.id = LTE_LC_CELL_EUTRAN_ID_INVALID;
 	cell_data->ncells_count = 0;
 	cell_data->gci_cells_count = 0;
-	/* Needs to set global variable so that NCELLMEAS parsing can access it */
+	/* Set global so that URC parsing callbacks can access it. */
 	nrfcloud_cell_data = cell_data;
 
-	/* Start backup timeout for 120 seconds to handle missing NCELLMEAS notification. */
-	k_work_schedule(&ncellmeas_timeout_backup_work, K_SECONDS(NRFCLOUDPOS_TIMEOUT_SEC));
+	ncellmeas_req_cell_count = cell_count;
+	ncellmeas_send_loc_req_flag = send_loc_req;
+	ncellmeas_done_cb = cb;
+	ncellmeas_done_ctx = ctx;
+
+	/* Schedule backup timeout on sm_work_q so it serialises with the rest
+	 * of the state machine and cannot race with ncellmeas_complete().
+	 */
+	k_work_schedule_for_queue(&sm_work_q, &ncellmeas_timeout_backup_work,
+				  K_SECONDS(NRFCLOUDPOS_TIMEOUT_SEC));
 	at_monitor_resume(&sm_ncellmeas);
 
 	LOG_DBG("Triggering cell measurements cell_count=%d", cell_count);
@@ -574,125 +620,137 @@ struct lte_lc_cells_info *sm_at_nrfcloud_ncellmeas(uint8_t cell_count, bool send
 	 */
 	LOG_DBG("Normal neighbor search (NCELLMEAS=1)");
 	ncellmeas_search_type = 1;
+	ncellmeas_sm_state = NCELLMEAS_STATE_FIRST_WAIT;
 	err = sm_util_at_printf("AT%%NCELLMEAS=1");
 	if (err) {
 		LOG_ERR("NCELLMEAS failed: %d", err);
-		goto end;
-	}
-	err = k_sem_take(&ncellmeas_sem_ncellmeas_evt, K_SECONDS(NRFCLOUDPOS_TIMEOUT_SEC));
-	if (err) {
-		/* Semaphore was reset so stop search procedure */
-		goto end;
+		ncellmeas_complete();
+		return err;
 	}
 
-	/* If no more than 1 cell is requested, don't perform GCI searches */
-	if (cell_count <= 1) {
-		goto end;
-	}
-
-	/* GCI searches are not done when in RRC connected mode. We are waiting for
-	 * device to enter RRC idle mode unless it's there already.
-	 * We'll poll for the RRC connection release every second for 10 seconds.
-	 * We could order CSCON notifications but this would require handling of
-	 * SM subscription of CSCON and host subscription so that
-	 * we send the notifications correctly to the host.
+	/* The rest of the flow is driven by %NCELLMEAS URCs via
+	 * at_handler_ncellmeas() → ncellmeas_state_handle_work_fn().
 	 */
-	for (int i = 0; i < 10; i++) {
-		err = sm_util_at_scanf("AT+CSCON?", "+CSCON: %*d,%d", &rrc_mode);
-		if (err == 1) {
-			if (rrc_mode == 0) {
-				break;
-			}
-			LOG_DBG("Waiting for RRC connection release");
-			k_sleep(K_SECONDS(1));
-		} else {
-			/* If AT+CSCON fails, we just go ahead and perform the GCI searches */
-			LOG_ERR("+CSCON failed %d", err);
-			break;
+	return 0;
+}
+
+/* Advance the state machine after %NCELLMEAS URC has been parsed.
+ * Runs on sm_work_q, submitted by at_handler_ncellmeas().
+ */
+static void ncellmeas_state_handle_work_fn(struct k_work *work)
+{
+	ARG_UNUSED(work);
+
+	int err;
+	int rrc_mode;
+	uint8_t ncellmeas_2nd_cell_count;
+	struct lte_lc_cell *cells;
+
+	switch (ncellmeas_sm_state) {
+	case NCELLMEAS_STATE_FIRST_WAIT:
+		if (ncellmeas_req_cell_count <= 1) {
+			ncellmeas_complete();
+			return;
 		}
-	}
+		/* GCI searches require RRC idle; start polling. */
+		ncellmeas_rrc_polls = 0;
+		ncellmeas_sm_state = NCELLMEAS_STATE_RRC_IDLE_WAIT;
+		k_work_schedule_for_queue(&sm_work_q, &ncellmeas_state_handle_work, K_NO_WAIT);
+		break;
 
-	/*****
-	 * 2nd: GCI history search to get GCI cells we can quickly search and measure.
-	 *      Because history search is quick and very power efficient, we request
-	 *      minimum of 5 cells even if less has been requested.
-	 */
-	ncellmeas3_cell_count = MAX(5, cell_count);
-	LOG_DBG("GCI history search (NCELLMEAS=3,%d)", ncellmeas3_cell_count);
-
-	/* Allocate GCI cells structure */
-	cells = calloc(ncellmeas3_cell_count, sizeof(struct lte_lc_cell));
-	if (cells == NULL) {
-		LOG_ERR("Failed to allocate memory for the GCI cells");
-		goto end;
-	}
-	cell_data->gci_cells = cells;
-
-	ncellmeas_search_type = 3;
-	ncellmeas_gci_count = ncellmeas3_cell_count;
-	err = sm_util_at_printf("AT%%NCELLMEAS=3,%d", ncellmeas3_cell_count);
-	if (err) {
-		LOG_WRN("NCELLMEAS failed: %d", err);
-		/* Clearing 'err' because previous neighbor search has succeeded
-		 * so those are still valid and positioning can proceed with that data
+	case NCELLMEAS_STATE_RRC_IDLE_WAIT:
+		/* GCI searches are not done when in RRC connected mode. We poll for the
+		 * RRC connection release every second for up to 10 seconds.
+		 * We could subscribe to CSCON notifications but that would require
+		 * coordinating SM vs. host subscriptions.
 		 */
-		goto end;
-	}
-	err = k_sem_take(&ncellmeas_sem_ncellmeas_evt, K_SECONDS(NRFCLOUDPOS_TIMEOUT_SEC));
-	if (err) {
-		/* Semaphore was reset so stop search procedure */
-		goto end;
-	}
+		err = sm_util_at_scanf("AT+CSCON?", "+CSCON: %*d,%d", &rrc_mode);
+		if (err == 1 && rrc_mode != 0 && ncellmeas_rrc_polls < 10) {
+			LOG_DBG("Waiting for RRC connection release (%d/10)",
+				ncellmeas_rrc_polls + 1);
+			ncellmeas_rrc_polls++;
+			k_work_schedule_for_queue(
+				&sm_work_q,
+				&ncellmeas_state_handle_work,
+				K_SECONDS(1));
+			return;
+		}
 
-	/* If we received already enough GCI cells including current cell */
-	if (cell_data->gci_cells_count + 1 >= cell_count) {
-		goto end;
-	}
+		if (err != 1) {
+			/* If AT+CSCON fails, proceed anyway with GCI searches. */
+			LOG_ERR("+CSCON failed %d, proceeding with GCI search", err);
+		}
 
-	/*****
-	 * 3rd: GCI regional search to try and get requested number of GCI cells.
-	 *      This search can be time and power consuming especially in rural areas
-	 *      depending on the available bands in the region.
-	 */
-	LOG_DBG("GCI regional search (NCELLMEAS=4,%d)", cell_count);
-
-	ncellmeas_search_type = 4;
-	ncellmeas_gci_count = cell_count;
-	err = sm_util_at_printf("AT%%NCELLMEAS=4,%d", cell_count);
-	if (err) {
-		LOG_WRN("NCELLMEAS failed: %d", err);
-		/* Clearing 'err' because previous neighbor nrfcloud_wifi_possearch has succeeded
-		 * so those are still valid and positioning can proceed with that data
+		/*****
+		 * 2nd: GCI history search to get GCI cells we can quickly search and measure.
+		 *      Because history search is quick and very power efficient, we request
+		 *      minimum of 5 cells even if less has been requested.
 		 */
-		goto end;
-	}
-	k_sem_take(&ncellmeas_sem_ncellmeas_evt, K_SECONDS(NRFCLOUDPOS_TIMEOUT_SEC));
+		ncellmeas_2nd_cell_count = MAX(5, ncellmeas_req_cell_count);
+		LOG_DBG("GCI history search (NCELLMEAS=3,%d)", ncellmeas_2nd_cell_count);
 
-end:
-	at_monitor_pause(&sm_ncellmeas);
-	if (send_loc_req) {
-		k_work_submit_to_queue(&sm_work_q, &nrfcloud_loc_req_work);
-	} else {
-		nrfcloud_sending_loc_req = false;
-		/* Clear global variable since the ownership moves to the caller */
-		nrfcloud_cell_data = NULL;
+		cells = calloc(ncellmeas_2nd_cell_count, sizeof(struct lte_lc_cell));
+		if (cells == NULL) {
+			LOG_ERR("Failed to allocate memory for the GCI cells");
+			ncellmeas_complete();
+			return;
+		}
+		nrfcloud_cell_data->gci_cells = cells;
+
+		ncellmeas_search_type = 3;
+		ncellmeas_gci_count = ncellmeas_2nd_cell_count;
+		ncellmeas_sm_state = NCELLMEAS_STATE_SECOND_WAIT;
+		err = sm_util_at_printf("AT%%NCELLMEAS=3,%d", ncellmeas_2nd_cell_count);
+		if (err) {
+			LOG_WRN("NCELLMEAS=3 failed: %d, using data from phase 1", err);
+			ncellmeas_complete();
+		}
+		break;
+
+	case NCELLMEAS_STATE_SECOND_WAIT:
+		if (nrfcloud_cell_data->gci_cells_count + 1 >= ncellmeas_req_cell_count) {
+			ncellmeas_complete();
+			return;
+		}
+		/*****
+		 * 3rd: GCI regional search to try and get requested number of GCI cells.
+		 *      This search can be time and power consuming especially in rural areas
+		 *      depending on the available bands in the region.
+		 */
+		LOG_DBG("GCI regional search (NCELLMEAS=4,%d)", ncellmeas_req_cell_count);
+		ncellmeas_search_type = 4;
+		ncellmeas_gci_count = ncellmeas_req_cell_count;
+		ncellmeas_sm_state = NCELLMEAS_STATE_THIRD_WAIT;
+		err = sm_util_at_printf("AT%%NCELLMEAS=4,%d", ncellmeas_req_cell_count);
+		if (err) {
+			LOG_WRN("NCELLMEAS=4 failed: %d, using data from earlier phases", err);
+			ncellmeas_complete();
+		}
+		break;
+
+	case NCELLMEAS_STATE_THIRD_WAIT:
+		ncellmeas_complete();
+		break;
+
+	default:
+		LOG_WRN("URC received in unexpected NCELLMEAS state %d", ncellmeas_sm_state);
+		break;
 	}
-	k_work_cancel_delayable(&ncellmeas_timeout_backup_work);
-	return cell_data;
+}
+
+static void ncellmeas_timeout_work_fn(struct k_work *work)
+{
+	ARG_UNUSED(work);
+
+	LOG_WRN("NCELLMEAS timeout");
+	ncellmeas_complete();
 }
 
 static void sm_at_nrfcloud_ncellmeas_work_fn(struct k_work *work)
 {
 	ARG_UNUSED(work);
 
-	nrfcloud_cell_data = sm_at_nrfcloud_ncellmeas(nrfcloud_cell_count, true);
-}
-
-static void ncellmeas_timeout_backup_work_fn(struct k_work *work)
-{
-	ARG_UNUSED(work);
-
-	k_sem_reset(&ncellmeas_sem_ncellmeas_evt);
+	sm_at_nrfcloud_ncellmeas_start(nrfcloud_cell_count, true, NULL, NULL);
 }
 
 static void nrfcloud_loc_req_work_fn(struct k_work *work)
@@ -1275,7 +1333,22 @@ static void at_handler_ncellmeas(const char *response)
 		break;
 	}
 
-	k_sem_give(&ncellmeas_sem_ncellmeas_evt);
+	if (err) {
+		ncellmeas_complete();
+		return;
+	}
+
+	/* For single-phase callback callers (e.g. A-GNSS, cell_count=1), complete
+	 * directly on this thread (AT monitor) so the callback can safely give a
+	 * semaphore without deadlocking sm_work_q. All other paths (multi-phase
+	 * or loc-req) are handled via sm_work_q as usual.
+	 */
+	if (ncellmeas_done_cb != NULL && ncellmeas_req_cell_count <= 1 &&
+	    ncellmeas_sm_state == NCELLMEAS_STATE_FIRST_WAIT) {
+		ncellmeas_complete();
+	} else {
+		k_work_schedule_for_queue(&sm_work_q, &ncellmeas_state_handle_work, K_NO_WAIT);
+	}
 }
 
 #endif /* CONFIG_SM_NRF_CLOUD_LOCATION */
