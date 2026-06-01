@@ -96,10 +96,10 @@ The sample provides:
 * Network performance testing using zperf.
 * DNS resolution support.
 * Automatic modem connection management.
-* CMUX (GSM 07.10) multiplexing support.
+* CMUX (GSM 07.10) multiplexing support with user pipes for AT command access.
 * Power management with runtime power saving.
 
-For more information about using the nRF91 Series SiP as a Zephyr-compatible modem, see :ref:`sm_cellular_modem`.
+For more information about using the nRF91 Series SiP as a Zephyr-compatible modem, including how to use user pipes for AT commands alongside PPP, see :ref:`sm_cellular_modem`.
 
 Configuration
 *************
@@ -121,6 +121,7 @@ The CMUX configuration enables:
 * Power save mode that closes CMUX pipes when idle
 * 5 second idle timeout before entering power save
 * MTU size of 127 bytes for optimal performance
+* User pipes on DLC channels 3 and 4 for AT command access (available when the network interface is up)
 
 Building and running
 ********************
@@ -221,6 +222,47 @@ To run a UDP upload test:
 
 See the `zperf: Network Traffic Generator`_ for more details on using zperf.
 
+Send AT commands through user pipes
+===================================
+
+When the network interface is up, you can access the modem's AT command interface through the user pipes on CMUX DLC channels 3 and 4.
+By default, the shell sample is configured to use the user pipe on DLC channel 3.
+
+To send an AT command:
+
+.. code-block:: console
+
+   uart:~$ modem at AT+CFUN=4
+   EVENT: L3 [1] IPv4 address del 100.92.136.41
+   EVENT: L4 [1] disconnected
+   EVENT: L4 [1] IPv4 connectivity lost
+   EVENT: L2 [1] interface down
+   OK
+   [00:14:52.706,554] <dbg> modem_cellular: modem_cellular_log_state_changed: switch from registered to await PPP dead
+   [00:14:52.706,738] <dbg> modem_cellular: modem_cellular_log_event: event ppp dead
+   [00:14:53.095,303] <dbg> modem_cellular: modem_cellular_log_event: event deregistered
+   [00:14:54.706,661] <dbg> modem_cellular: modem_cellular_log_event: event timeout
+   [00:14:54.706,720] <dbg> modem_cellular: modem_cellular_log_state_changed: switch from await PPP dead to await registered
+   [00:14:56.706,792] <dbg> modem_cellular: modem_cellular_log_event: event timeout
+   uart:~$ modem at AT+CFUN?
+   +CFUN: 4
+   OK
+   uart:~$ modem at AT+CFUN=1
+   OK
+   [00:15:16.308,209] <dbg> modem_cellular: modem_cellular_log_event: event deregistered
+   EVENT: L2 [1] interface up
+   [00:15:18.072,762] <dbg> modem_cellular: modem_cellular_log_event: event registered
+   [00:15:18.072,803] <dbg> modem_cellular: modem_cellular_log_state_changed: switch from await registered to run dial script
+   [00:15:18.072,861] <dbg> modem_cellular: modem_cellular_log_event: event timeout
+   [00:15:18.100,659] <dbg> modem_cellular: modem_cellular_log_event: event script success
+   [00:15:18.100,740] <dbg> modem_cellular: modem_cellular_log_state_changed: switch from run dial script to registered
+   EVENT: L3 [1] IPv6 address add fe80::3330:3539:3831:3936
+   EVENT: L3 [1] IPv6 neighbor add fe80::5eff:fe00:533a
+   EVENT: L3 [1] IPv4 address add 100.92.136.41
+   EVENT: L4 [1] connected
+   EVENT: L4 [1] IPv4 connectivity available
+   uart:~$
+
 Shutting down the network interface
 ===================================
 
@@ -241,6 +283,7 @@ The sample enables the following key features:
 * Network shell (``CONFIG_NET_SHELL``)
 * Zperf (``CONFIG_NET_ZPERF``)
 * Power management (``CONFIG_PM_DEVICE``)
+* AT command shell (``CONFIG_MODEM_AT_SHELL``)
 
 References
 **********

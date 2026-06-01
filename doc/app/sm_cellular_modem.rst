@@ -203,10 +203,54 @@ The controlling chip runs a Zephyr application, which uses Zephyr's native IP st
      See :ref:`uart_configuration` for more information.
    * System mode is not configured. See the `%XSYSTEMMODE`_ command in the AT command Reference Guide for more details.
 
+User pipes for AT commands
+==========================
+
+Zephyr's cellular modem driver provides **user pipes** for sending AT commands to the modem while PPP is active.
+User pipes are additional CMUX channels (DLC channels 3 and 4) that the host application can use for modem configuration, DFU/FOTA, or other AT command operations.
+
+User pipe availability
+----------------------
+
+User pipes are available only when the modem driver has all CMUX channels open.
+This occurs after the following conditions are met:
+
+* CMUX has been started with ``AT+CMUX=0``.
+* The network interface is activated with ``net_if_up()``, which opens the CMUX channels, connects to the network, and establishes the PPP connection.
+
+When the network interface is deactivated with ``net_if_down()``, the PPP connection is closed and user pipes become unavailable.
+
+.. important::
+
+   User pipes are not available when PPP is closed.
+   The modem driver is designed so that ``net_if_up()`` opens all CMUX channels, including user pipes, and ``net_if_down()`` closes them.
+
+The DLC channel callback notifies the host application when a user pipe opens or closes.
+
+Use cases for user pipes
+------------------------
+
+User pipes allow the host application to send AT commands while maintaining an active PPP connection.
+Common use cases include:
+
+* Configuring eDRX and PSM settings (``AT+CEDRXS``, ``AT+CPSMS``).
+* Performing modem firmware updates using ``AT#XFOTA`` or DFU commands.
+* Querying modem status and diagnostics.
+* Managing SMS or other modem features not exposed through the PPP interface.
+* Temporarily pausing PPP for maintenance operations.
+
+.. note::
+
+   When using the ``nordic,nrf91-sm-v2`` cellular driver, you can temporarily pause the PPP connection by issuing ``AT+CFUN=4`` on a user pipe.
+   This command puts the modem into flight mode, which causes the cellular modem driver to wait for a network registration URC message.
+   The PPP connection remains paused until you restore normal operation with ``AT+CFUN=1``, at which point the modem re-registers with the network and the PPP connection resumes.
+   This is useful for performing maintenance operations that require the modem to be offline temporarily.
+
 Example
 =======
 
 The Zephyr modem driver sends ``AT+CMUX=0`` to start the CMUX, then uses DLC channel 1 for AT commands and DLC channel 2 for PPP.
+User pipes on DLC channels 3 and 4 become available for host application AT commands once the network interface is up.
 The dial script issues ``AT+CGDATA`` on DLC channel 2, which starts PPP on that channel and leaves DLC channel 1 free for AT commands and URCs.
 
 .. figure:: ../images/ppp-zephyr-sequence.svg
