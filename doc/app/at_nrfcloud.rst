@@ -44,25 +44,25 @@ Syntax
 
    AT#XNRFCLOUD=<op>[,<send_location>]
 
-The ``<op>`` parameter can have the following integer values:
+* The ``<op>`` parameter can have the following integer values:
 
-* ``0`` - Disconnect from the nRF Cloud service.
-* ``1`` - Connect to the nRF Cloud service.
-* ``2`` - Send a message in the JSON format to the nRF Cloud service.
+  * ``0`` - Disconnect from the nRF Cloud service.
+  * ``1`` - Connect to the nRF Cloud service.
+  * ``2`` - Send a message in the JSON format to the nRF Cloud service.
 
-When ``<op>`` is ``2``, |SM| enters :ref:`sm_data_mode`.
+  When ``<op>`` is ``2``, |SM| enters :ref:`sm_data_mode`.
 
-The ``<send_location>`` parameter is used only when the value of ``<op>`` is ``1``.
-It can have the following integer values:
+* The ``<send_location>`` parameter is used only when the value of ``<op>`` is ``1``.
+  It can have the following integer values:
 
-* ``0`` - The device location is not sent to nRF Cloud.
-  This is the default behavior if the parameter is omitted.
-* ``1`` - The device location is sent to nRF Cloud.
+  * ``0`` - The device location is not sent to nRF Cloud.
+    This is the default behavior if the parameter is omitted.
+  * ``1`` - The device location is sent to nRF Cloud.
 
-.. note::
-   The location is sent to the nRF Cloud whenever a fix is produced by the GNSS module.
-   You must use the :ref:`#XGNSS <SM_AT_GNSS>` AT command to start GNSS either in single-fix or periodic navigation mode.
-   The interval between fixes must be at least 5 seconds.
+  .. note::
+     The location is sent to the nRF Cloud whenever a fix is produced by the GNSS module.
+     You must use the :ref:`#XGNSS <SM_AT_GNSS>` AT command to start GNSS either in single-fix or periodic navigation mode.
+     The interval between fixes must be at least 5 seconds.
 
 Unsolicited notification
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -192,50 +192,46 @@ Syntax
 
 ::
 
-   AT#XNRFCLOUDPOS=<cell_pos>,<wifi_pos>[,<MAC 1>[,<RSSI 1>],<MAC 2>[,<RSSI 2>][,<MAC 3>[...]]]
+   AT#XNRFCLOUDPOS=<cell_count>,<wifi_pos>[,<MAC 1>[,<RSSI 1>],<MAC 2>[,<RSSI 2>][,<MAC 3>[...]]]
 
-The ``<cell_pos>`` parameter can have the following integer values:
+* The ``<cell_count>`` parameter indicates the number of cells to include in the location request.
+  The value range is ``0`` to ``15``. A good suggested value for cellular positioning is ``4``.
+  ``0`` means that no cellular network information will be included in the location request.
+  The |SM| uses the ``AT%NCELLMEAS`` command to retrieve the cellular network information, and depending on the value of ``<cell_count>``, it may use the command multiple times.
 
-* ``0`` - Do not include cellular network information in the location request.
-* ``1`` - Use single-cell cellular network information (only the serving cell).
-* ``2`` - Use multi-cell cellular network information (the serving and possibly neighboring cells).
-  To use this option, you must first issue the ``AT%NCELLMEAS`` command and wait for its result notification.
+  .. note::
 
-  The cellular network information included in the location request will be the one received from the ``AT%NCELLMEAS`` command.
-  This means that, for the most up-to-date location information, you should use the command as close to sending the location request as possible.
-  Also, keep in mind that whenever you send a location request in single-cell mode, any previously saved multi-cell cellular network information is invalidated.
+     Since the |SM| uses the ``AT%NCELLMEAS`` command internally, the host must not use the ``AT%NCELLMEAS`` command during ``#XNRFCLOUDPOS`` command execution.
+     You may still use ``AT%NCELLMEAS`` command before or after ``#XNRFCLOUDPOS`` command execution for your own purposes.
+     You will also see ``%NCELLMEAS`` notifications, which you can ignore, during the ``#XNRFCLOUDPOS`` command execution.
 
-The ``<wifi_pos>`` parameter can have the following integer values:
+* The ``<wifi_pos>`` parameter can have the following integer values:
 
-* ``0`` - Do not include Wi-Fi access point information in the location request.
-* ``1`` - Use Wi-Fi access point information.
-  The access points must be given as additional parameters to the command.
-  The minimum number of access points to provide is two (``NRF_CLOUD_LOCATION_WIFI_AP_CNT_MIN``), and the maximum is limited by the AT command buffer size (:ref:`CONFIG_SM_AT_BUF_SIZE <CONFIG_SM_AT_BUF_SIZE>`).
+  * ``0`` - Do not include Wi-Fi access point information in the location request.
+  * ``1`` - Use Wi-Fi access point information.
+    The access points must be given as additional parameters to the command.
+    The minimum number of access points to provide is two (``NRF_CLOUD_LOCATION_WIFI_AP_CNT_MIN``), and the maximum is limited by the AT command buffer size (:ref:`CONFIG_SM_AT_BUF_SIZE <CONFIG_SM_AT_BUF_SIZE>`).
 
-The ``<MAC x>`` parameter is a string.
-It indicates the MAC address of a Wi-Fi access point and must be formatted as ``%02x:%02x:%02x:%02x:%02x:%02x`` (``WIFI_MAC_ADDR_TEMPLATE``).
+* The ``<MAC x>`` parameter is a string.
+  It indicates the MAC address of a Wi-Fi access point and must be formatted as ``%02x:%02x:%02x:%02x:%02x:%02x`` (``WIFI_MAC_ADDR_TEMPLATE``).
 
-The ``<RSSI x>`` parameter is an optional integer.
-It indicates the signal strength of a Wi-Fi access point in dBm, between ``-128`` and ``0``.
-If provided, it must follow the MAC address parameter of the access point.
-Providing the RSSI parameters helps improve the accuracy of the Wi-Fi location.
+* The ``<RSSI x>`` parameter is an optional integer.
+  It indicates the signal strength of a Wi-Fi access point in dBm, between ``-128`` and ``0``.
+  If provided, it must follow the MAC address parameter of the access point.
+  Providing the RSSI parameters helps improve the accuracy of the Wi-Fi location.
 
 Unsolicited notification
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 ::
 
-   #XNRFCLOUDPOS: <error>
+   #XNRFCLOUDPOS: <status>[,<type>,<latitude>,<longitude>,<uncertainty>]
 
-This is emitted when the location request failed, either when sending it or receiving its response.
-No notification containing location data will be emitted.
+* The ``<status>`` parameter indicates the status of the location request.
 
-* The ``<error>`` parameter indicates the error that happened.
-  It is one of the :c:enum:`nrf_cloud_error` values.
-
-::
-
-   #XNRFCLOUDPOS: <type>,<latitude>,<longitude>,<uncertainty>
+  * ``0`` - Successful request. Other parameters are also present.
+  * ``-1`` - Location request failed.
+  * ``<positive integer>`` - Requesting location from the cloud failed with cloud error as defined in :c:enum:`nrf_cloud_error` values.
 
 This is emitted when a successful response to a sent location request is received.
 
@@ -269,27 +265,29 @@ Example
 
   OK
 
-  #XNRFCLOUDPOS: 0,35.455833,139.626111,1094
-  AT%NCELLMEAS
+  #XNRFCLOUDPOS: 0,0,35.455833,139.626111,1094
+
+  AT#XNRFCLOUDPOS=5,0
 
   OK
 
   %NCELLMEAS: 0,"0199F10A","44020","107E",65535,3750,5,49,27,107504,3750,251,33,4,0,475,107,26,14,25,475,58,26,17,25,475,277,24,9,25,475,51,18,1,25
-  AT#XNRFCLOUDPOS=2,0
 
-  OK
+  %NCELLMEAS: 0,"01234567","44020","0340",50,175456,3400,34,5,24,1775066,1,0,"00143FAE","44020","0140",65535,0,6200,47,40,14,1775066,0,0
 
-  #XNRFCLOUDPOS: 1,35.455833,139.626111,1094
+  %NCELLMEAS: 0,"00987654","44020","0240",50,1754746,5500,44,4,4,1463457,1,0,"002F4344","44020","0140",65535,0,6200,47,40,14,1775066,0,0,"001C0502","44013","5A00",65535,0,6400,130,29,18,1775124,0,0,"00136107","44013","5A00",65535,0,3600,202,26,13,234533,0,0
+
+  #XNRFCLOUDPOS: 0,1,35.455833,139.626111,1094
   AT#XNRFCLOUDPOS=0,1,"40:9b:cd:c1:5a:40","00:90:fe:eb:4f:42"
 
   OK
 
-  #XNRFCLOUDPOS: 2,35.457335,139.624443,60
+  #XNRFCLOUDPOS: 0,2,35.457335,139.624443,60
   AT#XNRFCLOUDPOS=0,1,"40:9b:cd:c1:5a:40",-40,"00:90:fe:eb:4f:42",-69
 
   OK
 
-  #XNRFCLOUDPOS: 2,35.457346,139.624449,20
+  #XNRFCLOUDPOS: 0,2,35.457346,139.624449,20
 
 Read command
 ------------

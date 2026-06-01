@@ -3,20 +3,16 @@
  *
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
-#if defined(CONFIG_SM_NRF_CLOUD)
 
 #include <zephyr/kernel.h>
 #include <stdio.h>
 #include <zephyr/logging/log.h>
 #include <date_time.h>
 #include <net/nrf_cloud.h>
-#include <net/nrf_cloud_agnss.h>
-#include <net/nrf_cloud_pgps.h>
 #include <net/nrf_cloud_coap.h>
 #include "nrf_cloud_coap_transport.h"
 #include <modem/at_parser.h>
 #include <modem/nrf_modem_lib.h>
-#include <modem/modem_info.h>
 #include "sm_util.h"
 #include "sm_at_host.h"
 #include "sm_at_nrfcloud.h"
@@ -24,21 +20,44 @@
 LOG_MODULE_REGISTER(sm_nrfcloud, CONFIG_SM_LOG_LEVEL);
 
 static K_SEM_DEFINE(sem_date_time, 0, 1);
-uint8_t sm_at_buf[CONFIG_SM_AT_BUF_SIZE + 1];
 static struct modem_pipe *nrfcloud_pipe;
+
+static char nrfcloud_device_id[NRF_CLOUD_CLIENT_ID_MAX_LEN];
+
+bool sm_nrf_cloud_ready;
+bool sm_nrf_cloud_send_location;
+/* Parameters saved before submitting connection work. */
+static bool nrfcloud_connect;
+static bool nrfcloud_conn_send_location;
+
+static void nrfcloud_conn_work_fn(struct k_work *work);
+K_WORK_DEFINE(nrfcloud_conn_work, nrfcloud_conn_work_fn);
 
 #if defined(CONFIG_SM_NRF_CLOUD_LOCATION)
 
-/* Cellular positioning services .*/
-enum sm_nrfcloud_cellpos {
-	CELLPOS_NONE = 0,
-	CELLPOS_SINGLE_CELL,
-	CELLPOS_MULTI_CELL,
+#define NRFCLOUDPOS_TIMEOUT_SEC 120
 
-	CELLPOS_COUNT /* Keep last. */
-};
+/* NCELLMEAS notification parameters */
+#define AT_NCELLMEAS_STATUS_INDEX	     1
+#define AT_NCELLMEAS_CELL_ID_INDEX	     2
+#define AT_NCELLMEAS_PLMN_INDEX		     3
+#define AT_NCELLMEAS_TAC_INDEX		     4
+#define AT_NCELLMEAS_TIMING_ADV_INDEX	     5
+#define AT_NCELLMEAS_EARFCN_INDEX	     6
+#define AT_NCELLMEAS_PHYS_CELL_ID_INDEX	     7
+#define AT_NCELLMEAS_RSRP_INDEX		     8
+#define AT_NCELLMEAS_RSRQ_INDEX		     9
+#define AT_NCELLMEAS_MEASUREMENT_TIME_INDEX  10
+
+#define AT_NCELLMEAS_PRE_NCELLS_PARAMS_COUNT 11
+#define AT_NCELLMEAS_NCELLS_PARAMS_COUNT     5
+#define AT_NCELLMEAS_GCI_CELL_PARAMS_COUNT   12
+
+#define AT_NCELLMEAS_STATUS_VALUE_FAIL	     1
+#define AT_NCELLMEAS_STATUS_VALUE_INCOMPLETE 2
+
 /* Whether cellular positioning is requested and if so, which. */
-static enum sm_nrfcloud_cellpos nrfcloud_cell_pos = CELLPOS_NONE;
+static uint8_t nrfcloud_cell_count;
 
 /* Whether Wi-Fi positioning is requested. */
 static bool nrfcloud_wifi_pos;
@@ -46,269 +65,43 @@ static bool nrfcloud_wifi_pos;
 /* Whether a location request is currently being sent to nRF Cloud. */
 static bool nrfcloud_sending_loc_req;
 
-static struct k_work nrfcloud_loc_req;
-static struct k_work nrfcloud_conn_work;
+static uint8_t ncellmeas_search_type;
+static uint8_t ncellmeas_gci_count;
 
-/* Parameters saved before submitting connection work. */
-static bool nrfcloud_connect;
-static bool nrfcloud_conn_send_location;
+/* ---------- NCELLMEAS async state machine ---------- */
 
-/** Definitions for %NCELLMEAS notification
- * %NCELLMEAS: status [,<cell_id>, <plmn>, <tac>, <timing_advance>, <current_earfcn>,
- * <current_phys_cell_id>, <current_rsrp>, <current_rsrq>,<measurement_time>,]
- * [,<n_earfcn>1, <n_phys_cell_id>1, <n_rsrp>1, <n_rsrq>1,<time_diff>1]
- * [,<n_earfcn>2, <n_phys_cell_id>2, <n_rsrp>2, <n_rsrq>2,<time_diff>2] ...
- * [,<n_earfcn>17, <n_phys_cell_id>17, <n_rsrp>17, <n_rsrq>17,<time_diff>17
- *
- * Max 17 ncell
- * 11 number of parameters for current cell (including "%NCELLMEAS")
- * 5  number of parameters for one neighboring cell
- */
-#define MAX_PARAM_CELL   11
-#define MAX_PARAM_NCELL  5
-/* Neighbor cells are not very useful for positioning so we don't need to support 10 or 17 */
-#define NCELL_CNT 5
+enum ncellmeas_state {
+	NCELLMEAS_STATE_IDLE,
+	NCELLMEAS_STATE_FIRST_WAIT,    /* AT%NCELLMEAS=1 issued, awaiting URC */
+	NCELLMEAS_STATE_RRC_IDLE_WAIT, /* Polling AT+CSCON? for RRC idle */
+	NCELLMEAS_STATE_SECOND_WAIT,   /* AT%NCELLMEAS=3 issued, awaiting URC */
+	NCELLMEAS_STATE_THIRD_WAIT,    /* AT%NCELLMEAS=4 issued, awaiting URC */
+};
 
-/* Neighboring cell measurements. */
-static struct lte_lc_ncell nrfcloud_ncells[NCELL_CNT];
+static enum ncellmeas_state ncellmeas_sm_state = NCELLMEAS_STATE_IDLE;
+static uint8_t ncellmeas_req_cell_count;
+static bool ncellmeas_send_loc_req_flag;
+static sm_at_nrfcloud_ncellmeas_done_cb_t ncellmeas_done_cb;
+static void *ncellmeas_done_ctx;
+static uint8_t ncellmeas_rrc_polls;
+
+static void nrfcloud_loc_req_work_fn(struct k_work *work);
+static void sm_at_nrfcloud_ncellmeas_work_fn(struct k_work *work);
+static void ncellmeas_state_handle_work_fn(struct k_work *work);
+static void ncellmeas_timeout_work_fn(struct k_work *work);
+
+K_WORK_DEFINE(nrfcloud_loc_req_work, nrfcloud_loc_req_work_fn);
+K_WORK_DEFINE(sm_at_nrfcloud_ncellmeas_work, sm_at_nrfcloud_ncellmeas_work_fn);
+K_WORK_DELAYABLE_DEFINE(ncellmeas_state_handle_work, ncellmeas_state_handle_work_fn);
+K_WORK_DELAYABLE_DEFINE(ncellmeas_timeout_backup_work, ncellmeas_timeout_work_fn);
 
 /* nRF Cloud location request cellular data. */
-static struct lte_lc_cells_info nrfcloud_cell_data = {
-	.neighbor_cells = nrfcloud_ncells,
-	.gci_cells_count = 0
-};
-static bool nrfcloud_ncellmeas_done;
+static struct lte_lc_cells_info *nrfcloud_cell_data;
 
 #define WIFI_APS_BEGIN_IDX 3
 
 /* nRF Cloud location request Wi-Fi data. */
 static struct wifi_scan_info nrfcloud_wifi_data;
-
-#endif /* CONFIG_SM_NRF_CLOUD_LOCATION */
-
-static char nrfcloud_device_id[NRF_CLOUD_CLIENT_ID_MAX_LEN];
-
-bool sm_nrf_cloud_ready;
-bool sm_nrf_cloud_send_location;
-
-#if defined(CONFIG_SM_NRF_CLOUD_LOCATION)
-AT_MONITOR(ncell_meas, "NCELLMEAS", ncell_meas_mon, PAUSED);
-
-static void ncell_meas_mon(const char *notify)
-{
-	int err;
-	uint32_t param_count;
-	int ncellmeas_status;
-	char cid[9] = {0};
-	size_t size;
-	char plmn[6] = {0};
-	char mcc[4]  = {0};
-	char tac[9] = {0};
-	unsigned int ncells_count = 0;
-	struct at_parser parser;
-
-	nrfcloud_ncellmeas_done = false;
-	err = at_parser_init(&parser, notify);
-	if (err) {
-		goto exit;
-	}
-
-	/* parse status, 0: success 1: fail */
-	err = at_parser_num_get(&parser, 1, &ncellmeas_status);
-	if (err) {
-		goto exit;
-	}
-	if (ncellmeas_status != 0) {
-		LOG_ERR("NCELLMEAS failed");
-		err = -EAGAIN;
-		goto exit;
-	}
-
-	err = at_parser_cmd_count_get(&parser, &param_count);
-	if (err) {
-		goto exit;
-	}
-	if (param_count < MAX_PARAM_CELL) { /* at least current cell */
-		LOG_ERR("Missing param in NCELLMEAS notification");
-		err = -EAGAIN;
-		goto exit;
-	}
-
-	/* parse Cell ID */
-	size = sizeof(cid);
-	err = util_string_get(&parser, 2, cid, &size);
-	if (err) {
-		goto exit;
-	}
-	err = util_str_to_int(cid, 16, (int *)&nrfcloud_cell_data.current_cell.id);
-	if (err) {
-		goto exit;
-	}
-
-	/* parse PLMN */
-	size = sizeof(plmn);
-	err = util_string_get(&parser, 3, plmn, &size);
-	if (err) {
-		goto exit;
-	}
-	strncpy(mcc, plmn, 3); /* MCC always 3-digit */
-	err = util_str_to_int(mcc, 10, &nrfcloud_cell_data.current_cell.mcc);
-	if (err) {
-		goto exit;
-	}
-	err = util_str_to_int(&plmn[3], 10, &nrfcloud_cell_data.current_cell.mnc);
-	if (err) {
-		goto exit;
-	}
-
-	/* parse TAC */
-	size = sizeof(tac);
-	err = util_string_get(&parser, 4, tac, &size);
-	if (err) {
-		goto exit;
-	}
-	err = util_str_to_int(tac, 16, (int *)&nrfcloud_cell_data.current_cell.tac);
-	if (err) {
-		goto exit;
-	}
-
-	/* omit timing_advance */
-	nrfcloud_cell_data.current_cell.timing_advance = NRF_CLOUD_LOCATION_CELL_OMIT_TIME_ADV;
-
-	/* parse EARFCN */
-	err = at_parser_num_get(&parser, 6, &nrfcloud_cell_data.current_cell.earfcn);
-	if (err) {
-		goto exit;
-	}
-
-	/* parse PCI */
-	err = at_parser_num_get(&parser, 7,
-				&nrfcloud_cell_data.current_cell.phys_cell_id);
-	if (err) {
-		goto exit;
-	}
-
-	/* parse RSRP and RSRQ */
-	err = at_parser_num_get(&parser, 8, &nrfcloud_cell_data.current_cell.rsrp);
-	if (err < 0) {
-		goto exit;
-	}
-	err = at_parser_num_get(&parser, 9, &nrfcloud_cell_data.current_cell.rsrq);
-	if (err < 0) {
-		goto exit;
-	}
-
-	/* omit measurement_time and parse neighboring cells */
-
-	ncells_count = (param_count - MAX_PARAM_CELL) / MAX_PARAM_NCELL;
-	for (unsigned int i = 0; i != ncells_count; ++i) {
-		const unsigned int offset = MAX_PARAM_CELL + i * MAX_PARAM_NCELL;
-
-		if (i >= NCELL_CNT) {
-			LOG_INF("Too many neighboring cells (%d) for allocated buffer (%d)",
-				i, NCELL_CNT);
-			break;
-		}
-
-		/* parse n_earfcn */
-		err = at_parser_num_get(&parser, offset, &nrfcloud_ncells[i].earfcn);
-		if (err < 0) {
-			goto exit;
-		}
-
-		/* parse n_phys_cell_id */
-		err = at_parser_num_get(&parser, offset + 1,
-					&nrfcloud_ncells[i].phys_cell_id);
-		if (err < 0) {
-			goto exit;
-		}
-
-		/* parse n_rsrp */
-		err = at_parser_num_get(&parser, offset + 2, &nrfcloud_ncells[i].rsrp);
-		if (err < 0) {
-			goto exit;
-		}
-
-		/* parse n_rsrq */
-		err = at_parser_num_get(&parser, offset + 3, &nrfcloud_ncells[i].rsrq);
-		if (err < 0) {
-			goto exit;
-		}
-		/* omit time_diff */
-	}
-
-	err = 0;
-	nrfcloud_cell_data.ncells_count = ncells_count;
-	nrfcloud_ncellmeas_done = true;
-
-exit:
-	LOG_INF("NCELLMEAS notification parse (err: %d)", err);
-}
-
-int get_single_cell_info(struct lte_lc_cell *const cell_inf)
-{
-	int err;
-	struct modem_param_info modem_inf;
-
-	err = modem_info_params_init(&modem_inf);
-	if (err) {
-		LOG_ERR("Could not initialize modem info module, error: %d", err);
-		return err;
-	}
-	err = modem_info_params_get(&modem_inf);
-	if (err) {
-		LOG_ERR("Could not obtain information from modem, error: %d", err);
-		return err;
-	}
-	cell_inf->mcc = modem_inf.network.mcc.value;
-	cell_inf->mnc = modem_inf.network.mnc.value;
-	cell_inf->tac = modem_inf.network.area_code.value;
-	cell_inf->id = modem_inf.network.cellid_dec;
-	cell_inf->rsrp = modem_inf.network.rsrp.value;
-
-	return 0;
-}
-
-static void loc_req_wk(struct k_work *work)
-{
-	int err = 0;
-
-	if (nrfcloud_cell_pos == CELLPOS_SINGLE_CELL) {
-		LOG_DBG("Requesting single-cell location from nRF Cloud.");
-		/* Obtain the single cell info from the modem */
-		err = get_single_cell_info(&nrfcloud_cell_data.current_cell);
-		if (err) {
-			LOG_ERR("Failed to obtain single-cell cellular network information (%d).",
-				err);
-		} else {
-			nrfcloud_cell_data.ncells_count = 0;
-			/* Invalidate the last neighboring cell measurements
-			 * because they have been partly overwritten.
-			 */
-			nrfcloud_ncellmeas_done = false;
-		}
-	}
-
-	struct nrf_cloud_location_result result = {0};
-	const struct nrf_cloud_coap_location_request request = {
-		.config = NULL,
-		.cell_info = nrfcloud_cell_pos ? &nrfcloud_cell_data : NULL,
-		.wifi_info = nrfcloud_wifi_pos ? &nrfcloud_wifi_data : NULL};
-
-	err = nrf_cloud_coap_location_get(&request, &result);
-	if (err == 0) {
-		urc_send_to(nrfcloud_pipe, "\r\n#XNRFCLOUDPOS: %d,%lf,%lf,%d\r\n",
-			result.type, result.lat, result.lon, result.unc);
-	} else {
-		LOG_ERR("Failed to request nRF Cloud location (%d).", err);
-		urc_send_to(nrfcloud_pipe, "\r\n#XNRFCLOUDPOS: %d\r\n", err < 0 ? -1 : err);
-	}
-
-	if (nrfcloud_wifi_pos) {
-		k_free(nrfcloud_wifi_data.ap_info);
-	}
-	nrfcloud_sending_loc_req = false;
-}
 
 #endif /* CONFIG_SM_NRF_CLOUD_LOCATION */
 
@@ -331,9 +124,6 @@ static void on_cloud_ready(void)
 	sm_nrf_cloud_ready = true;
 	urc_send_to(nrfcloud_pipe, "\r\n#XNRFCLOUD: %d,%d\r\n", sm_nrf_cloud_ready,
 		    sm_nrf_cloud_send_location);
-#if defined(CONFIG_SM_NRF_CLOUD_LOCATION)
-	at_monitor_resume(&ncell_meas);
-#endif
 }
 
 static void on_cloud_disconnected(void)
@@ -341,9 +131,6 @@ static void on_cloud_disconnected(void)
 	sm_nrf_cloud_ready = false;
 	urc_send_to(nrfcloud_pipe, "\r\n#XNRFCLOUD: %d,%d\r\n", sm_nrf_cloud_ready,
 		    sm_nrf_cloud_send_location);
-#if defined(CONFIG_SM_NRF_CLOUD_LOCATION)
-	at_monitor_pause(&ncell_meas);
-#endif
 }
 
 static void date_time_event_handler(const struct date_time_evt *evt)
@@ -388,7 +175,7 @@ static int nrf_cloud_datamode_callback(uint8_t op, const uint8_t *data, int len,
 	return 0;
 }
 
-static void conn_wk(struct k_work *work)
+static void nrfcloud_conn_work_fn(struct k_work *work)
 {
 	int err;
 
@@ -422,7 +209,7 @@ static void conn_wk(struct k_work *work)
 }
 
 SM_AT_CMD_CUSTOM(xnrfcloud, "AT#XNRFCLOUD", handle_at_nrf_cloud);
-static int handle_at_nrf_cloud(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+STATIC int handle_at_nrf_cloud(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			       uint32_t param_count)
 {
 	enum sm_nrfcloud_operation {
@@ -464,7 +251,7 @@ static int handle_at_nrf_cloud(enum at_parser_cmd_type cmd_type, struct at_parse
 			k_work_submit_to_queue(&sm_work_q, &nrfcloud_conn_work);
 			err = 0;
 		} else {
-			err = -EINVAL;
+			err = -EBUSY;
 		} break;
 
 	case AT_PARSER_CMD_TYPE_READ: {
@@ -486,14 +273,44 @@ static int handle_at_nrf_cloud(enum at_parser_cmd_type cmd_type, struct at_parse
 	return err;
 }
 
+static void sm_at_nrfcloud_init(int ret, void *ctx)
+{
+	static bool initialized;
+	int err;
+
+	if (initialized) {
+		return;
+	}
+
+	err = nrf_cloud_coap_init();
+	if (err) {
+		LOG_ERR("Failed to initialize nRF Cloud CoAP library: %d", err);
+		return;
+	}
+
+	err = nrf_cloud_client_id_get(nrfcloud_device_id, sizeof(nrfcloud_device_id));
+	if (err) {
+		LOG_ERR("Failed to get nRF Cloud client ID: %d", err);
+		return;
+	}
+
+	initialized = true;
+}
+NRF_MODEM_LIB_ON_INIT(sm_nrfcloud_init_hook, sm_at_nrfcloud_init, NULL);
+
+/****************************************************************/
+/* Cellular positioning, i.e., %NCELLMEAS notification handling */
+/****************************************************************/
+
 #if defined(CONFIG_SM_NRF_CLOUD_LOCATION)
 
 SM_AT_CMD_CUSTOM(xnrfcloudpos, "AT#XNRFCLOUDPOS", handle_at_nrf_cloud_pos);
-static int handle_at_nrf_cloud_pos(enum at_parser_cmd_type cmd_type,
+STATIC int handle_at_nrf_cloud_pos(enum at_parser_cmd_type cmd_type,
 				   struct at_parser *parser, uint32_t param_count)
 {
 	int err;
-	uint16_t cell_pos, wifi_pos;
+	uint16_t cell_count = 0;
+	uint16_t wifi_pos = 0;
 
 	if (cmd_type != AT_PARSER_CMD_TYPE_SET) {
 		return -ENOTSUP;
@@ -514,7 +331,7 @@ static int handle_at_nrf_cloud_pos(enum at_parser_cmd_type cmd_type,
 		return -EINVAL;
 	}
 
-	err = at_parser_num_get(parser, 1, &cell_pos);
+	err = at_parser_num_get(parser, 1, &cell_count);
 	if (err) {
 		return err;
 	}
@@ -524,18 +341,13 @@ static int handle_at_nrf_cloud_pos(enum at_parser_cmd_type cmd_type,
 		return err;
 	}
 
-	if (cell_pos >= CELLPOS_COUNT || wifi_pos > 1) {
+	if (cell_count > 15 || wifi_pos > 1) {
 		return -EINVAL;
 	}
 
-	if (!cell_pos && !wifi_pos) {
+	if (!cell_count && !wifi_pos) {
 		LOG_ERR("At least one of cellular/Wi-Fi information must be included.");
 		return -EINVAL;
-	}
-
-	if (cell_pos == CELLPOS_MULTI_CELL && !nrfcloud_ncellmeas_done) {
-		LOG_ERR("%s", "No neighboring cell measurement. Did you run `AT%NCELLMEAS`?");
-		return -EAGAIN;
 	}
 
 	if (!wifi_pos && param_count > WIFI_APS_BEGIN_IDX) {
@@ -543,8 +355,13 @@ static int handle_at_nrf_cloud_pos(enum at_parser_cmd_type cmd_type,
 		return -E2BIG;
 	}
 
+	if (wifi_pos && param_count < WIFI_APS_BEGIN_IDX + 1) {
+		/* Wi-Fi AP required if Wi-Fi positioning. */
+		return -ENOENT;
+	}
+
 	if (wifi_pos) {
-		nrfcloud_wifi_data.ap_info = k_malloc(
+		nrfcloud_wifi_data.ap_info = malloc(
 			sizeof(*nrfcloud_wifi_data.ap_info) * (param_count - WIFI_APS_BEGIN_IDX));
 		if (!nrfcloud_wifi_data.ap_info) {
 			return -ENOMEM;
@@ -609,43 +426,929 @@ static int handle_at_nrf_cloud_pos(enum at_parser_cmd_type cmd_type,
 				nrfcloud_wifi_data.cnt, NRF_CLOUD_LOCATION_WIFI_AP_CNT_MIN);
 		}
 		if (err) {
-			k_free(nrfcloud_wifi_data.ap_info);
+			free(nrfcloud_wifi_data.ap_info);
 			return err;
 		}
 	}
 
-	nrfcloud_cell_pos = cell_pos;
+	nrfcloud_cell_count = cell_count;
 	nrfcloud_wifi_pos = wifi_pos;
 
 	nrfcloud_sending_loc_req = true;
-	k_work_submit_to_queue(&sm_work_q, &nrfcloud_loc_req);
+	if (cell_count >= 1) {
+		/* To workqueue to be able to send OK response */
+		k_work_submit_to_queue(&sm_work_q, &sm_at_nrfcloud_ncellmeas_work);
+	} else {
+		k_work_submit_to_queue(&sm_work_q, &nrfcloud_loc_req_work);
+	}
 	return 0;
 }
 
-#endif /* CONFIG_SM_NRF_CLOUD_LOCATION */
-
-static void sm_at_nrfcloud_init(int ret, void *ctx)
+/* This function has been copied from sdk-nrf nrf/lib/lte_link_control library
+ * with version v3.4.0-rc1.
+ */
+static int string_to_int(const char *str_buf, int base, int *output)
 {
-	static bool initialized;
+	int temp;
+	char *end_ptr;
+
+	__ASSERT_NO_MSG(str_buf != NULL);
+
+	errno = 0;
+	temp = strtol(str_buf, &end_ptr, base);
+
+	if (end_ptr == str_buf || *end_ptr != '\0' ||
+	    ((temp == LONG_MAX || temp == LONG_MIN) && errno == ERANGE)) {
+		return -ENODATA;
+	}
+
+	*output = temp;
+
+	return 0;
+}
+
+/* This function has been copied from sdk-nrf lte_link_control library
+ * with version v3.4.0-rc1.
+ */
+static int string_param_to_int(struct at_parser *parser, size_t idx, int *output, int base)
+{
+	int err;
+	char str_buf[16];
+	size_t len = sizeof(str_buf) - 1;
+
+	__ASSERT_NO_MSG(parser != NULL);
+	__ASSERT_NO_MSG(output != NULL);
+
+	err = at_parser_string_get(parser, idx, str_buf, &len);
+	if (err) {
+		return err;
+	}
+	str_buf[len] = '\0';
+
+	if (string_to_int(str_buf, base, output)) {
+		return -ENODATA;
+	}
+
+	return 0;
+}
+
+/* This function has been copied from sdk-nrf lte_link_control library
+ * with version v3.4.0-rc1.
+ */
+static int plmn_param_string_to_mcc_mnc(struct at_parser *parser, size_t idx, int *mcc, int *mnc)
+{
+	int err;
+	char str_buf[7];
+	size_t len = sizeof(str_buf);
+
+	err = at_parser_string_get(parser, idx, str_buf, &len);
+	if (err) {
+		LOG_ERR("Could not get PLMN, error: %d", err);
+		return err;
+	}
+
+	str_buf[len] = '\0';
+
+	/* Read MNC and store as integer. The MNC starts as the fourth character
+	 * in the string, following three characters long MCC.
+	 */
+	err = string_to_int(&str_buf[3], 10, mnc);
+	if (err) {
+		LOG_ERR("Could not get MNC, error: %d", err);
+		return err;
+	}
+
+	/* NUL-terminate MCC, read and store it. */
+	str_buf[3] = '\0';
+
+	err = string_to_int(str_buf, 10, mcc);
+	if (err) {
+		LOG_ERR("Could not get MCC, error: %d", err);
+		return err;
+	}
+
+	return 0;
+}
+
+AT_MONITOR(sm_ncellmeas, "NCELLMEAS", at_handler_ncellmeas, PAUSED);
+
+void sm_at_nrfcloud_ncellmeas_cleanup(struct lte_lc_cells_info *cell_data)
+{
+	if (cell_data == NULL) {
+		return;
+	}
+
+	free(cell_data->neighbor_cells);
+	cell_data->neighbor_cells = NULL;
+	free(cell_data->gci_cells);
+	cell_data->gci_cells = NULL;
+	free(cell_data);
+}
+
+/* Finalise a measurement run; must be called from sm_work_q context. */
+static void ncellmeas_complete(void)
+{
+	k_work_cancel_delayable(&ncellmeas_timeout_backup_work);
+	/* Cancel the RRC poll if it is pending. */
+	k_work_cancel_delayable(&ncellmeas_state_handle_work);
+	at_monitor_pause(&sm_ncellmeas);
+	ncellmeas_sm_state = NCELLMEAS_STATE_IDLE;
+
+	if (ncellmeas_send_loc_req_flag) {
+		k_work_submit_to_queue(&sm_work_q, &nrfcloud_loc_req_work);
+	} else {
+		/* Transfer cell_data ownership to the callback / caller. */
+		struct lte_lc_cells_info *cell_data = nrfcloud_cell_data;
+
+		nrfcloud_cell_data = NULL;
+		nrfcloud_sending_loc_req = false;
+		if (ncellmeas_done_cb) {
+			ncellmeas_done_cb(cell_data, ncellmeas_done_ctx);
+		} else {
+			sm_at_nrfcloud_ncellmeas_cleanup(cell_data);
+		}
+	}
+}
+
+/* This function has been adapted from sdk-nrf location library
+ * scan_cellular_execute() with version v3.4.0-rc1.
+ * The blocking semaphore waits and k_sleep() RRC poll loop have been removed
+ * in favour of the URC-driven state machine.
+ */
+int sm_at_nrfcloud_ncellmeas_start(uint8_t cell_count, bool send_loc_req,
+				   sm_at_nrfcloud_ncellmeas_done_cb_t cb, void *ctx)
+{
+	int err;
+	struct lte_lc_cells_info *cell_data;
+
+	/* Allocate main cell data structure.
+	 * Neighbor/GCI cells are only allocated when they are found.
+	 */
+	cell_data = calloc(1, sizeof(struct lte_lc_cells_info));
+	if (cell_data == NULL) {
+		LOG_ERR("Failed to allocate memory for the nRF Cloud cell data");
+		if (send_loc_req) {
+			k_work_submit_to_queue(&sm_work_q, &nrfcloud_loc_req_work);
+		}
+		return -ENOMEM;
+	}
+
+	nrfcloud_sending_loc_req = true;
+	cell_data->current_cell.id = LTE_LC_CELL_EUTRAN_ID_INVALID;
+	cell_data->ncells_count = 0;
+	cell_data->gci_cells_count = 0;
+	/* Set global so that URC parsing callbacks can access it. */
+	nrfcloud_cell_data = cell_data;
+
+	ncellmeas_req_cell_count = cell_count;
+	ncellmeas_send_loc_req_flag = send_loc_req;
+	ncellmeas_done_cb = cb;
+	ncellmeas_done_ctx = ctx;
+
+	/* Schedule backup timeout on sm_work_q so it serialises with the rest
+	 * of the state machine and cannot race with ncellmeas_complete().
+	 */
+	k_work_schedule_for_queue(&sm_work_q, &ncellmeas_timeout_backup_work,
+				  K_SECONDS(NRFCLOUDPOS_TIMEOUT_SEC));
+	at_monitor_resume(&sm_ncellmeas);
+
+	LOG_DBG("Triggering cell measurements cell_count=%d", cell_count);
+
+	/*****
+	 * 1st: Normal neighbor search to get current cell.
+	 *      In addition neighbor cells are received.
+	 */
+	LOG_DBG("Normal neighbor search (NCELLMEAS=1)");
+	ncellmeas_search_type = 1;
+	ncellmeas_sm_state = NCELLMEAS_STATE_FIRST_WAIT;
+	err = sm_util_at_printf("AT%%NCELLMEAS=1");
+	if (err) {
+		LOG_ERR("NCELLMEAS failed: %d", err);
+		ncellmeas_complete();
+		return err;
+	}
+
+	/* The rest of the flow is driven by %NCELLMEAS URCs via
+	 * at_handler_ncellmeas() → ncellmeas_state_handle_work_fn().
+	 */
+	return 0;
+}
+
+/* Advance the state machine after %NCELLMEAS URC has been parsed.
+ * Runs on sm_work_q, submitted by at_handler_ncellmeas().
+ */
+static void ncellmeas_state_handle_work_fn(struct k_work *work)
+{
+	ARG_UNUSED(work);
+
+	int err;
+	int rrc_mode;
+	uint8_t ncellmeas_2nd_cell_count;
+	struct lte_lc_cell *cells;
+
+	switch (ncellmeas_sm_state) {
+	case NCELLMEAS_STATE_FIRST_WAIT:
+		if (ncellmeas_req_cell_count <= 1) {
+			ncellmeas_complete();
+			return;
+		}
+		/* GCI searches require RRC idle; start polling. */
+		ncellmeas_rrc_polls = 0;
+		ncellmeas_sm_state = NCELLMEAS_STATE_RRC_IDLE_WAIT;
+		k_work_schedule_for_queue(&sm_work_q, &ncellmeas_state_handle_work, K_NO_WAIT);
+		break;
+
+	case NCELLMEAS_STATE_RRC_IDLE_WAIT:
+		/* GCI searches are not done when in RRC connected mode. We poll for the
+		 * RRC connection release every second for up to 10 seconds.
+		 * We could subscribe to CSCON notifications but that would require
+		 * coordinating SM vs. host subscriptions.
+		 */
+		err = sm_util_at_scanf("AT+CSCON?", "+CSCON: %*d,%d", &rrc_mode);
+		if (err == 1 && rrc_mode != 0 && ncellmeas_rrc_polls < 10) {
+			LOG_DBG("Waiting for RRC connection release (%d/10)",
+				ncellmeas_rrc_polls + 1);
+			ncellmeas_rrc_polls++;
+			k_work_schedule_for_queue(
+				&sm_work_q,
+				&ncellmeas_state_handle_work,
+				K_SECONDS(1));
+			return;
+		}
+
+		if (err != 1) {
+			/* If AT+CSCON fails, proceed anyway with GCI searches. */
+			LOG_ERR("+CSCON failed %d, proceeding with GCI search", err);
+		}
+
+		/*****
+		 * 2nd: GCI history search to get GCI cells we can quickly search and measure.
+		 *      Because history search is quick and very power efficient, we request
+		 *      minimum of 5 cells even if less has been requested.
+		 */
+		ncellmeas_2nd_cell_count = MAX(5, ncellmeas_req_cell_count);
+		LOG_DBG("GCI history search (NCELLMEAS=3,%d)", ncellmeas_2nd_cell_count);
+
+		cells = calloc(ncellmeas_2nd_cell_count, sizeof(struct lte_lc_cell));
+		if (cells == NULL) {
+			LOG_ERR("Failed to allocate memory for the GCI cells");
+			ncellmeas_complete();
+			return;
+		}
+		nrfcloud_cell_data->gci_cells = cells;
+
+		ncellmeas_search_type = 3;
+		ncellmeas_gci_count = ncellmeas_2nd_cell_count;
+		ncellmeas_sm_state = NCELLMEAS_STATE_SECOND_WAIT;
+		err = sm_util_at_printf("AT%%NCELLMEAS=3,%d", ncellmeas_2nd_cell_count);
+		if (err) {
+			LOG_WRN("NCELLMEAS=3 failed: %d, using data from phase 1", err);
+			ncellmeas_complete();
+		}
+		break;
+
+	case NCELLMEAS_STATE_SECOND_WAIT:
+		if (nrfcloud_cell_data->gci_cells_count + 1 >= ncellmeas_req_cell_count) {
+			ncellmeas_complete();
+			return;
+		}
+		/*****
+		 * 3rd: GCI regional search to try and get requested number of GCI cells.
+		 *      This search can be time and power consuming especially in rural areas
+		 *      depending on the available bands in the region.
+		 */
+		LOG_DBG("GCI regional search (NCELLMEAS=4,%d)", ncellmeas_req_cell_count);
+		ncellmeas_search_type = 4;
+		ncellmeas_gci_count = ncellmeas_req_cell_count;
+		ncellmeas_sm_state = NCELLMEAS_STATE_THIRD_WAIT;
+		err = sm_util_at_printf("AT%%NCELLMEAS=4,%d", ncellmeas_req_cell_count);
+		if (err) {
+			LOG_WRN("NCELLMEAS=4 failed: %d, using data from earlier phases", err);
+			ncellmeas_complete();
+		}
+		break;
+
+	case NCELLMEAS_STATE_THIRD_WAIT:
+		ncellmeas_complete();
+		break;
+
+	default:
+		LOG_WRN("URC received in unexpected NCELLMEAS state %d", ncellmeas_sm_state);
+		break;
+	}
+}
+
+static void ncellmeas_timeout_work_fn(struct k_work *work)
+{
+	ARG_UNUSED(work);
+
+	LOG_WRN("NCELLMEAS timeout");
+	ncellmeas_complete();
+}
+
+static void sm_at_nrfcloud_ncellmeas_work_fn(struct k_work *work)
+{
+	ARG_UNUSED(work);
+
+	sm_at_nrfcloud_ncellmeas_start(nrfcloud_cell_count, true, NULL, NULL);
+}
+
+static void nrfcloud_loc_req_work_fn(struct k_work *work)
+{
+	int err = 0;
+
+	struct nrf_cloud_location_result result = {0};
+	struct nrf_cloud_coap_location_request request = {
+		.config = NULL,
+		.cell_info = nrfcloud_cell_count ? nrfcloud_cell_data : NULL,
+		.wifi_info = nrfcloud_wifi_pos ? &nrfcloud_wifi_data : NULL
+	};
+
+	/* Check if ncellmeas was requested but there are no results */
+	if (nrfcloud_cell_count > 0) {
+		if (nrfcloud_cell_data == NULL ||
+		    nrfcloud_cell_data->current_cell.id == LTE_LC_CELL_EUTRAN_ID_INVALID) {
+			request.cell_info = NULL;
+			if (nrfcloud_wifi_pos) {
+				LOG_WRN("NCELLMEAS failed but Wi-Fi APs are available");
+				/* Continue to send Wi-Fi APs to cloud*/
+			} else {
+				urc_send_to(nrfcloud_pipe, "\r\n#XNRFCLOUDPOS: -1\r\n");
+				goto clean_exit;
+			}
+		}
+	}
+
+	err = nrf_cloud_coap_location_get(&request, &result);
+	if (err == 0) {
+		urc_send_to(nrfcloud_pipe, "\r\n#XNRFCLOUDPOS: 0,%d,%lf,%lf,%d\r\n",
+			result.type, result.lat, result.lon, result.unc);
+	} else {
+		LOG_ERR("Failed to request nRF Cloud location (%d).", err);
+		urc_send_to(nrfcloud_pipe, "\r\n#XNRFCLOUDPOS: %d\r\n", err < 0 ? -1 : err);
+	}
+
+clean_exit:
+	sm_at_nrfcloud_ncellmeas_cleanup(nrfcloud_cell_data);
+	nrfcloud_cell_data = NULL;
+	if (nrfcloud_wifi_pos) {
+		free(nrfcloud_wifi_data.ap_info);
+		nrfcloud_wifi_data.ap_info = NULL;
+	}
+	nrfcloud_sending_loc_req = false;
+}
+
+/* Counts the frequency of a character in a null-terminated string. */
+static uint32_t get_char_frequency(const char *str, char c)
+{
+	uint32_t count = 0;
+
+	__ASSERT_NO_MSG(str != NULL);
+
+	do {
+		if (*str == c) {
+			count++;
+		}
+	} while (*(str++) != '\0');
+
+	return count;
+}
+
+static uint32_t neighborcell_count_get(const char *at_response)
+{
+	uint32_t comma_count, ncell_elements, ncell_count;
+
+	__ASSERT_NO_MSG(at_response != NULL);
+
+	comma_count = get_char_frequency(at_response, ',');
+	if (comma_count < AT_NCELLMEAS_PRE_NCELLS_PARAMS_COUNT) {
+		return 0;
+	}
+
+	/* Add one, as there's no comma after the last element. */
+	ncell_elements = comma_count - (AT_NCELLMEAS_PRE_NCELLS_PARAMS_COUNT - 1) + 1;
+	ncell_count = ncell_elements / AT_NCELLMEAS_NCELLS_PARAMS_COUNT;
+
+	return ncell_count;
+}
+
+static struct lte_lc_ncell *parse_ncellmeas_neighbors(
+	struct at_parser *parser,
+	uint8_t ncell_count,
+	int *curr_index)
+{
+	int err;
+	struct lte_lc_ncell *ncells = NULL;
+	int tmp_int = 0;
+	size_t j = 0;
+
+	if (ncell_count == 0) {
+		return NULL;
+	}
+	/* Allocate room for the parsed neighbor info. */
+	ncells = calloc(ncell_count, sizeof(struct lte_lc_ncell));
+	if (ncells == NULL) {
+		LOG_ERR("OOM: ncells");
+		return NULL;
+	}
+
+	/* Parse neighbors */
+	for (j = 0; j < ncell_count; j++) {
+		/* <n_earfcn[j]> */
+		err = at_parser_num_get(parser, *curr_index, &ncells[j].earfcn);
+		if (err) {
+			LOG_ERR("Could not parse n_earfcn, error: %d", err);
+			goto error_exit;
+		}
+
+		/* <n_phys_cell_id[j]> */
+		(*curr_index)++;
+		err = at_parser_num_get(parser, *curr_index, &ncells[j].phys_cell_id);
+		if (err) {
+			LOG_ERR("Could not parse n_phys_cell_id, error: %d", err);
+			goto error_exit;
+		}
+
+		/* <n_rsrp[j]> */
+		(*curr_index)++;
+		err = at_parser_num_get(parser, *curr_index, &tmp_int);
+		if (err) {
+			LOG_ERR("Could not parse n_rsrp, error: %d", err);
+			goto error_exit;
+		}
+		ncells[j].rsrp = tmp_int;
+
+		/* <n_rsrq[j]> */
+		(*curr_index)++;
+		err = at_parser_num_get(parser, *curr_index, &tmp_int);
+		if (err) {
+			LOG_ERR("Could not parse n_rsrq, error: %d", err);
+			goto error_exit;
+		}
+		ncells[j].rsrq = tmp_int;
+
+		/* <time_diff[j]> */
+		(*curr_index)++;
+		err = at_parser_num_get(parser, *curr_index, &ncells[j].time_diff);
+		if (err) {
+			LOG_ERR("Could not parse time_diff, error: %d", err);
+			goto error_exit;
+		}
+		(*curr_index)++;
+	}
+
+	return ncells;
+
+error_exit:
+	free(ncells);
+	return NULL;
+}
+
+/* This function has been copied from sdk-nrf lte_link_control library
+ * with version v3.4.0-rc1.
+ */
+static int parse_ncellmeas_gci(const char *at_response, struct lte_lc_cells_info *cells)
+{
+	struct at_parser parser;
+	int err, status, tmp_int, len;
+	int16_t tmp_short;
+	char tmp_str[7];
+	int curr_index;
+	size_t i = 0, k = 0;
+
+	__ASSERT_NO_MSG(at_response != NULL);
+	__ASSERT_NO_MSG(cells != NULL);
+	__ASSERT_NO_MSG(cells->gci_cells != NULL);
+
+	/* Count the actual number of parameters in the AT response before
+	 * allocating heap for it. This may save quite a bit of heap as the
+	 * worst case scenario is 96 elements.
+	 * 3 is added to account for the parameters that do not have a trailing
+	 * comma.
+	 */
+	size_t param_count = get_char_frequency(at_response, ',') + 3;
+
+	/* We don't want to clear old current cell since it's not always returned but
+	 * we want to overwrite old GCI cells.
+	 */
+	cells->gci_cells_count = 0;
+
+	/*
+	 * Response format for GCI search types:
+	 * High level:
+	 * status[,
+	 *	GCI_cell_info1,neighbor_count1[,neighbor_cell1_1,neighbor_cell1_2...],
+	 *	GCI_cell_info2,neighbor_count2[,neighbor_cell2_1,neighbor_cell2_2...]...]
+	 *
+	 * Detailed:
+	 * %NCELLMEAS: status
+	 * [,<cell_id>,<plmn>,<tac>,<ta>,<ta_meas_time>,<earfcn>,<phys_cell_id>,<rsrp>,<rsrq>,
+	 *		<meas_time>,<serving>,<neighbor_count>
+	 *	[,<n_earfcn1>,<n_phys_cell_id1>,<n_rsrp1>,<n_rsrq1>,<time_diff1>]
+	 *	[,<n_earfcn2>,<n_phys_cell_id2>,<n_rsrp2>,<n_rsrq2>,<time_diff2>]...],
+	 *  <cell_id>,<plmn>,<tac>,<ta>,<ta_meas_time>,<earfcn>,<phys_cell_id>,<rsrp>,<rsrq>,
+	 *		<meas_time>,<serving>,<neighbor_count>
+	 *	[,<n_earfcn1>,<n_phys_cell_id1>,<n_rsrp1>,<n_rsrq1>,<time_diff1>]
+	 *	[,<n_earfcn2>,<n_phys_cell_id2>,<n_rsrp2>,<n_rsrq2>,<time_diff2>]...]...
+	 */
+
+	err = at_parser_init(&parser, at_response);
+	__ASSERT_NO_MSG(err == 0);
+
+	/* Status code */
+	curr_index = AT_NCELLMEAS_STATUS_INDEX;
+	err = at_parser_num_get(&parser, curr_index, &status);
+	if (err) {
+		LOG_DBG("Cannot parse NCELLMEAS status");
+		goto clean_exit;
+	}
+
+	if (status == AT_NCELLMEAS_STATUS_VALUE_FAIL) {
+		err = 1;
+		LOG_WRN("NCELLMEAS failed");
+		goto clean_exit;
+	} else if (status == AT_NCELLMEAS_STATUS_VALUE_INCOMPLETE) {
+		LOG_WRN("NCELLMEAS interrupted; results incomplete");
+		if (param_count == 3) {
+			/* No results, skip parsing. */
+			goto clean_exit;
+		}
+	}
+
+	/* Go through the cells */
+	for (i = 0; curr_index < (param_count - (AT_NCELLMEAS_GCI_CELL_PARAMS_COUNT + 1)) &&
+		    i < ncellmeas_gci_count;
+	     i++) {
+		struct lte_lc_cell parsed_cell;
+		bool is_serving_cell;
+		uint8_t parsed_ncells_count;
+
+		/* <cell_id>  */
+		curr_index++;
+		err = string_param_to_int(&parser, curr_index, &tmp_int, 16);
+		if (err) {
+			LOG_ERR("Could not parse cell_id, index %d, i %d error: %d", curr_index, i,
+				err);
+			goto clean_exit;
+		}
+
+		if (tmp_int > LTE_LC_CELL_EUTRAN_ID_MAX) {
+			LOG_WRN("cell_id = %d which is > LTE_LC_CELL_EUTRAN_ID_MAX; "
+				"marking invalid",
+				tmp_int);
+			tmp_int = LTE_LC_CELL_EUTRAN_ID_INVALID;
+		}
+		parsed_cell.id = tmp_int;
+
+		/* <plmn> */
+		len = sizeof(tmp_str);
+
+		curr_index++;
+		err = at_parser_string_get(&parser, curr_index, tmp_str, &len);
+		if (err) {
+			LOG_ERR("Could not parse plmn, error: %d", err);
+			goto clean_exit;
+		}
+
+		/* Read MNC and store as integer. The MNC starts as the fourth character
+		 * in the string, following three characters long MCC.
+		 */
+		err = string_to_int(&tmp_str[3], 10, &parsed_cell.mnc);
+		if (err) {
+			LOG_ERR("string_to_int, error: %d", err);
+			goto clean_exit;
+		}
+
+		/* Null-terminated MCC, read and store it. */
+		tmp_str[3] = '\0';
+
+		err = string_to_int(tmp_str, 10, &parsed_cell.mcc);
+		if (err) {
+			LOG_ERR("string_to_int, error: %d", err);
+			goto clean_exit;
+		}
+
+		/* <tac> */
+		curr_index++;
+		err = string_param_to_int(&parser, curr_index, &tmp_int, 16);
+		if (err) {
+			LOG_ERR("Could not parse tracking_area_code in i %d, error: %d", i, err);
+			goto clean_exit;
+		}
+		parsed_cell.tac = tmp_int;
+
+		/* <ta> */
+		curr_index++;
+		err = at_parser_num_get(&parser, curr_index, &tmp_int);
+		if (err) {
+			LOG_ERR("Could not parse timing_advance, error: %d", err);
+			goto clean_exit;
+		}
+		parsed_cell.timing_advance = tmp_int;
+
+		/* <ta_meas_time> */
+		curr_index++;
+		err = at_parser_num_get(&parser, curr_index, &parsed_cell.timing_advance_meas_time);
+		if (err) {
+			LOG_ERR("Could not parse timing_advance_meas_time, error: %d", err);
+			goto clean_exit;
+		}
+
+		/* <earfcn> */
+		curr_index++;
+		err = at_parser_num_get(&parser, curr_index, &parsed_cell.earfcn);
+		if (err) {
+			LOG_ERR("Could not parse earfcn, error: %d", err);
+			goto clean_exit;
+		}
+
+		/* <phys_cell_id> */
+		curr_index++;
+		err = at_parser_num_get(&parser, curr_index, &parsed_cell.phys_cell_id);
+		if (err) {
+			LOG_ERR("Could not parse phys_cell_id, error: %d", err);
+			goto clean_exit;
+		}
+
+		/* <rsrp> */
+		curr_index++;
+		err = at_parser_num_get(&parser, curr_index, &parsed_cell.rsrp);
+		if (err) {
+			LOG_ERR("Could not parse rsrp, error: %d", err);
+			goto clean_exit;
+		}
+
+		/* <rsrq> */
+		curr_index++;
+		err = at_parser_num_get(&parser, curr_index, &parsed_cell.rsrq);
+		if (err) {
+			LOG_ERR("Could not parse rsrq, error: %d", err);
+			goto clean_exit;
+		}
+
+		/* <meas_time> */
+		curr_index++;
+		err = at_parser_num_get(&parser, curr_index, &parsed_cell.measurement_time);
+		if (err) {
+			LOG_ERR("Could not parse meas_time, error: %d", err);
+			goto clean_exit;
+		}
+
+		/* <serving> */
+		curr_index++;
+		err = at_parser_num_get(&parser, curr_index, &tmp_short);
+		if (err) {
+			LOG_ERR("Could not parse serving, error: %d", err);
+			goto clean_exit;
+		}
+		is_serving_cell = tmp_short;
+
+		/* <neighbor_count> */
+		curr_index++;
+		err = at_parser_num_get(&parser, curr_index, &tmp_short);
+		if (err) {
+			LOG_ERR("Could not parse neighbor_count, error: %d", err);
+			goto clean_exit;
+		}
+		parsed_ncells_count = tmp_short;
+
+		if (is_serving_cell) {
+			/* This the current/serving cell.
+			 * In practice the <neighbor_count> is always 0 for other than
+			 * the serving cell, i.e. no neigbor cell list is available.
+			 * Thus, handle neighbor cells only for the serving cell.
+			 */
+			cells->current_cell = parsed_cell;
+			if (parsed_ncells_count != 0) {
+				/* Free any neighbor_cells allocated by a prior parse pass
+				 * (e.g. from NCELLMEAS=1) before overwriting the pointer.
+				 */
+				free(cells->neighbor_cells);
+				cells->neighbor_cells = NULL;
+				cells->ncells_count = 0;
+				cells->neighbor_cells = parse_ncellmeas_neighbors(
+					&parser, parsed_ncells_count, &curr_index);
+				if (cells->neighbor_cells == NULL) {
+					LOG_ERR("Failed to parse neighbor cells");
+					err = -EFAULT;
+					goto clean_exit;
+				}
+				cells->ncells_count = parsed_ncells_count;
+			}
+		} else {
+			cells->gci_cells[k] = parsed_cell;
+			cells->gci_cells_count++; /* Increase count for non-serving GCI cell */
+			k++;
+		}
+	}
+
+clean_exit:
+	return err;
+}
+
+/* This function has been copied from sdk-nrf lte_link_control library
+ * with version v3.4.0-rc1.
+ */
+static int parse_ncellmeas(const char *at_response, struct lte_lc_cells_info *cells)
+{
+	int err, status, tmp;
+	struct at_parser parser;
+	size_t count = 0;
+	int ncells_start_idx = AT_NCELLMEAS_PRE_NCELLS_PARAMS_COUNT;
+
+	__ASSERT_NO_MSG(at_response != NULL);
+	__ASSERT_NO_MSG(cells != NULL);
+
+	err = at_parser_init(&parser, at_response);
+	__ASSERT_NO_MSG(err == 0);
+
+	/**
+	 * Definitions for %NCELLMEAS notification
+	 * %NCELLMEAS: status [,<cell_id>, <plmn>, <tac>, <timing_advance>, <current_earfcn>,
+	 * <current_phys_cell_id>, <current_rsrp>, <current_rsrq>,<measurement_time>,]
+	 * [,<n_earfcn>1, <n_phys_cell_id>1, <n_rsrp>1, <n_rsrq>1,<time_diff>1]
+	 * [,<n_earfcn>2, <n_phys_cell_id>2, <n_rsrp>2, <n_rsrq>2,<time_diff>2] ...
+	 * [,<n_earfcn>17, <n_phys_cell_id>17, <n_rsrp>17, <n_rsrq>17,<time_diff>17
+	 *
+	 * Max 17 ncell
+	 */
+
+	err = at_parser_cmd_count_get(&parser, &count);
+	if (err) {
+		LOG_ERR("Could not get NCELLMEAS param count, "
+			"potentially malformed notification, error: %d",
+			err);
+		goto clean_exit;
+	}
+
+	/* Status code */
+	err = at_parser_num_get(&parser, AT_NCELLMEAS_STATUS_INDEX, &status);
+	if (err) {
+		goto clean_exit;
+	}
+
+	if (status == AT_NCELLMEAS_STATUS_VALUE_FAIL) {
+		err = 1;
+		LOG_WRN("NCELLMEAS failed");
+		goto clean_exit;
+	} else if (status == AT_NCELLMEAS_STATUS_VALUE_INCOMPLETE) {
+		LOG_WRN("NCELLMEAS interrupted; results incomplete");
+		if (count == 2) {
+			/* No results, skip parsing. */
+			goto clean_exit;
+		}
+	}
+
+	/* Current cell ID */
+	err = string_param_to_int(&parser, AT_NCELLMEAS_CELL_ID_INDEX, &tmp, 16);
+	if (err) {
+		goto clean_exit;
+	}
+
+	if (tmp > LTE_LC_CELL_EUTRAN_ID_MAX) {
+		tmp = LTE_LC_CELL_EUTRAN_ID_INVALID;
+	}
+	cells->current_cell.id = tmp;
+
+	/* PLMN, that is, MCC and MNC */
+	err = plmn_param_string_to_mcc_mnc(&parser, AT_NCELLMEAS_PLMN_INDEX,
+					   &cells->current_cell.mcc, &cells->current_cell.mnc);
+	if (err) {
+		goto clean_exit;
+	}
+
+	/* Tracking area code */
+	err = string_param_to_int(&parser, AT_NCELLMEAS_TAC_INDEX, &tmp, 16);
+	if (err) {
+		goto clean_exit;
+	}
+
+	cells->current_cell.tac = tmp;
+
+	/* Timing advance */
+	err = at_parser_num_get(&parser, AT_NCELLMEAS_TIMING_ADV_INDEX, &tmp);
+	if (err) {
+		goto clean_exit;
+	}
+
+	cells->current_cell.timing_advance = tmp;
+
+	/* EARFCN */
+	err = at_parser_num_get(&parser, AT_NCELLMEAS_EARFCN_INDEX, &cells->current_cell.earfcn);
+	if (err) {
+		goto clean_exit;
+	}
+
+	/* Physical cell ID */
+	err = at_parser_num_get(&parser, AT_NCELLMEAS_PHYS_CELL_ID_INDEX,
+				&cells->current_cell.phys_cell_id);
+	if (err) {
+		goto clean_exit;
+	}
+
+	/* RSRP */
+	err = at_parser_num_get(&parser, AT_NCELLMEAS_RSRP_INDEX, &tmp);
+	if (err) {
+		goto clean_exit;
+	}
+
+	cells->current_cell.rsrp = tmp;
+
+	/* RSRQ */
+	err = at_parser_num_get(&parser, AT_NCELLMEAS_RSRQ_INDEX, &tmp);
+	if (err) {
+		goto clean_exit;
+	}
+
+	cells->current_cell.rsrq = tmp;
+
+	/* Measurement time */
+	err = at_parser_num_get(&parser, AT_NCELLMEAS_MEASUREMENT_TIME_INDEX,
+				&cells->current_cell.measurement_time);
+	if (err) {
+		goto clean_exit;
+	}
+
+	/* Neighbor cell count */
+	cells->ncells_count = neighborcell_count_get(at_response);
+
+	/* Timing advance measurement time is added as the last parameter in the response. */
+	size_t ta_meas_time_index = AT_NCELLMEAS_PRE_NCELLS_PARAMS_COUNT +
+				    cells->ncells_count * AT_NCELLMEAS_NCELLS_PARAMS_COUNT;
+
+	if (count > ta_meas_time_index) {
+		err = at_parser_num_get(&parser, ta_meas_time_index,
+					&cells->current_cell.timing_advance_meas_time);
+		if (err) {
+			goto clean_exit;
+		}
+	} else {
+		cells->current_cell.timing_advance_meas_time = 0;
+	}
+
+	if (cells->ncells_count == 0) {
+		goto clean_exit;
+	}
+
+	cells->neighbor_cells = parse_ncellmeas_neighbors(
+		&parser, cells->ncells_count, &ncells_start_idx);
+	if (cells->neighbor_cells == NULL) {
+		LOG_ERR("Failed to parse neighbor cells");
+		err = -EFAULT;
+	}
+
+clean_exit:
+	return err;
+}
+
+/* This function has been copied from sdk-nrf lte_link_control library
+ * with version v3.4.0-rc1.
+ * The structure has been modified from lte_link_control library as follows:
+ * - parse_ncellmeas_gci is called in this handler and not from parse_ncellmeas() function.
+ * - New parse_ncellmeas_neighbors() function handles neighbors parsing for
+ *   both GCI and non-GCI search types.
+ */
+static void at_handler_ncellmeas(const char *response)
+{
 	int err;
 
-	if (initialized) {
-		return;
-	}
-	initialized = true;
+	__ASSERT_NO_MSG(response != NULL);
+	__ASSERT_NO_MSG(nrfcloud_sending_loc_req);
+	__ASSERT_NO_MSG(nrfcloud_cell_data != NULL);
 
-	err = nrf_cloud_coap_init();
+	if (ncellmeas_search_type > 2) {
+		err = parse_ncellmeas_gci(response, nrfcloud_cell_data);
+	} else {
+		err = parse_ncellmeas(response, nrfcloud_cell_data);
+	}
+
+	switch (err) {
+	case 0:
+		LOG_DBG("NCELLMEAS parsed successfully, err: %d, gci_count: %d, ncells_count: %d",
+			err, nrfcloud_cell_data->gci_cells_count, nrfcloud_cell_data->ncells_count);
+		break;
+	/* case 1: NCELLMEAS failed */
+	default:
+		LOG_ERR("NCELLMEAS parsing failed, err: %d", err);
+		break;
+	}
+
 	if (err) {
-		LOG_ERR("Failed to initialize nRF Cloud CoAP library: %d", err);
+		ncellmeas_complete();
 		return;
 	}
 
-	k_work_init(&nrfcloud_conn_work, conn_wk);
-#if defined(CONFIG_SM_NRF_CLOUD_LOCATION)
-	k_work_init(&nrfcloud_loc_req, loc_req_wk);
-#endif
-	nrf_cloud_client_id_get(nrfcloud_device_id, sizeof(nrfcloud_device_id));
+	/* For single-phase callback callers (e.g. A-GNSS, cell_count=1), complete
+	 * directly on this thread (AT monitor) so the callback can safely give a
+	 * semaphore without deadlocking sm_work_q. All other paths (multi-phase
+	 * or loc-req) are handled via sm_work_q as usual.
+	 */
+	if (ncellmeas_done_cb != NULL && ncellmeas_req_cell_count <= 1 &&
+	    ncellmeas_sm_state == NCELLMEAS_STATE_FIRST_WAIT) {
+		ncellmeas_complete();
+	} else {
+		k_work_schedule_for_queue(&sm_work_q, &ncellmeas_state_handle_work, K_NO_WAIT);
+	}
 }
-NRF_MODEM_LIB_ON_INIT(sm_nrfcloud_init_hook, sm_at_nrfcloud_init, NULL);
 
-#endif /* CONFIG_SM_NRF_CLOUD */
+#endif /* CONFIG_SM_NRF_CLOUD_LOCATION */
