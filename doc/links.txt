@@ -102,6 +102,7 @@
 .. _`Zephyr Modem modules`: https://docs.zephyrproject.org/latest/services/modem/index.html
 .. _`zperf: Network Traffic Generator`: https://docs.zephyrproject.org/latest/connectivity/networking/api/zperf.html
 .. _`Zephyr CMUX Power Saving`: https://docs.zephyrproject.org/latest/services/modem/index.html#cmux-power-saving
+.. _`Zephyr application VERSION`: https://docs.zephyrproject.org/latest/build/version/index.html#app-version-details
 
 .. ### github.com
 

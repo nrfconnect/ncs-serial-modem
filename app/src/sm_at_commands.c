@@ -75,12 +75,12 @@ STATIC int handle_at_smver(enum at_parser_cmd_type cmd_type, struct at_parser *,
 
 	if (cmd_type == AT_PARSER_CMD_TYPE_SET) {
 		if (strlen(CONFIG_SM_CUSTOMER_VERSION) > 0) {
-			rsp_send("\r\n#XSMVER: %s,%s,\"%s\"\r\n",
-				 STRINGIFY(SM_VERSION), STRINGIFY(NCS_VERSION_STRING),
+			rsp_send("\r\n#XSMVER: \"%s\",\"%s\",\"%s\"\r\n",
+				 SM_VERSION, NCS_VERSION_STRING,
 				 CONFIG_SM_CUSTOMER_VERSION);
 		} else {
-			rsp_send("\r\n#XSMVER: %s,%s\r\n",
-				 STRINGIFY(SM_VERSION), STRINGIFY(NCS_VERSION_STRING));
+			rsp_send("\r\n#XSMVER: \"%s\",\"%s\"\r\n",
+				 SM_VERSION, NCS_VERSION_STRING);
 		}
 		ret = 0;
 	}
