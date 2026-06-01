@@ -43,10 +43,11 @@ PPP_PIDFILE="/var/run/ppp-nrf91.pid"
 MODEM_TRACE_FILE="/var/log/nrf91-modem-trace.bin"
 TRACE_PID_FILE="/var/run/nrf91-modem-trace.pid"
 TRACE=0
+CMUX_ATTACHED=0
 
 usage() {
     echo "Usage: $0 [-s serial_port] [-b baud_rate] [-B new_speed] [-t timeout] [-a APN]"
-    echo "          [-f IP|IPV6|IPV4V6] [-p PDN] [-T] [-v] [-h]"
+    echo "          [-f IP|IPV6|IPV4V6] [-p PDN] [-C] [-T] [-v] [-h]"
     echo ""
     echo "  -s serial_port : Serial port where the modem is connected (default: $MODEM)"
     echo "  -b baud_rate   : Current baud rate of Serial Modem (default: $BAUD)"
@@ -58,6 +59,8 @@ usage() {
     echo "  -a APN         : Access Point Name for cellular connection (default: $APN)"
     echo "  -f FAMILY      : PDP_type, one of IP, IPV6, IPV4V6 (default: $PDP_TYPE)"
     echo "  -p PDN         : PDN ID to use (default: $CID), 0 means use default PDN"
+    echo "  -C             : Attach to existing CMUX (started with sm2_start_cmux.sh)."
+    echo "                   Skips CMUX initialization and teardown."
     echo "  -T             : Enable modem trace collection (file: $MODEM_TRACE_FILE)"
     echo "  -v             : Enable verbose output"
     echo "  -h             : Show this help message"
@@ -66,7 +69,7 @@ usage() {
 }
 
 # Parse command line parameters
-while getopts s:b:B:t:a::f:p:Thv flag
+while getopts s:b:B:t:a::f:p:CThv flag
 do
     case "${flag}" in
 	s) MODEM=${OPTARG};;
@@ -76,6 +79,7 @@ do
 	a) APN=${OPTARG};;
 	p) CID=${OPTARG};;
 	f) PDP_TYPE=${OPTARG};;
+	C) CMUX_ATTACHED=1;;
 	T) TRACE=1;;
 	v) VERBOSE=1; CHATOPT="-v"; PPP_DEBUG="debug";;
 	h|?) usage;;
@@ -84,9 +88,16 @@ done
 
 log_dbg() {
     if [ $VERBOSE -eq 1 ]; then
-	echo "$@" >&2
+	logger --id=$$ -s "$@"
     fi
 }
+
+# Do not allow starting the trace if attach to existing CMUX
+if [ $TRACE -gt 0 ] && [ $CMUX_ATTACHED -eq 1 ]; then
+	echo "Error: Trace collection is not supported when attaching to existing CMUX."
+	echo "Please start trace collection in sm2_start_cmux.sh."
+	exit 1
+fi
 
 if [ $CID -gt 0 ]; then
 	log_dbg "Using PDN ID: $CID on APN: $APN protocol: $PDP_TYPE"
@@ -142,21 +153,28 @@ if [ -f "$PIDFILE" ]; then
 	fi
 fi
 
-if [ -f "$TRACE_PID_FILE" ]; then
+if [ $TRACE -gt 0 ] && [ -f "$TRACE_PID_FILE" ]; then
 	if ! kill -0 $(cat "$TRACE_PID_FILE" 2>/dev/null) 2>/dev/null; then
 		log_dbg "Removing stale trace PID file: $TRACE_PID_FILE"
 		rm -f "$TRACE_PID_FILE"
 	fi
 fi
 
-if find /dev -type c -name 'gsmtty*' | grep -q . ; then
-	echo "Error: existing CMUX devices found (/dev/gsmtty*)"
-	exit 1
-fi
+if [ $CMUX_ATTACHED -eq 0 ]; then
+	if find /dev -type c -name 'gsmtty*' | grep -q . ; then
+		echo "Error: existing CMUX devices found (/dev/gsmtty*)"
+		exit 1
+	fi
 
-if pgrep ldattach >/dev/null; then
-	echo "Error: existing ldattach process found"
-	exit 1
+	if pgrep ldattach >/dev/null; then
+		echo "Error: existing ldattach process found"
+		exit 1
+	fi
+else
+	if ! find /dev -type c -name 'gsmtty*' | grep -q . ; then
+		echo "Error: no CMUX devices found (/dev/gsmtty*). Run sm2_start_cmux.sh first."
+		exit 1
+	fi
 fi
 
 cmux_close() {
@@ -165,96 +183,111 @@ cmux_close() {
 	sleep 2
 }
 
+stop_trace() {
+	if [ $TRACE -gt 0 ]; then
+		start-stop-daemon --stop --pidfile $TRACE_PID_FILE --remove-pidfile --oknodo \
+				  --retry 1
+	fi
+}
+
 cleanup() {
 	set +eu
-	start-stop-daemon --stop --pidfile $TRACE_PID_FILE --remove-pidfile --oknodo
 	pkill pppd
-	pkill ldattach
-	printf "\xF9\x03\xEF\x05\xC3\x01\xF2\xF9" > $MODEM
+	if [ $CMUX_ATTACHED -eq 0 ]; then
+		stop_trace
+		pkill ldattach
+		cmux_close
+	fi
 	echo "Failed to start..."
 	exit 1
 }
 
 trap cleanup ERR
 
-# Configure serial port
-stty -F $MODEM $BAUD pass8 raw crtscts clocal
+if [ $CMUX_ATTACHED -eq 0 ]; then
+	# Configure serial port
+	stty -F $MODEM $BAUD pass8 raw crtscts clocal
 
-log_dbg "Wait modem to boot"
-if chat -t1 "Ready--" "AT" "OK" <$MODEM >$MODEM; then
-	log_dbg "Modem is in AT mode"
-else
-	log_dbg "Modem not responding, try CMUX close down..."
-	cmux_close
-	if ! chat -t1 "" "AT" "OK" <$MODEM >$MODEM; then
-		echo "Error: Modem not responding"
-		exit 1
-	fi
-fi
-
-if [ $IPR_BAUD -ne 0 ]; then
-	log_dbg "Set baud rate on modem to $IPR_BAUD"
-	chat $CHATOPT -t1 '' "AT+IPR=$IPR_BAUD" "OK" >$MODEM <$MODEM
-	# Reconfigure serial port
-	stty -F $MODEM $IPR_BAUD pass8 raw crtscts clocal
-fi
-
-log_dbg "Attach CMUX channel to modem..."
-chat $CHATOPT -t1 '' "AT+CMUX=0" "OK" >$MODEM <$MODEM
-ldattach GSM0710 $MODEM
-
-# AT_CMUX is the channel where setup commands will be sent and converted into PPP
-AT_CMUX=$(ls /dev/gsmtty* | sort -V | head -n 1)
-# AT_CMUX_USER is the AT channel that host can use after PPP is set up
-AT_CMUX_USER=$(ls /dev/gsmtty* | sort -V | head -n 2 | tail -n 1)
-log_dbg "AT CMUX:  $AT_CMUX_USER"
-log_dbg "PPP CMUX: $AT_CMUX"
-
-MT_CMUX=""
-if [ $TRACE -gt 0 ]; then
-	MT_CMUX=$(ls /dev/gsmtty* | sort -V | head -n 3 | tail -n 1)
-	log_dbg "Trace CMUX: $MT_CMUX"
-	echo "Trace file: $MODEM_TRACE_FILE"
-	stty -F $MT_CMUX raw clocal -icrnl -ixon -opost
-fi
-sleep 3
-
-stty -F $AT_CMUX clocal
-test -c $AT_CMUX
-
-if [ $TRACE -gt 0 ]; then
-	echo "Starting trace collection..."
-	chat $CHATOPT -t1 '' 'AT#XCMUXTRACE=3' 'OK' >$AT_CMUX <$AT_CMUX
-
-	# Prefer to use socat, if installed.
-	if command -v socat >/dev/null 2>&1; then
-		start-stop-daemon --start --pidfile $TRACE_PID_FILE --make-pidfile \
-			--background --exec $(command -v socat) -- -u $MT_CMUX,cfmakeraw,clocal=1 \
-			CREATE:$MODEM_TRACE_FILE
+	log_dbg "Wait modem to boot"
+	if chat -t1 "Ready--" "AT" "OK" <$MODEM >$MODEM; then
+		log_dbg "Modem is in AT mode"
 	else
-		start-stop-daemon --start --pidfile $TRACE_PID_FILE --make-pidfile \
-		--background --exec /bin/dd -- if=$MT_CMUX of=$MODEM_TRACE_FILE bs=1024
+		log_dbg "Modem not responding, try CMUX close down..."
+		cmux_close
+		if ! chat -t1 "" "AT" "OK" <$MODEM >$MODEM; then
+			echo "Error: Modem not responding"
+			exit 1
+		fi
 	fi
+
+	if [ $IPR_BAUD -ne 0 ]; then
+		log_dbg "Set baud rate on modem to $IPR_BAUD"
+		chat $CHATOPT -t1 '' "AT+IPR=$IPR_BAUD" "OK" >$MODEM <$MODEM
+		# Reconfigure serial port
+		stty -F $MODEM $IPR_BAUD pass8 raw crtscts clocal
+	fi
+
+	log_dbg "Attach CMUX channel to modem..."
+	chat $CHATOPT -t1 '' "AT+CMUX=0" "OK" >$MODEM <$MODEM
+	ldattach GSM0710 $MODEM
+	sleep 3
 fi
+
+# DLC 1: PPP data channel
+# DLC 2: AT command channel for host
+# DLC 3: Trace channel
+DLC1=$(ls /dev/gsmtty* | sort -V | head -n 1)
+DLC2=$(ls /dev/gsmtty* | sort -V | head -n 2 | tail -n 1)
+DLC3=$(ls /dev/gsmtty* | sort -V | head -n 3 | tail -n 1)
 
 check_devices_or_exit() {
 	# Verify that UART devices are still present
-	if [ ! -c $AT_CMUX ] || [ ! -c $MODEM ]; then
+	if [ ! -c $DLC1 ] || [ ! -c $DLC2 ] || [ ! -c $DLC3 ] || [ ! -c $MODEM ]; then
+		log_dbg "UART or DLC devices not found."
 		echo "Error: UART devices not found, exiting..."
-		start-stop-daemon --stop --pidfile $TRACE_PID_FILE --remove-pidfile \
-				  --oknodo --retry 1
-		pkill ldattach
+		if [ $CMUX_ATTACHED -eq 0 ]; then
+			stop_trace
+			pkill ldattach
+		fi
 		exit 1
 	fi
 }
 
+check_devices_or_exit
+
+echo "DLC 1 (PPP):       $DLC1"
+echo "DLC 2 (AT):        $DLC2"
+
+stty -F $DLC1 clocal
+
+if [ $TRACE -gt 0 ]; then
+	echo "DLC 3 (TRACE):        $DLC3"
+	echo "Starting trace collection to $MODEM_TRACE_FILE"
+	stty -F $DLC3 raw clocal -icrnl -ixon -opost
+	chat $CHATOPT -t1 '' 'AT#XCMUXTRACE=3' 'OK' >$DLC1 <$DLC1
+
+	# Prefer to use socat, if installed.
+	if command -v socat >/dev/null 2>&1; then
+		start-stop-daemon --start --pidfile $TRACE_PID_FILE --make-pidfile \
+			--background --exec $(command -v socat) -- -u $DLC3,cfmakeraw,clocal=1 \
+			CREATE:$MODEM_TRACE_FILE
+	else
+		start-stop-daemon --start --pidfile $TRACE_PID_FILE --make-pidfile \
+		--background --exec /bin/dd -- if=$DLC3 of=$MODEM_TRACE_FILE bs=1024
+	fi
+fi
+
 shutdown_modem() {
 	set +eu
 	check_devices_or_exit
-	start-stop-daemon --stop --pidfile $TRACE_PID_FILE --remove-pidfile --oknodo --retry 1
-	chat $CHATOPT -t5 '' $SHUTDOWN_SCRIPT >$AT_CMUX <$AT_CMUX
+	if [ $CMUX_ATTACHED -eq 0 ]; then
+		stop_trace
+	fi
+	chat $CHATOPT -t5 '' $SHUTDOWN_SCRIPT >$DLC1 <$DLC1
 	CHAT_ERR=$?
-	pkill ldattach
+	if [ $CMUX_ATTACHED -eq 0 ]; then
+		pkill ldattach
+	fi
 	sleep 1
 	if [ "$CHAT_ERR" -ne 0 ]; then
 		cmux_close
@@ -271,13 +304,18 @@ ppp_start() {
 	set +eu
 	set -x
 	check_devices_or_exit
-	pppd $AT_CMUX ${PPP_OPTIONS} connect "${CONNECT_CMD}"
-	echo "pppd terminated, shutting down modem..."
-	shutdown_modem
+	pppd $DLC1 ${PPP_OPTIONS} connect "${CONNECT_CMD}"
+	if [ $CMUX_ATTACHED -eq 0 ]; then
+		echo "pppd terminated, shutting down modem..."
+		shutdown_modem
+	else
+		echo "pppd terminated"
+	fi
 	test -O $PIDFILE && rm -f $PIDFILE
 }
 
-export AT_CMUX
+export DLC1
+export CMUX_ATTACHED
 export MODEM
 export SHUTDOWN_SCRIPT
 export PPP_OPTIONS
@@ -286,11 +324,14 @@ export PIDFILE
 export CHATOPT
 export BAUD
 export IPR_BAUD
+export TRACE
 export TRACE_PID_FILE
 export TIMEOUT
+export VERBOSE
 export -f ppp_start
 export -f shutdown_modem
 export -f cmux_close
+export -f stop_trace
 export -f check_devices_or_exit
 
 echo "Connect and wait for PPP link..."
