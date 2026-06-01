@@ -124,7 +124,8 @@ static void sms_concat_handle(struct sms_data *const data)
 		goto done;
 	}
 	if (header->concatenated.seq_number == 1) {
-		sprintf(sms_ctx.concat_rsp_buf,
+		snprintf(sms_ctx.concat_rsp_buf,
+			SM_SMS_AT_HEADER_INFO_MAX_LEN + SMS_MAX_PAYLOAD_LEN_CHARS,
 			"\r\n#XSMS: \"%02d-%02d-%02d %02d:%02d:%02d "
 			"UTC%+03d:%02d\",\"%s\",\"%s",
 			header->time.year, header->time.month, header->time.day,
@@ -134,19 +135,22 @@ static void sms_concat_handle(struct sms_data *const data)
 			header->originating_address.address_str,
 			data->payload);
 	} else {
-		strcpy(sms_ctx.concat_rsp_buf + SM_SMS_AT_HEADER_INFO_MAX_LEN +
-		       (header->concatenated.seq_number - 1) * SMS_MAX_PAYLOAD_LEN_CHARS,
-		       data->payload);
+		snprintf(sms_ctx.concat_rsp_buf + SM_SMS_AT_HEADER_INFO_MAX_LEN +
+			 (header->concatenated.seq_number - 1) * SMS_MAX_PAYLOAD_LEN_CHARS,
+			 SMS_MAX_PAYLOAD_LEN_CHARS,
+			 "%s", data->payload);
 	}
 	sms_ctx.count++;
 	if (sms_ctx.count == sms_ctx.total_msgs) {
+		uint16_t buf_size = SM_SMS_AT_HEADER_INFO_MAX_LEN +
+			SMS_MAX_PAYLOAD_LEN_CHARS * sms_ctx.total_msgs;
+
 		for (int i = 1; i < (sms_ctx.total_msgs); i++) {
-			strncat(sms_ctx.concat_rsp_buf,
+			strcat_s(sms_ctx.concat_rsp_buf, buf_size,
 				sms_ctx.concat_rsp_buf + SM_SMS_AT_HEADER_INFO_MAX_LEN +
-				i * SMS_MAX_PAYLOAD_LEN_CHARS,
-				SMS_MAX_PAYLOAD_LEN_CHARS);
+				i * SMS_MAX_PAYLOAD_LEN_CHARS);
 		}
-		strcat(sms_ctx.concat_rsp_buf, "\"\r\n");
+		strcat_s(sms_ctx.concat_rsp_buf, buf_size, "\"\r\n");
 		urc_send_to(sms_ctx.pipe, "%s", sms_ctx.concat_rsp_buf);
 	} else {
 		/* If new messages for the concatenated message are not received
