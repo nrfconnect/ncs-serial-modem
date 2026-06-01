@@ -186,6 +186,61 @@ This setup is useful for quick testing, but the UART cannot be used for AT comma
 
 #. Terminate the PPP connection with CTRL+C in the terminal where ``pppd`` is running or ``sudo poff`` in another terminal.
 
+Option C: PPP over CMUX with NTN support
+=========================================
+
+When using NTN (Non-Terrestrial Network) cellular profiles, PPP cannot function while the modem is in NTN mode.
+It must be stopped and restarted on each mode transition between TN (Terrestrial Network) and NTN.
+
+Option A manages CMUX and PPP as a single lifecycle: stopping PPP also issues ``AT+CFUN=0`` and tears down CMUX.
+For NTN scenarios, use the separate CMUX management scripts so that CMUX stays alive across PPP restarts:
+
+* :file:`sm2_start_cmux.sh` - Starts CMUX only, then exits. The ``gsmtty`` channels remain open.
+* :file:`sm2_stop_cmux.sh` - Stops CMUX and releases the serial port.
+* :file:`sm2_start_ppp.sh` with the ``-C`` flag - attaches PPP to an already-running CMUX (DLC 1). When PPP stops, the modem and CMUX are left untouched.
+
+When PPP is not running, all CMUX channels (``gsmtty1`` and ``gsmtty2``) are available for AT commands.
+This allows the host to reconfigure the modem (for example, switch profiles) through the AT channel while PPP is inactive.
+
+.. note::
+
+   The ``-C`` flag prevents ``AT+CFUN=0`` and ``AT#XCMUXCLD`` from being issued when PPP stops, so the modem and CMUX remain active.
+
+Workflow:
+
+1. Start CMUX (once, before the first PPP session):
+
+   .. code-block:: shell
+
+      $ sudo scripts/sm2_start_cmux.sh [-s serial_port] [-b baud_rate] [-B new_speed]
+
+#. Start PPP in TN mode:
+
+   .. code-block:: shell
+
+      $ sudo scripts/sm2_start_ppp.sh -C [-s serial_port] [-a APN]
+
+#. When switching to NTN mode, stop PPP without tearing down CMUX:
+
+   .. code-block:: shell
+
+      $ sudo poff
+
+   After PPP stops, both ``gsmtty1`` and ``gsmtty2`` are available for AT commands.
+   Use them to reconfigure the modem or monitor URCs while in NTN mode.
+
+#. When returning to TN mode, start PPP again:
+
+   .. code-block:: shell
+
+      $ sudo scripts/sm2_start_ppp.sh -C [-s serial_port] [-a APN]
+
+#. When done with all PPP sessions, stop CMUX:
+
+   .. code-block:: shell
+
+      $ sudo scripts/sm2_stop_cmux.sh [-s serial_port]
+
 Use case: Zephyr host
 *********************
 
