@@ -186,6 +186,66 @@ This setup is useful for quick testing, but the UART cannot be used for AT comma
 
 #. Terminate the PPP connection with CTRL+C in the terminal where ``pppd`` is running or ``sudo poff`` in another terminal.
 
+Option C: PPP over CMUX with NTN support
+=========================================
+
+When using NTN (Non-Terrestrial Network) cellular profiles, the modem switches between TN and NTN modes using ``AT+CFUN=45`` (NTN) and ``AT+CFUN=1`` (TN).
+PPP cannot function while the modem is in NTN mode, so it must be stopped and restarted on each mode transition.
+
+Option A manages CMUX and PPP as a single lifecycle: stopping PPP also issues ``AT+CFUN=0`` and tears down CMUX.
+For NTN scenarios, use the separate CMUX management scripts so that CMUX stays alive across PPP restarts:
+
+* :file:`sm2_start_cmux.sh` — starts CMUX only, then exits. The ``gsmtty`` channels remain open.
+* :file:`sm2_stop_cmux.sh` — stops CMUX and releases the serial port.
+* :file:`sm2_start_ppp.sh` with the ``-C`` flag — attaches PPP to an already-running CMUX. When PPP stops, the modem and CMUX are left untouched.
+
+When PPP is not running, all CMUX channels (``gsmtty1`` and ``gsmtty2``) are available for AT commands.
+This allows the host to reconfigure the modem (for example, switch profiles) through the AT channel while PPP is inactive.
+
+.. note::
+
+   NTN profile switching is performed through ``AT%CELLULARPRFL``.
+   The ``-C`` flag does not issue ``AT+CFUN=0`` or ``AT#XCMUXCLD`` when PPP stops, so the modem and CMUX remain active.
+
+Workflow:
+
+1. Start CMUX (once, before the first PPP session):
+
+   .. code-block:: shell
+
+      $ sudo scripts/sm2_start_cmux.sh [-s serial_port] [-b baud_rate] [-B new_speed]
+
+#. Start PPP in TN mode:
+
+   .. code-block:: shell
+
+      $ sudo scripts/sm2_start_ppp.sh -C [-s serial_port] [-a APN]
+
+#. When switching to NTN mode, stop PPP without tearing down CMUX:
+
+   .. code-block:: shell
+
+      $ sudo scripts/sm_stop_ppp.sh
+
+      # OR
+
+      $ sudo poff
+
+   After PPP stops, both ``gsmtty1`` and ``gsmtty2`` are available for AT commands.
+   Use them to reconfigure the modem or monitor URCs while in NTN mode.
+
+#. When returning to TN mode, start PPP again:
+
+   .. code-block:: shell
+
+      $ sudo scripts/sm2_start_ppp.sh -C [-s serial_port] [-a APN]
+
+#. When done with all PPP sessions, stop CMUX:
+
+   .. code-block:: shell
+
+      $ sudo scripts/sm2_stop_cmux.sh [-s serial_port]
+
 Use case: Zephyr host
 *********************
 
