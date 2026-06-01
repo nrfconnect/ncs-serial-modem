@@ -504,7 +504,11 @@ static void http_send_data(struct http_request *req, const uint8_t *data, int le
 		return;
 	}
 
-	urc_send_to(req->pipe, "\r\n#XHTTPCDATA: %d,%d,%d\r\n", req->fd, req->bytes_sent, len);
+	/* Lock the AT host to prevent URCs from being injected between the notification
+	 * header, the data bytes, and the trailing CRLF.
+	 */
+	sm_at_host_lock(req->pipe);
+	rsp_send_to(req->pipe, "\r\n#XHTTPCDATA: %d,%d,%d\r\n", req->fd, req->bytes_sent, len);
 	req->bytes_sent += len;
 	if (req->hex_rx) {
 		http_data_send_hex(req->pipe, data, (size_t)len);
@@ -513,6 +517,7 @@ static void http_send_data(struct http_request *req, const uint8_t *data, int le
 	}
 	/* CRLF after the data chunk, consistent with socket auto-receive behaviour. */
 	rsp_send_to(req->pipe, "\r\n");
+	sm_at_host_unlock(req->pipe);
 }
 
 /*

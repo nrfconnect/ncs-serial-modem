@@ -168,7 +168,11 @@ static void coap_send_data(struct coap_request *req, const uint8_t *payload, siz
 		return;
 	}
 
-	urc_send_to(req->pipe, "\r\n#XCOAPCDATA: %d,%d,%d\r\n", req->fd,
+	/* Lock the AT host to prevent URCs from being injected between the notification
+	 * header, the data bytes, and the trailing CRLF.
+	 */
+	sm_at_host_lock(req->pipe);
+	rsp_send_to(req->pipe, "\r\n#XCOAPCDATA: %d,%d,%d\r\n", req->fd,
 		    (int)req->bytes_sent, (int)payload_len);
 	req->bytes_sent += payload_len;
 	if (req->hex_rx) {
@@ -178,6 +182,7 @@ static void coap_send_data(struct coap_request *req, const uint8_t *payload, siz
 	}
 	/* CRLF after the data chunk, consistent with socket auto-receive behaviour. */
 	rsp_send_to(req->pipe, "\r\n");
+	sm_at_host_unlock(req->pipe);
 }
 
 /* Notify host that a response block is ready to pull in manual receive mode. */
