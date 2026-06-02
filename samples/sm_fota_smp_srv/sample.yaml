@@ -1,0 +1,10 @@
+sample:
+  name: Serial Modem SMP server
+tests:
+  serial_modem.sm_fota_smp_srv:
+    build_only: true
+    integration_platforms:
+      - nrf54l15dk/nrf54l15/cpuapp
+    platform_allow: nrf54l15dk/nrf54l15/cpuapp
+    tags:
+      - ci_build
