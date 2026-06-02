@@ -1,0 +1,15 @@
+#
+# Copyright (c) 2026 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+# native_sim does not produce Intel hex files; disable merged hex generation.
+if !BOARD_NATIVE_SIM
+
+config MERGED_HEX_FILES
+	default y
+
+endif
+
+source "share/sysbuild/Kconfig"
