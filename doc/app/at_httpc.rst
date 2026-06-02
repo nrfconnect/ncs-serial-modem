@@ -159,7 +159,7 @@ In hex mode (``<format>=1``), the data is ``2×<length>`` lower-case ASCII hex c
 * The ``<total_bytes>`` parameter is an integer.
    On successful completion, failure, or timeout, it contains the total number of response body bytes received by the HTTP client.
    For chunked transfer encoding this includes the raw framing bytes (chunk-size lines, ``\r\n`` separators, and the final ``0\r\n\r\n`` terminator).
-   On cancel (``status_code=-1`` from ``AT#XHTTPCCANCEL``), it contains the number of response body bytes already delivered to the host.
+   On cancel (``status_code=-1`` from ``AT#XHTTPCCANCEL`` or ``AT#XCLOSE``), it contains the number of response body bytes already delivered to the host.
 * The ``<connection_close>`` parameter is an integer.
   It is ``1`` when the server includes a ``Connection: close`` header in its response, indicating that the TCP connection will be closed after this response.
   It is ``0`` otherwise (keep-alive connection).
@@ -482,6 +482,10 @@ Syntax
   It identifies the socket of the request to cancel.
 
 An unsolicited ``#XHTTPCSTAT: <handle>,-1,<total_bytes>,<connection_close>`` notification is emitted after cancellation, where ``<total_bytes>`` is the number of response body bytes already delivered to the host.
+
+.. note::
+
+   Closing the socket with ``AT#XCLOSE`` while a request is active also cancels the request and emits ``#XHTTPCSTAT: <handle>,-1,<total_bytes>,<connection_close>`` before the socket is freed.
 
 Example
 ~~~~~~~

@@ -956,6 +956,20 @@ bool sm_at_httpc_poll_event(int fd, uint8_t events)
 	return (req && req->need_rearm_pollin);
 }
 
+void sm_at_httpc_socket_closed(int fd)
+{
+	k_mutex_lock(&http_mutex, K_FOREVER);
+	struct http_request *req = find_request(fd);
+
+	if (req) {
+		LOG_WRN("HTTP %d: socket closed with active request (state=%d); cleaning up",
+			fd, req->state);
+		http_send_cancel_status(req);
+		http_close_request(req);
+	}
+	k_mutex_unlock(&http_mutex);
+}
+
 /* Build HTTP request headers and send them synchronously for streaming POST/PUT */
 static int http_send_request_headers(struct http_request *req)
 {
