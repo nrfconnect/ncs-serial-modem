@@ -25,6 +25,17 @@
  */
 bool sm_at_httpc_poll_event(int fd, uint8_t events);
 
+/**
+ * @brief Notify HTTP client that a socket has been closed (e.g. via AT#XCLOSE).
+ *
+ * If a request is active on @p fd, it is cancelled: a cancel status URC
+ * (#XHTTPCSTAT with -1 status) is sent to the host and the request is freed.
+ * No-op if no request is active on @p fd.
+ *
+ * @param fd Socket file descriptor that was closed.
+ */
+void sm_at_httpc_socket_closed(int fd);
+
 /** @} */
 
 #endif /* SM_AT_HTTPC_H_ */

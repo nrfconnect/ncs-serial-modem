@@ -715,6 +715,9 @@ static int do_socket_close(struct sm_socket *sock)
 
 	rsp_send("\r\n#XCLOSE: %d,%d\r\n", sock->fd, ret);
 
+#if defined(CONFIG_SM_HTTPC)
+	sm_at_httpc_socket_closed(sock->fd);
+#endif
 	init_socket(sock);
 
 	return ret;
