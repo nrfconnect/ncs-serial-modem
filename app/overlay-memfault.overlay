@@ -9,11 +9,13 @@
 / {
 	chosen {
 		nordic,memfault-coredump-partition = &memfault_coredump_partition;
+		zephyr,settings_partition = &settings_storage_partition;
 	};
 };
 
 /delete-node/ &slot0_partition;
 /delete-node/ &slot1_partition;
+/delete-node/ &storage_partition;
 
 &flash0 {
 	partitions {
@@ -63,13 +65,25 @@
 			};
 		};
 
-		memfault_coredump_partition: partition@f9000 {
+		storage_partition: partition@f9000 {
 			compatible = "zephyr,mapped-partition";
-			label = "memfault_coredump_partition";
-			reg = <0xf9000 0x4000>;
-			ranges = <0x0 0xf9000 0x4000>;
+			label = "storage";
+			reg = <0xf9000 0x7000>;
+			ranges = <0x0 0xf9000 0x7000>;
 			#address-cells = <1>;
 			#size-cells = <1>;
+
+			memfault_coredump_partition: partition@0 {
+				compatible = "zephyr,mapped-partition";
+				label = "memfault_coredump_partition";
+				reg = <0x0 0x4000>;
+			};
+
+			settings_storage_partition: partition@4000 {
+				compatible = "zephyr,mapped-partition";
+				label = "settings-storage";
+				reg = <0x4000 0x3000>;
+			};
 		};
 	};
 };
