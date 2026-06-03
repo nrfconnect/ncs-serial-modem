@@ -17,9 +17,14 @@
  *   0x2000_c800  Application RAM            ( 206 kB)
  */
 
+/delete-node/ &sram0_s;
 /delete-node/ &sram0_ns;
 
 &sram0 {
+
+	sram0_s: sram@0 {
+		reg = <0x0 0x4000>;
+	};
 
 	sram0_ns: sram@4000 {
 		reg = <0x4000 0x3c000>;
