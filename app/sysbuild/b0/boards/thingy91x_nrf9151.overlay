@@ -6,7 +6,7 @@
 
 / {
 	chosen {
-		zephyr,code-partition = &s0_partition;
+		zephyr,code-partition = &b0_partition;
 		zephyr,console = &uart1;
 	};
 };

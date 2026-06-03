@@ -159,7 +159,6 @@ tests:
       - EXTRA_DTC_OVERLAY_FILE="overlay-carrier.overlay"
     platform_allow:
       - nrf9151dk/nrf9151/ns
-      - thingy91x/nrf9151/ns
     integration_platforms:
       - nrf9151dk/nrf9151/ns
   serial_modem.lwm2m_carrier.softbank:
