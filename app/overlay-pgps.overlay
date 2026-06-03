@@ -9,11 +9,13 @@
 / {
 	chosen {
 		nordic,pgps_partition = &pgps_partition;
+		zephyr,settings_partition = &settings_storage_partition;
 	};
 };
 
 /delete-node/ &slot0_partition;
 /delete-node/ &slot1_partition;
+/delete-node/ &storage_partition;
 
 &flash0 {
 	partitions {
@@ -63,13 +65,25 @@
 			};
 		};
 
-		pgps_partition: partition@e9000 {
+		storage_partition: partition@e9000 {
 			compatible = "zephyr,mapped-partition";
-			label = "pgps";
-			reg = <0xe9000 0x14000>;
-			ranges = <0x0 0xe9000 0x14000>;
+			label = "storage";
+			reg = <0x000e9000 0x17000>;
+			ranges = <0x0 0x000e9000 0x17000>;
 			#address-cells = <1>;
 			#size-cells = <1>;
+
+			pgps_partition: partition@0 {
+				compatible = "zephyr,mapped-partition";
+				label = "pgps";
+				reg = <0x00000000 0x14000>;
+			};
+
+			settings_storage_partition: partition@14000 {
+				compatible = "zephyr,mapped-partition";
+				label = "settings-storage";
+				reg = <0x000014000 0x3000>;
+			};
 		};
 	};
 };
