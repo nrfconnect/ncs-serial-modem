@@ -554,6 +554,16 @@ static void ncellmeas_complete(void)
 	at_monitor_pause(&sm_ncellmeas);
 	ncellmeas_sm_state = NCELLMEAS_STATE_IDLE;
 
+	/* If single cell was requested, delete any neighbors we might have
+	 * because cloud will categorize such a request as multi-cell.
+	 */
+	if (ncellmeas_req_cell_count <= 1 && nrfcloud_cell_data->ncells_count > 0) {
+		LOG_DBG("Deleting neighbors for single cell request");
+		free(nrfcloud_cell_data->neighbor_cells);
+		nrfcloud_cell_data->neighbor_cells = NULL;
+		nrfcloud_cell_data->ncells_count = 0;
+	}
+
 	if (ncellmeas_send_loc_req_flag) {
 		k_work_submit_to_queue(&sm_work_q, &nrfcloud_loc_req_work);
 	} else {
