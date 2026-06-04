@@ -308,10 +308,11 @@ static void response_handler(const uint8_t *data, const size_t len)
 
 			/* Copy the possibly remaining data to the buffer. */
 			if (copy_len < len) {
-				assert((sizeof(at_cmd_resp) - resp_len) >= (len - copy_len));
+				size_t remaining = sizeof(at_cmd_resp) - resp_len;
+				size_t copy2_len = MIN(len - copy_len, remaining);
 
-				memcpy(at_cmd_resp + resp_len, data + copy_len, len - copy_len);
-				resp_len += len - copy_len;
+				memcpy(at_cmd_resp + resp_len, data + copy_len, copy2_len);
+				resp_len += copy2_len;
 			}
 
 			k_sem_give(&at_rsp);
