@@ -9,8 +9,8 @@ GNSS AT commands
 
 This page describes GNSS-related AT commands.
 
-Control GNSS
-============
+Control GNSS #XGNSS
+===================
 
 The ``#XGNSS`` command controls the GNSS.
 
@@ -109,9 +109,11 @@ As an alternative to GNSS-based positioning, see :ref:`#XNRFCLOUDPOS <SM_AT_NRFC
 Unsolicited notification
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
+``#XGNSSPOS`` notification indicates that a new position fix has been acquired.
+
 .. code-block::
 
-   #XGNSS: <latitude>,<longitude>,<altitude>,<accuracy>,<speed>,<heading>,<datetime>
+   #XGNSSPOS: <latitude>,<longitude>,<altitude>,<accuracy>,<speed>,<heading>,<datetime>
 
 * The ``<latitude>`` parameter represents the latitude in degrees.
 * The ``<longitude>`` parameter represents the longitude in degrees.
@@ -120,6 +122,8 @@ Unsolicited notification
 * The ``<speed>`` parameter represents the horizontal speed in meters per second.
 * The ``<heading>`` parameter represents the heading of the movement of the user in degrees.
 * The ``<datetime>`` parameter represents the UTC date-time.
+
+``#XGNSS`` notification indicates GNSS status.
 
 .. sm_gps_status_notif_start
 
@@ -144,6 +148,8 @@ Unsolicited notification
 Example
 ~~~~~~~
 
+Get GNSS fix in GNSS only mode:
+
 ::
 
   AT%XSYSTEMMODE=0,0,1,0
@@ -158,9 +164,11 @@ Example
 
   OK
 
+  #XGNSSPOS: 35.457576,139.625090,121.473785,22.199919,0.442868,0.000000,"2021-06-02 06:25:48"
+
   #XGNSS: 1,4
 
-  #XGNSS: 35.457576,139.625090,121.473785,22.199919,0.442868,0.000000,"2021-06-02 06:25:48"
+Set PSM and eDRX configurations, use GNSS assistance from nRF Cloud and get GNSS fixes in continuous navigation mode:
 
 ::
 
@@ -183,24 +191,25 @@ Example
 
   OK
   #XNRFCLOUD: 1,0
-  AT#XGNSS=1,1,0,1
+  AT#XGNSS=1,1,1
 
   #XGNSS: 1,1
 
   OK
 
-  #XGNSS: 35.457417,139.625211,162.850952,15.621976,1.418092,0.000000,"2021-06-02 05:21:31"
+  #XGNSSPOS: 35.457417,139.625211,162.850952,15.621976,1.418092,0.000000,"2021-06-02 05:21:31"
 
-  #XGNSS: 35.457435,139.625348,176.104797,14.245458,1.598184,69.148659,"2021-06-02 05:21:32"
+  #XGNSSPOS: 35.457435,139.625348,176.104797,14.245458,1.598184,69.148659,"2021-06-02 05:21:32"
 
-  #XGNSS: 35.457417,139.625415,179.132980,13.318132,1.235241,69.148659,"2021-06-02 05:21:33"
+  #XGNSSPOS: 35.457417,139.625415,179.132980,13.318132,1.235241,69.148659,"2021-06-02 05:21:33"
 
-  #XGNSS: 35.457410,139.625469,181.223541,12.667312,0.803951,69.148659,"2021-06-02 05:21:34"
+  #XGNSSPOS: 35.457410,139.625469,181.223541,12.667312,0.803951,69.148659,"2021-06-02 05:21:34"
   AT#XGNSS=0
+  OK
 
   #XGNSS: 1,0
 
-  OK
+Set PSM and eDRX configurations, use GNSS assistance from nRF Cloud and get GNSS fixes in periodic navigation mode every 10 seconds:
 
 ::
 
@@ -220,7 +229,7 @@ Example
 
   OK
   #XNRFCLOUD: 1,0
-  AT#XGNSS=1,0,1
+  AT#XGNSS=1,1,10
 
   #XGNSS: 1,1
 
@@ -228,27 +237,27 @@ Example
 
   #XGNSS: 1,2
 
-  #XGNSS: 1,4
+  #XGNSSPOS: 35.457243,139.625435,149.005020,28.184258,10.431827,281.446014,"2021-06-24 04:35:52"
 
-  #XGNSS: 35.457243,139.625435,149.005020,28.184258,10.431827,281.446014,"2021-06-24 04:35:52"
+  #XGNSS: 1,4
 
   #XGNSS: 1,2
 
-  #XGNSS: 1,4
+  #XGNSSPOS: 35.457189,139.625602,176.811203,43.015198,0.601837,281.446014,"2021-06-24 04:36:32"
 
-  #XGNSS: 35.457189,139.625602,176.811203,43.015198,0.601837,281.446014,"2021-06-24 04:36:32"
+  #XGNSS: 1,4
 
   #XGNSS: 1,2
 
-  #XGNSS: 1,4
+  #XGNSSPOS: 35.457498,139.625422,168.243591,31.753956,0.191195,281.446014,"2021-06-24 04:37:12"
 
-  #XGNSS: 35.457498,139.625422,168.243591,31.753956,0.191195,281.446014,"2021-06-24 04:37:12"
+  #XGNSS: 1,4
 
   #XGNSS: 1,2
 
-  #XGNSS: 1,4
+  #XGNSSPOS: 35.457524,139.624667,100.745979,25.324850,6.347160,94.699837,"2021-06-24 04:37:52"
 
-  #XGNSS: 35.457524,139.624667,100.745979,25.324850,6.347160,94.699837,"2021-06-24 04:37:52"
+  #XGNSS: 1,4
   AT#XGNSS=0
 
   #XGNSS: 1,0
@@ -308,8 +317,8 @@ Example
 
   OK
 
-Delete GNSS data
-================
+Delete GNSS data #XGNSSDEL
+==========================
 
 The ``#XGNSSDEL`` command deletes GNSS data from non-volatile memory.
 This command should be issued when GNSS is activated but not started yet.

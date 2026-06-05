@@ -23,6 +23,17 @@ The following changes are mandatory to make your application work in the same wa
 * Full FOTA - When compiling, rename ``overlay-full_fota.conf`` to ``overlay-full-fota.conf`` and add ``overlay-full-fota.overlay`` to the build configuration.
   See :ref:`SM_AT_FOTA` for more information.
 
+* ``#XGNSS`` notification had two meanings with alternative syntaxes as follows:
+  ::
+    #XGNSS: <gnss_service>,<gnss_status>
+    #XGNSS: <latitude>,<longitude>,<altitude>,<accuracy>,<speed>,<heading>,<datetime>
+
+  The latter is now renamed to ``#XGNSSPOS`` as follows:
+  ::
+    #XGNSSPOS: <latitude>,<longitude>,<altitude>,<accuracy>,<speed>,<heading>,<datetime>
+
+  The former syntax remains unchanged.
+
 * ``AT#XNRFCLOUDPOS``:
 
   * Changed ``<cell_pos>`` parameter to ``<cell_count>``. The meaning changes from no cell positioning, single-cell or multi-cell to the number of cells to be included in the location request.
