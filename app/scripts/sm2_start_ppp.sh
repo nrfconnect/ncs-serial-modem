@@ -88,14 +88,20 @@ done
 
 log_dbg() {
     if [ $VERBOSE -eq 1 ]; then
-	logger --id=$$ -s "$@"
+        echo "$@" >&2
+        logger --id=$$ "$@"
     fi
+}
+
+log_inf() {
+    echo "$@" >&2
+    logger --id=$$ "$@"
 }
 
 # Do not allow starting the trace if attach to existing CMUX
 if [ $TRACE -gt 0 ] && [ $CMUX_ATTACHED -eq 1 ]; then
-	echo "Error: Trace collection is not supported when attaching to existing CMUX."
-	echo "Please start trace collection in sm2_start_cmux.sh."
+	log_inf "Error: Trace collection is not supported when attaching to existing CMUX."
+	log_inf "Please start trace collection in sm2_start_cmux.sh."
 	exit 1
 fi
 
@@ -141,7 +147,7 @@ CONNECT_CMD="/usr/sbin/chat $CHATOPT -E -f $CHATSCRIPT"
 
 
 if [[ ! -c $MODEM ]]; then
-	echo "Serial port not found: $MODEM"
+	log_inf "Serial port not found: $MODEM"
 	exit 1
 fi
 
@@ -162,17 +168,17 @@ fi
 
 if [ $CMUX_ATTACHED -eq 0 ]; then
 	if find /dev -type c -name 'gsmtty*' | grep -q . ; then
-		echo "Error: existing CMUX devices found (/dev/gsmtty*)"
+		log_inf "Error: existing CMUX devices found (/dev/gsmtty*)"
 		exit 1
 	fi
 
 	if pgrep ldattach >/dev/null; then
-		echo "Error: existing ldattach process found"
+		log_inf "Error: existing ldattach process found"
 		exit 1
 	fi
 else
 	if ! find /dev -type c -name 'gsmtty*' | grep -q . ; then
-		echo "Error: no CMUX devices found (/dev/gsmtty*). Run sm2_start_cmux.sh first."
+		log_inf "Error: no CMUX devices found (/dev/gsmtty*). Run sm2_start_cmux.sh first."
 		exit 1
 	fi
 fi
@@ -198,7 +204,7 @@ cleanup() {
 		pkill ldattach
 		cmux_close
 	fi
-	echo "Failed to start..."
+	log_inf "Failed to start..."
 	exit 1
 }
 
@@ -215,7 +221,7 @@ if [ $CMUX_ATTACHED -eq 0 ]; then
 		log_dbg "Modem not responding, try CMUX close down..."
 		cmux_close
 		if ! chat -t1 "" "AT" "OK" <$MODEM >$MODEM; then
-			echo "Error: Modem not responding"
+			log_inf "Error: Modem not responding"
 			exit 1
 		fi
 	fi
@@ -244,7 +250,7 @@ check_devices_or_exit() {
 	# Verify that UART devices are still present
 	if [ ! -c $DLC1 ] || [ ! -c $DLC2 ] || [ ! -c $DLC3 ] || [ ! -c $MODEM ]; then
 		log_dbg "UART or DLC devices not found."
-		echo "Error: UART devices not found, exiting..."
+		log_inf "Error: UART devices not found, exiting..."
 		if [ $CMUX_ATTACHED -eq 0 ]; then
 			stop_trace
 			pkill ldattach
@@ -255,14 +261,14 @@ check_devices_or_exit() {
 
 check_devices_or_exit
 
-echo "DLC 1 (PPP):       $DLC1"
-echo "DLC 2 (AT):        $DLC2"
+log_inf "DLC 1 (PPP):       $DLC1"
+log_inf "DLC 2 (AT):        $DLC2"
 
 stty -F $DLC1 clocal
 
 if [ $TRACE -gt 0 ]; then
-	echo "DLC 3 (TRACE):        $DLC3"
-	echo "Starting trace collection to $MODEM_TRACE_FILE"
+	log_inf "DLC 3 (TRACE):     $DLC3"
+	log_inf "Starting trace collection to $MODEM_TRACE_FILE"
 	stty -F $DLC3 raw clocal -icrnl -ixon -opost
 	chat $CHATOPT -t1 '' 'AT#XCMUXTRACE=3' 'OK' >$DLC1 <$DLC1
 
@@ -306,10 +312,10 @@ ppp_start() {
 	check_devices_or_exit
 	pppd $DLC1 ${PPP_OPTIONS} connect "${CONNECT_CMD}"
 	if [ $CMUX_ATTACHED -eq 0 ]; then
-		echo "pppd terminated, shutting down modem..."
+		log_inf "pppd terminated, shutting down modem..."
 		shutdown_modem
 	else
-		echo "pppd terminated"
+		log_inf "pppd terminated"
 	fi
 	test -O $PIDFILE && rm -f $PIDFILE
 }
@@ -334,7 +340,7 @@ export -f cmux_close
 export -f stop_trace
 export -f check_devices_or_exit
 
-echo "Connect and wait for PPP link..."
+log_inf "Connect and wait for PPP link..."
 
 # Start PPPD in a subshell
 # Logs go to syslog so redirect output to /dev/null
@@ -345,7 +351,7 @@ echo $! > $PIDFILE
 for i in $(seq 1 $TIMEOUT); do
 	if [ -f $PPP_PIDFILE ]; then
 		if grep "ppp[0-9]" $PPP_PIDFILE >/dev/null; then
-			echo "PPP link started"
+			log_inf "PPP link started"
 			log_dbg "Interface $(cat $PPP_PIDFILE| tail -1)"
 			exit 0
 		fi
@@ -353,5 +359,5 @@ for i in $(seq 1 $TIMEOUT); do
 	sleep 1
 done
 
-echo "Failed to start PPP link"
+log_inf "Failed to start PPP link"
 cleanup

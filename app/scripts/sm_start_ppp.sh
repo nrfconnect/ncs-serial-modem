@@ -79,8 +79,14 @@ done
 
 log_dbg() {
     if [ $VERBOSE -eq 1 ]; then
-	echo "$@" >&2
+        echo "$@" >&2
+        logger --id=$$ "$@"
     fi
+}
+
+log_inf() {
+    echo "$@" >&2
+    logger --id=$$ "$@"
 }
 
 if [ $PDN -gt 0 ]; then
@@ -148,7 +154,7 @@ $PPP_DEBUG
 "
 
 if [[ ! -c $MODEM ]]; then
-	echo "Serial port not found: $MODEM"
+	log_inf "Serial port not found: $MODEM"
 	exit 1
 fi
 
@@ -168,12 +174,12 @@ if [ -f "$TRACE_PID_FILE" ]; then
 fi
 
 if find /dev -type c -name 'gsmtty*' | grep -q . ; then
-	echo "Error: existing CMUX devices found (/dev/gsmtty*)"
+	log_inf "Error: existing CMUX devices found (/dev/gsmtty*)"
 	exit 1
 fi
 
 if pgrep ldattach >/dev/null; then
-	echo "Error: existing ldattach process found"
+	log_inf "Error: existing ldattach process found"
 	exit 1
 fi
 
@@ -189,7 +195,7 @@ cleanup() {
 	pkill pppd
 	pkill ldattach
 	printf "\xF9\x03\xEF\x05\xC3\x01\xF2\xF9" > $MODEM
-	echo "Failed to start..."
+	log_inf "Failed to start..."
 	exit 1
 }
 
@@ -206,7 +212,7 @@ else
 	cmux_close
 	sleep 1
 	if ! chat -t1 "" "AT" "OK" <$MODEM >$MODEM; then
-		echo "Error: Modem not responding"
+		log_inf "Error: Modem not responding"
 		exit 1
 	fi
 fi
@@ -223,14 +229,14 @@ ldattach -c $'\rAT#XCMUX=1\r' GSM0710 $MODEM
 
 AT_CMUX=$(ls /dev/gsmtty* | sort -V | head -n 1)
 PPP_CMUX=$(ls /dev/gsmtty* | sort -V | head -n 2 | tail -n 1)
-log_dbg "AT CMUX:  $AT_CMUX"
-log_dbg "PPP CMUX: $PPP_CMUX"
+log_inf "DLC 1 (AT):        $AT_CMUX"
+log_inf "DLC 2 (PPP):       $PPP_CMUX"
 
 MT_CMUX=""
 if [ $TRACE -gt 0 ]; then
 	MT_CMUX=$(ls /dev/gsmtty* | sort -V | head -n 3 | tail -n 1)
-	log_dbg "Trace CMUX: $MT_CMUX"
-	echo "Trace file: $MODEM_TRACE_FILE"
+	log_inf "DLC 3 (TRACE):     $MT_CMUX"
+	log_inf "Starting trace collection to $MODEM_TRACE_FILE"
 	stty -F $MT_CMUX raw clocal -icrnl -ixon -opost
 fi
 sleep 3
@@ -239,7 +245,7 @@ stty -F $AT_CMUX clocal
 test -c $AT_CMUX
 
 if [ $TRACE -gt 0 ]; then
-	echo "Starting trace collection..."
+	log_inf "Starting trace collection..."
 	# Prefer to use socat, if installed.
 	if command -v socat >/dev/null 2>&1; then
 		start-stop-daemon --start --pidfile $TRACE_PID_FILE --make-pidfile \
@@ -250,14 +256,14 @@ if [ $TRACE -gt 0 ]; then
 		--background --exec /bin/dd -- if=$MT_CMUX of=$MODEM_TRACE_FILE bs=1024
 	fi
 fi
-echo "Connect and wait for PPP link..."
+log_inf "Connect and wait for PPP link..."
 
 chat $CHATOPT -t$TIMEOUT "${CHAT_SCRIPT[@]}" >$AT_CMUX <$AT_CMUX
 
 check_devices_or_exit() {
 	# Verify that UART devices are still present
 	if [ ! -c $PPP_CMUX ] || [ ! -c $AT_CMUX ] || [ ! -c $MODEM ]; then
-		echo "Error: UART devices not found, exiting..."
+		log_inf "Error: UART devices not found, exiting..."
 		start-stop-daemon --stop --pidfile $TRACE_PID_FILE --remove-pidfile \
 				  --oknodo --retry 1
 		pkill ldattach
@@ -290,7 +296,7 @@ ppp_start() {
 	check_devices_or_exit
 	pppd $PPP_CMUX $PPP_OPTIONS
 	if [ "$?" -eq 5 ]; then
-		echo "pppd terminated with signal, shutting down modem..."
+		log_inf "pppd terminated with signal, shutting down modem..."
 		shutdown_modem
 		test -O $PIDFILE && rm -f $PIDFILE
 		exit 0
@@ -324,7 +330,7 @@ echo $! > $PIDFILE
 for i in {1..5}; do
 	if [ -f $PPP_PIDFILE ]; then
 		if grep "ppp[0-9]" $PPP_PIDFILE >/dev/null; then
-			echo "PPP link started"
+			log_inf "PPP link started"
 			log_dbg "Interface $(cat $PPP_PIDFILE| tail -1)"
 			exit 0
 		fi
@@ -332,5 +338,5 @@ for i in {1..5}; do
 	sleep 1
 done
 
-echo "Failed to start PPP link"
+log_inf "Failed to start PPP link"
 cleanup
