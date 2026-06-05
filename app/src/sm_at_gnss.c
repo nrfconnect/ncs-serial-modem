@@ -648,7 +648,7 @@ static void gnss_fix_sender(struct k_work *)
 
 	/* GIS accuracy: http://wiki.gis.com/wiki/index.php/Decimal_degrees, use default .6lf */
 	urc_send_to(gnss_pipe,
-		    "\r\n#XGNSS: %lf,%lf,%f,%f,%f,%f,\"%04u-%02u-%02u %02u:%02u:%02u\"\r\n",
+		    "\r\n#XGNSSPOS: %lf,%lf,%f,%f,%f,%f,\"%04u-%02u-%02u %02u:%02u:%02u\"\r\n",
 		    pvt.latitude, pvt.longitude, (double)pvt.altitude, (double)pvt.accuracy,
 		    (double)pvt.speed, (double)pvt.heading, pvt.datetime.year, pvt.datetime.month,
 		    pvt.datetime.day, pvt.datetime.hour, pvt.datetime.minute, pvt.datetime.seconds);
