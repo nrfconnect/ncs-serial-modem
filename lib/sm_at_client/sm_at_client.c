@@ -319,7 +319,8 @@ static void response_handler(const uint8_t *data, const size_t len)
 		}
 	}
 
-	if (sm_at_state != AT_CMD_PENDING && resp_len > 0) {
+	if (sm_at_state != AT_CMD_PENDING && resp_len >= 2 && at_cmd_resp[resp_len - 2] == '\r' &&
+	    at_cmd_resp[resp_len - 1] == '\n') {
 		sm_monitor_dispatch((const char *)at_cmd_resp, resp_len);
 
 #if defined(CONFIG_SM_AT_CLIENT_SHELL)
