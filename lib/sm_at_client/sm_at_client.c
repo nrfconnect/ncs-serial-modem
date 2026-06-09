@@ -630,8 +630,15 @@ static int dtr_uart_disable(void)
 		return err;
 	}
 
-	/* Optional: Wait for possible Serial Modem TX to complete. */
-	/* k_sleep(K_MSEC(100)); */
+	/* Wait for possible Serial Modem TX to complete if hw-flow-control is not set. */
+	{
+		struct uart_config uart_conf;
+
+		if (uart_config_get(uart_dev, &uart_conf) != 0 ||
+		    uart_conf.flow_ctrl != UART_CFG_FLOW_CTRL_RTS_CTS) {
+			k_sleep(K_MSEC(10));
+		}
+	}
 
 	/* Disable RX: UART is automatically suspended. */
 	err = rx_disable();
@@ -680,8 +687,15 @@ static int dtr_uart_enable(void)
 		return err;
 	}
 
-	/* Optional: Wait for Serial Modem to be ready */
-	/* k_sleep(K_MSEC(100)); */
+	/* Wait for Serial Modem to be ready if hw-flow-control is not set. */
+	{
+		struct uart_config uart_conf;
+
+		if (uart_config_get(uart_dev, &uart_conf) != 0 ||
+		    uart_conf.flow_ctrl != UART_CFG_FLOW_CTRL_RTS_CTS) {
+			k_sleep(K_MSEC(30));
+		}
+	}
 
 	/* Enable TX. */
 	err = tx_enable();
