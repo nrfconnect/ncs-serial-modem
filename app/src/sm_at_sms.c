@@ -85,6 +85,9 @@ static void sms_concat_handle(struct sms_data *const data)
 			sms_ctx.ref_number, header->concatenated.ref_number);
 		sms_concat_clear(&sms_ctx);
 	}
+	uint16_t concat_msg_len = SM_SMS_AT_HEADER_INFO_MAX_LEN +
+		SMS_MAX_PAYLOAD_LEN_CHARS * header->concatenated.total_msgs;
+
 	if (sms_ctx.ref_number == 0) {
 		sms_ctx.ref_number = header->concatenated.ref_number;
 
@@ -98,9 +101,6 @@ static void sms_concat_handle(struct sms_data *const data)
 		 * size is an upper boundary as headers and last message part
 		 * are slightly less in practice.
 		 */
-		uint16_t concat_msg_len =
-			SM_SMS_AT_HEADER_INFO_MAX_LEN +
-			SMS_MAX_PAYLOAD_LEN_CHARS * header->concatenated.total_msgs;
 		sms_ctx.concat_rsp_buf = calloc(1, concat_msg_len);
 		if (sms_ctx.concat_rsp_buf == NULL) {
 			LOG_ERR("Concat msg no memory for %d bytes, %d messages",
@@ -124,7 +124,8 @@ static void sms_concat_handle(struct sms_data *const data)
 		goto done;
 	}
 	if (header->concatenated.seq_number == 1) {
-		sprintf(sms_ctx.concat_rsp_buf,
+		snprintf(sms_ctx.concat_rsp_buf,
+			concat_msg_len,
 			"\r\n#XSMS: \"%02d-%02d-%02d %02d:%02d:%02d "
 			"UTC%+03d:%02d\",\"%s\",\"%s",
 			header->time.year, header->time.month, header->time.day,
@@ -134,9 +135,10 @@ static void sms_concat_handle(struct sms_data *const data)
 			header->originating_address.address_str,
 			data->payload);
 	} else {
-		strcpy(sms_ctx.concat_rsp_buf + SM_SMS_AT_HEADER_INFO_MAX_LEN +
-		       (header->concatenated.seq_number - 1) * SMS_MAX_PAYLOAD_LEN_CHARS,
-		       data->payload);
+		snprintf(sms_ctx.concat_rsp_buf + SM_SMS_AT_HEADER_INFO_MAX_LEN +
+			 (header->concatenated.seq_number - 1) * SMS_MAX_PAYLOAD_LEN_CHARS,
+			 SMS_MAX_PAYLOAD_LEN_CHARS + 1,
+			 "%s", data->payload);
 	}
 	sms_ctx.count++;
 	if (sms_ctx.count == sms_ctx.total_msgs) {
