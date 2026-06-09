@@ -24,13 +24,17 @@ The following changes are mandatory to make your application work in the same wa
   See :ref:`SM_AT_FOTA` for more information.
 
 * ``#XGNSS`` notification had two meanings with alternative syntaxes as follows:
-  ::
-    #XGNSS: <gnss_service>,<gnss_status>
-    #XGNSS: <latitude>,<longitude>,<altitude>,<accuracy>,<speed>,<heading>,<datetime>
+
+    .. code-block:: none
+
+       #XGNSS: <gnss_service>,<gnss_status>
+       #XGNSS: <latitude>,<longitude>,<altitude>,<accuracy>,<speed>,<heading>,<datetime>
 
   The latter is now renamed to ``#XGNSSPOS`` as follows:
-  ::
-    #XGNSSPOS: <latitude>,<longitude>,<altitude>,<accuracy>,<speed>,<heading>,<datetime>
+
+    .. code-block:: none
+
+       #XGNSSPOS: <latitude>,<longitude>,<altitude>,<accuracy>,<speed>,<heading>,<datetime>
 
   The former syntax remains unchanged.
 
@@ -41,12 +45,17 @@ The following changes are mandatory to make your application work in the same wa
   * The ``AT#XNRFCLOUDPOS`` command has been updated to use the ``AT%NCELLMEAS`` command internally, so the host must not use it anymore.
   * ``#XNRFCLOUDPOS`` notification now includes the status of the location request.
     The syntax has changed from:
-    ::
-      #XNRFCLOUDPOS: <error>
-      #XNRFCLOUDPOS: <type>,<latitude>,<longitude>,<uncertainty>
+
+    .. code-block:: none
+
+       #XNRFCLOUDPOS: <error>
+       #XNRFCLOUDPOS: <type>,<latitude>,<longitude>,<uncertainty>
+
     to:
-    ::
-      #XNRFCLOUDPOS: <status>[,<type>,<latitude>,<longitude>,<uncertainty>]
+
+    .. code-block:: none
+
+       #XNRFCLOUDPOS: <status>[,<type>,<latitude>,<longitude>,<uncertainty>]
 
 Custom static partition layout migration
 ----------------------------------------

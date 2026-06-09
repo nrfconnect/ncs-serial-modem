@@ -60,6 +60,8 @@ Syntax
      Raw sockets must not use the PDN connection at the same time.
      See :ref:`SM_AT_SOCKET_RAW_SOCKET_LIMITATION` for more information.
 
+After the ``#XFOTA: 4,0`` notification indicating that the FOTA update is downloaded, it must be activated by resetting either the whole device with the ``AT#XRESET`` command, or in case of modem update only the modem with the ``AT#XMODEMRESET`` command.
+
 .. note::
 
    During a delta update to the modem, the modem DFU area is automatically erased as needed as part of the update process. Erasing this area manually is optional.
