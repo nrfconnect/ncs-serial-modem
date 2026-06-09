@@ -318,7 +318,7 @@ def do_dfu_app(filepath: str, retries: int = 3) -> bool:
 def do_dfu_mcuboot_bootloader(filepath: str, retries: int = 3) -> bool:
     """Perform MCUboot second-stage bootloader DFU.
 
-    The image must be the signed candidate for the *inactive* s0/s1 bank.
+    The image must be the signed candidate for the *inactive* s0/s1 slot.
     """
     chunks = parse_chunks_bin(filepath)
     total_size = sum(len(data) for _, data in chunks)

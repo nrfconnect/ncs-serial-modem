@@ -8,8 +8,17 @@ This allows you to run your application on a separate host MCU.
 The application accepts both the modem specific AT commands and proprietary AT commands.
 The AT commands are documented in the following guides:
 
-* Modem specific AT commands - `nRF91x1 AT Commands Reference Guide`_
+* Modem specific AT commands
+
+  * ``mfw_nrf91x1`` - `nRF91x1 AT Commands Reference Guide`_
+  * ``mfw_nrf9151-ntn`` - `nRF91x1 NTN AT Commands Reference Guide`_
+
 * Proprietary AT commands - :ref:`SM_AT_commands`
+
+The application supports the following modem firmware:
+
+* ``mfw_nrf91x1`` v2.0.4 or later
+* ``mfw_nrf9151-ntn``
 
 The application supports the following development kits:
 
@@ -52,6 +61,7 @@ This application has the following dependencies:
   * `nRF Cloud A-GNSS`_
   * `nRF Cloud P-GPS`_
   * `nRF Cloud location`_
+  * `nRF Cloud device provisioning`_
 
 * It uses the following `sdk-nrfxlib`_ libraries:
 
@@ -70,8 +80,8 @@ See the subpages for how to use the application, how to extend it, and informati
    sm_build_and_run
    sm_logging
    sm_configuration
-   sm_releasing
    sm_cellular_modem
    sm_data_mode
+   sm_releasing
    sm_extending
    sm_testing

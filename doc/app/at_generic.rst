@@ -606,7 +606,7 @@ Set command
 * ``<op>`` - Operation to perform:
 
   * ``0`` - Query the firmware version of the active MCUboot slot.
-  * ``1`` - Query which MCUboot bank is currently active.
+  * ``1`` - Query which MCUboot slot is currently active.
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -616,7 +616,7 @@ Response syntax
    #XBOOTINFO: <value>
 
 * When ``<op>`` is ``0`` - ``<value>`` is an unsigned integer representing ``fw_info.version`` of the active MCUboot slot, set at build time using ``CONFIG_FW_INFO_FIRMWARE_VERSION`` and used by NSIB as a downgrade-protection counter.
-* When ``<op>`` is ``1`` - ``<value>`` is ``0`` if bank ``s0`` is active and ``1`` if bank ``s1`` is active.
+* When ``<op>`` is ``1`` - ``<value>`` is ``0`` if slot ``s0`` is active and ``1`` if slot ``s1`` is active.
 
 Examples
 ~~~~~~~~

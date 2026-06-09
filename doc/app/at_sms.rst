@@ -9,6 +9,12 @@ SMS AT commands
 
 This page describes SMS-related AT commands.
 
+.. note::
+
+   |SM|'s SMS implementation is based on the :ref:`lib_sms_readme` library, which uses the following AT commands: ``AT+CMGS``, ``AT+CNMI``, ``AT+CNMA``.
+   These modem AT commands should not be used in conjunction with the ``#XSMS`` command by the host in order to avoid unexpected behavior.
+   The implementation always acknowledges incoming ``+CMT`` and ``+CDS`` notifications with ``AT+CNMA`` command.
+
 SMS support #XSMS
 =================
 

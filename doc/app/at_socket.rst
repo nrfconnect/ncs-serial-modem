@@ -863,6 +863,10 @@ Syntax
     Valid timeout values are 1 to 600 seconds.
     Further sends for the socket are blocked until the unsolicited notification is received.
 
+    This is only supported by the following modem firmware:
+
+      * mfw_nrf9151-ntn
+
 * The ``<data>`` parameter is required when ``<mode>`` is ``0`` (string mode) or ``1`` (hex string mode).
   For string mode (``0``), it is a string that contains the data to be sent.
   For hex string mode (``1``), it is a hexadecimal string representation of the data to be sent.
@@ -909,6 +913,10 @@ Unsolicited notification
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 For network acknowledged sends (when the ``8192`` flag is used), an unsolicited notification is sent when the send operation is completed.
+
+This is only supported by the following modem firmware:
+
+  * mfw_nrf9151-ntn
 
 ::
 
@@ -1082,6 +1090,10 @@ Syntax
     Valid timeout values are 1 to 600 seconds.
     Further sends for the socket are blocked until the unsolicited notification is received.
 
+    This is only supported by the following modem firmware:
+
+      * mfw_nrf9151-ntn
+
 * The ``<url>`` parameter is a string.
   It indicates the hostname or the IP address of the remote peer.
   The maximum size of the hostname is 128 bytes.
@@ -1141,6 +1153,10 @@ Unsolicited notification
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 For network acknowledged sends (when the ``8192`` flag is used), an unsolicited notification is sent when the send operation is completed.
+
+This is only supported by the following modem firmware:
+
+  * mfw_nrf9151-ntn
 
 ::
 
