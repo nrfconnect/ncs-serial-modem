@@ -78,7 +78,7 @@ The following tables shows how to connect the UART pins to the corresponding pin
          * - RTS
            - P0.14
          * - CTS
-           - P0.15 (pull-down)
+           - P0.15 (pull-up)
          * - DTR
            - P0.08 (Button 1, pull-up, active high)
          * - RI
@@ -110,7 +110,7 @@ The following tables shows how to connect the UART pins to the corresponding pin
          * - RTS
            - P0.06
          * - CTS
-           - P0.07 (pull-down)
+           - P0.07 (pull-up)
          * - DTR
            - P0.31 (active low, pull-up)
          * - RI
@@ -125,7 +125,10 @@ The following tables shows how to connect the UART pins to the corresponding pin
       The DTR pin defaults to pull-up, so the external MCU must assert DTR to power on the UART.
       When UART power management is not used, the DTR pin should be pulled to active state.
 
-      When hardware flow control is not used, the CTS and RTS pins should be left floating.
+      When hardware flow control is not used, remove ``hw-flow-control;`` from the ``uart2`` node and remove the ``bias-pull-up`` from the CTS pin in the overlay.
+      With hardware flow control disabled, the UART peripheral does not monitor the CTS pin, so |SM| transmits unconditionally.
+      The CTS and RTS pins can be left unconnected.
+      See :ref:`uart_without_flow_control` for further considerations.
 
       This setup is provided in the :file:`app/overlay-external-mcu.overlay` overlay file.
 
@@ -191,8 +194,8 @@ The following table shows how to connect the UART pins to the corresponding pins
      - P0.14
      - 74
    * - UART0 CTS
-     - P0.15 (pull-down)
-     - 75 (pull-down)
+     - P0.15 (pull-up)
+     - 75 (pull-up)
    * - UART0 DTR
      - P0.31 (active low, pull-up) (Wire to GND to power on the UART0)
      - 50 (active low, pull-up)
@@ -218,6 +221,12 @@ The following table shows how to connect the UART pins to the corresponding pins
 .. important::
    When working with the `nrf9151dk`_ board with a PC host, the **DTR** pin must be wired to **GND** to power on the UART0.
    Currently, you must use a physical jumper wire, but in the future, the `Board Configurator app`_ can be used.
+
+.. important::
+   The nRF91M1 firmware has hardware flow control permanently enabled and cannot be changed.
+   When not using hardware flow control, the |SM| **CTS** pin must be wired to **GND** to allow |SM| to transmit.
+   Without this, |SM| will see CTS as high (not clear to send) and will not transmit.
+   See :ref:`uart_without_flow_control` for further considerations.
 
 By default in the `nrf9151dk`_ board, the UART0 is routed to VCOM0 on the interface chip, and UART1 is routed to VCOM1 on the interface chip.
 This allows the `nrf9151dk`_ board to be used with a PC host for development and testing.
@@ -350,6 +359,7 @@ The host must also have a pull-up on its CTS pin.
 
 **Without hardware flow control-** The host must monitor the RI signal, which is de-asserted when the |SM| UART becomes ready to receive data.
 Alternatively, the host can implement a sufficient timeout between asserting DTR and initiating its first TX operation.
+See :ref:`uart_without_flow_control` for how to configure |SM| to transmit without hardware flow control.
 
 Host-initiated wake-up
 ======================
@@ -388,12 +398,25 @@ Operating without hardware flow control
 ========================================
 
 .. important::
-   The use of |SM| without hardware flow control (RTS/CTS) is `experimental <Software maturity levels_>`_ and strongly not recommended..
+   The use of |SM| without hardware flow control (RTS/CTS) is `experimental <Software maturity levels_>`_ and strongly not recommended.
    Hardware flow control ensures reliable communication and prevents timing-related issues.
    Without hardware flow control, there is a risk of data loss in UART communication, especially in high-throughput scenarios.
 
-|SM|'s CTS pin is configured with pull-down, allowing |SM| to transmit when CTS and RTS pins are left floating.
-The host can operate without connecting the hardware flow control signals (CTS/RTS).
+The approach differs depending on whether you are using the pre-programmed nRF91M1 or a custom |SM| build.
+
+.. tabs::
+
+   .. group-tab:: nRF91M1 pre-programmed |SM| application
+
+      * **Wire the CTS pin to GND** — The nRF91M1 has hardware flow control permanently enabled.
+        Wiring CTS to GND holds the line low, allowing |SM| to transmit.
+      * **Leave RTS unconnected** — The RTS pin is not used and can be left floating.
+
+   .. group-tab:: |SM| application (nRF9151)
+
+      * **Remove** ``hw-flow-control;`` **from the UART node in the overlay** — With hardware flow control disabled, the UART peripheral does not monitor CTS and |SM| transmits unconditionally.
+      * **Remove the** ``bias-pull-up`` **from the CTS pinctrl group in the overlay** — This avoids a pull resistor drawing current against any external signal.
+      * **Leave CTS and RTS unconnected** — Neither pin is used and both can be left floating.
 
 **Key requirements:**
 
