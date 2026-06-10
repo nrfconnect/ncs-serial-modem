@@ -68,16 +68,9 @@ void nrf_modem_fault_handler(struct nrf_modem_fault_info *fault_info)
 
 static void on_modem_dfu_res(int dfu_res, void *ctx)
 {
-	sm_fota_type = SM_FOTA_TYPE_MFW;
-	sm_fota_stage = FOTA_STAGE_COMPLETE;
-	sm_fota_status = FOTA_STATUS_ERROR;
-	sm_fota_info = dfu_res;
-
 	switch (dfu_res) {
 	case NRF_MODEM_DFU_RESULT_OK:
 		LOG_INF("Modem update OK. Running new firmware.");
-		sm_fota_status = FOTA_STATUS_OK;
-		sm_fota_info = 0;
 		break;
 	case NRF_MODEM_DFU_RESULT_UUID_ERROR:
 	case NRF_MODEM_DFU_RESULT_AUTH_ERROR:
@@ -90,12 +83,24 @@ static void on_modem_dfu_res(int dfu_res, void *ctx)
 	case NRF_MODEM_DFU_RESULT_VOLTAGE_LOW:
 		LOG_ERR("Modem update postponed due to low voltage. "
 			"Reset the modem once you have sufficient power.");
-		sm_fota_stage = FOTA_STAGE_ACTIVATE;
 		break;
 	default:
 		LOG_ERR("Unhandled nrf_modem DFU result code 0x%x.", dfu_res);
 		break;
 	}
+
+	/* Update FOTA state only if a modem delta FOTA was in progress.
+	 * sm_fota_type is loaded from NVS; NONE means DFU or no update.
+	 */
+	if (sm_fota_type != SM_FOTA_TYPE_MFW) {
+		return;
+	}
+
+	sm_fota_stage  = (dfu_res == NRF_MODEM_DFU_RESULT_VOLTAGE_LOW)
+			? FOTA_STAGE_ACTIVATE : FOTA_STAGE_COMPLETE;
+	sm_fota_status = (dfu_res == NRF_MODEM_DFU_RESULT_OK)
+			? FOTA_STATUS_OK : FOTA_STATUS_ERROR;
+	sm_fota_info   = (dfu_res == NRF_MODEM_DFU_RESULT_OK) ? 0 : dfu_res;
 }
 
 static void check_app_fota_status(void)
@@ -107,11 +112,12 @@ static void check_app_fota_status(void)
 	 * image will be restored to the primary partition (so-called Revert).
 	 */
 	const int type = mcuboot_swap_type();
+	int ret = 0;
 
 	switch (type) {
 	/** Attempt to boot the contents of slot 0. */
 	case BOOT_SWAP_TYPE_NONE:
-		/* Normal reset, nothing happened, do nothing. */
+		/* Normal boot, nothing happened, do nothing. */
 		return;
 	/** Swap to slot 1. Absent a confirm command, revert back on next boot. */
 	case BOOT_SWAP_TYPE_TEST:
@@ -119,29 +125,27 @@ static void check_app_fota_status(void)
 	case BOOT_SWAP_TYPE_PERM:
 	/** Swap failed because image to be run is not valid. */
 	case BOOT_SWAP_TYPE_FAIL:
-		sm_fota_status = FOTA_STATUS_ERROR;
-		sm_fota_info = type;
 		break;
 	/** Swap back to alternate slot. A confirm changes this state to NONE. */
 	case BOOT_SWAP_TYPE_REVERT:
 		/* Happens on a successful application FOTA.
 		 * boot_write_img_confirmed() resolves the flash area via
-		 * zephyr,code-partition = slot0_ns_partition (fa_off=0x18000),
-		 * which places image_ok at abs 0x8dfe0 — 0x8000 past where MCUboot
-		 * reads the trailer. Use boot_write_img_confirmed_multi(0) instead:
-		 * it uses FLASH_AREA_IMAGE_PRIMARY(0) = slot0_partition (fa_off=0x10000),
-		 * writing image_ok at abs 0x85fe0 where MCUboot expects it.
+		 * slot_0_partition. It writes image_ok where MCUboot expects it.
 		 */
-		LOG_INF("FOTA: REVERT detected, calling boot_write_img_confirmed_multi(0)");
-		const int ret = boot_write_img_confirmed_multi(0);
-
-		LOG_INF("FOTA: boot_write_img_confirmed_multi ret=%d", ret);
-		sm_fota_info = ret;
-		sm_fota_status = ret ? FOTA_STATUS_ERROR : FOTA_STATUS_OK;
+		ret = boot_write_img_confirmed_multi(0);
+		LOG_INF("boot_write_img_confirmed_multi: %d", ret);
 		break;
 	}
-	sm_fota_type = SM_FOTA_TYPE_APP;
-	sm_fota_stage = FOTA_STAGE_COMPLETE;
+	/* Only report FOTA completion if an app FOTA was in progress.
+	 * sm_fota_type is loaded from NVS; NONE means DFU or no update.
+	 */
+	if (sm_fota_type != SM_FOTA_TYPE_APP) {
+		return;
+	}
+	sm_fota_status = (type == BOOT_SWAP_TYPE_REVERT && ret == 0)
+			? FOTA_STATUS_OK : FOTA_STATUS_ERROR;
+	sm_fota_info   = (type == BOOT_SWAP_TYPE_REVERT) ? ret : type;
+	sm_fota_stage  = FOTA_STAGE_COMPLETE;
 }
 
 static int bootloader_mode_init(void)
@@ -259,9 +263,8 @@ static int sm_main(void)
 	}
 
 #if defined(CONFIG_SM_FULL_FOTA)
-	if (sm_modem_full_fota) {
+	if (sm_fota_type == SM_FOTA_TYPE_FULL_MFW) {
 		sm_finish_modem_full_fota();
-		sm_fota_type = SM_FOTA_TYPE_FULL_MFW;
 	}
 #endif
 

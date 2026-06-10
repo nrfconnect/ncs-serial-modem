@@ -191,7 +191,7 @@ static void sm_modemreset(void)
 	++step;
 
 #if defined(CONFIG_SM_FULL_FOTA)
-	if (sm_modem_full_fota) {
+	if (sm_fota_type == SM_FOTA_TYPE_FULL_MFW) {
 		sm_finish_modem_full_fota();
 	}
 #endif

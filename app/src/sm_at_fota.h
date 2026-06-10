@@ -39,10 +39,6 @@ enum sm_fota_image_type {
 	SM_FOTA_TYPE_FULL_MFW,   /* Full modem FOTA */
 };
 
-/* Whether a modem full firmware update is to be activated. */
-extern bool sm_modem_full_fota;
-/** MCUboot bootloader FOTA: validate version increase after reboot. */
-extern bool sm_fota_bl_pending_validate;
 /** MCUboot bootloader FOTA: Active slot fw_info version before a bootloader update was started. */
 extern uint32_t sm_fota_bl_version_before;
 

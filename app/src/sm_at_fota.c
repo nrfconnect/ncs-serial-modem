@@ -45,8 +45,6 @@ enum sm_fota_operation {
 	SM_FOTA_ERASE_MFW = 9
 };
 
-bool sm_modem_full_fota;
-bool sm_fota_bl_pending_validate;
 uint32_t sm_fota_bl_version_before;
 
 enum sm_fota_image_type sm_fota_type = SM_FOTA_TYPE_NONE;
@@ -298,10 +296,6 @@ static void fota_dl_handler(const struct fota_download_evt *evt)
 		fota_path = NULL;
 		sm_fota_stage = FOTA_STAGE_ACTIVATE;
 		sm_fota_info = 0;
-		sm_modem_full_fota = (sm_fota_type == SM_FOTA_TYPE_FULL_MFW);
-#if defined(SM_FOTA_BL_SUPPORTED)
-		sm_fota_bl_pending_validate = (sm_fota_type == SM_FOTA_TYPE_MCUBOOT_BL);
-#endif
 		/* Save, in case reboot by reset */
 		sm_settings_fota_save();
 		urc_send_to(fota_pipe, "\r\n#XFOTA: %d,%d\r\n", sm_fota_stage, sm_fota_status);
@@ -508,7 +502,6 @@ SYS_INIT(sm_at_fota_init, APPLICATION, 0);
 
 void sm_fota_init_state(void)
 {
-	sm_modem_full_fota = false;
 	sm_fota_type = SM_FOTA_TYPE_NONE;
 	sm_fota_stage = FOTA_STAGE_INIT;
 	sm_fota_status = FOTA_STATUS_OK;
@@ -518,7 +511,7 @@ void sm_fota_init_state(void)
 void sm_fota_mcuboot_bl_boot_check(void)
 {
 #if defined(SM_FOTA_BL_SUPPORTED)
-	if (!sm_fota_bl_pending_validate) {
+	if (sm_fota_type != SM_FOTA_TYPE_MCUBOOT_BL) {
 		return;
 	}
 
@@ -541,7 +534,6 @@ void sm_fota_mcuboot_bl_boot_check(void)
 
 	sm_fota_type = SM_FOTA_TYPE_MCUBOOT_BL;
 	sm_fota_stage = FOTA_STAGE_COMPLETE;
-	sm_fota_bl_pending_validate = false;
 #endif
 }
 
