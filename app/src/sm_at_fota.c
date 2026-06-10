@@ -59,6 +59,13 @@ int32_t sm_fota_info;
 
 static struct modem_pipe *fota_pipe;
 
+/* Heap buffers for the current FOTA hostname and path.
+ * fota_download stores raw pointers to these, so they must
+ * remain valid until the download is complete.
+ */
+static char *fota_hostname;
+static char *fota_path;
+
 #if defined(CONFIG_SM_FULL_FOTA)
 /* Buffer used as temporary storage when downloading the modem firmware.
  */
@@ -199,8 +206,12 @@ static int do_fota_start(const char *file_uri, size_t file_uri_len, int sec_tag,
 		.field_set = 0
 	};
 	size_t path_off;
-	char *hostname = NULL;
-	char *path = NULL;
+
+	/* Safety free in case a terminal event was somehow missed. */
+	k_free(fota_hostname);
+	fota_hostname = NULL;
+	k_free(fota_path);
+	fota_path = NULL;
 
 	http_parser_url_init(&parser);
 	ret = http_parser_parse_url(file_uri, file_uri_len, 0, &parser);
@@ -222,39 +233,46 @@ static int do_fota_start(const char *file_uri, size_t file_uri_len, int sec_tag,
 	path_off = parser.field_data[UF_PATH].off;
 
 	/* host: scheme + authority (everything before the path), e.g. "https://host:port" */
-	hostname = k_malloc(path_off + 1);
-	if (!hostname) {
+	fota_hostname = k_malloc(path_off + 1);
+	if (!fota_hostname) {
 		return -ENOMEM;
 	}
-	memcpy(hostname, file_uri, path_off);
-	hostname[path_off] = '\0';
+	memcpy(fota_hostname, file_uri, path_off);
+	fota_hostname[path_off] = '\0';
 
 	/* path: URI content after the leading '/' */
-	path = k_malloc(file_uri_len - path_off);
-	if (!path) {
-		k_free(hostname);
+	fota_path = k_malloc(file_uri_len - path_off);
+	if (!fota_path) {
+		k_free(fota_hostname);
+		fota_hostname = NULL;
 		return -ENOMEM;
 	}
-	memcpy(path, file_uri + path_off + 1, file_uri_len - path_off - 1);
-	path[file_uri_len - path_off - 1] = '\0';
+	memcpy(fota_path, file_uri + path_off + 1, file_uri_len - path_off - 1);
+	fota_path[file_uri_len - path_off - 1] = '\0';
 
-	/* start HTTP(S) FOTA (hostname buffer includes scheme and port, see http_parser) */
-	if (strncasecmp(hostname, "https://", strlen("https://")) == 0) {
+	/* start HTTP(S) FOTA (fota_hostname includes scheme and port, see http_parser) */
+	if (strncasecmp(fota_hostname, "https://", strlen("https://")) == 0) {
 		if (sec_tag == SEC_TAG_TLS_INVALID) {
 			LOG_ERR("Missing sec_tag");
 			ret = -EINVAL;
 		} else {
-			ret = fota_download_start_with_image_type(hostname, path, sec_tag, pdn_id,
-								  0, type);
+			ret = fota_download_start_with_image_type(fota_hostname, fota_path,
+								  sec_tag, pdn_id, 0, type);
 		}
-	} else if (strncasecmp(hostname, "http://", strlen("http://")) == 0) {
-		ret = fota_download_start_with_image_type(hostname, path, -1, pdn_id, 0, type);
+	} else if (strncasecmp(fota_hostname, "http://", strlen("http://")) == 0) {
+		ret = fota_download_start_with_image_type(fota_hostname, fota_path,
+							  -1, pdn_id, 0, type);
 	} else {
 		ret = -EINVAL;
 	}
 
-	k_free(hostname);
-	k_free(path);
+	if (ret) {
+		/* Failed to start; fota_download won't fire a terminal event, so free now. */
+		k_free(fota_hostname);
+		fota_hostname = NULL;
+		k_free(fota_path);
+		fota_path = NULL;
+	}
 
 	/* Send an URC if failed to start */
 	if (ret) {
@@ -276,6 +294,11 @@ static void fota_dl_handler(const struct fota_download_evt *evt)
 			sm_fota_stage, sm_fota_status, sm_fota_info);
 		break;
 	case FOTA_DOWNLOAD_EVT_FINISHED:
+		/* fota_download is done; release the URI buffers. */
+		k_free(fota_hostname);
+		fota_hostname = NULL;
+		k_free(fota_path);
+		fota_path = NULL;
 		sm_fota_stage = FOTA_STAGE_ACTIVATE;
 		sm_fota_info = 0;
 		sm_modem_full_fota = (sm_fota_type == SM_FOTA_TYPE_FULL_MFW);
@@ -302,6 +325,11 @@ static void fota_dl_handler(const struct fota_download_evt *evt)
 		sm_fota_stage = FOTA_STAGE_INIT;
 		break;
 	case FOTA_DOWNLOAD_EVT_ERROR:
+		/* fota_download is done; release the URI buffers. */
+		k_free(fota_hostname);
+		fota_hostname = NULL;
+		k_free(fota_path);
+		fota_path = NULL;
 		sm_fota_status = FOTA_STATUS_ERROR;
 		sm_fota_info = evt->cause;
 		urc_send_to(fota_pipe, "\r\n#XFOTA: %d,%d,%d\r\n",
@@ -310,6 +338,11 @@ static void fota_dl_handler(const struct fota_download_evt *evt)
 		sm_fota_init_state();
 		break;
 	case FOTA_DOWNLOAD_EVT_CANCELLED:
+		/* fota_download is done; release the URI buffers. */
+		k_free(fota_hostname);
+		fota_hostname = NULL;
+		k_free(fota_path);
+		fota_path = NULL;
 		sm_fota_status = FOTA_STATUS_CANCELLED;
 		sm_fota_info = 0;
 		urc_send_to(fota_pipe, "\r\n#XFOTA: %d,%d\r\n", sm_fota_stage, sm_fota_status);
