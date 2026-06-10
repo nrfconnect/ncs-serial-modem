@@ -30,9 +30,6 @@ LOG_MODULE_REGISTER(sm_fota, CONFIG_SM_LOG_LEVEL);
 
 #define ERASE_POLL_TIME 2
 
-/* Some features need fota_download update */
-#define FOTA_FUTURE_FEATURE	0
-
 #if FIXED_PARTITION_EXISTS(s1_partition)
 #define SM_FOTA_BL_SUPPORTED
 #endif
@@ -361,9 +358,6 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 {
 	int err = -EINVAL;
 	uint16_t op;
-#if FOTA_FUTURE_FEATURE
-	static bool paused;
-#endif
 
 	switch (cmd_type) {
 	case AT_PARSER_CMD_TYPE_SET:
@@ -385,8 +379,11 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 		case SM_FOTA_START_FULL_FOTA:
 #endif
 		{
-			/* We cannot handle multiple simultaneous FOTA activations. */
-			if (sm_fota_stage == FOTA_STAGE_ACTIVATE) {
+			/* Only one FOTA session at a time. App and MCUboot share the
+			 * same update slot; modem and application updates are also
+			 * mutually exclusive.
+			 */
+			if (sm_fota_stage != FOTA_STAGE_INIT) {
 				err = -EBUSY;
 				break;
 			}
@@ -423,45 +420,40 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 				type = DFU_TARGET_IMAGE_TYPE_MODEM_DELTA;
 			}
 			err = do_fota_start(uri_ptr, uri_len, sec_tag, pdn_id, type);
-			sm_fota_init_state();
-			if (op == SM_FOTA_START_MFW) {
-				sm_fota_type = SM_FOTA_TYPE_MFW;
-			}
+			if (err == 0) {
+				sm_fota_init_state();
+				sm_fota_stage = FOTA_STAGE_DOWNLOAD;
+				if (op == SM_FOTA_START_MFW) {
+					sm_fota_type = SM_FOTA_TYPE_MFW;
+				}
 #if defined(CONFIG_SM_FULL_FOTA)
-			else if (op == SM_FOTA_START_FULL_FOTA) {
-				sm_fota_type = SM_FOTA_TYPE_FULL_MFW;
-			}
+				else if (op == SM_FOTA_START_FULL_FOTA) {
+					sm_fota_type = SM_FOTA_TYPE_FULL_MFW;
+				}
 #endif
 #if defined(SM_FOTA_BL_SUPPORTED)
-			else if (op == SM_FOTA_START_MCUBOOT_BL) {
-				sm_fota_type = SM_FOTA_TYPE_MCUBOOT_BL;
+				else if (op == SM_FOTA_START_MCUBOOT_BL) {
+					sm_fota_type = SM_FOTA_TYPE_MCUBOOT_BL;
 
-				/* Save the MCUboot version before FOTA. */
-				sm_util_mcuboot_active_version(&sm_fota_bl_version_before);
-				sm_settings_fota_save();
-			}
+					/* Save the MCUboot version before FOTA. */
+					sm_util_mcuboot_active_version(&sm_fota_bl_version_before);
+					sm_settings_fota_save();
+				}
 #endif
-			else {
-				sm_fota_type = SM_FOTA_TYPE_APP;
+				else {
+					sm_fota_type = SM_FOTA_TYPE_APP;
+				}
 			}
 			break;
 		}
-#if FOTA_FUTURE_FEATURE
-		case SM_FOTA_PAUSE_RESUME:
-			if (paused) {
-				fota_download_resume();
-				paused = false;
-			} else {
-				fota_download_pause();
-				paused = true;
-			}
-			err = 0;
-			break;
-#endif
 		case SM_FOTA_MFW_READ:
 			err = do_fota_mfw_read();
 			break;
 		case SM_FOTA_ERASE_MFW:
+			if (sm_fota_stage != FOTA_STAGE_INIT) {
+				err = -EBUSY;
+				break;
+			}
 			err = do_fota_erase_mfw();
 			break;
 		default:
