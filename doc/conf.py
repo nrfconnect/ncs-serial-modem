@@ -5,6 +5,7 @@
 
 from pathlib import Path
 import sys
+import os
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
@@ -12,7 +13,7 @@ import sys
 project = 'ncs-serial-modem'
 copyright = '2026, Nordic Semiconductor'
 author = 'Nordic Semiconductor'
-release = '0.1.0'
+release = os.environ.get('VERSION', 'latest')
 
 # Paths
 

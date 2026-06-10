@@ -54,12 +54,6 @@ jobs:
           pip-install: |
             -r doc/requirements.txt
 
-      - name: Build
-        working-directory: doc
-        run: |
-          doxygen
-          sphinx-build -M html . build
-
       - name: Check version
         run: |
           VERSION_REGEX="^v([0-9a-zA-Z\.\-]+)$"
@@ -72,6 +66,12 @@ jobs:
           fi
           echo "VERSION=${VERSION}"
           echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+
+      - name: Build
+        working-directory: doc
+        run: |
+          doxygen
+          sphinx-build -M html . build
 
       - name: Prepare Azure upload
         run: |
