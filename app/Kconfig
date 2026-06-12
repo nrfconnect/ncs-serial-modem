@@ -437,6 +437,12 @@ config UART_2_NRF_HW_ASYNC_TIMER
 
 endif # UART_ASYNC_API
 
+config SM_SMP_CLIENT
+	bool "SMP client echo on boot (wired UART to host MCU)"
+	help
+	  When enabled, initializes an MCUmgr SMP client on the UART selected by
+	  zephyr,uart-mcumgr and sends a one-shot OS echo command at boot.
+
 module = SM
 module-str = serial modem
 source "$(ZEPHYR_BASE)/subsys/logging/Kconfig.template.log_config"
