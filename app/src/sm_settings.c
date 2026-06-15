@@ -19,12 +19,6 @@ LOG_MODULE_REGISTER(sm_settings, CONFIG_SM_LOG_LEVEL);
 
 static int settings_set(const char *name, size_t len, settings_read_cb read_cb, void *cb_arg)
 {
-	if (!strcmp(name, "modem_full_fota")) {
-		if (len != sizeof(sm_modem_full_fota))
-			return -EINVAL;
-		if (read_cb(cb_arg, &sm_modem_full_fota, len) > 0)
-			return 0;
-	}
 	if (!strcmp(name, "bootloader_mode_requested")) {
 		if (len != sizeof(sm_bootloader_mode_requested))
 			return -EINVAL;
@@ -37,16 +31,16 @@ static int settings_set(const char *name, size_t len, settings_read_cb read_cb, 
 		if (read_cb(cb_arg, &full_mfw_dfu_segment_type, len) > 0)
 			return 0;
 	}
-	if (!strcmp(name, "bl_fota_pend")) {
-		if (len != sizeof(sm_fota_bl_pending_validate))
-			return -EINVAL;
-		if (read_cb(cb_arg, &sm_fota_bl_pending_validate, len) > 0)
-			return 0;
-	}
 	if (!strcmp(name, "bl_fota_ver")) {
 		if (len != sizeof(sm_fota_bl_version_before))
 			return -EINVAL;
 		if (read_cb(cb_arg, &sm_fota_bl_version_before, len) > 0)
+			return 0;
+	}
+	if (!strcmp(name, "fota_type")) {
+		if (len != sizeof(sm_fota_type))
+			return -EINVAL;
+		if (read_cb(cb_arg, &sm_fota_type, len) > 0)
 			return 0;
 	}
 	/* Simply ignore obsolete settings that are not in use anymore.
@@ -93,18 +87,12 @@ int sm_settings_fota_save(void)
 {
 	int err;
 
-	err = settings_save_one("sm/modem_full_fota",
-		&sm_modem_full_fota, sizeof(sm_modem_full_fota));
-	if (err) {
-		return err;
-	}
-	err = settings_save_one("sm/bl_fota_pend", &sm_fota_bl_pending_validate,
-			      sizeof(sm_fota_bl_pending_validate));
-	if (err) {
-		return err;
-	}
-	return settings_save_one("sm/bl_fota_ver", &sm_fota_bl_version_before,
+	err = settings_save_one("sm/bl_fota_ver", &sm_fota_bl_version_before,
 				 sizeof(sm_fota_bl_version_before));
+	if (err) {
+		return err;
+	}
+	return settings_save_one("sm/fota_type", &sm_fota_type, sizeof(sm_fota_type));
 }
 
 int sm_settings_bootloader_mode_save(void)
