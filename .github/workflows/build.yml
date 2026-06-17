@@ -109,7 +109,7 @@ jobs:
               cp "${src_dir}/dfu_application.zip" "${temp}/${base}_dfu_application.zip"
               cp "${src_dir}/dfu_mcuboot.zip" "${temp}/${base}_dfu_mcuboot.zip"
               cp "${src_dir}/signed_by_mcuboot_and_b0_mcuboot.bin" "${temp}/${base}_mcuboot_s0.signed.bin"
-              cp "${src_dir}/signed_by_mcuboot_and_b0_s1_image.bin" "${temp}/${base}_mcuboot_s1.signed.bin"
+              cp "${src_dir}/signed_by_mcuboot_and_b0_mcuboot_s1_variant.bin" "${temp}/${base}_mcuboot_s1.signed.bin"
             fi
             (cd "$temp" && zip -q -r "$root/artifacts/${base}.zip" .)
 
