@@ -33,6 +33,11 @@ jobs:
           sudo apt-get update
           sudo apt install libc6-dev-i386
 
+      - name: Configure git identity for patch application
+        run: |
+          git config --global user.email "ci@github-actions"
+          git config --global user.name "GitHub Actions"
+
       - name: Prepare west project
         run: |
           python3 -m pip install west
