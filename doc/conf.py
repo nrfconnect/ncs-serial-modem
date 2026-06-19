@@ -10,10 +10,10 @@ import os
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'ncs-serial-modem'
+project = 'Serial Modem'
 copyright = '2026, Nordic Semiconductor'
 author = 'Nordic Semiconductor'
-release = os.environ.get('VERSION', 'latest')
+version = release = os.environ.get('VERSION', 'latest')
 
 # Paths
 
