@@ -180,6 +180,11 @@ static void nrfcloud_conn_work_fn(struct k_work *work)
 	int err;
 
 	if (nrfcloud_connect) {
+		/* Clear any stale connection (e.g. left over after an LTE drop) so a
+		 * reconnect request always starts from a clean state. Harmless
+		 * (-ENOTCONN) when there is no active connection.
+		 */
+		(void)nrf_cloud_coap_disconnect();
 		LOG_DBG("Connecting to nRF Cloud.");
 		err = nrf_cloud_coap_connect(NULL);
 		if (err) {
@@ -228,7 +233,7 @@ STATIC int handle_at_nrf_cloud(enum at_parser_cmd_type cmd_type, struct at_parse
 		if (err < 0) {
 			return err;
 		}
-		if (op == SM_NRF_CLOUD_CONNECT && !sm_nrf_cloud_ready) {
+		if (op == SM_NRF_CLOUD_CONNECT) {
 			if (param_count > 2) {
 				err = at_parser_num_get(parser, 2, &send_location);
 				if (send_location != 0 && send_location != 1) {
@@ -246,12 +251,17 @@ STATIC int handle_at_nrf_cloud(enum at_parser_cmd_type cmd_type, struct at_parse
 		} else if (op == SM_NRF_CLOUD_SEND && sm_nrf_cloud_ready) {
 			/* enter data mode */
 			err = enter_datamode(nrf_cloud_datamode_callback, 0);
-		} else if (op == SM_NRF_CLOUD_DISCONNECT && sm_nrf_cloud_ready) {
-			nrfcloud_connect = false;
-			k_work_submit_to_queue(&sm_work_q, &nrfcloud_conn_work);
+		} else if (op == SM_NRF_CLOUD_DISCONNECT) {
+			/* Disconnect is idempotent: if already disconnected there is
+			 * nothing to do, so just acknowledge with OK.
+			 */
+			if (sm_nrf_cloud_ready) {
+				nrfcloud_connect = false;
+				k_work_submit_to_queue(&sm_work_q, &nrfcloud_conn_work);
+			}
 			err = 0;
 		} else {
-			err = -EBUSY;
+			err = -EINVAL;
 		} break;
 
 	case AT_PARSER_CMD_TYPE_READ: {

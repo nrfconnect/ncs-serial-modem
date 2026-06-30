@@ -52,6 +52,16 @@ Syntax
 
   When ``<op>`` is ``2``, |SM| enters :ref:`sm_data_mode`.
 
+  .. note::
+     You can issue ``AT#XNRFCLOUD=1`` even when the device already reports a connection to nRF Cloud.
+     The command first closes any existing connection, and then performs a new connection and authentication.
+     Use this operation to recover the connection after the LTE link is lost and restored.
+     In that case, the device can still report a connection through the read command even though the connection is no longer valid.
+
+  .. note::
+     The disconnect operation is idempotent.
+     Issuing ``AT#XNRFCLOUD=0`` when the device is already disconnected returns ``OK`` and does nothing.
+
 * The ``<send_location>`` parameter is used only when the value of ``<op>`` is ``1``.
   It can have the following integer values:
 
@@ -109,6 +119,16 @@ Example
   #XNRFCLOUD: 0,1
 
   OK
+
+::
+
+  // Reconnect to nRF Cloud after the LTE link is lost and restored.
+  // The command closes the stale connection and establishes a new one.
+  AT#XNRFCLOUD=1
+
+  OK
+
+  #XNRFCLOUD: 1,0
 
 Read command
 ------------
