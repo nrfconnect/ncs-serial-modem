@@ -1430,8 +1430,7 @@ STATIC int handle_at_secure_socket(enum at_parser_cmd_type cmd_type,
 		if (err) {
 			goto error;
 		}
-		sock->sec_tag = SEC_TAG_TLS_INVALID;
-		err = at_parser_num_get(parser, 4, &sock->sec_tag);
+		err = at_parser_num_get(parser, 4, (uint32_t *)&sock->sec_tag);
 		if (err) {
 			goto error;
 		}
@@ -1465,9 +1464,9 @@ STATIC int handle_at_secure_socket(enum at_parser_cmd_type cmd_type,
 		for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
 			if (socks[i].fd != INVALID_SOCKET &&
 			    socks[i].sec_tag != SEC_TAG_TLS_INVALID) {
-				rsp_send("\r\n#XSSOCKET: %d,%d,%d,%d,%d,%d\r\n", socks[i].fd,
+				rsp_send("\r\n#XSSOCKET: %d,%d,%d,%d,%u,%d\r\n", socks[i].fd,
 					 socks[i].family, socks[i].role, socks[i].type,
-					 socks[i].sec_tag, socks[i].cid);
+					 (uint32_t)socks[i].sec_tag, socks[i].cid);
 			}
 		}
 		err = 0;
