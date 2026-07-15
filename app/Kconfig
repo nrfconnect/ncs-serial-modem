@@ -4,8 +4,6 @@
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 #
 
-source "Kconfig.zephyr"
-
 menu "Nordic Serial Modem"
 
 config SM_CUSTOMER_VERSION
@@ -270,6 +268,43 @@ config SM_NRF_CLOUD_LOCATION
 	  Enable the nRF Cloud Location service for cloud-assisted geolocation.
 	  Supports cellular and Wi-Fi positioning.
 
+config SM_NRF_CLOUD_OBSERVABILITY
+	bool "nRF Cloud observability AT commands"
+	default y
+	depends on SM_NRF_CLOUD
+	depends on MEMFAULT_USE_NRF_CLOUD_COAP
+	depends on SETTINGS
+	select BASE64
+	help
+	  Enable the AT#XNRFCLOUDOBS* commands, which control Memfault
+	  over the nRF Cloud CoAP transport.
+
+config SM_NRF_CLOUD_OBSERVABILITY_AUTO_INTERVAL_SECONDS
+	int "Default interval of the automatic upload"
+	depends on SM_NRF_CLOUD_OBSERVABILITY
+	default 3600
+	range 60 86400
+	help
+	  Interval used by AT#XNRFCLOUDOBSAUTO when the host enables the
+	  automatic upload without giving one, and no interval has been stored
+	  yet. The interval the host gives is persistent, so this value only
+	  applies until the host configures one.
+
+config SM_NRF_CLOUD_OBSERVABILITY_DEBUG
+	bool "Debug nRF Cloud observability AT commands"
+	depends on SM_NRF_CLOUD_OBSERVABILITY
+	help
+	  Enable the debug observability commands:
+
+	  * AT#XNRFCLOUDOBSDEVINFO returns the Memfault device information.
+	  * AT#XNRFCLOUDOBSCRASH forces a crash so that coredump capture and
+	    upload can be tested.
+	  * AT#XNRFCLOUDOBSEXPORT prints the buffered Memfault chunks to the AT
+	    interface instead of uploading them.
+
+	  This is disabled by default: AT#XNRFCLOUDOBSCRASH deliberately crashes
+	  the application, so enable it only in development builds.
+
 config SM_COAPC
 	bool "CoAP client support"
 	default y
@@ -465,3 +500,8 @@ source "$(ZEPHYR_BASE)/subsys/logging/Kconfig.template.log_config"
 rsource "src/lwm2m_carrier/Kconfig"
 
 endmenu
+
+# Must be sourced before Kconfig.zephyr, see the file for the reason why.
+rsource "Kconfig.memfault"
+
+source "Kconfig.zephyr"

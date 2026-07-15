@@ -40,6 +40,9 @@ target_compile_options(app PRIVATE
   -DCONFIG_SM_NRF_CLOUD_LOCATION=1
   -DCONFIG_NRF_CLOUD_SEC_TAG=16842753
   -DCONFIG_SM_CMUX_CHANNEL_COUNT=1
+  # Not a Kconfig symbol: shorten the wait for a chunk response so that the timeout path is
+  # testable. The observability symbols are declared in Kconfig and set in prj.conf.
+  -DOBS_COAP_RESPONSE_TIMEOUT_MS=50
 )
 
 # Generate CMock mocks
@@ -68,6 +71,7 @@ target_sources(app PRIVATE
   src/test_at_nrfcloud.c
   src/nrf_modem_at_wrapper.c
   src/nrf_cloud_stubs.c          # date_time_update_async + nrf_cloud_client_id_get only
+  src/memfault_stubs.c           # Memfault symbols (AT#XNRFCLOUDOBS*)
   ../stubs/uart_stubs.c
   ../stubs/sm_at_host_stubs.c
   ../stubs/control_pin_stubs.c
@@ -78,6 +82,7 @@ target_sources(app PRIVATE
   ../stubs/sm_log_stubs.c
   ../../src/sm_util.c
   ../../src/sm_at_nrfcloud.c
+  ../../src/sm_at_nrfcloud_obs.c
   ../../src/sm_at_host.c
   ../../src/sm_at_commands.c
   ${ZEPHYR_BASE}/subsys/modem/modem_pipe.c

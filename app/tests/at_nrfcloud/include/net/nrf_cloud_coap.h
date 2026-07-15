@@ -46,16 +46,32 @@
 #ifndef COAP_CONTENT_FORMAT_APP_JSON
 #define COAP_CONTENT_FORMAT_APP_JSON 50
 #endif
+#ifndef COAP_CONTENT_FORMAT_APP_OCTET_STREAM
+#define COAP_CONTENT_FORMAT_APP_OCTET_STREAM 42
+#endif
+/* COAP_MAKE_RESPONSE_CODE(2, 1) */
+#ifndef COAP_RESPONSE_CODE_CREATED
+#define COAP_RESPONSE_CODE_CREATED 65
+#endif
 
 /* ----------------------------------------------------------------------
- * CoAP response callback – matches the real coap_client_response_cb_t.
+ * CoAP response data and callback – match the real
+ * struct coap_client_response_data and coap_client_response_cb_t.
  * ----------------------------------------------------------------------
  */
 #ifndef COAP_CLIENT_RESPONSE_CB_T_DEFINED
 #define COAP_CLIENT_RESPONSE_CB_T_DEFINED
-typedef void (*coap_client_response_cb_t)(int16_t result_code, size_t offset,
-					  const uint8_t *payload, size_t len,
-					  bool last_block, void *user_data);
+struct coap_client_response_data {
+	int16_t result_code;
+	const struct coap_packet *packet;
+	size_t offset;
+	const uint8_t *payload;
+	size_t payload_len;
+	bool last_block;
+};
+
+typedef void (*coap_client_response_cb_t)(const struct coap_client_response_data *data,
+					  void *user_data);
 #endif
 
 /* ----------------------------------------------------------------------

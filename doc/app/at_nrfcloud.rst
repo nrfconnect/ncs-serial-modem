@@ -299,3 +299,473 @@ Test command
 ------------
 
 The test command is not supported.
+
+.. _SM_AT_NRFCLOUDOBS:
+
+nRF Cloud observability
+=======================
+
+The ``#XNRFCLOUDOBS*`` commands control the Memfault data that the device collects (metrics, events, logs, and, in builds that include it, a coredump) and its upload to nRF Cloud over the CoAP transport.
+
+.. note::
+   To use the ``#XNRFCLOUDOBS*`` commands, the following preconditions apply:
+
+   * The commands that access the network (``#XNRFCLOUDOBSUPLOAD`` and ``#XNRFCLOUDOBSFORWARD``) require a connection to nRF Cloud.
+     See ``AT#XNRFCLOUD``.
+   * ``#XNRFCLOUDOBSDEVINFO``, ``#XNRFCLOUDOBSCRASH`` and ``#XNRFCLOUDOBSEXPORT`` additionally require the :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG <CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG>` Kconfig option, which is disabled by default.
+
+   Upload is host-driven.
+   The automatic upload starts disabled, and the host enables it with ``AT#XNRFCLOUDOBSAUTO=1`` or uploads on demand with ``AT#XNRFCLOUDOBSUPLOAD``.
+
+The ``<project_key>`` parameter, which several of the commands accept, is a string.
+It is a 32-character Memfault project key.
+When it is present and not empty, it overrides the server-side project-key routing, sending the data to the specified Memfault project.
+For more information about Memfault project keys, see `Memfault Project Keys`_.
+Find your project key in `Memfault Project Settings`_.
+
+.. _SM_AT_NRFCLOUDOBSAUTO:
+
+Automatic upload #XNRFCLOUDOBSAUTO
+==================================
+
+The ``#XNRFCLOUDOBSAUTO`` command configures the automatic upload of the buffered observability data.
+
+The configuration is persistent, so it survives a reboot.
+
+Set command
+-----------
+
+The set command enables or disables the automatic upload and configures its interval.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XNRFCLOUDOBSAUTO=<enable>[,<interval_seconds>][,<project_key>]
+
+* The ``<enable>`` parameter can have the following integer values:
+
+  * ``0`` - Disable the automatic upload.
+  * ``1`` - Enable the automatic upload.
+
+* The ``<interval_seconds>`` parameter is an integer from ``60`` to ``86400``.
+  It is the interval between two uploads.
+  When it is omitted, the stored interval is kept.
+  Its initial value is set by the :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_AUTO_INTERVAL_SECONDS <CONFIG_SM_NRF_CLOUD_OBSERVABILITY_AUTO_INTERVAL_SECONDS>` Kconfig option.
+
+* The ``<project_key>`` parameter is a string.
+  When it is omitted, the stored project key is kept, and an empty string clears it.
+
+The first upload runs when the interval expires, not when the automatic upload is enabled.
+An upload that falls while there is no connection to nRF Cloud is skipped, and the next one is scheduled as usual.
+
+The automatic upload is silent: it sends no unsolicited notification.
+
+Response
+~~~~~~~~
+
+The command returns ``OK``, also when the configuration could not be stored, in which case only its persistence is lost.
+
+Read command
+------------
+
+The read command returns the configuration of the automatic upload.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XNRFCLOUDOBSAUTO?
+
+Response
+~~~~~~~~
+
+::
+
+   #XNRFCLOUDOBSAUTO: <enable>,<interval_seconds>,<project_key>
+
+Example
+~~~~~~~
+
+::
+
+  AT#XNRFCLOUDOBSAUTO=1,600
+
+  OK
+  AT#XNRFCLOUDOBSAUTO?
+
+  #XNRFCLOUDOBSAUTO: 1,600,""
+
+  OK
+
+Test command
+------------
+
+The test command returns the supported syntax.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XNRFCLOUDOBSAUTO=?
+
+Response
+~~~~~~~~
+
+::
+
+   #XNRFCLOUDOBSAUTO: (0,1),(60-86400),<project_key>
+
+.. _SM_AT_NRFCLOUDOBSUPLOAD:
+
+On-demand upload #XNRFCLOUDOBSUPLOAD
+====================================
+
+The ``#XNRFCLOUDOBSUPLOAD`` command uploads the buffered observability data to nRF Cloud.
+
+The captured logs are collected before the upload, so that they are included.
+
+Set command
+-----------
+
+The set command uploads the buffered data.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XNRFCLOUDOBSUPLOAD[=<project_key>]
+
+The command returns ``OK`` immediately and the upload runs asynchronously.
+When it completes, an unsolicited notification is sent.
+
+Unsolicited notification
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+::
+
+   #XNRFCLOUDOBSUPLOAD: <result>[,<bytes>]
+
+* The ``<result>`` parameter is an integer.
+
+  * ``0`` - Success.
+    The ``<bytes>`` parameter follows and indicates the number of bytes uploaded, which is ``0`` when there was nothing buffered.
+  * ``-1`` - Failure.
+    The error code is shown in the log.
+
+Example
+~~~~~~~
+
+::
+
+  AT#XNRFCLOUDOBSUPLOAD
+
+  OK
+
+  #XNRFCLOUDOBSUPLOAD: 0,108
+
+Read command
+------------
+
+The read command is not supported.
+
+Test command
+------------
+
+The test command returns the supported syntax.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XNRFCLOUDOBSUPLOAD=?
+
+Response
+~~~~~~~~
+
+::
+
+   #XNRFCLOUDOBSUPLOAD: <project_key>
+
+.. _SM_AT_NRFCLOUDOBSHEARTBEAT:
+
+Metrics heartbeat #XNRFCLOUDOBSHEARTBEAT
+========================================
+
+The ``#XNRFCLOUDOBSHEARTBEAT`` command collects and finalizes a metrics heartbeat.
+
+The data is buffered on the device until it is uploaded, so the command does not require a connection to nRF Cloud.
+
+The heartbeat carries the LTE metrics that the modem reports: the modem firmware version, the network operator, RSRP, SNR, the current band, and the transmitted and received kilobytes.
+Values that the modem does not report, for example when it is deactivated, are left out of the heartbeat.
+
+Set command
+-----------
+
+The set command collects a heartbeat.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XNRFCLOUDOBSHEARTBEAT
+
+Example
+~~~~~~~
+
+::
+
+  AT#XNRFCLOUDOBSHEARTBEAT
+
+  OK
+
+Read command
+------------
+
+The read command is not supported.
+
+Test command
+------------
+
+The test command is not supported.
+
+.. _SM_AT_NRFCLOUDOBSFORWARD:
+
+Chunk forwarding #XNRFCLOUDOBSFORWARD
+=====================================
+
+The ``#XNRFCLOUDOBSFORWARD`` command forwards a Memfault chunk produced by the host to nRF Cloud, using the |SM| connection.
+
+.. note::
+   nRF Cloud attributes the chunk to the authenticated device, so the observability data of the host is reported under the device serial of the |SM| device by default.
+   To report it under a device serial of the host instead, build the host firmware with ``MEMFAULT_EVENT_INCLUDE_DEVICE_SERIAL`` set to ``1`` in its :file:`memfault_platform_config.h`.
+   Every chunk then carries the device serial of the host, which Memfault uses to attribute the data.
+
+Set command
+-----------
+
+The set command forwards a chunk.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XNRFCLOUDOBSFORWARD=<base64_chunk>[,<project_key>]
+
+* The ``<base64_chunk>`` parameter is a string.
+  It is the base64-encoded Memfault chunk to forward.
+
+The command returns ``OK`` immediately and the chunk is posted asynchronously.
+When the post completes, an unsolicited notification is sent.
+
+Unsolicited notification
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+::
+
+   #XNRFCLOUDOBSFORWARD: <result>
+
+* The ``<result>`` parameter is an integer.
+
+  * ``0`` - Success.
+  * ``-1`` - Failure.
+    The chunk is not buffered, so the host must send it again to retry.
+
+Example
+~~~~~~~
+
+Forward a chunk of the host, sent to a specific Memfault project::
+
+  AT#XNRFCLOUDOBSFORWARD="CAKnAgIDAQpqdGVzdHNlcmlhbA==","<project_key>"
+
+  OK
+
+  #XNRFCLOUDOBSFORWARD: 0
+
+Read command
+------------
+
+The read command is not supported.
+
+Test command
+------------
+
+The test command returns the supported syntax.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XNRFCLOUDOBSFORWARD=?
+
+Response
+~~~~~~~~
+
+::
+
+   #XNRFCLOUDOBSFORWARD: <base64_chunk>,<project_key>
+
+.. _SM_AT_NRFCLOUDOBSDEVINFO:
+
+Memfault device information #XNRFCLOUDOBSDEVINFO
+================================================
+
+The ``#XNRFCLOUDOBSDEVINFO`` command returns the Memfault device information, which identifies the device and the firmware in the Memfault project.
+
+This command requires the :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG <CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG>` Kconfig option.
+
+Set command
+-----------
+
+The set command returns the device information.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XNRFCLOUDOBSDEVINFO
+
+Response
+~~~~~~~~
+
+::
+
+   #XNRFCLOUDOBSDEVINFO: <device_serial>,<software_type>,<software_version>,<hardware_version>
+
+All four parameters are strings.
+
+Example
+~~~~~~~
+
+::
+
+  AT#XNRFCLOUDOBSDEVINFO
+
+  #XNRFCLOUDOBSDEVINFO: "50344654-3037-409f-802d-2206917f23d2","serial_modem","3.4.0","nrf9151dk"
+
+  OK
+
+Read command
+------------
+
+The read command is not supported.
+
+Test command
+------------
+
+The test command is not supported.
+
+.. _SM_AT_NRFCLOUDOBSCRASH:
+
+Forced crash #XNRFCLOUDOBSCRASH
+===============================
+
+The ``#XNRFCLOUDOBSCRASH`` command forces a crash, so that the coredump capture and upload can be tested.
+
+This command requires the :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG <CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG>` Kconfig option.
+
+Set command
+-----------
+
+The set command crashes the application.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XNRFCLOUDOBSCRASH[=<type>]
+
+* The ``<type>`` parameter is an integer from ``0`` to ``4``.
+  It defaults to ``0``, an assertion failure.
+
+The device crashes and no response is returned, unless the crash type is invalid.
+
+Read command
+------------
+
+The read command is not supported.
+
+Test command
+------------
+
+The test command returns the supported syntax.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XNRFCLOUDOBSCRASH=?
+
+Response
+~~~~~~~~
+
+::
+
+   #XNRFCLOUDOBSCRASH: <type>
+
+.. _SM_AT_NRFCLOUDOBSEXPORT:
+
+Chunk export #XNRFCLOUDOBSEXPORT
+================================
+
+The ``#XNRFCLOUDOBSEXPORT`` command prints the buffered Memfault chunks to the AT interface instead of uploading them, in the Memfault chunk export format, which the Memfault tooling can parse.
+
+This command requires the :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG <CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG>` Kconfig option.
+
+.. note::
+   The command consumes the chunks.
+   They are no longer available for ``#XNRFCLOUDOBSUPLOAD`` and the automatic upload.
+
+Set command
+-----------
+
+The set command prints the buffered chunks.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XNRFCLOUDOBSEXPORT
+
+Response
+~~~~~~~~
+
+The buffered chunks are returned, one per line::
+
+   MC:<base64_chunk>:
+
+Example
+~~~~~~~
+
+::
+
+  AT#XNRFCLOUDOBSHEARTBEAT
+
+  OK
+  AT#XNRFCLOUDOBSEXPORT
+
+  MC:CAKnAgIDAQpqdGVzdHNlcmlhbA==:
+
+  OK
+
+Read command
+------------
+
+The read command is not supported.
+
+Test command
+------------
+
+The test command is not supported.

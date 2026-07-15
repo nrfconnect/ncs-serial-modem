@@ -12,6 +12,22 @@ tests:
       - CONFIG_SM_DFU_MODEM_FULL=y
     platform_allow:
       - nrf9151dk/nrf9151/ns
+  # The nRF91M1 configuration is the one that carries the most Kconfig fragments and
+  # devicetree overlays, so this guards that the coredump partition still composes with
+  # all of them.
+  serial_modem.nrf91m1.coredump:
+    sysbuild: true
+    build_only: true
+    extra_args:
+      - EXTRA_CONF_FILE="cmux.conf;ppp.conf;trace-backend-uart.conf;nrf-device-provisioning.conf;nrfcloud-coredump-flash.conf"
+      - EXTRA_DTC_OVERLAY_FILE="nrf91m1.overlay;trace-backend.overlay;nrfcloud-coredump-flash.overlay"
+      - mcuboot_EXTRA_DTC_OVERLAY_FILE="${APP_DIR}/nrfcloud-coredump-flash.overlay"
+    extra_configs:
+      - CONFIG_SM_LOG_LEVEL_DBG=y
+    platform_allow:
+      - nrf9151dk/nrf9151/ns
+    integration_platforms:
+      - nrf9151dk/nrf9151/ns
   serial_modem.default:
     sysbuild: true
     build_only: true
@@ -106,18 +122,35 @@ tests:
       - thingy91x/nrf9151/ns
     integration_platforms:
       - nrf9151dk/nrf9151/ns
+  # Only nrf9151dk is covered. thingy91x has no free internal flash, so a coredump partition
+  # there would require shrinking slot0 and cascading matching changes into the b0/mcuboot
+  # images - out of scope for this minimal overlay.
   serial_modem.memfault:
     sysbuild: true
     build_only: true
     extra_args:
-      - EXTRA_CONF_FILE=memfault.conf
-      - EXTRA_DTC_OVERLAY_FILE="memfault.overlay"
-      - mcuboot_EXTRA_DTC_OVERLAY_FILE="${APP_DIR}/memfault.overlay"
-    extra_configs:
-      - CONFIG_MEMFAULT_NCS_PROJECT_KEY="dummy-key"
+      - EXTRA_CONF_FILE=nrfcloud-coredump-flash.conf
+      - EXTRA_DTC_OVERLAY_FILE="nrfcloud-coredump-flash.overlay"
+      - mcuboot_EXTRA_DTC_OVERLAY_FILE="${APP_DIR}/nrfcloud-coredump-flash.overlay"
+    # No CONFIG_MEMFAULT_NCS_PROJECT_KEY is set on purpose: an empty project key
+    # makes the device rely on the nRF Cloud server-side routing, which is what a
+    # user without a Memfault project key gets. Setting a placeholder key here
+    # would be injected as CoAP option 2429 and make every upload fail.
     platform_allow:
       - nrf9151dk/nrf9151/ns
-      - thingy91x/nrf9151/ns
+    integration_platforms:
+      - nrf9151dk/nrf9151/ns
+  # Memfault is enabled in prj.conf, so this guards the opposite configuration: every
+  # option Memfault needs is a configdefault in Kconfig.memfault, and assigning any of
+  # them in prj.conf instead both warns and leaves an unbuildable configuration, because
+  # nothing implements nrf_cloud_coap_get_user_options() without the Memfault CoAP port.
+  serial_modem.no_memfault:
+    sysbuild: true
+    build_only: true
+    extra_configs:
+      - CONFIG_MEMFAULT=n
+    platform_allow:
+      - nrf9151dk/nrf9151/ns
     integration_platforms:
       - nrf9151dk/nrf9151/ns
   serial_modem.mfw_full_fota_and_dfu:

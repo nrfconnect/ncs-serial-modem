@@ -77,6 +77,8 @@
 .. _`nRF Cloud Provisioning Service`: https://docs.memfault.com/docs/nrfcloud/provisioning-overview
 .. _`nRF Cloud claiming Devices`: https://docs.memfault.com/docs/nrfcloud/claiming-devices
 .. _`nRF Cloud Preconnect onboarding`: https://docs.memfault.com/docs/nrfcloud/onboarding#preconnect-onboarding
+.. _`Memfault Project Keys`: https://docs.memfault.com/docs/platform/data-routes
+.. _`Memfault Project Settings`: https://app.memfault.com/organizations/-/projects/-/settings/data-routes
 
 .. ### nRF Connect for Desktop
 
