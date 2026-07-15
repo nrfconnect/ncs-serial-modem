@@ -1,0 +1,78 @@
+#
+# Copyright (c) 2026 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+# Application defaults for Memfault, which is enabled in prj.conf.
+#
+# This file must be sourced before Kconfig.zephyr, which is what pulls in the Kconfig of
+# the Memfault module: a default is inserted at the position where it appears relative to
+# the definition of the symbol, and the first matching default wins. Sourced afterwards,
+# every default here would silently lose to the one of the module.
+
+# Report a statically configured firmware version. A choice symbol cannot be given a
+# configdefault, which warns that it has no effect, so the default of the choice itself is
+# overridden instead. Assigning the symbol in prj.conf would warn with CONFIG_MEMFAULT=n.
+choice MEMFAULT_FW_VERSION
+	default MEMFAULT_NCS_FW_VERSION_STATIC
+endchoice
+
+configdefault MEMFAULT_LOGGING_ENABLE
+	default y
+
+configdefault MEMFAULT_RAM_BACKED_COREDUMP_SIZE
+	default 4096
+
+# Upload Memfault data via the nRF Cloud CoAP transport.
+configdefault MEMFAULT_USE_NRF_CLOUD_COAP
+	default y
+
+configdefault MEMFAULT_HTTP_ENABLE
+	default n
+
+# The periodic upload port is not used: AT#XNRFCLOUDOBSAUTO implements the automatic upload
+# itself, with an interval that the host can change, and every other upload is host-driven
+# with AT#XNRFCLOUDOBSUPLOAD.
+configdefault MEMFAULT_PERIODIC_UPLOAD
+	default n
+
+# No Memfault release-management FOTA backend is wired up here.
+configdefault MEMFAULT_ZEPHYR_FOTA
+	default n
+
+# Collect metrics for unused stack space.
+configdefault MEMFAULT_NCS_STACK_METRICS
+	default y
+
+# Collect the LTE metrics that MODEM_INFO provides: modem firmware version, operator, RSRP,
+# SNR, band and the connectivity statistics. The remaining LTE metrics need
+# LTE_LINK_CONTROL, which this application does not use because the host drives the link.
+configdefault MEMFAULT_NCS_LTE_METRICS
+	default y
+
+# Memfault depends on POSIX, disable unneeded POSIX features.
+configdefault POSIX_FILE_SYSTEM
+	default n if MEMFAULT
+
+# The Memfault CoAP port (memfault_platform_coap.c) allocates the packetizer buffer with
+# k_calloc, and it fails to build unless CONFIG_HEAP_MEM_POOL_SIZE is greater than zero. A
+# HEAP_MEM_POOL_ADD_SIZE_* option is not enough, because the port tests this symbol
+# directly. Zephyr uses the greater of this value and the sum of the
+# HEAP_MEM_POOL_ADD_SIZE_* options, so this does not shrink the pool of other subsystems.
+configdefault HEAP_MEM_POOL_SIZE
+	default 4096 if MEMFAULT
+
+# MEMFAULT_USE_NRF_CLOUD_COAP requires at least two user CoAP options (the project key for
+# the chunks resource, and PROXY_URI plus the project key for the proxy resource), an
+# extended options length value of at least 192, and room for four extra CoAP client
+# options.
+configdefault NRF_CLOUD_COAP_MAX_USER_OPTIONS
+	default 2 if MEMFAULT
+
+configdefault COAP_EXTENDED_OPTIONS_LEN_VALUE
+	default 192 if MEMFAULT
+	default 96
+
+configdefault COAP_CLIENT_MAX_EXTRA_OPTIONS
+	default 4 if MEMFAULT

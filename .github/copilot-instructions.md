@@ -84,7 +84,7 @@ Available Kconfig fragments and DTS overlays (in `app/`):
 | `carrier-lgu.conf` | LwM2M carrier: LG U+ variant |
 | `carrier-softbank.conf` / `sysbuild-softbank.conf` | LwM2M carrier: SoftBank variant |
 | `full-fota.conf` / `full-fota.overlay` | Full MFW FOTA support (Kconfig + external flash partition) |
-| `memfault.conf` / `memfault.overlay` | Memfault integration (Kconfig + core dump partition) |
+| `nrfcloud-coredump-flash.conf` / `nrfcloud-coredump-flash.overlay` | Memfault flash-backed core dump (Kconfig + core dump partition) |
 | `nrf-device-provisioning.conf` | nRF Device Provisioning |
 | `external-mcu.overlay` | External MCU UART wiring |
 | `disable-dtr.overlay` | Disable DTR pin |

@@ -3,7 +3,13 @@
  *
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  *
- * Flash partition overlay for nRF9151DK with Memfault core dump partition.
+ * Flash partition overlay for nRF9151DK with Memfault core dump partition (16 KiB).
+ *
+ *   0x0002_0000  slot0 (primary app)             (436 KiB)
+ *   0x0008_d000  slot1 (secondary app)           (432 KiB)
+ *   0x000f_9000  storage (container)             ( 28 KiB)
+ *     0x000f_9000  Memfault core dump            ( 16 KiB)
+ *     0x000f_d000  Non-secure storage (settings) ( 12 KiB)
  */
 
 / {

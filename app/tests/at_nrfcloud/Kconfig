@@ -1,0 +1,30 @@
+#
+# Copyright (c) 2026 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+# The application Kconfig is not part of this build, so the symbols of the tested sources are
+# declared here. They are redefinitions of the ones in ../../Kconfig, without the SM_NRF_CLOUD
+# and MEMFAULT_USE_NRF_CLOUD_COAP dependencies, which cannot be met on native_sim as the modem
+# and Memfault are mocked. prj.conf assigns their values.
+
+config SM_NRF_CLOUD_OBSERVABILITY
+	bool "nRF Cloud observability AT commands"
+	depends on SETTINGS
+	help
+	  Redefinition of the application symbol, which enables the AT#XNRFCLOUDOBS* commands.
+
+config SM_NRF_CLOUD_OBSERVABILITY_AUTO_INTERVAL_SECONDS
+	int "Default interval of the automatic upload"
+	depends on SM_NRF_CLOUD_OBSERVABILITY
+	default 3600
+	range 60 86400
+
+config SM_NRF_CLOUD_OBSERVABILITY_DEBUG
+	bool "Debug nRF Cloud observability AT commands"
+	depends on SM_NRF_CLOUD_OBSERVABILITY
+
+menu "Zephyr Kernel"
+source "Kconfig.zephyr"
+endmenu

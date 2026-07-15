@@ -181,6 +181,29 @@ CONFIG_SM_NRF_CLOUD_LOCATION - nRF Cloud Location support
    Supports cellular and Wi-Fi positioning.
    This requires :ref:`CONFIG_SM_NRF_CLOUD <CONFIG_SM_NRF_CLOUD>` to be enabled.
 
+.. _CONFIG_SM_NRF_CLOUD_OBSERVABILITY:
+
+CONFIG_SM_NRF_CLOUD_OBSERVABILITY - nRF Cloud observability support
+   This option enables the ``#XNRFCLOUDOBS*`` commands, which control the Memfault data upload over the nRF Cloud CoAP transport.
+   This requires :ref:`CONFIG_SM_NRF_CLOUD <CONFIG_SM_NRF_CLOUD>` and :kconfig:option:`CONFIG_MEMFAULT_USE_NRF_CLOUD_COAP` to be enabled.
+   See :ref:`SM_AT_NRFCLOUDOBS` for more information.
+
+.. _CONFIG_SM_NRF_CLOUD_OBSERVABILITY_AUTO_INTERVAL_SECONDS:
+
+CONFIG_SM_NRF_CLOUD_OBSERVABILITY_AUTO_INTERVAL_SECONDS - Default interval of the automatic upload
+   This option sets the interval, in seconds, that ``#XNRFCLOUDOBSAUTO`` uses when the host enables the automatic upload without giving one, and no interval has been stored yet.
+   It defaults to one hour.
+   The interval the host gives is persistent, so this value only applies until the host configures one.
+   This requires :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY <CONFIG_SM_NRF_CLOUD_OBSERVABILITY>` to be enabled.
+
+.. _CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG:
+
+CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG - Debug observability commands
+   This option enables the ``#XNRFCLOUDOBSDEVINFO``, ``#XNRFCLOUDOBSCRASH`` and ``#XNRFCLOUDOBSEXPORT`` commands, which return the Memfault device information, force a crash for testing the coredump capture, and print the buffered Memfault chunks to the AT interface.
+   It is disabled by default, because ``#XNRFCLOUDOBSCRASH`` deliberately crashes the application.
+   Enable it only in development builds.
+   This requires :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY <CONFIG_SM_NRF_CLOUD_OBSERVABILITY>` to be enabled.
+
 .. _CONFIG_SM_COAPC:
 
 CONFIG_SM_COAPC - CoAP client support in |SM|
@@ -347,17 +370,21 @@ The following configuration files are provided:
 * :file:`trace-backend.overlay` - Devicetree overlay that defines the SRAM partition used by the modem trace backend.
   Required when using :file:`trace-backend-uart.conf` or :file:`trace-backend-cmux.conf`.
 
-* :file:`memfault.conf` - Configuration file that enables `Memfault`_.
-  Must be combined with :file:`memfault.overlay`.
+* :file:`nrfcloud-coredump-flash.conf` - Configuration file that adds the flash-backed core dump to `Memfault`_.
+  Must be combined with :file:`nrfcloud-coredump-flash.overlay`.
   For more information about Memfault features in |NCS|, see the `Memfault library`_ docs.
+
+  Memfault is enabled by default in :file:`prj.conf`, without this overlay.
+  Only the core dump requires the overlay, because it reserves a flash partition.
+  To build without Memfault altogether, set :kconfig:option:`CONFIG_MEMFAULT` to ``n``.
 
   .. note::
 
      The use of Memfault features in |SM| are `Experimental <Software maturity levels_>`_.
 
-* :file:`memfault.overlay` - Devicetree overlay that adds a dedicated flash partition for Memfault core dump storage.
+* :file:`nrfcloud-coredump-flash.overlay` - Devicetree overlay that adds a dedicated flash partition for Memfault core dump storage.
   The overlay resizes the MCUboot primary and secondary slots to free up space for the ``memfault_coredump_partition``.
-  Must be combined with :file:`memfault.conf`.
+  Must be combined with :file:`nrfcloud-coredump-flash.conf`.
   Must also be passed to the ``mcuboot`` image using :makevar:`mcuboot_EXTRA_DTC_OVERLAY_FILE` so that MCUboot operates with the same partition layout.
   The absolute path to the overlay file must be provided.
 
