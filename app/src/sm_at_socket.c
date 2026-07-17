@@ -644,6 +644,16 @@ static int do_secure_socket_open(struct sm_socket *sock, int peer_verify)
 
 	struct timeval tmo = {.tv_sec = SOCKET_SEND_TMO_SEC};
 
+#if defined(CONFIG_SM_APP_TLS)
+	int tls_native = 1;
+
+	/* Must be the first socket option to set. */
+	ret = zsock_setsockopt(sock->fd, SOL_TLS, TLS_NATIVE, &tls_native, sizeof(tls_native));
+	if (ret) {
+		goto error;
+	}
+#endif
+
 	ret = zsock_setsockopt(sock->fd, SOL_SOCKET, SO_SNDTIMEO, &tmo, sizeof(tmo));
 	if (ret) {
 		LOG_ERR("zsock_setsockopt(%d) error: %d", SO_SNDTIMEO, -errno);
@@ -674,6 +684,21 @@ static int do_secure_socket_open(struct sm_socket *sock, int peer_verify)
 		ret = -errno;
 		goto error;
 	}
+
+#if defined(CONFIG_SM_APP_TLS)
+	/* Set up DTLS server role if applicable */
+	if (sock->role == AT_SOCKET_ROLE_SERVER) {
+		int dtls_role = ZSOCK_TLS_DTLS_ROLE_SERVER;
+
+		ret = zsock_setsockopt(sock->fd, SOL_TLS, ZSOCK_TLS_DTLS_ROLE, &dtls_role,
+				     sizeof(int));
+		if (ret) {
+			LOG_ERR("zsock_setsockopt(%d) error: %d", ZSOCK_TLS_DTLS_ROLE, -errno);
+			ret = -errno;
+			goto error;
+		}
+	}
+#endif
 
 	rsp_send("\r\n#XSSOCKET: %d,%d,%d\r\n", sock->fd, sock->type, proto);
 
@@ -1026,6 +1051,21 @@ static int do_connect(struct sm_socket *sock, const char *url, uint16_t port)
 	if (ret) {
 		return -EAGAIN;
 	}
+
+#if defined(CONFIG_SM_APP_TLS)
+	/* MbedTLS requires TLS_HOSTNAME to be set explicitly for SNI.
+	 * Modem-offloaded TLS derives it automatically; application-side TLS does not.
+	 */
+	if (sock->sec_tag != SEC_TAG_TLS_INVALID) {
+		ret = zsock_setsockopt(sock->fd, SOL_TLS, TLS_HOSTNAME,
+				       url, strlen(url) + 1);
+		if (ret) {
+			LOG_ERR("TLS_HOSTNAME error: %d", -errno);
+			return -errno;
+		}
+	}
+#endif
+
 	if (sa.sa_family == AF_INET) {
 		ret = zsock_connect(sock->fd, (struct sockaddr *)&sa,
 				  sizeof(struct sockaddr_in));
@@ -1437,6 +1477,12 @@ STATIC int handle_at_secure_socket(enum at_parser_cmd_type cmd_type,
 
 		uint16_t peer_verify = ZSOCK_TLS_PEER_VERIFY_REQUIRED;
 
+#if defined(CONFIG_SM_APP_TLS)
+		/* Server does not do peer verify. */
+		if (sock->role == AT_SOCKET_ROLE_SERVER) {
+			peer_verify = ZSOCK_TLS_PEER_VERIFY_NONE;
+		}
+#endif
 		if (param_count > 5) {
 			err = at_parser_num_get(parser, 5, &peer_verify);
 			if (err) {
@@ -2034,10 +2080,15 @@ static int do_listen(struct sm_socket *sock)
 {
 	int ret;
 
-	if (sock->type != SOCK_STREAM || sock->local_port == 0 ||
-	    sock->sec_tag != SEC_TAG_TLS_INVALID) {
+	if (sock->type != SOCK_STREAM || sock->local_port == 0) {
 		return -EOPNOTSUPP;
 	}
+
+#if !defined(CONFIG_SM_APP_TLS)
+	if (sock->sec_tag != SEC_TAG_TLS_INVALID) {
+		return -EOPNOTSUPP;
+	}
+#endif
 
 	/* Set the socket to non-blocking mode, so accept() won't block. */
 	ret = zsock_fcntl(sock->fd, ZVFS_F_SETFL, ZVFS_O_NONBLOCK);
