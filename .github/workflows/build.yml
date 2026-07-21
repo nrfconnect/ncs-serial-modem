@@ -21,6 +21,9 @@ on:
 
 jobs:
   build-and-test-in-toolchain-bundle:
+    permissions:
+      contents: read
+      pull-requests: write
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout Serial Modem repository
@@ -79,6 +82,41 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           ./nrfutil toolchain-manager launch --chdir serial_modem -- west twister -T . -v --inline-logs --overflow-as-errors --integration --exclude-tag exclude_integration
+
+      - name: Locate nRF91M1 PR image
+        if: github.event_name == 'pull_request'
+        run: |
+          elf=$(find serial_modem/twister-out -type f \
+                 -path '*/serial_modem.nrf91m1/app/zephyr/zephyr.elf' | head -n1)
+          [ -n "$elf" ] || { echo "nrf91m1 image not found"; exit 1; }
+          log="$(dirname "$(dirname "$(dirname "$elf")")")/build.log"
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          # PR_HEAD_ELF/PR_HEAD_BUILD_LOG are relative to the workspace
+          echo "PR_HEAD_ELF=$elf" >> "$GITHUB_ENV"
+          echo "PR_HEAD_BUILD_LOG=$log" >> "$GITHUB_ENV"
+          echo "CI_RUN_URL=$run_url" >> "$GITHUB_ENV"
+
+      - name: Generate nRF91M1 app-size diff
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BOARD: nrf9151dk/nrf9151/ns
+          SCENARIO: serial_modem.nrf91m1
+          SIZE_COMMENT_PATH: ${{ github.workspace }}/size-comment.md
+        run: |
+          ./nrfutil toolchain-manager launch -- bash serial_modem/scripts/pr-size-diff.sh
+
+      - name: Post sticky size comment
+        # Posting needs pull-requests: write, which the default GITHUB_TOKEN
+        # does not grant on PRs from forks. Don't fail the build when the
+        # comment can't be posted (e.g. fork PRs); the size report is still
+        # available in the job log / artifacts.
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: nrf91m1-app-size
+          path: ${{ github.workspace }}/size-comment.md
 
       - name: Build Serial Modem nightly
         if: ${{ github.event_name == 'schedule' || inputs.trigger_source == 'release-workflow' || github.event_name == 'workflow_dispatch' }}
