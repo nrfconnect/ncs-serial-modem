@@ -277,10 +277,18 @@ static void sm_at_nrfcloud_init(int ret, void *ctx)
 {
 	static bool initialized;
 	int err;
+	/* We want to use the system heap for nRF Cloud library as we use for everything else. */
+	struct nrf_cloud_os_mem_hooks hooks = {
+		.malloc_fn = malloc,
+		.calloc_fn = calloc,
+		.free_fn = free,
+	};
 
 	if (initialized) {
 		return;
 	}
+
+	nrf_cloud_os_mem_hooks_init(&hooks);
 
 	err = nrf_cloud_coap_init();
 	if (err) {

@@ -256,10 +256,10 @@ config SM_NRF_CLOUD
 if SM_NRF_CLOUD
 config HEAP_MEM_POOL_ADD_SIZE_SM_NRF_CLOUD
 	int "Additional heap memory pool size for nRF Cloud support"
-	default 8192
+	default 1700
 	help
-	  Some libraries used by nRF Cloud use System Heap (k_malloc() / k_free()) for
-	  dynamic memory allocation.
+	  modem_jwt library used by nrf_cloud libraries, uses kernel heap for querying UUID.
+	  2x CONFIG_MODEM_JWT_MAX_LEN is the maximum it can use.
 endif # SM_NRF_CLOUD
 
 config SM_NRF_CLOUD_LOCATION
