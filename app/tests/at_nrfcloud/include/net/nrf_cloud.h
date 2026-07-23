@@ -10,6 +10,7 @@
 #define NRF_CLOUD_TEST_STUB_H_
 
 #include <stddef.h>
+#include <net/nrf_cloud_os.h>
 
 /** Maximum length of the nRF Cloud client ID. */
 #define NRF_CLOUD_CLIENT_ID_MAX_LEN 64
