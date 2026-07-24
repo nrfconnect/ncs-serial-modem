@@ -270,6 +270,18 @@ CONFIG_SM_DFU_MODEM_FULL - Enable full modem DFU
    This option enables support for full modem firmware updates using the ``AT#XDFUINIT``, ``AT#XDFUWRITE``, and ``AT#XDFUAPPLY`` commands.
    See the :ref:`DFU_AT_commands` for more information.
 
+.. _CONFIG_SM_DEBUG_STATS_HEAP:
+
+CONFIG_SM_DEBUG_STATS_HEAP - Enable heap memory statistics
+   This option enables the ``AT#XDBGSTATSMEM`` command for printing heap memory statistics.
+   See the :ref:`SM_AT_DBGSTATSMEM` for more information.
+
+.. _CONFIG_SM_DEBUG_STATS_THREAD_STACK:
+
+CONFIG_SM_DEBUG_STATS_THREAD_STACK - Enable thread stack memory statistics
+   This option enables thread stack memory statistics in the ``AT#XDBGSTATSMEM`` command.
+   See the :ref:`SM_AT_DBGSTATSMEM` for more information.
+
 .. _sm_config_files:
 
 Configuration files

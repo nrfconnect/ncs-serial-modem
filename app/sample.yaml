@@ -204,3 +204,13 @@ tests:
       - SB_CONFIG_SECURE_BOOT_APPCORE=n
     platform_allow:
       - nrf9151dk/nrf9151/ns
+  serial_modem.debug_stats_stacks:
+    sysbuild: true
+    build_only: true
+    extra_configs:
+      - CONFIG_SM_DEBUG_STATS_THREAD_STACK=y
+      - CONFIG_SYS_HEAP_INFO=y
+      - CONFIG_LOG_BUFFER_SIZE=2048
+    platform_allow:
+      - nrf9151dk/nrf9151/ns
+    tags: exclude_integration

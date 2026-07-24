@@ -81,10 +81,11 @@ target_sources(app PRIVATE
 
 # Include directories - override headers first
 set(includes
-  "${PROJECT_SOURCE_DIR}/include/"
+  "${PROJECT_SOURCE_DIR}/include"
   "${PROJECT_SOURCE_DIR}/../../src"
   "${ZEPHYR_BASE}/../nrfxlib/nrf_modem/include"
-  "${ZEPHYR_BASE}/include/"
+  "${ZEPHYR_BASE}/include"
+  "${ZEPHYR_BASE}/lib/libc/common/include"
   "${PROJECT_SOURCE_DIR}/../stubs"
 )
 

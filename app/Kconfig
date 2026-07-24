@@ -307,6 +307,27 @@ config SM_CMUX_CHANNEL_COUNT
 	  Number of channels to be used by the CMUX implementation.
 	  Each channel adds about 4 kB of RAM usage for buffers.
 
+config SM_DEBUG_STATS_HEAP
+	bool "Enable heap usage statistics"
+	default y
+	select SYS_HEAP_RUNTIME_STATS
+	help
+	  Enable heap usage statistics for debugging purposes through AT#XDBGSTATSMEM command.
+	  The statistics are printed to the log so use AT#XLOG=1 to enable logging.
+
+config SM_DEBUG_STATS_THREAD_STACK
+	bool "Enable threads' stack usage statistics"
+	depends on SM_DEBUG_STATS_HEAP
+	select THREAD_ANALYZER
+	select THREAD_NAME
+	help
+	  Enable threads' stack usage statistics for debugging purposes through
+	  the AT#XDBGSTATSMEM command. The statistics are printed to the log so use
+	  AT#XLOG=1 to enable logging.
+	  With default logging configurations, some of the stack usage metrics are dropped.
+	  You need to increase CONFIG_LOG_BUFFER_SIZE to 2048 or more to make it work.
+	  This feature will use 4-5 kB of FLASH.
+
 if SM_PPP
 
 config SM_PPP_FALLBACK_MTU
