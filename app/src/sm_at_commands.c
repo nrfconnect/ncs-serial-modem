@@ -14,6 +14,9 @@
 #include <zephyr/sys/reboot.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/types.h>
+#include <zephyr/sys/sys_heap.h>
+#include <zephyr/debug/thread_analyzer.h>
+#include <sys_malloc.h>
 #include <dfu/dfu_target.h>
 #include <tfm/tfm_ioctl_api.h>
 #include <modem/at_parser.h>
@@ -372,3 +375,59 @@ STATIC int handle_at_xbootinfo(enum at_parser_cmd_type cmd_type, struct at_parse
 		return -EINVAL;
 	}
 }
+
+#if defined(CONFIG_SM_DEBUG_STATS_HEAP)
+
+/* The feature only works if logging is enabled and the log level is at least INF. */
+BUILD_ASSERT(IS_ENABLED(CONFIG_LOG), "AT#XDBGSTATSMEM requires CONFIG_LOG");
+BUILD_ASSERT(CONFIG_SM_LOG_LEVEL >= 3,
+	     "AT#XDBGSTATSMEM requires CONFIG_SM_LOG_LEVEL_INF or CONFIG_SM_LOG_LEVEL_DBG");
+
+extern struct sys_heap _system_heap;
+
+SM_AT_CMD_CUSTOM(xmemstats, "AT#XDBGSTATSMEM", handle_at_memstats);
+STATIC int handle_at_memstats(enum at_parser_cmd_type cmd_type, struct at_parser *, uint32_t)
+{
+	int ret;
+	struct sys_memory_stats kernel_stats;
+	struct sys_memory_stats malloc_stats;
+
+	if (cmd_type != AT_PARSER_CMD_TYPE_SET) {
+		return -EINVAL;
+	}
+
+	/* System heap stats */
+	ret = malloc_runtime_stats_get(&malloc_stats);
+	if (ret) {
+		LOG_WRN("Failed to read system heap stats, error: %d", ret);
+	} else {
+		LOG_INF("System heap stats:");
+		LOG_INF("  free:           %6d", malloc_stats.free_bytes);
+		LOG_INF("  allocated:      %6d", malloc_stats.allocated_bytes);
+		LOG_INF("  max. allocated: %6d", malloc_stats.max_allocated_bytes);
+	}
+
+	/* Kernel heap stats */
+	ret = sys_heap_runtime_stats_get(&_system_heap, &kernel_stats);
+	if (ret) {
+		LOG_WRN("Failed to read kernel heap stats, error: %d", ret);
+	} else {
+		LOG_INF("Kernel heap stats:");
+		LOG_INF("  free:           %6d", kernel_stats.free_bytes);
+		LOG_INF("  allocated:      %6d", kernel_stats.allocated_bytes);
+		LOG_INF("  max. allocated: %6d", kernel_stats.max_allocated_bytes);
+	}
+#if defined(CONFIG_SYS_HEAP_INFO)
+	LOG_INF("Kernel heap block information:");
+	sys_heap_print_info(&_system_heap, true);
+#endif
+
+	/* Thread stack usage statistics */
+#if defined(CONFIG_SM_DEBUG_STATS_THREAD_STACK)
+	LOG_INF("Thread stack stats:");
+	thread_analyzer_print(0);
+#endif
+
+	return 0;
+}
+#endif

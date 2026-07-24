@@ -89,11 +89,12 @@ target_sources(app PRIVATE
 #      at_commands test.
 #   3. Source directories and external include paths follow.
 set(includes
-  "${PROJECT_SOURCE_DIR}/include/"
-  "${PROJECT_SOURCE_DIR}/../at_commands/include/"
+  "${PROJECT_SOURCE_DIR}/include"
+  "${PROJECT_SOURCE_DIR}/../at_commands/include"
   "${PROJECT_SOURCE_DIR}/../../src"
   "${ZEPHYR_BASE}/../nrfxlib/nrf_modem/include"
-  "${ZEPHYR_BASE}/include/"
+  "${ZEPHYR_BASE}/include"
+  "${ZEPHYR_BASE}/lib/libc/common/include"
   "${PROJECT_SOURCE_DIR}/../stubs"
 )
 

@@ -702,3 +702,123 @@ The ``<result>`` parameter returns an integer indicating the result of the re-in
    #. Connecting again using LTE.
    #. Restarting the service.
       For example, opening the socket and re-establishing the TCP connection.
+
+.. _SM_AT_DBGSTATSMEM:
+
+Memory statistics #XDBGSTATSMEM
+===============================
+
+.. note::
+
+   This AT command is `Experimental <Software maturity levels_>`_.
+
+Print heap and thread stack memory statistics to the log at the ``INF`` level.
+Since this is using the logging as an output, you must enable logging first by issuing the ``AT#XLOG=1`` command.
+
+The following statistics are printed:
+
+* System heap (``malloc`` heap) - Free bytes, allocated bytes, and peak allocated bytes.
+* Kernel heap (``k_malloc`` heap) - Free bytes, allocated bytes, and peak allocated bytes.
+* Kernel heap block information - This is only available when the ``CONFIG_SYS_HEAP_INFO`` Kconfig option is enabled.
+* Thread stack usage statistics:
+
+  * This is only available when the :ref:`CONFIG_SM_DEBUG_STATS_THREAD_STACK <CONFIG_SM_DEBUG_STATS_THREAD_STACK>` Kconfig option is enabled.
+  * Setting the ``CONFIG_LOG_BUFFER_SIZE`` Kconfig option to 2048 or more is required to avoid dropping some of the log entries showing stack usage statistics.
+
+This command is available when the firmware is built with the :ref:`CONFIG_SM_DEBUG_STATS_HEAP <CONFIG_SM_DEBUG_STATS_HEAP>` Kconfig option enabled.
+In addition, the ``CONFIG_LOG`` Kconfig option and the ``CONFIG_SM_LOG_LEVEL_DBG`` or ``CONFIG_SM_LOG_LEVEL_INF`` Kconfig option must be enabled.
+
+Set command
+-----------
+
+::
+
+   AT#XDBGSTATSMEM
+
+The command prints memory statistics to the log and returns ``OK``.
+No memory information is returned in the AT response.
+
+Read command
+------------
+
+The read command is not supported.
+
+Test command
+------------
+
+The test command is not supported.
+
+Example
+-------
+
+Query memory statistics:
+::
+
+   AT#XLOG=1
+   OK
+   AT#XDBGSTATSMEM
+   OK
+
+These commands will print the following output in the log:
+::
+
+   [00:00:36.270,965] <inf> sm_at: System heap stats:
+   [00:00:36.270,996] <inf> sm_at:   free:            45844
+   [00:00:36.270,996] <inf> sm_at:   allocated:         472
+   [00:00:36.271,026] <inf> sm_at:   max. allocated:    472
+   [00:00:36.271,026] <inf> sm_at: Kernel heap stats:
+   [00:00:36.271,057] <inf> sm_at:   free:             1892
+   [00:00:36.271,057] <inf> sm_at:   allocated:           0
+   [00:00:36.271,057] <inf> sm_at:   max. allocated:   1280
+
+The output appears as follows when ``CONFIG_SM_DEBUG_STATS_THREAD_STACK`` and ``CONFIG_SYS_HEAP_INFO`` Kconfig options are enabled.
+::
+
+   [00:01:16.852,478] <inf> sm_at: System heap stats:
+   [00:01:16.853,393] <inf> sm_at:   free:            48292
+   [00:01:16.854,431] <inf> sm_at:   allocated:         472
+   [00:01:16.855,438] <inf> sm_at:   max. allocated:   1344
+   [00:01:16.856,445] <inf> sm_at: Kernel heap stats:
+   [00:01:16.857,360] <inf> sm_at:   free:             1892
+   [00:01:16.858,398] <inf> sm_at:   allocated:           0
+   [00:01:16.859,405] <inf> sm_at:   max. allocated:   1280
+   [00:01:16.860,412] <inf> sm_at: Kernel heap block information:
+   Heap at 0x20028d40 contains 245 units in 8 buckets
+
+     bucket#    min units        total      largest      largest
+                threshold       chunks      (units)      (bytes)
+     -----------------------------------------------------------
+           7          128            1          237         1896
+
+   Chunk dump:
+   chunk    0: [*] size=8    left=0    right=8
+   chunk    8: [-] size=237  left=0    right=245
+   chunk  245: [*] size=0    left=8    right=245
+
+   1892 free bytes, 0 allocated bytes, overhead = 72 bytes (3.7%)
+   [00:01:16.869,781] <inf> sm_at: Thread stack stats:
+   Thread analyze:
+    ppp_tx              : STACK: unused 796 usage 228 / 1024 (22 %); CPU: 0 %
+                        : Total CPU cycles used: 2
+    trace_thread        : STACK: unused 460 usage 308 / 768 (40 %); CPU: 0 %
+                        : Total CPU cycles used: 3
+    coap_client_recv_thread: STACK: unused 1276 usage 772 / 2048 (37 %); CPU: 0 %
+                        : Total CPU cycles used: 67
+    nrf_provisioning_work_q: STACK: unused 1812 usage 236 / 2048 (11 %); CPU: 0 %
+                        : Total CPU cycles used: 2
+    date_time_work_q    : STACK: unused 492 usage 788 / 1280 (61 %); CPU: 0 %
+                        : Total CPU cycles used: 32
+    ppp_data_passing    : STACK: unused 1564 usage 484 / 2048 (23 %); CPU: 0 %
+                        : Total CPU cycles used: 2
+    downloader          : STACK: unused 3844 usage 252 / 4096 (6 %); CPU: 0 %
+                        : Total CPU cycles used: 2
+    net_mgmt            : STACK: unused 596 usage 204 / 800 (25 %); CPU: 0 %
+                        : Total CPU cycles used: 1
+    sysworkq            : STACK: unused 3180 usage 916 / 4096 (22 %); CPU: 0 %
+                        : Total CPU cycles used: 475
+    idle                : STACK: unused 252 usage 68 / 320 (21 %); CPU: 99 %
+                        : Total CPU cycles used: 2506299
+    sm_work_q           : STACK: unused 812 usage 3284 / 4096 (80 %); CPU: 0 %
+                        : Total CPU cycles used: 4467
+    ISR0                : STACK: unused 1588 usage 460 / 2048 (22 %); CPU: 0 %
+                        : Total CPU cycles used: 0
