@@ -41,7 +41,7 @@ exclude_patterns = ['_build_sphinx', 'Thumbs.db', '.DS_Store']
 html_theme = 'sphinx_ncs_theme'
 html_show_sphinx = False
 
-html_theme_options = {'docsets': {},"addons_url": "https://nrfconnect.github.io/ncs-app-index/","bare_metal_url": "","ncs_url": "https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/index.html", "ncs_label": "nRF Connect SDK Docs", "logo_url": "https://nordic-semiconductor.fluidtopics.net/"}
+html_theme_options = {'docsets': {},"addons_url": "https://nrfconnect.github.io/ncs-app-index/","bare_metal_url": "","ncs_url": "https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/index.html", "ncs_label": "nRF Connect SDK Docs", "logo_url": "https://docs.nordicsemi.com/"}
 
 html_extra_path = ['versions.json']
 
