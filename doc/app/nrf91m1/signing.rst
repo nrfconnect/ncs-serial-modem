@@ -1,0 +1,403 @@
+.. _nrf91m1_signing:
+
+nRF91M1 signing procedures
+###########################
+
+All commands below assume ``ncs-serial-modem/app`` as the working directory.
+
+.. note::
+
+   **Serial Modem connection**
+
+   After flashing, a working Serial Modem requires the correct UART wiring — in
+   particular the **DTR** pin wired to **GND** when using a PC host. See the
+   :ref:`uart_configuration` documentation for pin mapping, signal descriptions,
+   and host setup.
+
+Signing pipeline
+================
+
+``sign-hashes.sh`` is the only step that runs in the secure environment and the
+only script that contacts Vault. All other scripts run on a normal build machine
+and never touch private key material.
+
+Typical split:
+
+1. **Build machine** — ``sign-build-unsigned.sh`` produces ``manifest-tosign.env``
+   (opaque base64 hashes, no secrets).
+2. **Secure environment** — carries in ``manifest-tosign.env`` and ``sign-hashes.sh``,
+   authenticates to Vault, produces ``manifest-signed.env`` (signatures, no key material).
+3. **Build machine** — ``sign-assemble.sh`` applies the signatures and produces
+   the flashable images.
+
+To authenticate in the secure environment:
+
+.. code-block:: sh
+
+   export VAULT_ADDR=https://vault.example.com
+   export VAULT_TRANSIT_MOUNT=vault/location
+   vault login
+
+When a procedure involves two ``sign-hashes.sh`` calls (MCUboot update), the
+Vault session must still be valid for the second call, or re-authenticate.
+
+.. warning::
+
+   **Build machine trust boundary**
+
+   A compromised build environment could inject malicious code into the firmware
+   before hashing, or substitute the hashes sent to the secure environment.
+   Private keys never leave Vault, but the signing operator cannot verify firmware
+   content from hashes alone. Mitigate by building from a pinned, audited source
+   tree and cross-checking ``manifest-tosign.env`` against an independent build.
+
+Signing the application
+=======================
+
+Produces the initial full image flashed to production devices. All B0 public
+keys found in ``nrf91m1/certs/{env}/b0/`` are provisioned, enabling future
+B0 key rotation.
+
+.. code-block:: sh
+
+   ./nrf91m1/scripts/sign-build-unsigned.sh --dev
+
+   # In secure environment:
+   ./nrf91m1/scripts/sign-hashes.sh \
+       --in  ./signing-out/unsigned/manifest-tosign.env \
+       --out ./signing-out/manifest-signed.env
+
+   ./nrf91m1/scripts/sign-assemble.sh \
+       --signed       ./signing-out/manifest-signed.env \
+       --unsigned-dir ./signing-out/unsigned
+
+   nrfutil device program --firmware signing-out/release/full.hex
+
+   nrfutil device reset
+
+Updating the application
+========================
+
+Increment the version in ``VERSION`` before building. MCUboot enforces downgrade
+prevention. Use ``--override-app-version <X.Y.Z+BUILD>`` to override the VERSION
+file (debugging only).
+
+.. code-block:: sh
+
+   ./nrf91m1/scripts/sign-build-unsigned.sh --dev --app-update-only
+
+   # In secure environment:
+   ./nrf91m1/scripts/sign-hashes.sh \
+       --in  ./signing-out/unsigned/manifest-tosign.env \
+       --out ./signing-out/manifest-signed.env
+
+   ./nrf91m1/scripts/sign-assemble.sh \
+       --signed       ./signing-out/manifest-signed.env \
+       --unsigned-dir ./signing-out/unsigned \
+       --app-update-only
+
+   ./scripts/sm_dfu_host.py --port /dev/ttyACM0 --baudrate 115200 \
+       --type application \
+       --file ./signing-out/release/app_signed.bin
+
+   nrfutil device reset
+
+Updating MCUboot
+================
+
+MCUboot update images are signed by both B0 and the MCUboot key.
+
+Set ``CONFIG_FW_INFO_FIRMWARE_VERSION`` to 2 in MCUboot Kconfig before building.
+``--override-mcuboot-version <N>`` overrides this value (debugging only).
+
+.. code-block:: sh
+
+   ./nrf91m1/scripts/sign-build-unsigned.sh --dev
+
+   # In secure environment:
+   ./nrf91m1/scripts/sign-hashes.sh \
+       --in  ./signing-out/unsigned/manifest-tosign.env \
+       --out ./signing-out/manifest-signed.env
+
+   ./nrf91m1/scripts/sign-assemble.sh \
+       --signed       ./signing-out/manifest-signed.env \
+       --unsigned-dir ./signing-out/unsigned
+
+   ./nrf91m1/scripts/sign-prepare-mcuboot.sh
+
+   # Another round in secure environment:
+   # Re-authenticate to Vault if the session has expired
+   ./nrf91m1/scripts/sign-hashes.sh \
+       --in  ./signing-out/manifest-mcuboot-tosign.env \
+       --out ./signing-out/manifest-mcuboot-signed.env
+
+   ./nrf91m1/scripts/sign-assemble-mcuboot.sh \
+       --mcuboot-signed ./signing-out/manifest-mcuboot-signed.env
+
+   ./scripts/sm_dfu_host.py --port /dev/ttyACM0 --baudrate 115200 \
+       --type mcuboot-bootloader \
+       --file ./signing-out/release/signed_by_mcuboot_and_b0_mcuboot_s1_variant.bin
+
+   nrfutil device reset
+
+Expected: MCUboot version counter using ``AT#XBOOTINFO=0`` returns 2.
+
+B0 key rotation
+===============
+
+B0 provisions all public keys found in ``nrf91m1/certs/{env}/b0/`` at initial
+flash. The active signing key advances monotonically via the hardware counter;
+once a key is rotated out, it is permanently revoked.
+
+Step 1 — Rotate to B0_V1 (revokes B0_V0)
+----------------------------------------
+
+.. code-block:: sh
+
+   ./nrf91m1/scripts/sign-build-unsigned.sh --override-mcuboot-version 3 --b0-key-name B0_V1 --dev
+
+   # In secure environment:
+   ./nrf91m1/scripts/sign-hashes.sh \
+       --in  signing-out/unsigned/manifest-tosign.env \
+       --out signing-out/manifest-signed.env
+
+   ./nrf91m1/scripts/sign-assemble.sh
+
+   ./nrf91m1/scripts/sign-prepare-mcuboot.sh
+
+   # Another round in secure environment:
+   # Re-authenticate to Vault if the session has expired
+   ./nrf91m1/scripts/sign-hashes.sh \
+       --in  signing-out/manifest-mcuboot-tosign.env \
+       --out signing-out/manifest-mcuboot-signed.env
+
+   ./nrf91m1/scripts/sign-assemble-mcuboot.sh
+
+   # Note: Use signed_by_mcuboot_and_b0_mcuboot_s1_variant.bin if you did not update MCUboot.
+   # AT#XBOOTINFO=1 can be used to check the slot that is currently active.
+   ./scripts/sm_dfu_host.py --port /dev/ttyACM0 --baudrate 115200 \
+       --type mcuboot-bootloader \
+       --file ./signing-out/release/signed_by_mcuboot_and_b0_mcuboot.bin
+
+   nrfutil device reset
+
+Expected: MCUboot version counter using ``AT#XBOOTINFO=0`` returns 3.
+B0_V0 is now permanently revoked; only B0_V1, B0_V2, and B0_V3 are accepted for future updates.
+
+Step 2 — Verify revocation: sign with B0_V0 (expected to fail)
+--------------------------------------------------------------
+
+.. code-block:: sh
+
+   ./nrf91m1/scripts/sign-build-unsigned.sh --override-mcuboot-version 4 --b0-key-name B0_V0 --dev
+
+   # In secure environment:
+   ./nrf91m1/scripts/sign-hashes.sh \
+       --in  signing-out/unsigned/manifest-tosign.env \
+       --out signing-out/manifest-signed.env
+
+   ./nrf91m1/scripts/sign-assemble.sh
+
+   ./nrf91m1/scripts/sign-prepare-mcuboot.sh
+
+   # Another round in secure environment:
+   # Re-authenticate to Vault if the session has expired
+   ./nrf91m1/scripts/sign-hashes.sh \
+       --in  signing-out/manifest-mcuboot-tosign.env \
+       --out signing-out/manifest-mcuboot-signed.env
+
+   ./nrf91m1/scripts/sign-assemble-mcuboot.sh
+
+   ./scripts/sm_dfu_host.py --port /dev/ttyACM0 --baudrate 115200 \
+       --type mcuboot-bootloader \
+       --file ./signing-out/release/signed_by_mcuboot_and_b0_mcuboot_s1_variant.bin
+
+   nrfutil device reset
+
+Expected: B0 rejects the update because B0_V0 is revoked. ``AT#XBOOTINFO=0``
+still returns 3.
+
+MCUboot key rotation
+====================
+
+MCUboot key rotation replaces the key MCUboot uses to verify the application and MCUboot
+update image. The process is a three-phase FOTA campaign; all phases keep devices
+functional throughout.
+
+Phase 1 — Transition MCUboot (bakes MCUBOOT_V0 + MCUBOOT_V1, signs app with MCUBOOT_V0)
+---------------------------------------------------------------------------------------
+
+Devices currently have MCUboot with only MCUBOOT_V0 baked. This build produces a
+MCUboot update that bakes both MCUBOOT_V0 and MCUBOOT_V1. The app is still signed with MCUBOOT_V0 so
+existing devices can verify it before and after the MCUboot update.
+
+.. note::
+
+   In production:
+
+   1. Instead of using the ``--override-mcuboot-version`` option, update the MCUboot ``CONFIG_FW_INFO_FIRMWARE_VERSION`` Kconfig value to a higher version.
+
+.. code-block:: sh
+
+   ./nrf91m1/scripts/sign-build-unsigned.sh --dev --override-mcuboot-version 5 --next-mcuboot-key MCUBOOT_V1
+
+   # In secure environment:
+   ./nrf91m1/scripts/sign-hashes.sh \
+       --in  signing-out/unsigned/manifest-tosign.env \
+       --out signing-out/manifest-signed.env
+
+   ./nrf91m1/scripts/sign-assemble.sh
+
+   ./nrf91m1/scripts/sign-prepare-mcuboot.sh
+
+   # Another round in secure environment:
+   ./nrf91m1/scripts/sign-hashes.sh \
+       --in  signing-out/manifest-mcuboot-tosign.env \
+       --out signing-out/manifest-mcuboot-signed.env
+
+   ./nrf91m1/scripts/sign-assemble-mcuboot.sh
+
+   ./scripts/sm_dfu_host.py --port /dev/ttyACM0 --baudrate 115200 \
+       --type mcuboot-bootloader \
+       --file ./signing-out/release/signed_by_mcuboot_and_b0_mcuboot_s1_variant.bin
+
+   nrfutil device reset
+
+Expected: devices now accept images signed by either MCUBOOT_V0 or MCUBOOT_V1.
+Verify with ``AT#XBOOTINFO=0`` that the MCUboot version counter is updated to 5.
+
+Phase 2 — Build MCUBOOT_V1-only artifacts and push app update
+-------------------------------------------------------------
+
+Build the final MCUboot (MCUBOOT_V1 only) and app signed with MCUBOOT_V1. Push the app update
+first; the MCUboot update is used in Phase 3.
+
+.. important::
+
+   The app update with MCUBOOT_V1 (Phase 2)  must be pushed and succeed before the MCUboot update with MCUBOOT_V1 (Phase 3).
+   If the MCUboot update is pushed first, devices will reject to boot the application signed with MCUBOOT_V0, and the device will be bricked.
+
+.. note::
+
+   In production:
+
+   1. Update the ``VERSION`` file to a higher version.
+   2. Instead of using the ``--override-mcuboot-version`` option, update the MCUboot ``CONFIG_FW_INFO_FIRMWARE_VERSION`` Kconfig value to a higher version.
+
+.. code-block:: sh
+
+   ./nrf91m1/scripts/sign-build-unsigned.sh --dev --override-mcuboot-version 6 --mcuboot-key-name MCUBOOT_V1
+
+   # In secure environment:
+   ./nrf91m1/scripts/sign-hashes.sh \
+       --in  signing-out/unsigned/manifest-tosign.env \
+       --out signing-out/manifest-signed.env
+
+   ./nrf91m1/scripts/sign-assemble.sh
+
+   ./nrf91m1/scripts/sign-prepare-mcuboot.sh
+
+   # Another round in secure environment:
+   ./nrf91m1/scripts/sign-hashes.sh \
+       --in  signing-out/manifest-mcuboot-tosign.env \
+       --out signing-out/manifest-mcuboot-signed.env
+
+   ./nrf91m1/scripts/sign-assemble-mcuboot.sh
+
+   ./scripts/sm_dfu_host.py --port /dev/ttyACM0 --baudrate 115200 \
+       --type application \
+       --file ./signing-out/release/app_signed.bin
+
+   nrfutil device reset
+
+Expected: app on all devices is now signed with MCUBOOT_V1.
+If the VERSION file was updated, ``AT#XSMVER`` reflects the new version.
+
+Phase 3 — Push final MCUboot with MCUBOOT_V1
+--------------------------------------------
+
+Use the MCUboot artifacts produced by the Phase 2 build. No new build needed.
+
+.. code-block:: sh
+
+   ./scripts/sm_dfu_host.py --port /dev/ttyACM0 --baudrate 115200 \
+       --type mcuboot-bootloader \
+       --file ./signing-out/release/signed_by_mcuboot_and_b0_mcuboot_s1_variant.bin
+
+   nrfutil device reset
+
+Expected: devices now accept images signed only by MCUBOOT_V1. MCUBOOT_V0 is permanently revoked.
+Verify with ``AT#XBOOTINFO=0`` that the MCUboot version counter is updated to 6.
+
+Phase 4 — Verify revocation (testing only)
+------------------------------------------
+
+.. note::
+
+   Only required during testing to confirm revocation is effective. Devices in field do not perform this step.
+
+.. note::
+
+   When testing production deployments:
+
+   1. Update the ``VERSION`` file **temporarily** to a higher version to test revocation.
+      The device will reject the application update and ``AT#XSMVER`` will still return the previous version.
+   2. Instead of using the ``--override-mcuboot-version`` option, **temporarily** update the MCUboot ``CONFIG_FW_INFO_FIRMWARE_VERSION`` Kconfig value to a higher version to test revocation.
+      The device will reject the MCUboot update and ``AT#XBOOTINFO=0`` will still return the previous version.
+
+Build a MCUboot update and an app update both signed with the old ``MCUBOOT_V0``
+key and attempt to install them. Both must be rejected by the device.
+
+.. code-block:: sh
+
+   # MCUboot update signed with revoked MCUBOOT_V0 — expected to fail
+   ./nrf91m1/scripts/sign-build-unsigned.sh --dev \
+       --override-mcuboot-version 7 \
+       --mcuboot-key-name MCUBOOT_V0
+
+   # In secure environment:
+   ./nrf91m1/scripts/sign-hashes.sh \
+       --in  signing-out/unsigned/manifest-tosign.env \
+       --out signing-out/manifest-signed.env
+
+   ./nrf91m1/scripts/sign-assemble.sh
+
+   ./nrf91m1/scripts/sign-prepare-mcuboot.sh
+
+   # Another round in secure environment:
+   ./nrf91m1/scripts/sign-hashes.sh \
+       --in  signing-out/manifest-mcuboot-tosign.env \
+       --out signing-out/manifest-mcuboot-signed.env
+
+   ./nrf91m1/scripts/sign-assemble-mcuboot.sh
+
+   ./scripts/sm_dfu_host.py --port /dev/ttyACM0 --baudrate 115200 \
+       --type mcuboot-bootloader \
+       --file ./signing-out/release/signed_by_mcuboot_and_b0_mcuboot_s1_variant.bin
+
+   nrfutil device reset
+
+Expected: MCUboot rejects the update; version counter unchanged. ``AT#XBOOTINFO=0``
+still returns the previous version.
+
+.. code-block:: sh
+
+   # App update signed with revoked MCUBOOT_V0 — expected to fail
+   ./scripts/sm_dfu_host.py --port /dev/ttyACM0 --baudrate 115200 \
+       --type application \
+       --file ./signing-out/release/app_signed.bin
+
+   nrfutil device reset
+
+Expected: MCUboot rejects the app image; device continues running the previous app. Failed update is only verifiable from boot logs.
+If VERSION file was updated, the updated version would not be reflected in the device's AT#XSMVER output.
+
+Phase 5 — Cleanup (production only)
+-----------------------------------
+
+After the packages have been created:
+
+- Remove ``nrf91m1/certs/{env}/mcuboot/MCUBOOT_V0.pem`` from the repository so
+  it can no longer be accidentally used for new builds.
+- Retain ``MCUBOOT_V0`` in Vault so that existing signed update packages can
+  still be re-assembled or verified if needed.

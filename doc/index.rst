@@ -14,6 +14,7 @@ It includes host examples in the form of the :ref:`sm_at_client_shell_sample` an
    gsg_guide
    app/README
    app/at_commands
+   app/nrf91m1/index
    uart_configuration
    samples/README
    releases/releases
