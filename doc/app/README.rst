@@ -85,3 +85,4 @@ See the subpages for how to use the application, how to extend it, and informati
    sm_releasing
    sm_extending
    sm_testing
+   sm_nrf91m1_signing
