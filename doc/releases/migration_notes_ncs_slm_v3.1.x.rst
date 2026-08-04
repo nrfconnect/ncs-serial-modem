@@ -38,6 +38,11 @@ This section gives instructions on how to migrate from the |NCS| v3.1.x `SLM <Se
   * ``CONFIG_MODEM_SLM_*`` to ``CONFIG_SM_AT_CLIENT_*``
   * ``CONFIG_SLM_CMUX_TX_BUFFER_SIZE`` to ``CONFIG_SM_URC_BUFFER_SIZE``
 
+* When compiling, remove ``overlay-`` prefix from Kconfig fragments and devicetree overlays as follows:
+
+  * ``overlay-*.conf`` to ``*.conf``
+  * ``overlay-*.overlay`` to ``*.overlay``
+
 * Code patches:
 
   * Renamed the file names from ``slm_`` to ``sm_`` and ``modem_slm`` to ``sm_at_client``.
@@ -83,7 +88,7 @@ Custom static partition layout migration
 The |SM| no longer uses the |NCS| Partition Manager.
 All flash and SRAM partitions are now defined in devicetree overlays instead of ``pm_static_*.yml`` files.
 
-If you maintained a custom ``pm_static_*.yml`` file, recreate the partition layout as a devicetree overlay, using the files in :file:`app/boards/` and :file:`app/overlay-*.overlay` as a reference.
+If you maintained a custom ``pm_static_*.yml`` file, recreate the partition layout as a devicetree overlay, using the files in :file:`app/boards/` and :file:`app/*.overlay` as a reference.
 For a general guide on migrating from Partition Manager to DTS, see the |NCS| `PM to DTS migration <migration_partitions_>`_ page.
 
 Socket AT command changes
@@ -356,8 +361,8 @@ PPP connection management changes
   * Removed:
 
     * The :file:`overlay-zephyr-modem.conf` file as the default behavior of the |SM| application is compatible with the Zephyr modem driver.
-    * The :file:`overlay-ppp-cmux-linux.conf` overlay file.
-      Use the :file:`overlay-ppp.conf` and :file:`overlay-cmux.conf` files instead.
+    * The :file:`overlay-ppp-cmux-linux.conf` Kconfig fragment file.
+      Use the :file:`ppp.conf` and :file:`cmux.conf` files instead.
 
 Other changes
 *************
@@ -741,8 +746,8 @@ If you need any of those features with this |SM|, please contact customer suppor
   * The ``CONFIG_SLM_DATAMODE_URC`` Kconfig option.
   * The ``CONFIG_SLM_START_SLEEP`` Kconfig option.
   * The :file:`overlay-zephyr-modem.conf` file as the default behavior of the |SM| application is compatible with the Zephyr modem driver.
-  * The :file:`overlay-ppp-cmux-linux.conf` overlay file.
-    Use the :file:`overlay-ppp.conf` and :file:`overlay-cmux.conf` files instead.
+  * The :file:`overlay-ppp-cmux-linux.conf` Kconfig fragment file.
+    Use the :file:`ppp.conf` and :file:`cmux.conf` files instead.
   * The :file:`sm_auto_connect.h` header file.
     Use the ``CONFIG_SM_AUTO_CONNECT*`` Kconfig options to configure automatic network attach.
   * The ``CONFIG_SM_SKIP_READY_MSG`` Kconfig option.

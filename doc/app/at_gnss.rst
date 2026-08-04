@@ -27,7 +27,7 @@ In addition, the following Kconfig options must be enabled:
 
    * ``CONFIG_NRF_CLOUD_AGNSS`` to use A-GNSS.
    * ``CONFIG_NRF_CLOUD_PGPS`` to use P-GPS.
-     This also requires applying the :file:`overlay-pgps.overlay` devicetree overlay to both the application and the ``mcuboot`` image (using the absolute path for the latter).
+     This also requires applying the :file:`pgps.overlay` devicetree overlay to both the application and the ``mcuboot`` image (using the absolute path for the latter).
 
 If both assistive services were enabled during compilation, you cannot choose to use only one of them at run time.
 
@@ -100,7 +100,7 @@ In periodic navigation mode, the ``<interval>`` and ``<timeout>`` parameters are
 
 .. note::
 
-   When using P-GPS, apply the :file:`overlay-pgps.overlay` devicetree overlay to both the application and the ``mcuboot`` image to provide a dedicated flash partition for P-GPS prediction data storage and to ensure MCUboot operates with the same partition layout.
+   When using P-GPS, apply the :file:`pgps.overlay` devicetree overlay to both the application and the ``mcuboot`` image to provide a dedicated flash partition for P-GPS prediction data storage and to ensure MCUboot operates with the same partition layout.
    The absolute path to the overlay file must be provided when passing it to the ``mcuboot`` image using :makevar:`mcuboot_EXTRA_DTC_OVERLAY_FILE`.
    See :ref:`sm_config_files` for more information.
 

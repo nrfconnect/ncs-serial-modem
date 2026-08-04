@@ -14,7 +14,7 @@ See more information on the functionality of this sample from the :ref:`lib_sm_a
 Requirements
 ************
 
-The |SM| application should be configured with :file:`app/overlay-external-mcu.overlay` on the nRF91 Series DK side.
+The |SM| application should be configured with :file:`app/external-mcu.overlay` on the nRF91 Series DK side.
 
 The sample supports the following development kit:
 
@@ -31,7 +31,7 @@ The sample supports the following development kit:
      - `nrf54l15dk`_
      - ``nrf54l15dk/nrf54l15/cpuapp``
 
-Connect the DK pins that are defined in the board-specific overlay files :file:`samples/sm_at_client_shell/boards/*.overlay` to the corresponding pins in the nRF91 Series DK, which are defined in :file:`app/overlay-external-mcu.overlay`.
+Connect the DK pins that are defined in the board-specific overlay files :file:`samples/sm_at_client_shell/boards/*.overlay` to the corresponding pins in the nRF91 Series DK, which are defined in :file:`app/external-mcu.overlay`.
 
 The following table shows how to connect UART, DTR and RI pins of the DK to the corresponding pins in the nRF91 Series DKs:
 

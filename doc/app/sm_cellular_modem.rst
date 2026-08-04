@@ -103,15 +103,15 @@ Build and flash |SM|
 Build and program |SM| with the PPP overlay enabled.
 For the CMUX-based setup, enable both PPP and CMUX:
 
-* :file:`overlay-ppp.conf`
-* :file:`overlay-cmux.conf`
+* :file:`ppp.conf`
+* :file:`cmux.conf`
 
 If you change the UART baud rate in |SM|'s devicetree overlay, set the same baud rate in the host scripts or ``pppd`` command line.
 
 .. note::
 
    When using the standard Linux ``ldattach`` utility, CMUX MRU/MTU is set to 127 bytes and cannot be changed.
-   In that case, make sure |SM| uses ``CONFIG_MODEM_CMUX_MTU=127`` (this is already configured in :file:`overlay-cmux.conf`).
+   In that case, make sure |SM| uses ``CONFIG_MODEM_CMUX_MTU=127`` (this is already configured in :file:`cmux.conf`).
 
 
 Option A: PPP over CMUX (recommended)
@@ -324,9 +324,9 @@ nRF91 Series SiP running |SM|
 
 Include the following configuration overlays:
 
-* :file:`overlay-cmux.conf` - Enable CMUX.
-* :file:`overlay-ppp.conf` - Enable PPP.
-* :file:`overlay-external-mcu.overlay` - Configure UART (pins, baud rate), DTR, and RI pins used between the MCU and the SiP.
+* :file:`cmux.conf` - Enable CMUX.
+* :file:`ppp.conf` - Enable PPP.
+* :file:`external-mcu.overlay` - Configure UART (pins, baud rate), DTR, and RI pins used between the MCU and the SiP.
 
 Controlling chip running Zephyr
 -------------------------------

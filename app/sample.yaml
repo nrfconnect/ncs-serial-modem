@@ -5,8 +5,8 @@ tests:
     sysbuild: true
     build_only: true
     extra_args:
-      - EXTRA_CONF_FILE="overlay-cmux.conf;overlay-ppp.conf;overlay-trace-backend-uart.conf;overlay-nrf-device-provisioning.conf"
-      - EXTRA_DTC_OVERLAY_FILE="overlay-nrf91m1.overlay;overlay-trace-backend.overlay"
+      - EXTRA_CONF_FILE="cmux.conf;ppp.conf;trace-backend-uart.conf;nrf-device-provisioning.conf"
+      - EXTRA_DTC_OVERLAY_FILE="nrf91m1.overlay;trace-backend.overlay"
     extra_configs:
       - CONFIG_SM_LOG_LEVEL_DBG=y
     platform_allow:
@@ -21,7 +21,7 @@ tests:
     sysbuild: true
     build_only: true
     extra_args:
-      - EXTRA_DTC_OVERLAY_FILE="overlay-external-mcu.overlay"
+      - EXTRA_DTC_OVERLAY_FILE="external-mcu.overlay"
     platform_allow:
       - nrf9151dk/nrf9151/ns
     tags: exclude_integration
@@ -29,15 +29,15 @@ tests:
     sysbuild: true
     build_only: true
     extra_args:
-      - EXTRA_CONF_FILE="overlay-trace-backend-uart.conf"
-      - EXTRA_DTC_OVERLAY_FILE="overlay-external-mcu.overlay;overlay-trace-backend.overlay"
+      - EXTRA_CONF_FILE="trace-backend-uart.conf"
+      - EXTRA_DTC_OVERLAY_FILE="external-mcu.overlay;trace-backend.overlay"
     platform_allow:
       - nrf9151dk/nrf9151/ns
   serial_modem.no_dtr:
     sysbuild: true
     build_only: true
     extra_args:
-      - EXTRA_DTC_OVERLAY_FILE="overlay-disable-dtr.overlay"
+      - EXTRA_DTC_OVERLAY_FILE="disable-dtr.overlay"
     platform_allow:
       - nrf9151dk/nrf9151/ns
       - thingy91x/nrf9151/ns
@@ -46,7 +46,7 @@ tests:
     sysbuild: true
     build_only: true
     extra_args:
-      - EXTRA_CONF_FILE="overlay-ppp.conf"
+      - EXTRA_CONF_FILE="ppp.conf"
     platform_allow:
       - nrf9151dk/nrf9151/ns
       - thingy91x/nrf9151/ns
@@ -56,7 +56,7 @@ tests:
     sysbuild: true
     build_only: true
     extra_args:
-      - EXTRA_CONF_FILE="overlay-cmux.conf;overlay-ppp.conf"
+      - EXTRA_CONF_FILE="cmux.conf;ppp.conf"
     platform_allow:
       - nrf9151dk/nrf9151/ns
       - thingy91x/nrf9151/ns
@@ -65,8 +65,8 @@ tests:
     sysbuild: true
     build_only: true
     extra_args:
-      - EXTRA_CONF_FILE="overlay-cmux.conf;overlay-ppp.conf;overlay-trace-backend-uart.conf"
-      - EXTRA_DTC_OVERLAY_FILE="overlay-trace-backend.overlay"
+      - EXTRA_CONF_FILE="cmux.conf;ppp.conf;trace-backend-uart.conf"
+      - EXTRA_DTC_OVERLAY_FILE="trace-backend.overlay"
     extra_configs:
       - CONFIG_SM_LOG_LEVEL_DBG=y
     platform_allow:
@@ -78,8 +78,8 @@ tests:
     sysbuild: true
     build_only: true
     extra_args:
-      - EXTRA_CONF_FILE="overlay-cmux.conf;overlay-ppp.conf"
-      - EXTRA_DTC_OVERLAY_FILE="overlay-external-mcu.overlay"
+      - EXTRA_CONF_FILE="cmux.conf;ppp.conf"
+      - EXTRA_DTC_OVERLAY_FILE="external-mcu.overlay"
     platform_allow:
       - nrf9151dk/nrf9151/ns
     tags: exclude_integration
@@ -87,8 +87,8 @@ tests:
     sysbuild: true
     build_only: true
     extra_args:
-      - EXTRA_CONF_FILE="overlay-cmux.conf;overlay-ppp.conf;overlay-trace-backend-uart.conf"
-      - EXTRA_DTC_OVERLAY_FILE="overlay-external-mcu.overlay;overlay-trace-backend.overlay"
+      - EXTRA_CONF_FILE="cmux.conf;ppp.conf;trace-backend-uart.conf"
+      - EXTRA_DTC_OVERLAY_FILE="external-mcu.overlay;trace-backend.overlay"
     extra_configs:
       - CONFIG_SM_LOG_LEVEL_DBG=y
     platform_allow:
@@ -98,8 +98,8 @@ tests:
     sysbuild: true
     build_only: true
     extra_args:
-      - EXTRA_CONF_FILE="overlay-cmux.conf;overlay-ppp.conf;overlay-trace-backend-cmux.conf"
-      - EXTRA_DTC_OVERLAY_FILE="overlay-trace-backend.overlay"
+      - EXTRA_CONF_FILE="cmux.conf;ppp.conf;trace-backend-cmux.conf"
+      - EXTRA_DTC_OVERLAY_FILE="trace-backend.overlay"
     platform_allow:
       - nrf9151dk/nrf9151/ns
       - thingy91x/nrf9151/ns
@@ -109,9 +109,9 @@ tests:
     sysbuild: true
     build_only: true
     extra_args:
-      - EXTRA_CONF_FILE=overlay-memfault.conf
-      - EXTRA_DTC_OVERLAY_FILE="overlay-memfault.overlay"
-      - mcuboot_EXTRA_DTC_OVERLAY_FILE="${APP_DIR}/overlay-memfault.overlay"
+      - EXTRA_CONF_FILE=memfault.conf
+      - EXTRA_DTC_OVERLAY_FILE="memfault.overlay"
+      - mcuboot_EXTRA_DTC_OVERLAY_FILE="${APP_DIR}/memfault.overlay"
     extra_configs:
       - CONFIG_MEMFAULT_NCS_PROJECT_KEY="dummy-key"
     platform_allow:
@@ -123,8 +123,8 @@ tests:
     sysbuild: true
     build_only: true
     extra_args:
-      - EXTRA_CONF_FILE="overlay-full-fota.conf"
-      - EXTRA_DTC_OVERLAY_FILE="overlay-full-fota.overlay"
+      - EXTRA_CONF_FILE="full-fota.conf"
+      - EXTRA_DTC_OVERLAY_FILE="full-fota.overlay"
     extra_configs:
       - CONFIG_SM_DFU_MODEM_FULL=y
     platform_allow:
@@ -133,8 +133,8 @@ tests:
     sysbuild: true
     build_only: true
     extra_args:
-      - EXTRA_DTC_OVERLAY_FILE="overlay-pgps.overlay"
-      - mcuboot_EXTRA_DTC_OVERLAY_FILE="${APP_DIR}/overlay-pgps.overlay"
+      - EXTRA_DTC_OVERLAY_FILE="pgps.overlay"
+      - mcuboot_EXTRA_DTC_OVERLAY_FILE="${APP_DIR}/pgps.overlay"
     extra_configs:
       - CONFIG_NRF_CLOUD_PGPS=y
     platform_allow:
@@ -143,8 +143,8 @@ tests:
     sysbuild: true
     build_only: true
     extra_args:
-      - EXTRA_DTC_OVERLAY_FILE="overlay-pgps.overlay"
-      - mcuboot_EXTRA_DTC_OVERLAY_FILE="${APP_DIR}/overlay-pgps.overlay"
+      - EXTRA_DTC_OVERLAY_FILE="pgps.overlay"
+      - mcuboot_EXTRA_DTC_OVERLAY_FILE="${APP_DIR}/pgps.overlay"
     extra_configs:
       - CONFIG_NRF_CLOUD_PGPS=y
       - CONFIG_NRF_CLOUD_AGNSS=n
@@ -155,8 +155,8 @@ tests:
     sysbuild: true
     build_only: true
     extra_args:
-      - EXTRA_CONF_FILE="overlay-carrier.conf"
-      - EXTRA_DTC_OVERLAY_FILE="overlay-carrier.overlay"
+      - EXTRA_CONF_FILE="carrier.conf"
+      - EXTRA_DTC_OVERLAY_FILE="carrier.overlay"
     platform_allow:
       - nrf9151dk/nrf9151/ns
     integration_platforms:
@@ -165,8 +165,8 @@ tests:
     sysbuild: true
     build_only: true
     extra_args:
-      - EXTRA_CONF_FILE="overlay-carrier.conf;overlay-carrier-softbank.conf"
-      - EXTRA_DTC_OVERLAY_FILE="overlay-carrier.overlay"
+      - EXTRA_CONF_FILE="carrier.conf;carrier-softbank.conf"
+      - EXTRA_DTC_OVERLAY_FILE="carrier.overlay"
       - SB_EXTRA_CONF_FILE=sysbuild-softbank.conf
     platform_allow:
       - nrf9151dk/nrf9151/ns
@@ -175,8 +175,8 @@ tests:
     sysbuild: true
     build_only: true
     extra_args:
-      - EXTRA_CONF_FILE="overlay-carrier.conf;overlay-carrier-lgu.conf"
-      - EXTRA_DTC_OVERLAY_FILE="overlay-carrier.overlay"
+      - EXTRA_CONF_FILE="carrier.conf;carrier-lgu.conf"
+      - EXTRA_DTC_OVERLAY_FILE="carrier.overlay"
     platform_allow:
       - nrf9151dk/nrf9151/ns
     tags: exclude_integration
@@ -199,8 +199,8 @@ tests:
     sysbuild: true
     build_only: true
     extra_args:
-      - EXTRA_DTC_OVERLAY_FILE="overlay-disable-b0.overlay"
-      - mcuboot_EXTRA_DTC_OVERLAY_FILE="${APP_DIR}/overlay-disable-b0.overlay"
+      - EXTRA_DTC_OVERLAY_FILE="disable-b0.overlay"
+      - mcuboot_EXTRA_DTC_OVERLAY_FILE="${APP_DIR}/disable-b0.overlay"
       - SB_CONFIG_SECURE_BOOT_APPCORE=n
     platform_allow:
       - nrf9151dk/nrf9151/ns
