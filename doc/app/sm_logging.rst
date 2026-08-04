@@ -82,7 +82,7 @@ To also enable the modem trace backend (``AT#XTRACE``), build with the Kconfig o
 
 .. code-block:: console
 
-   west build -p -b nrf9151dk/nrf9151/ns -- -DEXTRA_CONF_FILE="overlay-trace-backend-uart.conf"
+   west build -p -b nrf9151dk/nrf9151/ns -- -DEXTRA_CONF_FILE="trace-backend-uart.conf"
 
 After the application is initialized, the UART is suspended.
 Use ``AT#XLOG=1`` to activate application logs and ``AT#XTRACE=1`` to activate modem traces.
@@ -145,7 +145,7 @@ To use the CMUX trace backend, build the |SM| application with the trace backend
 
 .. code-block:: console
 
-   west build -p -b nrf9151dk/nrf9151/ns -- -DEXTRA_CONF_FILE="overlay-ppp.conf;overlay-cmux.conf;overlay-trace-backend-cmux.conf"
+   west build -p -b nrf9151dk/nrf9151/ns -- -DEXTRA_CONF_FILE="ppp.conf;cmux.conf;trace-backend-cmux.conf"
 
 For optimal throughput and to minimize trace data loss, configure the UART to run at maximum speed:
 

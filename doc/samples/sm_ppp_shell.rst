@@ -15,12 +15,12 @@ Requirements
 
 The |SM| application must be built with the following overlays:
 
-* :file:`app/overlay-cmux.conf` - To enable CMUX support
-* :file:`app/overlay-ppp.conf` - To enable PPP support
+* :file:`app/cmux.conf` - To enable CMUX support
+* :file:`app/ppp.conf` - To enable PPP support
 
 If using an external MCU as the controlling device, also include:
 
-* :file:`app/overlay-external-mcu.overlay` - To configure UART pins, DTR, and RI signals
+* :file:`app/external-mcu.overlay` - To configure UART pins, DTR, and RI signals
 
 The sample supports the following development kits:
 

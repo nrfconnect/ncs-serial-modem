@@ -22,7 +22,7 @@ For other devices, follow the instructions in the `nRF Cloud Provisioning Servic
 
 Any steps that require nRF9151 application firmware support are handled by the |SM|.
 
-These commands are only available when the application is built with the :file:`overlay-nrf-device-provisioning.conf` overlay, which enables the provisioning client and its AT command interface.
+These commands are only available when the application is built with the :file:`nrf-device-provisioning.conf` overlay, which enables the provisioning client and its AT command interface.
 
 .. note::
 

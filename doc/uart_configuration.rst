@@ -130,7 +130,7 @@ The following tables shows how to connect the UART pins to the corresponding pin
       The CTS and RTS pins can be left unconnected.
       See :ref:`uart_without_flow_control` for further considerations.
 
-      This setup is provided in the :file:`app/overlay-external-mcu.overlay` overlay file.
+      This setup is provided in the :file:`app/external-mcu.overlay` overlay file.
 
       .. note::
 
@@ -233,7 +233,7 @@ This allows the `nrf9151dk`_ board to be used with a PC host for development and
 
 When working with `nrf9151dk`_ board with an external MCU host, you must disable VCOM0 and VCOM1 in the `Board Configurator app`_ to release the UART pins for external use.
 
-This setup is provided in the :file:`app/overlay-nrf91m1.overlay` devicetree overlay file.
+This setup is provided in the :file:`app/nrf91m1.overlay` devicetree overlay file.
 
 Host application
 ================

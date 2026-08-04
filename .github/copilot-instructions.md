@@ -71,26 +71,26 @@ Pass extra Kconfig files and DTC overlays via `--`:
 
 ```bash
 west build -b nrf9151dk/nrf9151/ns app -- \
-  -DEXTRA_CONF_FILE="overlay-cmux.conf;overlay-ppp.conf" \
-  -DEXTRA_DTC_OVERLAY_FILE="overlay-external-mcu.overlay"
+  -DEXTRA_CONF_FILE="cmux.conf;ppp.conf" \
+  -DEXTRA_DTC_OVERLAY_FILE="external-mcu.overlay"
 ```
 
-Available overlay files (in `app/`):
+Available Kconfig fragments and DTS overlays (in `app/`):
 | File | Purpose |
 |---|---|
-| `overlay-cmux.conf` | Enable CMUX multiplexing |
-| `overlay-ppp.conf` | Enable PPP networking |
-| `overlay-carrier.conf` | LwM2M carrier library |
-| `overlay-full-fota.conf` | Full MFW FOTA support |
-| `overlay-memfault.conf` | Memfault integration |
-| `overlay-nrf-device-provisioning.conf` | nRF Device Provisioning |
-| `overlay-external-mcu.overlay` | External MCU UART wiring |
-| `overlay-disable-dtr.overlay` | Disable DTR pin |
-| `overlay-external-flash.overlay` | External flash |
-| `overlay-uart1-hwfc.overlay` | UART1 hardware flow control |
-| `overlay-nrf91m1.overlay` | nRF91M1 variant |
-| `overlay-trace-backend-uart.conf` | Modem trace over UART |
-| `overlay-trace-backend-cmux.conf` | Modem trace over CMUX |
+| `cmux.conf` | Enable CMUX multiplexing |
+| `ppp.conf` | Enable PPP networking |
+| `carrier.conf` | LwM2M carrier library |
+| `full-fota.conf` | Full MFW FOTA support |
+| `memfault.conf` | Memfault integration |
+| `nrf-device-provisioning.conf` | nRF Device Provisioning |
+| `external-mcu.overlay` | External MCU UART wiring |
+| `disable-dtr.overlay` | Disable DTR pin |
+| `external-flash.overlay` | External flash |
+| `uart1-hwfc.overlay` | UART1 hardware flow control |
+| `nrf91m1.overlay` | nRF91M1 variant |
+| `trace-backend-uart.conf` | Modem trace over UART |
+| `trace-backend-cmux.conf` | Modem trace over CMUX |
 
 ---
 
@@ -229,8 +229,8 @@ ncs-serial-modem/
 │   ├── tests/                  # Unit tests (run on native_sim via Twister)
 │   │   ├── at_commands/        # Tests for sm_at_commands.c
 │   │   └── at_socket/          # Tests for sm_at_socket.c
-│   ├── overlay-*.conf          # Feature Kconfig overlays
-│   ├── overlay-*.overlay       # Feature DTC overlays
+│   ├── *.conf                  # Feature Kconfig overlays
+│   ├── *.overlay               # Feature DTC overlays
 │   └── sysbuild.conf           # Sysbuild Kconfig (MCUBoot, B0)
 ├── doc/                        # Sphinx + Doxygen documentation source
 │   ├── Doxyfile                # Doxygen configuration
@@ -309,7 +309,7 @@ Work queue: `sm_work_q` (declared `extern` in `sm_util.h`, defined in `main.c`).
    target_sources_ifdef(CONFIG_SM_<FEATURE> app PRIVATE src/sm_at_<feature>.c)
    ```
 3. Add `CONFIG_SM_<FEATURE>` bool Kconfig option in `app/Kconfig` (inside the `menu "Nordic Serial Modem"` block).
-4. Enable in `prj.conf` or a new `overlay-<feature>.conf`.
+4. Enable in `prj.conf` or a new `<feature>.conf`.
 
 ### Modem AT Command Forwarding
 

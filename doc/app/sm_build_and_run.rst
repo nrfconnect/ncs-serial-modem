@@ -68,10 +68,10 @@ Connecting with an external MCU
 If you run your user application on an external MCU (for example, an nRF54 Series development kit), you can control the |SM| application on an nRF91 Series device directly from the application.
 See the :ref:`sm_at_client_shell_sample` for a sample implementation of such an application.
 
-To connect with an external MCU using UART_2, include the :file:`overlay-external-mcu.overlay` devicetree overlay in your build.
+To connect with an external MCU using UART_2, include the :file:`external-mcu.overlay` devicetree overlay in your build.
 This overlay configures the UART_2 pins, DTR pin, and RI pin for the nRF9151 DK.
 
-If you use a different setup, you can customize the :file:`overlay-external-mcu.overlay` file to match your hardware configuration in (for example) the following ways:
+If you use a different setup, you can customize the :file:`external-mcu.overlay` file to match your hardware configuration in (for example) the following ways:
 
 * Change the highlighted UART baud rate or DTR and RI pins::
 
@@ -219,8 +219,8 @@ To enable the LwM2M carrier library, add the following parameters to your build 
 
 .. code-block:: none
 
-   -DEXTRA_CONF_FILE=overlay-carrier.conf
-   -DEXTRA_DTC_OVERLAY_FILE=overlay-carrier.overlay
+   -DEXTRA_CONF_FILE=carrier.conf
+   -DEXTRA_DTC_OVERLAY_FILE=carrier.overlay
 
 The CA root certificates that are needed for modem FOTA are not provisioned in the |SM| application.
 You can flash the `Cellular: LwM2M carrier`_ sample to write the certificates to modem before flashing the |SM| application, or use the `Cellular: AT Client`_ sample as explained in `preparing the Cellular: LwM2M Client sample for production <lwm2m_client_provisioning_>`_.
@@ -251,11 +251,11 @@ By default, the |SM| application uses an immutable bootloader B0 (NSIB) and an u
 Version 1.x.x of the |SM| application uses only an upgradeable MCUboot bootloader.
 Building without the B0 bootloader is offered as backwards compatibility option if you want to maintain the same partition layout as in |SM| version 1.x.x.
 
-To build without B0 and with a single, non-updatable MCUboot slot, include :file:`overlay-disable-b0.overlay` in both the application and MCUboot images and disable the secure boot appcore in the sysbuild configuration:
+To build without B0 and with a single, non-updatable MCUboot slot, include :file:`disable-b0.overlay` in both the application and MCUboot images and disable the secure boot appcore in the sysbuild configuration:
 
 .. code-block:: console
 
-   west build -p -b nrf9151dk/nrf9151/ns -- -DEXTRA_DTC_OVERLAY_FILE=overlay-disable-b0.overlay -Dmcuboot_EXTRA_DTC_OVERLAY_FILE=<path-to-app>/overlay-disable-b0.overlay -DSB_CONFIG_SECURE_BOOT_APPCORE=n
+   west build -p -b nrf9151dk/nrf9151/ns -- -DEXTRA_DTC_OVERLAY_FILE=disable-b0.overlay -Dmcuboot_EXTRA_DTC_OVERLAY_FILE=<path-to-app>/disable-b0.overlay -DSB_CONFIG_SECURE_BOOT_APPCORE=n
 
 Where ``<path-to-app>`` is the absolute path to the :file:`app` directory.
 

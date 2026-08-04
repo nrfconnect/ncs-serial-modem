@@ -340,7 +340,7 @@ The ``<sleep_mode>`` parameter accepts only the following integer values:
   When the |SM| is in idle mode, and there is data to be read by the host, the RI pin (``ri-gpios``) is asserted for a short period of time to notify the host.
   The host can then deassert and assert DTR to exit idle mode and read the data.
 
-The DTR pin is defined either in the :file:`boards/*_ns.overlay` overlay file matching your board or in the :file:`overlay-external-mcu.overlay` overlay file, if it is included.
+The DTR pin is defined either in the :file:`boards/*_ns.overlay` overlay file matching your board or in the :file:`external-mcu.overlay` overlay file, if it is included.
 
 .. note::
 
