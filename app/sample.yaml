@@ -9,6 +9,7 @@ tests:
       - EXTRA_DTC_OVERLAY_FILE="overlay-nrf91m1.overlay;overlay-trace-backend.overlay"
     extra_configs:
       - CONFIG_SM_LOG_LEVEL_DBG=y
+      - CONFIG_SM_DFU_MODEM_FULL=y
     platform_allow:
       - nrf9151dk/nrf9151/ns
   serial_modem.default:
