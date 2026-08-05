@@ -299,9 +299,9 @@ config SM_CMUX
 	bool "CMUX support"
 
 config SM_CMUX_CHANNEL_COUNT
-	int "Number of CMUX channels"
-	depends on SM_CMUX
-	default 4
+	int "Number of CMUX channels" if SM_CMUX
+	default 4 if SM_CMUX
+	default 1 if !SM_CMUX
 	range 1 63
 	help
 	  Number of channels to be used by the CMUX implementation.

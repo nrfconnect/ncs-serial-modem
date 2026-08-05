@@ -41,6 +41,7 @@ target_compile_options(app PRIVATE
   -DCONFIG_SM_AT_ECHO_MAX_LEN=256
   -DCONFIG_SM_UART_RX_BUF_SIZE=256
   -DCONFIG_SM_UART_TX_BUF_SIZE=256
+  -DCONFIG_SM_CMUX_CHANNEL_COUNT=1
   # Suppress upstream Zephyr warnings in net_if.h (returns address of local var)
   -Wno-return-local-addr
   # Enable POSIX-compat socket name aliases (AF_INET, SOL_SOCKET, sockaddr, etc.)
