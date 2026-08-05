@@ -41,6 +41,7 @@ LOG_MODULE_REGISTER(sm_at_host, CONFIG_SM_LOG_LEVEL);
 #define AT_XDFU_WRITE_CMD "AT#XDFUWRITE"
 #define AT_XDFU_APPLY_CMD "AT#XDFUAPPLY"
 #define AT_XRESET_CMD     "AT#XRESET"
+#define URC_ALL_CHANNELS  99
 
 /* Operation mode variables */
 enum sm_operation_mode {
@@ -192,10 +193,7 @@ static uint8_t sm_response_buf[CONFIG_SM_AT_BUF_SIZE + 1];
 /* Current executing context (set by entry points) */
 static struct sm_at_host_ctx *current_ctx;
 static struct k_spinlock sm_at_host_lock;
-
-#if defined(CONFIG_SM_CMUX)
 static uint8_t urc_channel;
-#endif /* CONFIG_SM_CMUX */
 
 /**
  * @brief Create a new AT host instance.
@@ -219,6 +217,11 @@ static struct sm_at_host_ctx *sm_at_host_create(struct modem_pipe *pipe);
  * @return 0 on success, negative error code on failure.
  */
 static int sm_at_host_destroy(struct sm_at_host_ctx *ctx);
+
+static bool urc_mode_all_channels(void)
+{
+	return sm_cmux_is_started() && urc_channel == URC_ALL_CHANNELS;
+}
 
 static void send_msg(struct sm_at_host_msg msg)
 {
@@ -336,9 +339,12 @@ struct sm_at_host_ctx *sm_at_host_get_urc_ctx(void)
 {
 	struct sm_at_host_ctx *ctx;
 
-#if defined(CONFIG_SM_CMUX)
-	if (sm_cmux_is_started()) {
-		if (urc_channel == 0) {
+	if (IS_ENABLED(CONFIG_SM_CMUX) && sm_cmux_is_started()) {
+		/* This also returns the first channel even if
+		 * urc_channel is set to URC_ALL_CHANNELS so we always
+		 * return a valid context.
+		 */
+		if (urc_channel == 0 || urc_channel > CONFIG_SM_CMUX_CHANNEL_COUNT) {
 			for (uint8_t ch = 1; ch <= CONFIG_SM_CMUX_CHANNEL_COUNT; ++ch) {
 				ctx = sm_at_host_get_ctx_from(sm_cmux_get_dlci(ch));
 				if (in_at_mode(ctx)) {
@@ -349,7 +355,6 @@ struct sm_at_host_ctx *sm_at_host_get_urc_ctx(void)
 			return sm_at_host_get_ctx_from(sm_cmux_get_dlci(urc_channel));
 		}
 	}
-#endif /* CONFIG_SM_CMUX */
 
 	/* Fallback to first instance if no context is found */
 	return SYS_SLIST_PEEK_HEAD_CONTAINER(&instance_list, ctx, node);
@@ -1483,7 +1488,17 @@ static void rsp_send_internal(struct sm_at_host_ctx *ctx, bool urc, const char *
 	rsp_len = vsnprintf(rsp_buf, sizeof(rsp_buf), fmt, arg_ptr);
 	rsp_len = MIN(rsp_len, sizeof(rsp_buf) - 1);
 
-	sm_at_send_internal(ctx, rsp_buf, rsp_len, urc, SM_DEBUG_PRINT_FULL);
+	if (IS_ENABLED(CONFIG_SM_CMUX) && !ctx && urc && urc_mode_all_channels()) {
+		for (uint8_t ch = 1; ch <= CONFIG_SM_CMUX_CHANNEL_COUNT; ++ch) {
+			ctx = sm_at_host_get_ctx_from(sm_cmux_get_dlci(ch));
+			if (in_at_mode(ctx)) {
+				sm_at_send_internal(ctx, rsp_buf, rsp_len, urc,
+						    SM_DEBUG_PRINT_FULL);
+			}
+		}
+	} else {
+		sm_at_send_internal(ctx, rsp_buf, rsp_len, urc, SM_DEBUG_PRINT_FULL);
+	}
 
 	k_mutex_unlock(&mutex_rsp_buf);
 }
@@ -1936,7 +1951,7 @@ static struct sm_at_host_ctx *sm_at_host_create(struct modem_pipe *pipe)
 
 static void send_urcs(struct sm_at_host_ctx *ctx)
 {
-	if (!ctx || ctx != sm_at_host_get_urc_ctx()) {
+	if (!ctx || (ctx != sm_at_host_get_urc_ctx() && !urc_mode_all_channels())) {
 		/* URC CTX have changed, ignore this event */
 		return;
 	}
@@ -2189,12 +2204,14 @@ STATIC int handle_at_xcmuxurc(enum at_parser_cmd_type cmd_type, struct at_parser
 		if (ret) {
 			return ret;
 		}
-		if (channel > CONFIG_SM_CMUX_CHANNEL_COUNT) {
+		if (channel > CONFIG_SM_CMUX_CHANNEL_COUNT && channel != URC_ALL_CHANNELS) {
 			return -EINVAL;
 		}
+		struct sm_at_host_ctx *previous = sm_at_host_get_urc_ctx();
 		urc_channel = channel;
 		/* Retrigger, in case we have buffered URCs while pipe changed */
-		check_idle_timer(sm_at_host_get_urc_ctx(), false);
+		check_idle_timer(urc_mode_all_channels() ? previous : sm_at_host_get_urc_ctx(),
+				 false);
 		break;
 	case AT_PARSER_CMD_TYPE_READ:
 		rsp_send("\r\n#XCMUXURC: %d\r\n", urc_channel);

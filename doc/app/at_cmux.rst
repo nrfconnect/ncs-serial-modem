@@ -256,3 +256,89 @@ Read command
 ------------
 
 The read command is not supported.
+
+URC channel #XCMUXURC
+=====================
+
+The ``#XCMUXURC`` command configures the CMUX DLC channel to which URCs are routed.
+
+By default (channel ``0``), URCs are sent to the first open AT channel that is not in data mode.
+Routing URCs to a fixed channel is recommended when multiple CMUX channels are in use, for example, when one channel is occupied by a PPP session.
+
+Set command
+-----------
+
+The set command sets the CMUX channel used for URC delivery.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XCMUXURC=<channel>
+
+* The ``<channel>`` parameter is an integer from ``0`` to the total number of CMUX channels:
+
+  * ``0`` means auto-select - URCs are sent to the first open AT channel not in data mode.
+  * ``99`` means all channels - URCs are sent to all open AT channels not in data mode.
+  * Any other value routes URCs to the specified DLC channel.
+
+Read command
+------------
+
+The read command returns the currently configured URC channel.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XCMUXURC?
+
+Response syntax
+~~~~~~~~~~~~~~~
+
+::
+
+   #XCMUXURC: <channel>
+
+* The ``<channel>`` parameter is the currently configured URC channel (see the set command).
+
+Test command
+------------
+
+The test command returns the parameter description.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XCMUXURC=?
+
+Response syntax
+~~~~~~~~~~~~~~~
+
+::
+
+   #XCMUXURC=<channel>
+
+Example
+-------
+
+Route URCs to DLC channel 2 before starting CMUX:
+
+::
+
+   AT#XCMUXURC=2
+
+   OK
+   AT#XCMUXURC?
+
+   #XCMUXURC: 2
+
+   OK
+   AT+CMUX=0
+
+   OK
+   // CMUX is now started. URCs are delivered on DLC channel 2.

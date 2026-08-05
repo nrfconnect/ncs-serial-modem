@@ -19,13 +19,12 @@ enum cmux_channel {
 };
 
 #if CONFIG_SM_CMUX
+/**
+ * @brief Check if the CMUX is started.
+ *
+ * @return true if the CMUX is started, false otherwise.
+ */
 bool sm_cmux_is_started(void);
-#else
-static inline bool sm_cmux_is_started(void)
-{
-	return false;
-}
-#endif
 
 /**
  * @brief Get a pointer to the modem_pipe associated with a given DLCI address.
@@ -35,5 +34,21 @@ static inline bool sm_cmux_is_started(void)
  *	   or NULL if there is no pipe associated with the given address.
  */
 struct modem_pipe *sm_cmux_get_dlci(uint8_t address);
+
+#else
+/* Allow compilation without CMUX */
+
+static inline bool sm_cmux_is_started(void)
+{
+	return false;
+}
+
+static inline struct modem_pipe *sm_cmux_get_dlci(uint8_t address)
+{
+	ARG_UNUSED(address);
+	return NULL;
+}
+
+#endif /* CONFIG_SM_CMUX */
 
 #endif
