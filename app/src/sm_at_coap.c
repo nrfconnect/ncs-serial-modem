@@ -484,6 +484,12 @@ static int coap_datamode_callback(uint8_t op, const uint8_t *data, int len, uint
 			return -EINVAL;
 		}
 
+		if (req->staging == NULL) {
+			LOG_ERR("Data mode without a staging buffer");
+			exit_datamode_handler(sm_at_host_get_current(), -EINVAL);
+			return -EINVAL;
+		}
+
 		if (req->payload_len <= CONFIG_COAP_CLIENT_BLOCK_SIZE) {
 			/* Small payload: accumulate in staging[]; coap_start_request()
 			 * is called from DATAMODE_EXIT once all bytes are received.
