@@ -328,8 +328,14 @@ wait_for_data:
 			}
 		}
 		if (len < header_len) {
-			/* Data length error, ignore "silently" */
+			/* Data length error, ignore "silently" and wait for the
+			 * next datagram. Without this continue, the checks below
+			 * would inspect stale bytes left in buf by a previous
+			 * iteration (or the zero-initialised allocation) and could
+			 * accept them as a valid echo reply (CERT EXP33-C).
+			 */
 			LOG_ERR("zsock_recv() wrong data (%d)", len);
+			continue;
 		}
 
 		if ((rep == ICMP_ECHO_REP && buf[IP_PROTOCOL_POS] == IPPROTO_ICMP) ||
