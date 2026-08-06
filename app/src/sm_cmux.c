@@ -228,14 +228,6 @@ static int cmux_start(void)
 {
 	int ret;
 
-	if (sm_cmux_is_started()) {
-		ret = modem_pipe_open(cmux.uart_pipe, K_SECONDS(CONFIG_SM_MODEM_PIPE_TIMEOUT));
-		if (!ret) {
-			LOG_INF("CMUX resumed.");
-		}
-		return ret;
-	}
-
 	/* Get the UART pipe (already open and attached to AT host) */
 	cmux.uart_pipe = sm_uart_pipe_get();
 	if (!cmux.uart_pipe) {
@@ -248,13 +240,21 @@ static int cmux_start(void)
 	ret = sm_at_host_set_pipe(ctx, cmux.dlcis[cmux.at_channel].pipe);
 	if (ret) {
 		LOG_ERR("Failed to switch AT host to CMUX DLCI pipe. (%d)", ret);
+		/* uart_pipe is what sm_cmux_is_started() reports on. Leaving it set
+		 * after a failed start would make every later AT#XCMUX take the
+		 * "resume" path and let AT#XCMUXCLD release a CMUX instance that was
+		 * never attached.
+		 */
+		cmux.uart_pipe = NULL;
 		return ret;
 	}
 
-	/* Attach CMUX to UART pipe (AT host will be detached by transition) */
+	/* Attach CMUX to UART pipe */
 	ret = modem_cmux_attach(&cmux.instance, cmux.uart_pipe);
 	if (ret) {
 		LOG_ERR("Failed to attach CMUX to UART pipe. (%d)", ret);
+		/* Try to switch AT host back to UART so the error is reported correctly */
+		stop_work_fn(NULL);
 		return ret;
 	}
 
