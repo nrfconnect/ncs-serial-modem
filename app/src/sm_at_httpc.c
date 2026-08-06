@@ -567,6 +567,7 @@ static int parse_content_length(const char *buf, const char *header_end, int *le
 {
 	char *cl_header;
 	char *value_start;
+	int parsed;
 	int ret;
 
 	cl_header = strstr(buf, "Content-Length:");
@@ -583,10 +584,23 @@ static int parse_content_length(const char *buf, const char *header_end, int *le
 		value_start++;
 	}
 
-	ret = sscanf(value_start, "%d", length);
+	ret = sscanf(value_start, "%d", &parsed);
 	if (ret != 1) {
 		return -EINVAL;
 	}
+
+	/* A negative Content-Length is never valid. The caller distinguishes
+	 * "no Content-Length" (treated as chunked/until-close) from a known
+	 * body length using the sign of this field, so a malicious or broken
+	 * server could otherwise flip the framing mode (CERT INT31-C). Do not
+	 * publish the value to the caller unless it validates.
+	 */
+	if (parsed < 0) {
+		LOG_WRN("Rejecting negative Content-Length: %d", parsed);
+		return -EINVAL;
+	}
+
+	*length = parsed;
 
 	return 0;
 }
