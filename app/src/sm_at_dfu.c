@@ -42,11 +42,6 @@ enum xdfu_image_type {
 #endif
 };
 
-enum xdfu_full_mfw_segment_type {
-	DFU_FULL_MFW_SEGMENT_BOOTLOADER = 0,
-	DFU_FULL_MFW_SEGMENT_FIRMWARE = 1,
-};
-
 enum xdfu_operation {
 	DFU_OPERATION_INITIALIZE = 0,
 	DFU_OPERATION_DATA_WRITE = 1,
@@ -78,6 +73,17 @@ static bool app_dfu_buffer_initialized;
 static enum xdfu_image_type xdfu_current_image_type;
 static uint32_t xdfu_bytes_written;
 static int xdfu_status;
+
+/* Restores the per-chunk data-write accounting to its initial state. Used when
+ * entering data mode fails, so that a later command can never observe partially
+ * armed DFU state from a write that never started (CERT ERR34-C).
+ */
+static void xdfu_datamode_state_reset(void)
+{
+	xdfu_current_image_type = DFU_TYPE_APP;
+	xdfu_bytes_written = 0;
+	xdfu_status = 0;
+}
 
 static void delta_dfu_evt_handler(enum dfu_target_evt_id evt_id)
 {
@@ -422,6 +428,7 @@ static int handle_at_xdfu_write(enum at_parser_cmd_type cmd_type, struct at_pars
 						xdfu_app_datamode_context.len);
 			if (err) {
 				LOG_ERR("Failed to enter data write mode: %d", err);
+				xdfu_datamode_state_reset();
 				return err;
 			}
 
@@ -456,6 +463,7 @@ static int handle_at_xdfu_write(enum at_parser_cmd_type cmd_type, struct at_pars
 						xdfu_delta_mfw_datamode_context.len);
 			if (err) {
 				LOG_ERR("Failed to enter data write mode: %d", err);
+				xdfu_datamode_state_reset();
 				return err;
 			}
 
@@ -502,6 +510,7 @@ static int handle_at_xdfu_write(enum at_parser_cmd_type cmd_type, struct at_pars
 						xdfu_full_mfw_datamode_context.len);
 			if (err) {
 				LOG_ERR("Failed to enter data write mode: %d", err);
+				xdfu_datamode_state_reset();
 				return err;
 			}
 
