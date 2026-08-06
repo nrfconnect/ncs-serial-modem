@@ -35,6 +35,7 @@
  */
 
 #include <unity.h>
+#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -413,6 +414,70 @@ void test_xnrfcloudpos_wifi_no_aps(void)
 	clear_captured_response();
 
 	send_at_command("AT#XNRFCLOUDPOS=0,1\r\n");
+	resp = get_captured_response();
+	TEST_ASSERT_NOT_NULL(strstr(resp, "ERROR"));
+
+	clear_captured_response();
+	helper_xnrfcloud_disconnect_ok();
+}
+
+/* Builds an AT#XNRFCLOUDPOS Wi-Fi request carrying ap_count access points. */
+static void build_wifi_pos_cmd(char *cmd, size_t cmd_size, int ap_count)
+{
+	int off = snprintf(cmd, cmd_size, "AT#XNRFCLOUDPOS=0,1");
+
+	for (int i = 0; i < ap_count; i++) {
+		off += snprintf(&cmd[off], cmd_size - off, ",\"AA:BB:CC:DD:%02X:%02X\"",
+				(i >> 8) & 0xFF, i & 0xFF);
+		TEST_ASSERT_TRUE(off < (int)cmd_size);
+	}
+	off += snprintf(&cmd[off], cmd_size - off, "\r\n");
+	TEST_ASSERT_TRUE(off < (int)cmd_size);
+}
+
+/*
+ * Regression test for the Wi-Fi access point count cap.
+ *
+ * The AP count is derived from the AT parameter count, which is bounded only by
+ * CONFIG_SM_AT_BUF_SIZE, and is multiplied into a malloc() size. The handler
+ * caps it at WIFI_APS_MAX (64). Verify the boundary: exactly WIFI_APS_MAX APs
+ * is still accepted, one more is rejected.
+ */
+void test_xnrfcloudpos_wifi_ap_count_cap(void)
+{
+	/* Must match WIFI_APS_MAX in sm_at_nrfcloud.c. */
+	const int wifi_aps_max = 64;
+	static struct nrf_cloud_location_result loc_result = {
+		.type = LOCATION_TYPE_WIFI,
+		.lat  = 60.1699,
+		.lon  = 24.9384,
+		.unc  = 50,
+	};
+	static char cmd[4096];
+
+	helper_xnrfcloud_connect_ok();
+	clear_captured_response();
+
+	/* Exactly at the cap: accepted. */
+	__cmock_nrf_cloud_coap_location_get_ExpectAnyArgsAndReturn(0);
+	__cmock_nrf_cloud_coap_location_get_ReturnThruPtr_result(&loc_result);
+
+	build_wifi_pos_cmd(cmd, sizeof(cmd), wifi_aps_max);
+	k_sleep(K_MSEC(1));
+	send_at_command(cmd);
+	k_sleep(K_MSEC(1));
+
+	resp = get_captured_response();
+	TEST_ASSERT_NOT_NULL(strstr(resp, "OK"));
+	TEST_ASSERT_NULL(strstr(resp, "ERROR"));
+
+	k_sleep(K_MSEC(10));
+	clear_captured_response();
+
+	/* One past the cap: rejected before any allocation is sized from it. */
+	build_wifi_pos_cmd(cmd, sizeof(cmd), wifi_aps_max + 1);
+	send_at_command(cmd);
+
 	resp = get_captured_response();
 	TEST_ASSERT_NOT_NULL(strstr(resp, "ERROR"));
 

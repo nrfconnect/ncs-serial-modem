@@ -38,7 +38,11 @@ int test_at_nrfcloud_ncellmeas_resp_ret;
 
 int nrf_modem_at_cmd(void *buf, size_t buf_size, const char *fmt, ...)
 {
-	char at_cmd[256];
+	/* Sized to CONFIG_SM_AT_BUF_SIZE: a smaller buffer silently truncates long
+	 * AT commands (for example a Wi-Fi positioning request with many access
+	 * points) before the handler ever sees them.
+	 */
+	static char at_cmd[4096];
 	va_list args;
 	int ret;
 
