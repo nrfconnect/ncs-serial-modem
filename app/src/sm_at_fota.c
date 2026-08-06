@@ -288,7 +288,9 @@ static void fota_dl_handler(const struct fota_download_evt *evt)
 		urc_send_to(fota_pipe, "\r\n#XFOTA: %d,%d,%d\r\n",
 			sm_fota_stage, sm_fota_status, sm_fota_info);
 		break;
-	case FOTA_DOWNLOAD_EVT_FINISHED:
+	case FOTA_DOWNLOAD_EVT_FINISHED: {
+		int err;
+
 		/* fota_download is done; release the URI buffers. */
 		k_free(fota_hostname);
 		fota_hostname = NULL;
@@ -297,9 +299,17 @@ static void fota_dl_handler(const struct fota_download_evt *evt)
 		sm_fota_stage = FOTA_STAGE_ACTIVATE;
 		sm_fota_info = 0;
 		/* Save, in case reboot by reset */
-		sm_settings_fota_save();
+		err = sm_settings_fota_save();
+		if (err) {
+			/* The download is complete but the state could not be
+			 * persisted. A reset before activation now loses track of
+			 * the pending update, so make it visible to the host.
+			 */
+			LOG_ERR("Failed to persist FOTA state after download: %d", err);
+		}
 		urc_send_to(fota_pipe, "\r\n#XFOTA: %d,%d\r\n", sm_fota_stage, sm_fota_status);
 		break;
+	}
 	case FOTA_DOWNLOAD_EVT_ERASE_TIMEOUT:
 		LOG_INF("Erasure timeout reached. Erasure continues.");
 		break;
@@ -429,9 +439,29 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 				else if (op == SM_FOTA_START_MCUBOOT_BL) {
 					sm_fota_type = SM_FOTA_TYPE_MCUBOOT_BL;
 
-					/* Save the MCUboot version before FOTA. */
-					sm_util_mcuboot_active_version(&sm_fota_bl_version_before);
-					sm_settings_fota_save();
+					/* Save the MCUboot version before FOTA. The
+					 * post-reboot validation compares against this
+					 * value, so if it cannot be read or persisted the
+					 * update would later be reported as successful
+					 * purely because the stored version defaults to 0.
+					 * Abort instead of starting a FOTA whose result
+					 * cannot be verified.
+					 */
+					err = sm_util_mcuboot_active_version(
+						&sm_fota_bl_version_before);
+					if (err) {
+						LOG_ERR("Failed to read MCUboot version: %d",
+							err);
+						sm_fota_init_state();
+						break;
+					}
+					err = sm_settings_fota_save();
+					if (err) {
+						LOG_ERR("Failed to persist FOTA state: %d",
+							err);
+						sm_fota_init_state();
+						break;
+					}
 				}
 #endif
 				else {
@@ -580,7 +610,9 @@ void sm_fota_post_process(void)
 	}
 
 	sm_fota_init_state();
-	sm_settings_fota_save();
+	if (sm_settings_fota_save()) {
+		LOG_ERR("Failed to clear the persisted FOTA state");
+	}
 }
 
 #if defined(CONFIG_SM_FULL_FOTA)
