@@ -2670,6 +2670,105 @@ void test_xgetaddrinfo_invalid_family(void)
 }
 
 /*
+ * Helper callback for mocking zsock_getaddrinfo with many chained IPv6
+ * results, each with a maximum-length (45-char) address string. This is
+ * used to regression-test the CVE-style stack buffer overflow fix in
+ * handle_at_getaddrinfo() (rsp_buf[256] previously overflowed via
+ * unbounded strcat() when enough addresses were returned).
+ */
+#define XGETADDRINFO_MANY_RESULTS 10
+
+static int mock_zsock_getaddrinfo_many_ipv6_callback(const char *nodename, const char *servname,
+						     const struct zsock_addrinfo *hints,
+						     struct zsock_addrinfo **res,
+						     int cmock_num_calls)
+{
+	static struct {
+		struct zsock_addrinfo ai;
+		struct net_sockaddr_in6 sa;
+	} results[XGETADDRINFO_MANY_RESULTS];
+
+	memset(results, 0, sizeof(results));
+
+	for (int i = 0; i < XGETADDRINFO_MANY_RESULTS; i++) {
+		results[i].sa.sin6_family = AF_INET6;
+		/* Distinct address per entry, but all maximal-length when printed */
+		results[i].sa.sin6_addr.s6_addr[0] = 0x20;
+		results[i].sa.sin6_addr.s6_addr[1] = 0x01;
+		results[i].sa.sin6_addr.s6_addr[2] = 0x0d;
+		results[i].sa.sin6_addr.s6_addr[3] = 0xb8;
+		results[i].sa.sin6_addr.s6_addr[14] = (uint8_t)(i >> 8);
+		results[i].sa.sin6_addr.s6_addr[15] = (uint8_t)i;
+
+		results[i].ai.ai_family = AF_INET6;
+		results[i].ai.ai_socktype = SOCK_STREAM;
+		results[i].ai.ai_protocol = IPPROTO_TCP;
+		results[i].ai.ai_addrlen = sizeof(results[i].sa);
+		results[i].ai.ai_addr = (struct net_sockaddr *)&results[i].sa;
+		results[i].ai.ai_next = (i + 1 < XGETADDRINFO_MANY_RESULTS) ?
+					 &results[i + 1].ai : NULL;
+	}
+
+	*res = &results[0].ai;
+	return 0;
+}
+
+/* Return a maximal-length IPv6 literal (45 chars incl. NUL) for every call,
+ * regardless of the input address, to maximize rsp_buf pressure.
+ */
+static char *mock_zsock_inet_ntop_max_ipv6_callback(net_sa_family_t af, const void *src, char *dst,
+						    net_socklen_t size, int cmock_num_calls)
+{
+	/* Longest possible IPv6 textual form: full 8 groups, no compression */
+	static const char *max_addrs[XGETADDRINFO_MANY_RESULTS] = {
+		"2001:0db8:1111:2222:3333:4444:5555:0000",
+		"2001:0db8:1111:2222:3333:4444:5555:0001",
+		"2001:0db8:1111:2222:3333:4444:5555:0002",
+		"2001:0db8:1111:2222:3333:4444:5555:0003",
+		"2001:0db8:1111:2222:3333:4444:5555:0004",
+		"2001:0db8:1111:2222:3333:4444:5555:0005",
+		"2001:0db8:1111:2222:3333:4444:5555:0006",
+		"2001:0db8:1111:2222:3333:4444:5555:0007",
+		"2001:0db8:1111:2222:3333:4444:5555:0008",
+		"2001:0db8:1111:2222:3333:4444:5555:0009",
+	};
+
+	strcpy(dst, max_addrs[cmock_num_calls % XGETADDRINFO_MANY_RESULTS]);
+	return dst;
+}
+
+/*
+ * Regression test for C-1: stack buffer overflow in AT#XGETADDRINFO
+ * response building (rsp_buf[256] + unbounded strcat()).
+ *
+ * With 10 max-length IPv6 addresses (40 chars each + separator), the
+ * fully-formatted response would require ~410+ bytes, well beyond the
+ * 256-byte rsp_buf. The fixed implementation must truncate safely
+ * (verified here indirectly via ASAN/ subsequent OK response) instead of
+ * corrupting the stack.
+ */
+void test_xgetaddrinfo_many_results_no_overflow(void)
+{
+	const char *response;
+
+	__cmock_zsock_getaddrinfo_Stub(mock_zsock_getaddrinfo_many_ipv6_callback);
+	__cmock_zsock_inet_ntop_Stub(mock_zsock_inet_ntop_max_ipv6_callback);
+	__cmock_zsock_freeaddrinfo_Expect(NULL);
+	__cmock_zsock_freeaddrinfo_IgnoreArg_ai();
+
+	/* Execute XGETADDRINFO command with IPv6 family (AF_INET6 = 2) */
+	send_at_command("AT#XGETADDRINFO=\"many.example.com\",2\r\n");
+
+	/* If the stack buffer overflowed, ASAN (CONFIG_ASAN=y in this test
+	 * suite) would abort the test binary before this point is reached.
+	 * A safely truncated response should still terminate with OK.
+	 */
+	response = get_captured_response();
+	TEST_ASSERT_TRUE(strstr(response, "#XGETADDRINFO:") != NULL);
+	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
+}
+
+/*
  * Test: AT#XGETADDRINFO when DNS resolution fails
  * - Command: AT#XGETADDRINFO="invalid.host"
  * - Tests: Error response when hostname cannot be resolved
