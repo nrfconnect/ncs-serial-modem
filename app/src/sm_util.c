@@ -44,8 +44,16 @@ int sm_util_at_printf(const char *fmt, ...)
 	va_start(args, fmt);
 	ret = vsnprintf(buf, sizeof(buf), fmt, args);
 	va_end(args);
-	if (ret >= sizeof(buf)) {
-		LOG_ERR("AT command \"%.16s...\" would get truncated from %u to %u bytes. "
+	if (ret < 0) {
+		/* Encoding error. Check this before the truncation check below:
+		 * comparing a negative int against a size_t would promote it to
+		 * a huge unsigned value and misreport the failure as truncation.
+		 */
+		LOG_ERR("Failed to format AT command (encoding error).");
+		return -EIO;
+	}
+	if ((size_t)ret >= sizeof(buf)) {
+		LOG_ERR("AT command \"%.16s...\" would get truncated from %d to %zu bytes. "
 			"The buffer needs to be made bigger.", buf, ret, sizeof(buf) - 1);
 		return -E2BIG;
 	}
@@ -63,7 +71,7 @@ int sm_util_at_printf(const char *fmt, ...)
 		/* Unlikely, but in that case the response code most likely didn't
 		 * make it into the buffer, so searching for it would be fruitless.
 		 */
-		LOG_ERR("AT response to \"%s\" didn't fit into %u bytes. "
+		LOG_ERR("AT response to \"%s\" didn't fit into %zu bytes. "
 			"The buffer needs to be made bigger.", fmt, sizeof(buf) - 1);
 	}
 	return ret;
@@ -82,7 +90,7 @@ int sm_util_at_scanf(const char *cmd, const char *fmt, ...)
 
 	ret = nrf_modem_at_cmd(buf, sizeof(buf), "%s", cmd);
 	if (ret == -NRF_E2BIG) {
-		LOG_ERR("AT response to \"%s\" truncated to %u bytes. "
+		LOG_ERR("AT response to \"%s\" truncated to %zu bytes. "
 			"The buffer needs to be made bigger.", cmd, sizeof(buf) - 1);
 		buf[sizeof(buf) - 1] = '\0';
 	} else if (ret < 0) {
@@ -102,12 +110,22 @@ int sm_util_at_scanf(const char *cmd, const char *fmt, ...)
 static int terminate_at_response(char *buf, size_t len,
 				 const char *termination_str, int success_ret)
 {
-	len -= strlen(buf);
-	const int printf_ret = snprintf(buf + strlen(buf), len, "%s", termination_str);
+	const size_t used = strlen(buf);
 
-	if (printf_ret >= len) {
-		LOG_ERR("%u bytes of the AT response were truncated."
-			" The buffer needs to be made bigger.", printf_ret - len + 1);
+	if (used >= len) {
+		/* Should not happen: buf is always NUL-terminated within len. */
+		LOG_ERR("AT response buffer is already full.");
+		return -NRF_E2BIG;
+	}
+	len -= used;
+
+	const int printf_ret = snprintf(buf + used, len, "%s", termination_str);
+
+	if (printf_ret < 0 || (size_t)printf_ret >= len) {
+		LOG_ERR("%zu bytes of the AT response were truncated."
+			" The buffer needs to be made bigger.",
+			(printf_ret < 0) ? strlen(termination_str)
+					 : ((size_t)printf_ret - len + 1));
 		return -NRF_E2BIG;
 	}
 	return success_ret;
@@ -116,7 +134,7 @@ static int terminate_at_response(char *buf, size_t len,
 int sm_util_at_cmd_no_intercept(char *buf, size_t len, const char *at_cmd)
 {
 	int ret;
-	char second_line[strlen("+CMx ERROR: xxxx")];
+	char second_line[sizeof("+CMx ERROR: xxxx") - 1];
 	char format_str[24];
 
 	/* Construct the format string to read two response lines (into buf and second_line).
@@ -125,8 +143,9 @@ int sm_util_at_cmd_no_intercept(char *buf, size_t len, const char *at_cmd)
 	 * See the scanf() format specifer documentation for more information.
 	 */
 	ret = snprintf(format_str, sizeof(format_str),
-		       "%%%u[^\r]\r\n%%%u[^\r]", len - 1, sizeof(second_line) - 1);
-	assert(ret < sizeof(format_str));
+		       "%%%u[^\r]\r\n%%%u[^\r]", (unsigned int)(len - 1),
+		       (unsigned int)(sizeof(second_line) - 1));
+	assert(ret > 0 && (size_t)ret < sizeof(format_str));
 
 	LOG_DBG("Forwarding \"%s\" to the modem.", at_cmd);
 
@@ -140,7 +159,7 @@ int sm_util_at_cmd_no_intercept(char *buf, size_t len, const char *at_cmd)
 /* Restore the trap macro after the only place where this function is
  * allowed to be used so that other code does not accidentally use it.
  */
-#define nrf_modem_at_scanf nrf_modem_at_printf
+#define nrf_modem_at_scanf(...) function_disallowed_use_sm_util_scanf_alternative(__VA_ARGS__)
 
 	if (line_count < 1) {
 		LOG_ERR("Forwarding of \"%s\" failed (%d).", at_cmd, line_count);

@@ -300,7 +300,12 @@ STATIC int handle_at_clac(enum at_parser_cmd_type cmd_type, struct at_parser *, 
 		}
 
 		if (!duplicate) {
-			rsp_send("%.*s\r\n", base_cmd_len[i],
+			/* The %.*s precision argument must have type int per the
+			 * C standard; base_cmd_len[] is size_t, so cast explicitly
+			 * rather than relying on size_t == unsigned int (true on
+			 * this 32-bit target, but not on a 64-bit host build).
+			 */
+			rsp_send("%.*s\r\n", (int)base_cmd_len[i],
 				 _nrf_modem_at_cmd_custom_list_start[i].cmd);
 		}
 	}
