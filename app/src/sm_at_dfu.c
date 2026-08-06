@@ -74,6 +74,42 @@ static enum xdfu_image_type xdfu_current_image_type;
 static uint32_t xdfu_bytes_written;
 static int xdfu_status;
 
+/* Upper bound on the byte count a single AT#XDFUWRITE may declare.
+ *
+ * addr and len come straight from AT command parameters and are used as raw
+ * write offsets/sizes against flash and the modem bootloader. Without an upper
+ * bound, a host can declare an arbitrarily large window and make the address
+ * accounting below run past the target region. The largest image any supported
+ * DFU target accepts is well under this limit.
+ */
+#define XDFU_MAX_WRITE_LEN (4U * 1024U * 1024U)
+
+/* Validates the addr/len pair of an AT#XDFUWRITE data-write request.
+ *
+ * Rejects a zero or oversized length and an addr/len pair whose sum wraps,
+ * which would otherwise turn "addr += len" in the data-mode callback into a
+ * write at a wrapped-around offset (CERT INT30-C, ARR30-C).
+ */
+static int xdfu_validate_write_params(size_t addr, size_t len)
+{
+	if (len == 0) {
+		LOG_ERR("Length cannot be 0");
+		return -EINVAL;
+	}
+
+	if (len > XDFU_MAX_WRITE_LEN) {
+		LOG_ERR("Length %zu exceeds the maximum %u", len, XDFU_MAX_WRITE_LEN);
+		return -EINVAL;
+	}
+
+	if (addr > SIZE_MAX - len) {
+		LOG_ERR("Address %zu and length %zu overflow", addr, len);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 /* Restores the per-chunk data-write accounting to its initial state. Used when
  * entering data mode fails, so that a later command can never observe partially
  * armed DFU state from a write that never started (CERT ERR34-C).
@@ -180,6 +216,20 @@ static int xdfu_datamode_callback(uint8_t op, const uint8_t *data, int len, uint
 					break;
 				}
 			} else if (full_mfw_dfu_segment_type == DFU_FULL_MFW_SEGMENT_FIRMWARE) {
+				/* Never write past the window the host declared in
+				 * AT#XDFUWRITE. This keeps the running address inside
+				 * the validated [addr, addr + len) range regardless of
+				 * how much data the host actually feeds into data mode.
+				 */
+				if ((size_t)len > xdfu_full_mfw_datamode_context.len ||
+				    xdfu_bytes_written >
+					    xdfu_full_mfw_datamode_context.len - (size_t)len) {
+					LOG_ERR("Write of %d bytes exceeds the declared "
+						"length %zu", len,
+						xdfu_full_mfw_datamode_context.len);
+					xdfu_status = -EINVAL;
+					break;
+				}
 				err = nrf_modem_bootloader_fw_write(
 					xdfu_full_mfw_datamode_context.addr,
 					(void *)data, len);
@@ -414,9 +464,10 @@ static int handle_at_xdfu_write(enum at_parser_cmd_type cmd_type, struct at_pars
 				return err;
 			}
 
-			if (xdfu_app_datamode_context.len == 0) {
-				LOG_ERR("Length cannot be 0");
-				return -EINVAL;
+			err = xdfu_validate_write_params(xdfu_app_datamode_context.addr,
+							 xdfu_app_datamode_context.len);
+			if (err) {
+				return err;
 			}
 
 			/* Prepare per-chunk accounting for the datamode callback. */
@@ -449,9 +500,10 @@ static int handle_at_xdfu_write(enum at_parser_cmd_type cmd_type, struct at_pars
 				return err;
 			}
 
-			if (xdfu_delta_mfw_datamode_context.len == 0) {
-				LOG_ERR("Length cannot be 0");
-				return -EINVAL;
+			err = xdfu_validate_write_params(xdfu_delta_mfw_datamode_context.addr,
+							 xdfu_delta_mfw_datamode_context.len);
+			if (err) {
+				return err;
 			}
 
 			/* Prepare per-chunk accounting for the datamode callback. */
@@ -496,9 +548,10 @@ static int handle_at_xdfu_write(enum at_parser_cmd_type cmd_type, struct at_pars
 				return err;
 			}
 
-			if (xdfu_full_mfw_datamode_context.len == 0) {
-				LOG_ERR("Length cannot be 0");
-				return -EINVAL;
+			err = xdfu_validate_write_params(xdfu_full_mfw_datamode_context.addr,
+							 xdfu_full_mfw_datamode_context.len);
+			if (err) {
+				return err;
 			}
 
 			/* Prepare per-chunk accounting for the datamode callback. */
