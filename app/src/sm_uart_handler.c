@@ -5,6 +5,7 @@
  */
 
 #include <zephyr/kernel.h>
+#include <limits.h>
 #include <stdio.h>
 #include <zephyr/drivers/uart.h>
 #include <hal/nrf_uarte.h>
@@ -286,6 +287,13 @@ static void uart_callback(const struct device *dev, struct uart_event *evt, void
 		if (err) {
 			LOG_ERR("UART_TX_%s failure: %d",
 				(evt->type == UART_TX_DONE) ? "DONE" : "ABORTED", err);
+			/* The claim could not be committed, so the ring buffer
+			 * accounting is now inconsistent with what the UART
+			 * actually transmitted. Leaving the claim outstanding
+			 * would corrupt every subsequent transfer, so drop the
+			 * pending TX data and return to a known-good state.
+			 */
+			ring_buf_reset(&tx_buf);
 		}
 		if (ring_buf_is_empty(&tx_buf) ||
 		    (evt->type == UART_TX_ABORTED &&
@@ -493,7 +501,7 @@ static int pipe_transmit(void *data, const uint8_t *buf, size_t size)
 
 		if (err == -EAGAIN) {
 			k_sem_give(&tx_done_sem);
-			return (int)sent;
+			return (int)MIN(sent, (size_t)INT_MAX);
 		} else if (err) {
 			LOG_ERR("TX %s failed (%d).", "start", err);
 			k_sem_give(&tx_done_sem);
@@ -501,7 +509,7 @@ static int pipe_transmit(void *data, const uint8_t *buf, size_t size)
 		}
 	}
 
-	return (int)sent;
+	return (int)MIN(sent, (size_t)INT_MAX);
 }
 
 static int pipe_receive(void *data, uint8_t *buf, size_t size)
@@ -543,7 +551,7 @@ static int pipe_receive(void *data, uint8_t *buf, size_t size)
 		rx_recovery();
 	}
 
-	return (int)received;
+	return (int)MIN(received, (size_t)INT_MAX);
 }
 
 static int pipe_close(void *data)
