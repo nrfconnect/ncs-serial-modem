@@ -3438,6 +3438,69 @@ void test_xrecvcfg_set_all_sockets(void)
 	send_at_command("AT#XCLOSE=2\r\n");
 }
 
+/* Helper callback for mocking zsock_recv with a payload spanning several
+ * hex-conversion chunks (data_send_hex() converts at most 128 bytes per pass).
+ */
+#define HEX_MULTI_CHUNK_LEN 300
+static ssize_t mock_zsock_recv_multi_chunk_callback(int sock, void *buf, size_t max_len,
+						    int flags, int cmock_num_calls)
+{
+	ARG_UNUSED(sock);
+	ARG_UNUSED(flags);
+	ARG_UNUSED(cmock_num_calls);
+
+	if (max_len < HEX_MULTI_CHUNK_LEN) {
+		return -1;
+	}
+	memset(buf, 0xab, HEX_MULTI_CHUNK_LEN);
+	return HEX_MULTI_CHUNK_LEN;
+}
+
+/*
+ * Regression test for review finding M-12 (CERT INT31-C).
+ *
+ * data_send_hex() used to mix the signed recv_len with size_t expressions
+ * while chunking the conversion. Receive a payload larger than one hex
+ * conversion chunk (128 bytes) so the loop runs several times, and verify
+ * that every single received byte is reproduced in the hex output.
+ */
+void test_xrecv_hex_multi_chunk(void)
+{
+	const char *response;
+	char expected[2 * HEX_MULTI_CHUNK_LEN + 1];
+
+	for (size_t i = 0; i < HEX_MULTI_CHUNK_LEN; i++) {
+		expected[2 * i] = 'a';
+		expected[2 * i + 1] = 'b';
+	}
+	expected[2 * HEX_MULTI_CHUNK_LEN] = '\0';
+
+	/* Create TCP socket first */
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 1);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0);
+	send_at_command("AT#XSOCKET=1,1,0\r\n");
+	clear_captured_response();
+
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Set receive timeout */
+	__cmock_zsock_recv_Stub(mock_zsock_recv_multi_chunk_callback);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* Poll event update */
+
+	/* handle=1, mode=1 (hex), flags=0, timeout=5 */
+	send_at_command("AT#XRECV=1,1,0,5\r\n");
+
+	response = get_captured_response();
+	TEST_ASSERT_TRUE(strstr(response, "#XRECV: 1,1,300") != NULL);
+	/* The complete payload must be present, with no bytes dropped or
+	 * duplicated at the chunk boundaries.
+	 */
+	TEST_ASSERT_TRUE(strstr(response, expected) != NULL);
+	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
+
+	__cmock_zsock_close_ExpectAndReturn(1, 0);
+	send_at_command("AT#XCLOSE=1\r\n");
+}
+
 extern int unity_main(void);
 
 int main(void)
