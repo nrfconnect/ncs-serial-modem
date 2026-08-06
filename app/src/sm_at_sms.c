@@ -20,11 +20,7 @@
 LOG_MODULE_REGISTER(sm_sms, CONFIG_SM_LOG_LEVEL);
 
 #define MAX_CONCATENATED_MESSAGE 10
-/* Header info max lenght before the data. This includes ',"' before the data */
-#define SM_SMS_AT_HEADER_INFO_MAX_LEN 74
-/* Length of the notification after the data. This includes '"\r\n' after the data */
-#define SM_SMS_AT_NOTIF_AFTER_DATA_LEN 3
-
+#define SM_SMS_AT_HEADER_INFO_MAX_LEN 64
 /* Maximum time to wait for the next part of the concatenated message to be received in minutes */
 #define MAX_CONCATENATED_MESSAGE_AGE K_MINUTES(3)
 
@@ -117,16 +113,16 @@ static void sms_concat_handle(struct sms_data *const data)
 			sms_ctx.ref_number, header->concatenated.ref_number);
 		sms_concat_clear(&sms_ctx);
 	}
-	/* Staging buffer layout: [0, SM_SMS_AT_HEADER_INFO_MAX_LEN) holds the header text only
-	 * (date/address prefix); each message part i (1-based) is staged in its own fixed-size
-	 * slot at SM_SMS_AT_HEADER_INFO_MAX_LEN + (i-1) * SMS_MAX_PAYLOAD_LEN_CHARS,
-	 * independent of arrival order. One extra byte of slack is allocated so we can never
-	 * write one byte past the end of the buffer. Although this cannot happen with max size of
-	 * concatenated message part being 153, instead of SMS max len of 160.
+	/* Staging buffer layout: [0, SM_SMS_AT_HEADER_INFO_MAX_LEN) holds the
+	 * header text only (date/address prefix); each message part i
+	 * (1-based) is staged in its own fixed-size slot at
+	 * SM_SMS_AT_HEADER_INFO_MAX_LEN + (i-1) * SMS_MAX_PAYLOAD_LEN_CHARS,
+	 * independent of arrival order. One extra byte of slack is
+	 * allocated so the final compaction pass (see below) can never
+	 * write one byte past the end of the buffer.
 	 */
 	size_t concat_msg_len = SM_SMS_AT_HEADER_INFO_MAX_LEN +
-		(size_t)SMS_MAX_PAYLOAD_LEN_CHARS * header->concatenated.total_msgs +
-		(size_t)SM_SMS_AT_NOTIF_AFTER_DATA_LEN + 1;
+		(size_t)SMS_MAX_PAYLOAD_LEN_CHARS * header->concatenated.total_msgs + 1;
 
 	if (sms_ctx.ref_number == 0) {
 		sms_ctx.ref_number = header->concatenated.ref_number;
@@ -170,6 +166,10 @@ static void sms_concat_handle(struct sms_data *const data)
 		 * SM_SMS_AT_HEADER_INFO_MAX_LEN) is intentional and safe:
 		 * snprintf() always NUL-terminates within bounds.
 		 */
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-truncation"
+#endif
 		snprintf(sms_ctx.concat_rsp_buf,
 			SM_SMS_AT_HEADER_INFO_MAX_LEN,
 			"\r\n#XSMS: \"%02d-%02d-%02d %02d:%02d:%02d "
@@ -179,25 +179,36 @@ static void sms_concat_handle(struct sms_data *const data)
 			header->time.timezone * 15 / 60,
 			abs(header->time.timezone) * 15 % 60,
 			header->originating_address.address_str);
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 	}
 	{
-		/* Copy at most SMS_MAX_PAYLOAD_LEN_CHARS bytes into this part's fixed-size slot.
-		 * A plain snprintf() would write NUL after a full-length (160-byte) payload,
-		 * overrunning by one byte into the next part's slot. Using memcpy() with the
-		 * payload's actual length avoids writing past the slot regardless of arrival order.
+		/* Copy at most SMS_MAX_PAYLOAD_LEN_CHARS bytes into this part's
+		 * fixed-size slot. A plain snprintf("%s", ...) would write a
+		 * terminating NUL after a full-length (160-byte) payload,
+		 * overrunning by one byte into the next part's slot -- benign
+		 * only if that neighboring slot is written afterward. Using
+		 * memcpy() with the payload's actual length avoids writing
+		 * past the slot regardless of arrival order.
 		 */
 		char *slot = sms_ctx.concat_rsp_buf + SM_SMS_AT_HEADER_INFO_MAX_LEN +
 			     (header->concatenated.seq_number - 1) * SMS_MAX_PAYLOAD_LEN_CHARS;
-		size_t len = (data->payload_len < SMS_MAX_PAYLOAD_LEN_CHARS)
+		size_t len = (data->payload_len > 0 &&
+			      data->payload_len < SMS_MAX_PAYLOAD_LEN_CHARS)
 				? (size_t)data->payload_len
 				: SMS_MAX_PAYLOAD_LEN_CHARS;
 
 		memcpy(slot, data->payload, len);
-		slot[len] = '\0';
 	}
 	sms_ctx.count++;
 	if (sms_ctx.count == sms_ctx.total_msgs) {
-		/* Compact the header + all message-part slots into a single, contiguous string. */
+		/* Compact the header + all message-part slots into a single,
+		 * contiguous string at the front of the buffer. memmove() is
+		 * used (instead of strcat()/strncat()) because source and
+		 * destination regions can legitimately overlap once the
+		 * write cursor catches up with a slot's own storage.
+		 */
 		size_t pos = strnlen(sms_ctx.concat_rsp_buf, SM_SMS_AT_HEADER_INFO_MAX_LEN - 1);
 
 		for (int i = 0; i < sms_ctx.total_msgs; i++) {
