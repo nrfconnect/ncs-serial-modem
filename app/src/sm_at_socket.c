@@ -2192,7 +2192,7 @@ STATIC int handle_at_getaddrinfo(enum at_parser_cmd_type cmd_type, struct at_par
 				 uint32_t param_count)
 {
 	int err = -EINVAL;
-	char hostname[NI_MAXHOST];
+	char hostname[NI_MAXHOST] = {0};
 	char host[SM_MAX_DNS_LEN + 1] = {0};
 	size_t size = sizeof(host);
 	struct zsock_addrinfo *result;
@@ -2231,27 +2231,46 @@ STATIC int handle_at_getaddrinfo(enum at_parser_cmd_type cmd_type, struct at_par
 			return -ENOENT;
 		}
 
-		sprintf(rsp_buf, "\r\n#XGETADDRINFO: \"");
+		strcpy(rsp_buf, "\r\n#XGETADDRINFO: \"");
 		/* loop over all returned results and do inverse lookup */
 		for (res = result; res != NULL; res = res->ai_next) {
+			size_t used, hostname_len, sep_len;
+
 			if (res->ai_family == AF_INET) {
 				struct sockaddr_in *host =
 					(struct sockaddr_in *)res->ai_addr;
 
-				zsock_inet_ntop(AF_INET, &host->sin_addr, hostname,
-					      sizeof(hostname));
+				if (!zsock_inet_ntop(AF_INET, &host->sin_addr, hostname,
+						     sizeof(hostname))) {
+					continue;
+				}
 			} else if (res->ai_family == AF_INET6) {
 				struct sockaddr_in6 *host =
 					(struct sockaddr_in6 *)res->ai_addr;
 
-				zsock_inet_ntop(AF_INET6, &host->sin6_addr, hostname,
-					      sizeof(hostname));
+				if (!zsock_inet_ntop(AF_INET6, &host->sin6_addr, hostname,
+						     sizeof(hostname))) {
+					continue;
+				}
 			} else {
 				continue;
 			}
 
+			used = strlen(rsp_buf);
+			hostname_len = strlen(hostname);
+			sep_len = res->ai_next ? 1 : 0;
+			/* Reserve space for optional separator + closing "\"\r\n" + NUL */
+			if (used + hostname_len + sep_len + sizeof("\"\r\n") > sizeof(rsp_buf)) {
+				/* Remove a previously appended trailing separator on truncation */
+				if (used > 0 && rsp_buf[used - 1] == ' ') {
+					rsp_buf[used - 1] = '\0';
+				}
+
+				LOG_ERR("XGETADDRINFO response truncated, too many addresses");
+				break;
+			}
 			strcat(rsp_buf, hostname);
-			if (res->ai_next) {
+			if (sep_len) {
 				strcat(rsp_buf, " ");
 			}
 		}
