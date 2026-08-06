@@ -5,7 +5,6 @@
  */
 
 #include <zephyr/kernel.h>
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <zephyr/logging/log.h>
@@ -538,14 +537,22 @@ static void on_gnss_evt_nmea(void)
 	err = nrf_modem_gnss_read(&nmea, sizeof(nmea), NRF_MODEM_GNSS_DATA_NMEA);
 	if (err) {
 		LOG_ERR("Failed to read GNSS NMEA data. (%d)", err);
+		return;
 	}
 	nmea_str = nmea.nmea_str;
-	len = strlen(nmea_str);
+	/* The NMEA string comes from the modem. Bound the scan by the field size
+	 * in case it is not NUL-terminated, and validate the expected CRLF
+	 * terminator with real runtime checks rather than assert(), which is
+	 * compiled out in release builds (CERT ERR33-C, MSC11-C).
+	 */
+	len = strnlen(nmea_str, sizeof(nmea.nmea_str));
 
-	assert(len >= 2);
+	if (len < 2 || strncmp(nmea_str + len - 2, "\r\n", 2) != 0) {
+		LOG_ERR("Malformed GNSS NMEA data (%zu bytes, missing CRLF terminator).", len);
+		return;
+	}
 	len -= 2;
-	assert(!strcmp(nmea_str + len, "\r\n"));
-	LOG_DBG("%.*s", len, nmea_str);
+	LOG_DBG("%.*s", (int)len, nmea_str);
 }
 
 static void on_gnss_evt_pvt(void)
