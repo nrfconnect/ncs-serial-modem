@@ -1291,6 +1291,25 @@ static int socket_datamode_callback(uint8_t op, const uint8_t *data, int len, ui
 	struct async_poll_ctx *poll_ctx =
 		sm_at_host_get_async_poll_ctx(sm_at_host_get_current_pipe());
 
+	if (op == DATAMODE_EXIT) {
+		LOG_DBG("Data mode exit");
+		memset(udp_url, 0, sizeof(udp_url));
+		udp_port = 0;
+		if ((flags & SM_DATAMODE_FLAGS_EXIT_HANDLER) != 0) {
+			/* Datamode exited unexpectedly. */
+			rsp_send(CONFIG_SM_DATAMODE_TERMINATOR);
+		}
+		if (poll_ctx != NULL) {
+			poll_ctx->datamode_sock = NULL;
+		}
+		return 0;
+	}
+
+	if (poll_ctx == NULL || poll_ctx->datamode_sock == NULL) {
+		LOG_ERR("Data mode callback with no valid socket context");
+		return -ENODEV;
+	}
+
 	if (op == DATAMODE_SEND) {
 		if (poll_ctx->datamode_sock->type == SOCK_DGRAM &&
 		    (flags & SM_DATAMODE_FLAGS_MORE_DATA) != 0) {
@@ -1310,15 +1329,6 @@ static int socket_datamode_callback(uint8_t op, const uint8_t *data, int len, ui
 		}
 		/* Return the amount of data sent or an error code. */
 		return ret;
-
-	} else if (op == DATAMODE_EXIT) {
-		LOG_DBG("Data mode exit");
-		memset(udp_url, 0, sizeof(udp_url));
-		if ((flags & SM_DATAMODE_FLAGS_EXIT_HANDLER) != 0) {
-			/* Datamode exited unexpectedly. */
-			rsp_send(CONFIG_SM_DATAMODE_TERMINATOR);
-		}
-		poll_ctx->datamode_sock = NULL;
 	}
 
 	return 0;
@@ -1803,6 +1813,9 @@ STATIC int handle_at_send(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 			}
 			struct async_poll_ctx *poll_ctx = sm_at_host_get_async_poll_ctx(sock->pipe);
 
+			if (poll_ctx == NULL) {
+				return -ENODEV;
+			}
 			poll_ctx->datamode_sock = sock;
 			err = enter_datamode(socket_datamode_callback, data_len);
 			if (!err && sock->async_poll.adr_flags & SM_ADR_DATA_MODE) {
@@ -1956,6 +1969,11 @@ STATIC int handle_at_sendto(enum at_parser_cmd_type cmd_type, struct at_parser *
 			}
 			struct async_poll_ctx *poll_ctx = sm_at_host_get_async_poll_ctx(sock->pipe);
 
+			if (poll_ctx == NULL) {
+				memset(udp_url, 0, sizeof(udp_url));
+				udp_port = 0;
+				return -ENODEV;
+			}
 			poll_ctx->datamode_sock = sock;
 			err = enter_datamode(socket_datamode_callback, data_len);
 			if (!err && sock->async_poll.adr_flags & SM_ADR_DATA_MODE) {
@@ -2140,9 +2158,13 @@ static int do_accept(struct sm_socket *sock)
 		 peer_port);
 
  	/* Update poll events for xapoll and automatic data reception */
-	new_sock->async_poll.adr_flags = poll_ctx->adr_flags;
-	new_sock->async_poll.adr_hex = poll_ctx->adr_hex;
-	new_sock->async_poll.xapoll_events_requested = poll_ctx->xapoll_events_requested;
+	if (poll_ctx != NULL) {
+		new_sock->async_poll.adr_flags = poll_ctx->adr_flags;
+		new_sock->async_poll.adr_hex = poll_ctx->adr_hex;
+		new_sock->async_poll.xapoll_events_requested = poll_ctx->xapoll_events_requested;
+	} else {
+		LOG_WRN("No poll context for accepting socket; using default poll flags");
+	}
 	update_poll_events(new_sock,
 			   ZSOCK_POLLIN | ZSOCK_POLLOUT | ZSOCK_POLLERR | ZSOCK_POLLHUP |
 				   ZSOCK_POLLNVAL,
