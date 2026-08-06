@@ -942,7 +942,7 @@ static void ppp_data_passing_thread(void*, void*, void*)
 			}
 
 			/* Networks can send packets larger than the MTU, so use the buffer size. */
-			const ssize_t len = zsock_recv(fds[src].fd, ppp_data_buf,
+			const ssize_t len = zsock_recv(ppp_fds[src], ppp_data_buf,
 						       sizeof(ppp_data_buf), ZSOCK_MSG_DONTWAIT);
 
 			if (len <= 0) {
@@ -970,8 +970,8 @@ static void ppp_data_passing_thread(void*, void*, void*)
 				}
 			}
 
-			send_ret =
-				zsock_sendto(fds[dst].fd, ppp_data_buf, len, 0, dst_addr, addrlen);
+			send_ret = zsock_sendto(ppp_fds[dst], ppp_data_buf, len, 0, dst_addr,
+						addrlen);
 			if (send_ret == -1) {
 				LOG_ERR("Failed to send %zd bytes to %s socket (%d).",
 					len, ppp_socket_names[dst], -errno);
