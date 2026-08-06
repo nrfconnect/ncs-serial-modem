@@ -18,7 +18,11 @@ LOG_MODULE_REGISTER(uart_stubs, LOG_LEVEL_DBG);
 
 const struct device *const sm_uart_dev;
 uint32_t sm_uart_baudrate = 115200;
-RING_BUF_DECLARE(uart_rx_ring_buf, 1024);
+/* Sized to match CONFIG_SM_AT_BUF_SIZE so that tests can inject a maximum
+ * length AT command in one go. A smaller buffer silently truncates the command
+ * and leaves a partial line behind, which wedges every subsequent test.
+ */
+RING_BUF_DECLARE(uart_rx_ring_buf, 4096);
 static K_SEM_DEFINE(tx_done, 0, 1);
 
 static void tx_done_fn(struct k_work *work)
@@ -56,10 +60,15 @@ static int pipe_receive(void *data, uint8_t *buf, size_t size)
 {
 	struct modem_pipe *pipe = (struct modem_pipe *)data;
 
-	if (ring_buf_size_get(&uart_rx_ring_buf) > size) {
+	int ret = ring_buf_get(&uart_rx_ring_buf, buf, size);
+
+	/* Re-arm after draining this chunk. Notifying before the read can be lost,
+	 * which stalls any input longer than one receive buffer.
+	 */
+	if (ring_buf_size_get(&uart_rx_ring_buf) > 0) {
 		modem_pipe_notify_receive_ready(pipe);
 	}
-	return ring_buf_get(&uart_rx_ring_buf, buf, size);
+	return ret;
 }
 
 static int pipe_close(void *data)
