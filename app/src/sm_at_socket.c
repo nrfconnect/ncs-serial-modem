@@ -2279,6 +2279,11 @@ void xapoll_stop(struct sm_socket *sock)
 	struct async_poll_ctx *poll_ctx =
 		sm_at_host_get_async_poll_ctx(pipe);
 
+	if (poll_ctx == NULL) {
+		LOG_ERR("No poll context for the current pipe");
+		return;
+	}
+
 	/* Stop events for all sockets. */
 	poll_ctx->xapoll_events_requested = 0;
 	for (int i = 0; i < SM_MAX_SOCKET_COUNT; i++) {
@@ -2315,6 +2320,11 @@ int set_xapoll_events(struct sm_socket *sock, uint8_t events)
 		/* Set events for a specific socket. */
 		sock->async_poll.xapoll_events_requested = events;
 		return update_poll_events(sock, events, true);
+	}
+
+	if (poll_ctx == NULL) {
+		LOG_ERR("No poll context for the current pipe");
+		return -ENODEV;
 	}
 
 	/* Set events for all sockets in this context */
@@ -2447,6 +2457,10 @@ STATIC int handle_at_recvcfg(enum at_parser_cmd_type cmd_type, struct at_parser 
 			sock->async_poll.adr_hex = hex_mode != 0;
 			err = update_poll_events(sock, ZSOCK_POLLIN, false);
 		} else {
+			if (poll_ctx == NULL) {
+				LOG_ERR("No poll context for the current pipe");
+				return -ENODEV;
+			}
 			/* Apply to all sockets in this context */
 			poll_ctx->adr_flags = flags;
 			poll_ctx->adr_hex = hex_mode != 0;
