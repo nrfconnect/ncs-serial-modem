@@ -83,6 +83,14 @@ static void init_dlci(size_t dlci_idx, uint16_t recv_buf_size,
 	};
 
 	dlci->pipe = modem_cmux_dlci_init(&cmux.instance, &dlci->instance, &dlci_config);
+	if (dlci->pipe == NULL) {
+		/* Do not hand a NULL pipe to the AT host; sm_cmux_get_dlci() will
+		 * then report this DLCI as unavailable instead of the AT host
+		 * dereferencing it later (CERT ERR33-C).
+		 */
+		LOG_ERR("Failed to initialize CMUX DLCI %zu.", dlci_idx + 1);
+		return;
+	}
 
 	sm_at_host_attach(dlci->pipe);
 }
