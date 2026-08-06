@@ -71,12 +71,28 @@ static uint8_t tx_buffer[CONFIG_SM_MQTTC_MESSAGE_BUFFER_LEN];
 /* The mqtt client struct */
 static struct mqtt_client client;
 
+/* Upper bound on the payload of a single received MQTT PUBLISH.
+ *
+ * payload.len is advertised by the broker in the MQTT fixed header and is not
+ * otherwise bounded by the client. Without a cap, a malicious or broken broker
+ * can make the read loop below stream an arbitrary amount of data to the host
+ * UART.
+ */
+#define MQTT_MAX_RX_PAYLOAD_LEN (64 * 1024)
+
 /**@brief Function to handle received publish event.
  */
 static int handle_mqtt_publish_evt(struct mqtt_client *const c, const struct mqtt_evt *evt)
 {
-	int size_read = 0;
+	const uint32_t payload_len = evt->param.publish.message.payload.len;
+	uint32_t size_read = 0;
 	int ret;
+
+	if (payload_len > MQTT_MAX_RX_PAYLOAD_LEN) {
+		LOG_ERR("Rejecting MQTT PUBLISH with oversized payload: %u (max %d)",
+			payload_len, MQTT_MAX_RX_PAYLOAD_LEN);
+		return -EMSGSIZE;
+	}
 
 	/* Send QoS acknowledgments */
 	if (evt->param.publish.message.topic.qos == MQTT_QOS_1_AT_LEAST_ONCE) {
@@ -97,9 +113,8 @@ static int handle_mqtt_publish_evt(struct mqtt_client *const c, const struct mqt
 	 * promise is not kept. This deviates from MQTT v3.1.1.
 	 */
 	sm_at_host_lock(ctx.pipe);
-	urc_send_to(ctx.pipe, "\r\n#XMQTTMSG: %d,%d\r\n",
-		evt->param.publish.message.topic.topic.size,
-		evt->param.publish.message.payload.len);
+	urc_send_to(ctx.pipe, "\r\n#XMQTTMSG: %d,%u\r\n",
+		evt->param.publish.message.topic.topic.size, payload_len);
 	data_send(ctx.pipe, evt->param.publish.message.topic.topic.utf8,
 		evt->param.publish.message.topic.topic.size);
 	data_send(ctx.pipe, "\r\n", 2);
@@ -107,9 +122,9 @@ static int handle_mqtt_publish_evt(struct mqtt_client *const c, const struct mqt
 		ret = mqtt_read_publish_payload_blocking(c, sm_data_buf, sizeof(sm_data_buf));
 		if (ret > 0) {
 			data_send(ctx.pipe, sm_data_buf, ret);
-			size_read += ret;
+			size_read += (uint32_t)ret;
 		}
-	} while (ret >= 0 && size_read < evt->param.publish.message.payload.len);
+	} while (ret > 0 && size_read < payload_len);
 	data_send(ctx.pipe, "\r\n", 2);
 
 	sm_at_host_unlock(ctx.pipe);
