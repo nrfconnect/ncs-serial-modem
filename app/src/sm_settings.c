@@ -17,36 +17,98 @@
 
 LOG_MODULE_REGISTER(sm_settings, CONFIG_SM_LOG_LEVEL);
 
+/* Reads a setting of exactly @p expect_len bytes into @p dst.
+ *
+ * The value is staged in the caller-provided destination only after the read
+ * has fully succeeded, so a truncated or failing read can never leave a
+ * partially-updated setting behind (CERT ERR33-C).
+ */
+static int settings_read_checked(const char *name, size_t len, settings_read_cb read_cb,
+				 void *cb_arg, void *dst, size_t expect_len)
+{
+	ssize_t read_len;
+
+	if (len != expect_len) {
+		LOG_ERR("Setting \"%s\" has unexpected length %zu (expected %zu). Keeping default.",
+			name, len, expect_len);
+		return -EINVAL;
+	}
+
+	read_len = read_cb(cb_arg, dst, expect_len);
+	if (read_len != (ssize_t)expect_len) {
+		LOG_ERR("Failed to read setting \"%s\": %zd. Keeping default.", name, read_len);
+		return -EIO;
+	}
+
+	return 0;
+}
+
 static int settings_set(const char *name, size_t len, settings_read_cb read_cb, void *cb_arg)
 {
 	if (!strcmp(name, "bootloader_mode_requested")) {
-		if (len != sizeof(sm_bootloader_mode_requested))
-			return -EINVAL;
-		if (read_cb(cb_arg, &sm_bootloader_mode_requested, len) > 0)
+		bool value;
+
+		if (settings_read_checked(name, len, read_cb, cb_arg, &value, sizeof(value))) {
 			return 0;
+		}
+		sm_bootloader_mode_requested = value;
+		return 0;
 	}
 	if (!strcmp(name, "full_mfw_dfu_segment_type")) {
-		if (len != sizeof(full_mfw_dfu_segment_type))
-			return -EINVAL;
-		if (read_cb(cb_arg, &full_mfw_dfu_segment_type, len) > 0)
+		int value;
+
+		if (settings_read_checked(name, len, read_cb, cb_arg, &value, sizeof(value))) {
 			return 0;
+		}
+		/* Reject out-of-range values from a corrupt or downgraded record so
+		 * that the DFU code never dispatches on an unknown segment type.
+		 */
+		if (value != DFU_FULL_MFW_SEGMENT_BOOTLOADER &&
+		    value != DFU_FULL_MFW_SEGMENT_FIRMWARE) {
+			LOG_ERR("Invalid stored full MFW segment type %d. Keeping default.", value);
+			return 0;
+		}
+		full_mfw_dfu_segment_type = value;
+		return 0;
 	}
 	if (!strcmp(name, "bl_fota_ver")) {
-		if (len != sizeof(sm_fota_bl_version_before))
-			return -EINVAL;
-		if (read_cb(cb_arg, &sm_fota_bl_version_before, len) > 0)
+		uint32_t value;
+
+		if (settings_read_checked(name, len, read_cb, cb_arg, &value, sizeof(value))) {
 			return 0;
+		}
+		sm_fota_bl_version_before = value;
+		return 0;
 	}
 	if (!strcmp(name, "fota_type")) {
-		if (len != sizeof(sm_fota_type))
-			return -EINVAL;
-		if (read_cb(cb_arg, &sm_fota_type, len) > 0)
+		enum sm_fota_image_type value;
+
+		if (settings_read_checked(name, len, read_cb, cb_arg, &value, sizeof(value))) {
 			return 0;
+		}
+		if (value < SM_FOTA_TYPE_NONE || value > SM_FOTA_TYPE_FULL_MFW) {
+			LOG_ERR("Invalid stored FOTA type %d. Keeping default.", (int)value);
+			return 0;
+		}
+		sm_fota_type = value;
+		return 0;
 	}
 	/* Simply ignore obsolete settings that are not in use anymore.
 	 * settings_delete() does not completely remove settings.
 	 */
 	return 0;
+}
+
+/* Restores every setting-backed variable to its compiled-in default. Called
+ * before settings_load_subtree() so that a partial or corrupt NVS record can
+ * never leave a variable in an indeterminate state.
+ */
+static void settings_set_defaults(void)
+{
+	sm_bootloader_mode_requested = false;
+	full_mfw_dfu_segment_type = DFU_FULL_MFW_SEGMENT_BOOTLOADER;
+	sm_fota_bl_version_before = 0;
+	sm_fota_type = SM_FOTA_TYPE_NONE;
 }
 
 static struct settings_handler sm_settings_conf = {
@@ -70,6 +132,7 @@ static int sm_settings_init(void)
 		sm_init_failed = true;
 		return ret;
 	}
+	settings_set_defaults();
 	ret = settings_load_subtree("sm");
 	if (ret) {
 		LOG_ERR("Load setting failed: %d", ret);

@@ -23,6 +23,12 @@ extern bool sm_bootloader_mode_requested;
 extern bool sm_bootloader_mode_enabled;
 
 /* Full MFW DFU segment type. */
+enum xdfu_full_mfw_segment_type {
+	DFU_FULL_MFW_SEGMENT_BOOTLOADER = 0,
+	DFU_FULL_MFW_SEGMENT_FIRMWARE = 1,
+};
+
+/* Full MFW DFU segment type. */
 extern int full_mfw_dfu_segment_type;
 
 /**
