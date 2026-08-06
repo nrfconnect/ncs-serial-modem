@@ -227,6 +227,18 @@ static int do_fota_start(const char *file_uri, size_t file_uri_len, int sec_tag,
 
 	path_off = parser.field_data[UF_PATH].off;
 
+	/* The size arithmetic below is unsigned, so an out-of-range path offset
+	 * would wrap "file_uri_len - path_off" into a huge value and turn a small
+	 * allocation into a large memcpy. Reject that up front (CERT INT30-C,
+	 * ARR30-C). path_off must also be non-zero (there is always a scheme and
+	 * host before the path) and strictly less than file_uri_len (the path is
+	 * at least the leading '/').
+	 */
+	if (file_uri_len > SM_MAX_URL || path_off == 0 || path_off >= file_uri_len) {
+		LOG_ERR("Invalid URL layout: uri_len=%zu path_off=%zu", file_uri_len, path_off);
+		return -EINVAL;
+	}
+
 	/* host: scheme + authority (everything before the path), e.g. "https://host:port" */
 	fota_hostname = k_malloc(path_off + 1);
 	if (!fota_hostname) {
@@ -390,6 +402,15 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 
 			err = at_parser_string_ptr_get(parser, 2, &uri_ptr, &uri_len);
 			if (err) {
+				break;
+			}
+			/* The URI comes straight from the AT command buffer, which is
+			 * CONFIG_SM_AT_BUF_SIZE (4096) bytes. Bound it before it is
+			 * used to size any buffer (CERT STR31-C).
+			 */
+			if (uri_len == 0 || uri_len > SM_MAX_URL) {
+				LOG_ERR("Invalid URI length: %zu (max %d)", uri_len, SM_MAX_URL);
+				err = -EINVAL;
 				break;
 			}
 			if (param_count > 3) {
