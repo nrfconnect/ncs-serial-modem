@@ -9,6 +9,10 @@
 #include <assert.h>
 #include <stdio.h>
 #include <zephyr/drivers/gpio.h>
+#if defined(CONFIG_SM_EXTERNAL_XTAL)
+#include <zephyr/drivers/clock_control.h>
+#include <zephyr/drivers/clock_control/nrf_clock_control.h>
+#endif
 #include <hal/nrf_regulators.h>
 #include <zephyr/sys/reboot.h>
 #include "sm_at_host.h"
@@ -28,6 +32,13 @@ static const struct gpio_dt_spec dtr_gpio =
 static struct gpio_callback dtr_gpio_cb;
 #endif
 
+/* Controls the external crystal used by the UART.
+ *
+ * This is a no-op (and always returns 0) unless CONFIG_SM_EXTERNAL_XTAL is
+ * enabled. Callers therefore see an unconditionally successful return in the
+ * default configuration; the error handling below is only reachable in an
+ * external-XTAL build. This is intentional, not dead code.
+ */
 static int ext_xtal_control(bool xtal_on)
 {
 	int err = 0;
@@ -39,6 +50,10 @@ static int ext_xtal_control(bool xtal_on)
 
 		/* request external XTAL for UART */
 		clk_mgr = z_nrf_clock_control_get_onoff(CLOCK_CONTROL_NRF_SUBSYS_HF);
+		if (clk_mgr == NULL) {
+			LOG_ERR("Failed to get HF clock onoff manager.");
+			return -ENODEV;
+		}
 		sys_notify_init_spinwait(&cli.notify);
 		err = onoff_request(clk_mgr, &cli);
 		if (err < 0) {
@@ -49,6 +64,10 @@ static int ext_xtal_control(bool xtal_on)
 			/*empty*/
 		}
 	} else {
+		if (clk_mgr == NULL) {
+			/* Never requested, nothing to release. */
+			return 0;
+		}
 		/* release external XTAL for UART */
 		err = onoff_release(clk_mgr);
 		if (err < 0) {
@@ -56,6 +75,8 @@ static int ext_xtal_control(bool xtal_on)
 			return err;
 		}
 	}
+#else
+	ARG_UNUSED(xtal_on);
 #endif
 
 	return err;

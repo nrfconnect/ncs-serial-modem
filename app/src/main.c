@@ -58,6 +58,9 @@ static void on_modem_failure(struct k_work *)
 }
 K_WORK_DEFINE(modem_failure_work, on_modem_failure);
 
+/* The parameter is only read, but it cannot be made const: the signature is
+ * fixed by the nrf_modem_lib.h prototype this function overrides.
+ */
 void nrf_modem_fault_handler(struct nrf_modem_fault_info *fault_info)
 {
 	modem_fault_info = *fault_info;
