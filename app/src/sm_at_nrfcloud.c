@@ -100,6 +100,21 @@ static struct lte_lc_cells_info *nrfcloud_cell_data;
 
 #define WIFI_APS_BEGIN_IDX 3
 
+/* Upper bound on the number of Wi-Fi access points accepted in one
+ * AT#XNRFCLOUDPOS request. param_count originates from the AT parser and is
+ * only bounded by CONFIG_SM_AT_BUF_SIZE, so cap it explicitly before it is
+ * used to size a heap allocation (CERT INT30-C, MEM35-C). The value is far
+ * above any realistic scan result set submitted for Wi-Fi positioning.
+ */
+#define WIFI_APS_MAX 64
+
+/* Upper bound on the neighbor cell count accepted from an %NCELLMEAS response.
+ * The count is derived by counting commas in a modem-supplied string and is
+ * stored in a uint8_t, so cap it explicitly before it is used to size an
+ * allocation or to compute a parameter index (CERT INT31-C, MEM35-C).
+ */
+#define NCELLMEAS_NCELLS_MAX 32
+
 /* nRF Cloud location request Wi-Fi data. */
 static struct wifi_scan_info nrfcloud_wifi_data;
 
@@ -369,8 +384,16 @@ STATIC int handle_at_nrf_cloud_pos(enum at_parser_cmd_type cmd_type,
 	}
 
 	if (wifi_pos) {
-		nrfcloud_wifi_data.ap_info = malloc(
-			sizeof(*nrfcloud_wifi_data.ap_info) * (param_count - WIFI_APS_BEGIN_IDX));
+		const uint32_t ap_count = param_count - WIFI_APS_BEGIN_IDX;
+
+		if (ap_count > WIFI_APS_MAX) {
+			LOG_ERR("Too many Wi-Fi access points: %u (max %d)", ap_count,
+				WIFI_APS_MAX);
+			return -E2BIG;
+		}
+
+		nrfcloud_wifi_data.ap_info =
+			malloc(sizeof(*nrfcloud_wifi_data.ap_info) * ap_count);
 		if (!nrfcloud_wifi_data.ap_info) {
 			return -ENOMEM;
 		}
@@ -854,6 +877,12 @@ static uint32_t neighborcell_count_get(const char *at_response)
 	ncell_elements = comma_count - (AT_NCELLMEAS_PRE_NCELLS_PARAMS_COUNT - 1) + 1;
 	ncell_count = ncell_elements / AT_NCELLMEAS_NCELLS_PARAMS_COUNT;
 
+	if (ncell_count > NCELLMEAS_NCELLS_MAX) {
+		LOG_WRN("Neighbor cell count %u exceeds the supported maximum %d, clamping.",
+			ncell_count, NCELLMEAS_NCELLS_MAX);
+		ncell_count = NCELLMEAS_NCELLS_MAX;
+	}
+
 	return ncell_count;
 }
 
@@ -1136,6 +1165,12 @@ static int parse_ncellmeas_gci(const char *at_response, struct lte_lc_cells_info
 			goto clean_exit;
 		}
 		parsed_ncells_count = tmp_short;
+		if (parsed_ncells_count > NCELLMEAS_NCELLS_MAX) {
+			LOG_ERR("Neighbor cell count %d exceeds the supported maximum %d.",
+				parsed_ncells_count, NCELLMEAS_NCELLS_MAX);
+			err = -E2BIG;
+			goto clean_exit;
+		}
 
 		if (is_serving_cell) {
 			/* This the current/serving cell.
