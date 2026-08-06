@@ -1048,7 +1048,8 @@ static int sm_at_send_internal(struct sm_at_host_ctx *ctx, const uint8_t *data, 
 				LOG_DBG("No context available for URC: %s", (const char *)data);
 				return -EIO;
 			}
-			LOG_DBG("URC default pipe=%p: %s", ctx->pipe, (const char *)data);
+			LOG_DBG("URC default pipe=%p: %.*s", ctx->pipe, (int)len,
+				(const char *)data);
 			ret = ring_buf_put(&urc_buf, data, len);
 			if (ret < len) {
 				LOG_ERR("URC buffer full, dropped %d bytes", len - ret);
@@ -1057,7 +1058,7 @@ static int sm_at_send_internal(struct sm_at_host_ctx *ctx, const uint8_t *data, 
 				return -EIO;
 			}
 		} else {
-			LOG_DBG("URC to pipe=%p: %s", ctx->pipe, (const char *)data);
+			LOG_DBG("URC to pipe=%p: %.*s", ctx->pipe, (int)len, (const char *)data);
 			/* Pipe specific URC */
 			struct urc_msg *msg = calloc(1, sizeof(struct urc_msg) + len + 1);
 
@@ -1065,7 +1066,8 @@ static int sm_at_send_internal(struct sm_at_host_ctx *ctx, const uint8_t *data, 
 				LOG_ERR("Failed to allocate URC message");
 				return -ENOMEM;
 			}
-			strcpy(msg->urc, (const char *)data);
+			memcpy(msg->urc, data, len);
+			msg->urc[len] = '\0';
 			K_SPINLOCK(&sm_at_host_lock) {
 				sys_slist_append(&ctx->buffered_urcs, &msg->node);
 			}
