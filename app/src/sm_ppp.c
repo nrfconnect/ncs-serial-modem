@@ -127,6 +127,8 @@ void sm_ppp_set_auto_start(bool enable)
 	sm_ppp_auto_start = enable;
 }
 
+static void close_ppp_sockets(void);
+
 static bool open_ppp_sockets(void)
 {
 	int ret;
@@ -147,12 +149,14 @@ static bool open_ppp_sockets(void)
 		   (const struct sockaddr *)&ppp_zephyr_dst_addr, sizeof(ppp_zephyr_dst_addr));
 	if (ret < 0) {
 		LOG_ERR("Failed to bind Zephyr socket (%d).", -errno);
+		close_ppp_sockets();
 		return false;
 	}
 
 	ppp_fds[MODEM_FD_IDX] = zsock_socket(AF_PACKET, SOCK_RAW, 0);
 	if (ppp_fds[MODEM_FD_IDX] < 0) {
 		LOG_ERR("Modem socket creation failed (%d).", -errno);
+		close_ppp_sockets();
 		return false;
 	}
 
@@ -160,6 +164,8 @@ static bool open_ppp_sockets(void)
 	int pdn_id = sm_util_pdn_id_get(ppp_pdn_cid);
 
 	if (pdn_id < 0) {
+		LOG_ERR("Failed to get PDN ID for CID %d (%d).", ppp_pdn_cid, pdn_id);
+		close_ppp_sockets();
 		return false;
 	}
 
@@ -171,6 +177,7 @@ static bool open_ppp_sockets(void)
 		LOG_INF("PPP socket bound to PDN ID %d", pdn_id);
 	} else {
 		LOG_ERR("Failed to bind PPP to PDN ID %d (%d)", pdn_id, -errno);
+		close_ppp_sockets();
 		return false;
 	}
 
