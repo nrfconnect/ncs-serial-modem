@@ -71,11 +71,6 @@ int sm_at_host_power_off(void);
 int sm_at_host_power_on(void);
 
 /**
- * @brief Uninitialize AT host for Serial Modem
- */
-void sm_at_host_uninit(void);
-
-/**
  * @brief Send AT command response
  *
  * @param fmt Response message format string

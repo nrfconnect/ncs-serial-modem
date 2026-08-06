@@ -114,9 +114,6 @@ void sm_ctrl_pin_enter_sleep_no_uninit(bool at_host_power_off)
 void sm_ctrl_pin_enter_sleep(void)
 {
 #if SM_DTR_GPIOS
-	/* Stop threads, uninitialize host and disable DTR UART. */
-	sm_at_host_uninit();
-
 	/* Only power off the modem if it has not been put
 	 * in flight mode to allow reducing NVM wear.
 	 */

@@ -141,7 +141,6 @@ void final_call(void (*func)(void))
 
 static void sm_shutdown(void)
 {
-	sm_at_host_uninit();
 	sm_power_off_modem();
 	sm_ctrl_pin_enter_shutdown();
 }
@@ -159,7 +158,6 @@ STATIC int handle_at_shutdown(enum at_parser_cmd_type cmd_type, struct at_parser
 
 FUNC_NORETURN void sm_reset(void)
 {
-	sm_at_host_uninit();
 	sm_power_off_modem();
 	sm_log_flush();
 	sys_reboot(SYS_REBOOT_COLD);

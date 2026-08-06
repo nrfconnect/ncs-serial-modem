@@ -2140,11 +2140,6 @@ static int sm_at_host_init(void)
 }
 SYS_INIT(sm_at_host_init, APPLICATION, 0);
 
-void sm_at_host_uninit(void)
-{
-	/* TODO: implement this */
-}
-
 SM_AT_CMD_CUSTOM(xdatactrl, "AT#XDATACTRL", handle_at_datactrl);
 STATIC int handle_at_datactrl(enum at_parser_cmd_type cmd_type, struct at_parser *parser, uint32_t)
 {
