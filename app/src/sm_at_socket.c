@@ -1026,6 +1026,14 @@ static int do_connect(struct sm_socket *sock, const char *url, uint16_t port)
 	if (ret) {
 		return -EAGAIN;
 	}
+	/* Defense in depth: util_resolve_host() validates the family itself, but
+	 * the address length passed to zsock_connect() below is derived from it,
+	 * so never fall through to the AF_INET6 length for an unexpected family.
+	 */
+	if (sa.sa_family != AF_INET && sa.sa_family != AF_INET6) {
+		LOG_ERR("Unexpected address family %d resolved for %s", sa.sa_family, url);
+		return -EAFNOSUPPORT;
+	}
 	if (sa.sa_family == AF_INET) {
 		ret = zsock_connect(sock->fd, (struct sockaddr *)&sa,
 				  sizeof(struct sockaddr_in));
@@ -1094,24 +1102,34 @@ static int do_send(struct sm_socket *sock, const uint8_t *data, int len, int fla
 
 static int data_send_hex(struct sm_socket *sock, const uint8_t *buf, int recv_len)
 {
-	size_t consumed = 0;
 	char hex_buf[257] = {0};
-	uint16_t data_len =
-		recv_len < (sizeof(hex_buf) - 1) / 2 ? recv_len : (sizeof(hex_buf) - 1) / 2;
+	const size_t max_chunk = (sizeof(hex_buf) - 1) / 2;
+	size_t consumed = 0;
+	size_t remaining;
+
+	/* Normalise to a single unsigned type after an explicit non-negative
+	 * check. Comparing the signed recv_len directly against the size_t
+	 * expressions below would convert a negative value into a huge
+	 * unsigned one and read past the end of buf (CERT INT31-C).
+	 */
+	if (recv_len < 0) {
+		LOG_ERR("Invalid receive length: %d", recv_len);
+		return -EINVAL;
+	}
+	remaining = (size_t)recv_len;
 
 	/* For hex string mode, convert the received data to hex string */
-	while (consumed < recv_len) {
-		size_t size = bin2hex(buf + consumed, data_len, hex_buf, sizeof(hex_buf));
+	while (remaining > 0) {
+		const size_t chunk = MIN(remaining, max_chunk);
+		const size_t size = bin2hex(buf + consumed, chunk, hex_buf, sizeof(hex_buf));
 
 		if (size == 0) {
 			LOG_ERR("Failed to convert binary data to hex string");
 			return -EINVAL;
 		}
 		data_send(sock->pipe, hex_buf, size);
-		consumed += size / 2; /* size is in hex string length */
-		if (recv_len - consumed < data_len) {
-			data_len = recv_len - consumed;
-		}
+		consumed += chunk;
+		remaining -= chunk;
 	}
 	return 0;
 }
@@ -1178,6 +1196,13 @@ static int do_sendto(struct sm_socket *sock, const char *url, uint16_t port, con
 	ret = util_resolve_host(sock->cid, url, port, sock->family, &sa);
 	if (ret) {
 		return -EAGAIN;
+	}
+	/* Defense in depth: the address length passed to zsock_sendto() below is
+	 * derived from sa_family, so reject anything unexpected up front.
+	 */
+	if (sa.sa_family != AF_INET && sa.sa_family != AF_INET6) {
+		LOG_ERR("Unexpected address family %d resolved for %s", sa.sa_family, url);
+		return -EAFNOSUPPORT;
 	}
 
 	if (send_ntf) {
