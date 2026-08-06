@@ -1159,11 +1159,12 @@ static void cmd_send(struct sm_at_host_ctx *ctx, uint8_t *buf, size_t cmd_length
 
 	err = cmd_grammar_check(at_cmd, cmd_length);
 	if (err < 0) {
+		/* cmd_grammar_check() only ever returns 0 or -EINVAL. Anything that
+		 * does not parse as an AT command -- including line noise received
+		 * before the first valid "AT" -- is answered with ERROR so that the
+		 * host is never left waiting for a response.
+		 */
 		LOG_ERR("AT command syntax invalid: %s", at_cmd);
-		if (err == -ENOENT) {
-			/* Not an AT command, ignore silently. */
-			return;
-		}
 		rsp_send_error();
 		return;
 	}
