@@ -2230,9 +2230,11 @@ STATIC int handle_at_getaddrinfo(enum at_parser_cmd_type cmd_type, struct at_par
 			return -ENOENT;
 		}
 
-		sprintf(rsp_buf, "\r\n#XGETADDRINFO: \"");
+		strcpy(rsp_buf, "\r\n#XGETADDRINFO: \"");
 		/* loop over all returned results and do inverse lookup */
 		for (res = result; res != NULL; res = res->ai_next) {
+			size_t used, hostname_len, sep_len;
+
 			if (res->ai_family == AF_INET) {
 				struct sockaddr_in *host =
 					(struct sockaddr_in *)res->ai_addr;
@@ -2249,8 +2251,16 @@ STATIC int handle_at_getaddrinfo(enum at_parser_cmd_type cmd_type, struct at_par
 				continue;
 			}
 
+			used = strlen(rsp_buf);
+			hostname_len = strlen(hostname);
+			sep_len = res->ai_next ? 1 : 0;
+			/* +1 for the closing quote/CRLF handled below, +1 for NUL */
+			if (used + hostname_len + sep_len + sizeof("\"\r\n") > sizeof(rsp_buf)) {
+				LOG_ERR("XGETADDRINFO response truncated, too many addresses");
+				break;
+			}
 			strcat(rsp_buf, hostname);
-			if (res->ai_next) {
+			if (sep_len) {
 				strcat(rsp_buf, " ");
 			}
 		}
