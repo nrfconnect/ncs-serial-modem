@@ -37,6 +37,12 @@
 
 LOG_MODULE_REGISTER(sm_at, CONFIG_SM_LOG_LEVEL);
 
+/* Upper bound on the number of custom AT commands AT#XCLAC can list. The actual
+ * count is a link-time constant well below this; the bound only exists so the
+ * bookkeeping array has a fixed, diagnosable size.
+ */
+#define CLAC_MAX_COMMANDS 256
+
 /** @brief Shutdown modes. */
 enum sleep_modes {
 	SLEEP_MODE_INVALID,
@@ -261,9 +267,17 @@ STATIC int handle_at_clac(enum at_parser_cmd_type cmd_type, struct at_parser *, 
 	extern struct nrf_modem_at_cmd_custom _nrf_modem_at_cmd_custom_list_end[];
 	size_t cmd_custom_count = _nrf_modem_at_cmd_custom_list_end -
 				  _nrf_modem_at_cmd_custom_list_start;
-	size_t base_cmd_len[cmd_custom_count];
+	/* Fixed-size instead of a VLA: the count is a link-time constant, but a
+	 * stack array sized from a runtime expression gives no diagnosable bound.
+	 */
+	size_t base_cmd_len[CLAC_MAX_COMMANDS] = {0};
 
-	memset(base_cmd_len, 0, cmd_custom_count * sizeof(size_t));
+	if (cmd_custom_count > ARRAY_SIZE(base_cmd_len)) {
+		LOG_ERR("Custom AT command count %zu exceeds CLAC_MAX_COMMANDS (%zu); "
+			"listing is truncated.", cmd_custom_count, ARRAY_SIZE(base_cmd_len));
+		cmd_custom_count = ARRAY_SIZE(base_cmd_len);
+	}
+
 	rsp_send("\r\n");
 	for (size_t i = 0; i < cmd_custom_count; i++) {
 		const char *cmd = _nrf_modem_at_cmd_custom_list_start[i].cmd;

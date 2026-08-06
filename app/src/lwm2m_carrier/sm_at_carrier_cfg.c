@@ -569,8 +569,9 @@ static int do_cfg_binding(enum at_parser_cmd_type, struct at_parser *parser,
 			  uint32_t param_count)
 {
 	int ret;
-	int size = sizeof("UN");
-	char binding_string[size];
+	char binding_string[sizeof("UN")];
+	/* util_string_get() takes the buffer size by pointer and updates it. */
+	int size = sizeof(binding_string);
 	uint8_t binding_mask = 0;
 
 	if (param_count == 2) {
@@ -578,11 +579,13 @@ static int do_cfg_binding(enum at_parser_cmd_type, struct at_parser *parser,
 		memset(binding_string, 0, sizeof(binding_string));
 
 		if (binding_mask & LWM2M_CARRIER_SERVER_BINDING_UDP) {
-			strcat(binding_string, "U");
+			strncat(binding_string, "U",
+				sizeof(binding_string) - strlen(binding_string) - 1);
 		}
 
 		if (binding_mask & LWM2M_CARRIER_SERVER_BINDING_NONIP) {
-			strcat(binding_string, "N");
+			strncat(binding_string, "N",
+				sizeof(binding_string) - strlen(binding_string) - 1);
 		}
 
 		rsp_send("\r\n#XCARRIERCFG: %s\r\n", binding_string);

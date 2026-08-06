@@ -268,7 +268,7 @@ void util_get_ip_addr(int cid, char addr4[NET_INET_ADDRSTRLEN], char addr6[NET_I
 	if (addr6) {
 		addr6[0] = '\0';
 	}
-	sprintf(cmd, "AT+CGPADDR=%d", cid);
+	snprintf(cmd, sizeof(cmd), "AT+CGPADDR=%d", cid);
 	/** parse +CGPADDR: <cid>,<PDP_addr_1>,<PDP_addr_2>
 	 * PDN type "IP": PDP_addr_1 is <IPv4>, max 16(NET_INET_ADDRSTRLEN), '.' and digits
 	 * PDN type "IPV6": PDP_addr_1 is <IPv6>, max 46(NET_INET6_ADDRSTRLEN),':', digits, 'A'~'F'
@@ -383,7 +383,7 @@ int sm_util_pdn_id_get(uint8_t cid)
 	char cmd[32];
 	int pdn_id;
 
-	sprintf(cmd, "AT%%XGETPDNID=%u", cid);
+	snprintf(cmd, sizeof(cmd), "AT%%XGETPDNID=%u", cid);
 
 	ret = sm_util_at_scanf(cmd, "%%XGETPDNID: %d", &pdn_id);
 	if (ret < 0) {
