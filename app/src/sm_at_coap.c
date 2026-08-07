@@ -80,6 +80,7 @@ struct coap_request {
 	struct k_sem staging_ready;     /* Signaled: staging[] has data for coap_client */
 	struct k_sem staging_consumed;  /* Signaled: coap_client has consumed staging[] */
 	bool payload_aborted;           /* Set on data mode error; payload_cb returns -EIO */
+	atomic_t cancelled;             /* Set by AT#XCOAPCCANCEL */
 	/* Response tracking */
 	size_t bytes_sent;              /* Bytes delivered to host via URCs */
 	int status_code;                /* CoAP response code (or -1 on failure) */
@@ -235,27 +236,44 @@ static void coap_callback(const struct coap_client_response_data *data, void *us
 			 * host must call AT#XCOAPCDATA to drain rx_buf[] and unblock
 			 * this callback via rx_consumed.  For Block2 this naturally
 			 * throttles the next block request to the host's pull rate.
+			 *
+			 * If a cancel is in progress, skip the host handshake entirely:
+			 * blocking here would keep coap_client's lock held and stall
+			 * AT#XCOAPCCANCEL (which needs that lock) until the pull timeout.
 			 */
 			if (data->payload_len > CONFIG_COAP_CLIENT_BLOCK_SIZE) {
 				LOG_ERR("CoAP block too large: %zu > %d",
 					data->payload_len, CONFIG_COAP_CLIENT_BLOCK_SIZE);
+				/* Cancel first: it clears request_ongoing and NULLs the
+				 * library's cb/user_data, so coap_client never dereferences
+				 * req again after we free it below.
+				 */
+				coap_client_cancel_requests(&sm_coap_client);
 				coap_fail_request(req);
 				return;
 			}
-			k_mutex_lock(&coap_mutex, K_FOREVER);
-			memcpy(req->rx_buf, data->payload, data->payload_len);
-			req->rx_buf_filled = data->payload_len;
-			k_mutex_unlock(&coap_mutex);
-			coap_send_head(req, data->result_code, data->payload_len);
-			/* Wait for the host to drain rx_buf[] via AT#XCOAPCDATA.
-			 * Use a bounded timeout to avoid stalling the coap_client
-			 * background thread indefinitely if the host stops pulling.
-			 */
-			if (k_sem_take(&req->rx_consumed, COAP_HOST_PULL_TIMEOUT) != 0) {
-				LOG_ERR("Timed out waiting for AT#XCOAPCDATA (handle=%d)",
-					req->fd);
-				coap_fail_request(req);
-				return;
+			if (!atomic_get(&req->cancelled)) {
+				k_mutex_lock(&coap_mutex, K_FOREVER);
+				memcpy(req->rx_buf, data->payload, data->payload_len);
+				req->rx_buf_filled = data->payload_len;
+				k_mutex_unlock(&coap_mutex);
+				coap_send_head(req, data->result_code, data->payload_len);
+				/* Wait for the host to drain rx_buf[] via AT#XCOAPCDATA.
+				 * Use a bounded timeout to avoid stalling the coap_client
+				 * background thread indefinitely if the host stops pulling.
+				 * A concurrent cancel gives rx_consumed to release us early.
+				 */
+				if (k_sem_take(&req->rx_consumed, COAP_HOST_PULL_TIMEOUT) != 0) {
+					LOG_ERR("Timed out waiting for AT#XCOAPCDATA (handle=%d)",
+						req->fd);
+					/* Cancel first: it clears request_ongoing and NULLs the
+					 * library's cb/user_data, so coap_client never
+					 * dereferences req again after we free it below.
+					 */
+					coap_client_cancel_requests(&sm_coap_client);
+					coap_fail_request(req);
+					return;
+				}
 			}
 		} else {
 			coap_send_data(req, data->payload, data->payload_len);
@@ -834,6 +852,18 @@ STATIC int handle_at_coap_cancel(enum at_parser_cmd_type cmd_type, struct at_par
 		 */
 		req = (coap_pending_req && coap_pending_req->fd == handle)
 			? coap_pending_req : NULL;
+		if (req) {
+			/* Wake any callback parked waiting for the host (manual-receive
+			 * rx_consumed, or upload payload staging_ready) so it releases
+			 * coap_client's lock.  coap_client_cancel_requests() below needs
+			 * that lock; without this it would block until the pull/send
+			 * timeout (COAP_HOST_PULL_TIMEOUT) expires.
+			 */
+			atomic_set(&req->cancelled, 1);
+			req->payload_aborted = true;
+			k_sem_give(&req->rx_consumed);
+			k_sem_give(&req->staging_ready);
+		}
 		k_mutex_unlock(&coap_mutex);
 
 		if (!req) {
