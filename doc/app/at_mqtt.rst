@@ -501,7 +501,7 @@ Syntax
 
 ::
 
-   AT#XMQTTPUB=<topic>[,<msg>[,<qos>[,<retain>]]]
+   AT#XMQTTPUB=<topic>[,<msg>[,<qos>[,<retain>[,<data_len>]]]]
 
 
 * The ``<topic>`` parameter is a string.
@@ -524,6 +524,15 @@ Syntax
 * The ``<retain>`` parameter is an integer.
   Its default value is ``0``.
   When ``1``, it indicates that the broker should store the message persistently.
+* The ``<data_len>`` parameter is optional and only used when ``<msg>`` is empty (data mode).
+  It sets the number of bytes of payload to publish in data mode.
+  When the required number of bytes are received, the payload is published and the data mode is exited.
+  The termination command :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` is not used in this case.
+  The value must not exceed the value configured in the
+  :ref:`CONFIG_SM_DATAMODE_BUF_SIZE <CONFIG_SM_DATAMODE_BUF_SIZE>`, Kconfig option, as the
+  payload must fit within the data mode buffer to be published as a single message.
+  The value ``0`` is equivalent to omitting the parameter.
+  Specifying a non-zero ``<data_len>`` together with a non-empty ``<msg>`` results in an error.
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -557,6 +566,13 @@ Examples
    AT#XMQTTPUB="nrf91/sm/mqtt/topic0"
    OK
    {"msg":"Test Json publish"}+++
+   #XDATAMODE: 0
+
+::
+
+   AT#XMQTTPUB="nrf91/sm/mqtt/topic0","",0,0,23
+   OK
+   Test message, 23 bytes.
    #XDATAMODE: 0
 
 ::
