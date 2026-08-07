@@ -671,6 +671,7 @@ static int handle_at_mqtt_publish(enum at_parser_cmd_type cmd_type, struct at_pa
 	size_t topic_sz = MQTT_MAX_TOPIC_LEN;
 	const char *pub_msg_ptr = NULL;
 	size_t msg_sz = 0;
+	int data_len = 0;
 
 	if (!ctx.connected) {
 		return -ENOTCONN;
@@ -700,6 +701,22 @@ static int handle_at_mqtt_publish(enum at_parser_cmd_type cmd_type, struct at_pa
 				return err;
 			}
 		}
+		if (param_count > 5) {
+			err = at_parser_num_get(parser, 5, &data_len);
+			if (err) {
+				return err;
+			}
+			/* The payload must fit in the data mode buffer, as it is
+			 * published as a single message.
+			 */
+			if (data_len < 0 || data_len > CONFIG_SM_DATAMODE_BUF_SIZE) {
+				return -EINVAL;
+			}
+			if (data_len > 0 && msg_sz > 0) {
+				/* <data_len> only applies to data mode */
+				return -EINVAL;
+			}
+		}
 
 		/* common publish parameters*/
 		if (qos <= MQTT_QOS_2_EXACTLY_ONCE) {
@@ -721,14 +738,14 @@ static int handle_at_mqtt_publish(enum at_parser_cmd_type cmd_type, struct at_pa
 		}
 		if (pub_msg_ptr == NULL || msg_sz == 0) {
 			/* Publish payload in data mode */
-			err = enter_datamode(mqtt_datamode_callback, 0);
+			err = enter_datamode(mqtt_datamode_callback, data_len);
 		} else {
 			err = do_mqtt_publish((uint8_t *)pub_msg_ptr, msg_sz);
 		}
 		break;
 
 	case AT_PARSER_CMD_TYPE_TEST:
-		rsp_send("\r\n#XMQTTPUB: <topic>,<msg>,(0,1,2),(0,1)\r\n");
+		rsp_send("\r\n#XMQTTPUB: <topic>,<msg>,(0,1,2),(0,1)[,<data_len>]\r\n");
 		err = 0;
 		break;
 
