@@ -137,6 +137,14 @@ Syntax
      35,"coap://proxy/res"     Proxy-Uri verbatim string
      6,"0x00",17,"0x3c"        Observe register + Accept cbor
 
+.. note::
+
+   The Observe option (option ``6``) with the register value ``"0x00"`` starts a persistent subscription.
+   The request stays active and the firmware delivers each server notification through ``#XCOAPCDATA`` (automatic mode) or ``#XCOAPCHEAD`` (manual mode).
+   No ``#XCOAPCSTAT`` is emitted between notifications.
+   To stop the subscription, use ``AT#XCOAPCCANCEL``.
+   You cannot send a separate deregister request (``6,"0x01"``) while the subscription is active, because only one CoAP request can be active at a time.
+
 Unsolicited notification
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -290,7 +298,16 @@ CoAP GET with Observe and Accept options (option 6 = Observe register ``"0x00"``
    #XCOAPCDATA: 0,0,18
    <18 bytes CBOR>
 
-   #XCOAPCSTAT: 0,69,18
+   #XCOAPCDATA: 0,0,18
+   <18 bytes CBOR>
+
+   AT#XCOAPCCANCEL=0
+   OK
+
+   #XCOAPCSTAT: 0,-1,0
+
+The subscription stays active and delivers a ``#XCOAPCDATA`` notification for each server update until you cancel it with ``AT#XCOAPCCANCEL``.
+The ``#XCOAPCSTAT`` notification is emitted only when the subscription ends.
 
 Test command
 ------------
@@ -439,6 +456,7 @@ CoAP request cancel #XCOAPCCANCEL
 ==================================
 
 The ``#XCOAPCCANCEL`` command cancels the active CoAP request.
+It is also the mechanism for stopping a CoAP Observe subscription started with the Observe register option (``6,"0x00"``).
 
 Set command
 -----------
