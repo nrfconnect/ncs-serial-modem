@@ -7,10 +7,12 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/kernel.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <zephyr/net/mqtt.h>
 #include <zephyr/net/socket.h>
 #include <zephyr/net/tls_credentials.h>
 #include <zephyr/random/random.h>
+#include <zephyr/net/socket_ncs.h>
 #include "sm_util.h"
 #include "sm_at_host.h"
 
@@ -33,9 +35,12 @@ enum sm_mqttsub_operation {
 	AT_MQTTSUB_UNSUB,
 	AT_MQTTSUB_SUB
 };
-
+/* All ctx access is lock-free because every user runs on sm_work_q and is thus serialized:
+ * AT command handlers, mqtt_poll_work and mqtt_keepalive_work.
+ */
 static struct sm_mqtt_ctx {
 	int family; /* Socket address family */
+
 	bool connected;
 	bool disconnect_requested;
 	struct mqtt_utf8 client_id;
@@ -47,37 +52,33 @@ static struct sm_mqtt_ctx {
 		struct sockaddr_in6 broker6;
 	};
 	struct modem_pipe *pipe;
+	/* Incoming PUBLISH state: valid from mqtt_input() return until drain completes */
+	size_t publish_payload_remaining;
+	size_t rx_topic_len;    /* > 0 while header unsent; cleared when pipe is locked */
 } ctx;
 
-static char mqtt_broker_url[SM_MAX_DNS_LEN + 1];
 static uint16_t mqtt_broker_port;
 static char mqtt_clientid[MQTT_MAX_CID_LEN + 1];
-static char mqtt_username[SM_MAX_USERNAME + 1];
-static char mqtt_password[SM_MAX_PASSWORD + 1];
-extern uint8_t sm_data_buf[SM_MAX_MESSAGE_SIZE]; /* TODO: replace with something else */
-static struct mqtt_publish_param pub_param;
-static uint8_t pub_topic[MQTT_MAX_TOPIC_LEN];
 
-#define THREAD_STACK_SIZE	KB(2)
-#define THREAD_PRIORITY		K_LOWEST_APPLICATION_THREAD_PRIO
-
-static struct k_thread mqtt_thread;
-static K_THREAD_STACK_DEFINE(mqtt_thread_stack, THREAD_STACK_SIZE);
-
-/* Buffers for MQTT client. */
-static uint8_t rx_buffer[CONFIG_SM_MQTTC_MESSAGE_BUFFER_LEN];
-static uint8_t tx_buffer[CONFIG_SM_MQTTC_MESSAGE_BUFFER_LEN];
+struct mqtt_conn {
+	uint8_t rx[CONFIG_SM_MQTTC_MESSAGE_BUFFER_LEN];
+	uint8_t tx[CONFIG_SM_MQTTC_MESSAGE_BUFFER_LEN];
+	uint8_t payload_drain[MQTT_MAX_TOPIC_LEN];
+	uint8_t pub_topic[MQTT_MAX_TOPIC_LEN];
+	char broker_url[SM_MAX_DNS_LEN + 1];
+	char username[SM_MAX_USERNAME + 1];
+	char password[SM_MAX_PASSWORD + 1];
+	struct mqtt_publish_param pub_param;
+};
+static struct mqtt_conn *mqtt_conn;
 
 /* The mqtt client struct */
 static struct mqtt_client client;
 
 /**@brief Function to handle received publish event.
  */
-static int handle_mqtt_publish_evt(struct mqtt_client *const c, const struct mqtt_evt *evt)
+static void handle_mqtt_publish_evt(struct mqtt_client *const c, const struct mqtt_evt *evt)
 {
-	int size_read = 0;
-	int ret;
-
 	/* Send QoS acknowledgments */
 	if (evt->param.publish.message.topic.qos == MQTT_QOS_1_AT_LEAST_ONCE) {
 		const struct mqtt_puback_param ack = {
@@ -96,23 +97,36 @@ static int handle_mqtt_publish_evt(struct mqtt_client *const c, const struct mqt
 	/* MQTT client does not track the packet identifiers, so MQTT_QOS_2_EXACTLY_ONCE
 	 * promise is not kept. This deviates from MQTT v3.1.1.
 	 */
-	sm_at_host_lock(ctx.pipe);
-	urc_send_to(ctx.pipe, "\r\n#XMQTTMSG: %d,%d\r\n",
-		evt->param.publish.message.topic.topic.size,
-		evt->param.publish.message.payload.len);
-	data_send(ctx.pipe, evt->param.publish.message.topic.topic.utf8,
-		evt->param.publish.message.topic.topic.size);
-	data_send(ctx.pipe, "\r\n", 2);
-	do {
-		ret = mqtt_read_publish_payload_blocking(c, sm_data_buf, sizeof(sm_data_buf));
-		if (ret > 0) {
-			data_send(ctx.pipe, sm_data_buf, ret);
-			size_read += ret;
-		}
-	} while (ret >= 0 && size_read < evt->param.publish.message.payload.len);
-	data_send(ctx.pipe, "\r\n", 2);
 
-	sm_at_host_unlock(ctx.pipe);
+	/* Copy topic into payload_drain now; rx_buf may be reused after mqtt_input() returns.
+	 * payload_drain is not used for draining until after the topic has been forwarded.
+	 */
+	ctx.rx_topic_len = MIN(evt->param.publish.message.topic.topic.size, MQTT_MAX_TOPIC_LEN);
+	memcpy(mqtt_conn->payload_drain, evt->param.publish.message.topic.topic.utf8,
+	       ctx.rx_topic_len);
+	ctx.publish_payload_remaining = evt->param.publish.message.payload.len;
+}
+
+/* Drain as much publish payload as is available without blocking.
+ * Returns 0 when complete, -EAGAIN when more data is needed.
+ */
+static int drain_publish_payload(struct mqtt_client *const c)
+{
+	while (ctx.publish_payload_remaining > 0) {
+		int ret = mqtt_read_publish_payload(c, mqtt_conn->payload_drain,
+					     sizeof(mqtt_conn->payload_drain));
+
+		if (ret == -EAGAIN) {
+			return -EAGAIN;
+		}
+		if (ret <= 0) {
+			break;
+		}
+		data_send(ctx.pipe, mqtt_conn->payload_drain, ret);
+		ctx.publish_payload_remaining -= ret;
+	}
+
+	ctx.publish_payload_remaining = 0;
 	return 0;
 }
 
@@ -135,7 +149,7 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 		break;
 
 	case MQTT_EVT_PUBLISH:
-		ret = handle_mqtt_publish_evt(c, evt);
+		handle_mqtt_publish_evt(c, evt);
 		break;
 
 	case MQTT_EVT_PUBACK:
@@ -209,99 +223,198 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 		break;
 	}
 
-	urc_send_to(ctx.pipe, "\r\n#XMQTTEVT: %d,%d\r\n", evt->type, ret);
+	/* #XMQTTEVT for MQTT_EVT_PUBLISH is sent after the payload in mqtt_poll_work_handler.
+	 * It cannot be buffered here via urc_send_to: sm_at_host_lock() flushes pending URCs,
+	 * which would place it ahead of the #XMQTTMSG header and payload.
+	 */
+	if (evt->type != MQTT_EVT_PUBLISH) {
+		urc_send_to(ctx.pipe, "\r\n#XMQTTEVT: %d,%d\r\n", evt->type, ret);
+	}
 }
 
-static void mqtt_thread_fn(void *arg1, void *arg2, void *arg3)
+static void mqtt_poll_work_handler(struct k_work *work);
+static void mqtt_keepalive_work_handler(struct k_work *work);
+static void mqtt_poll_cb(const struct socket_ncs_pollcb_params *params);
+
+static void mqtt_conn_release(void)
 {
-	int err = 0;
-	struct zsock_pollfd fds;
-
-	ARG_UNUSED(arg1);
-	ARG_UNUSED(arg2);
-	ARG_UNUSED(arg3);
-
-	fds.fd = client.transport.tcp.sock;
+	ctx.username.utf8 = NULL;
+	ctx.username.size = 0;
+	ctx.password.utf8 = NULL;
+	ctx.password.size = 0;
+	client.user_name = NULL;
+	client.password = NULL;
+	client.rx_buf = NULL;
+	client.tx_buf = NULL;
 #if defined(CONFIG_MQTT_LIB_TLS)
-	if (client.transport.type == MQTT_TRANSPORT_SECURE) {
-		fds.fd = client.transport.tls.sock;
-	}
+	client.transport.tls.config.hostname = NULL;
 #endif
-	fds.events = ZSOCK_POLLIN;
-	while (true) {
-		if (!ctx.connected) {
-			LOG_WRN("MQTT disconnected");
-			err = 0;
-			break;
-		}
-		err = zsock_poll(&fds, 1, mqtt_keepalive_time_left(&client));
-		if (err < 0) {
-			LOG_ERR("ERROR: poll %d", errno);
-			break;
-		}
+	free(mqtt_conn);
+	mqtt_conn = NULL;
+}
 
-		if ((fds.revents & ZSOCK_POLLIN) == ZSOCK_POLLIN) {
+static atomic_t mqtt_poll_revents;
+static K_WORK_DEFINE(mqtt_poll_work, mqtt_poll_work_handler);
+static K_WORK_DELAYABLE_DEFINE(mqtt_keepalive_work, mqtt_keepalive_work_handler);
+
+static void mqtt_connection_abort(int err)
+{
+	LOG_ERR("Abort MQTT connection (error %d)", err);
+	(void)mqtt_abort(&client);
+	ctx.connected = false;
+	if (ctx.rx_topic_len == 0 && ctx.publish_payload_remaining > 0) {
+		/* drain_publish_payload spanned multiple poll work invocations:
+		 * the topic header was forwarded and the pipe is held locked. Release it.
+		 */
+		sm_at_host_unlock(ctx.pipe);
+	}
+	ctx.rx_topic_len = 0;
+	ctx.publish_payload_remaining = 0;
+	client.broker = NULL;
+	mqtt_conn_release();
+	k_work_cancel_delayable(&mqtt_keepalive_work);
+}
+
+static int mqtt_arm_poll_cb(void)
+{
+	int fd;
+
+#if defined(CONFIG_MQTT_LIB_TLS)
+	fd = (client.transport.type == MQTT_TRANSPORT_SECURE)
+		? client.transport.tls.sock
+		: client.transport.tcp.sock;
+#else
+	fd = client.transport.tcp.sock;
+#endif
+
+	struct socket_ncs_pollcb pcb = {
+		.callback = mqtt_poll_cb,
+		.events = ZSOCK_POLLIN,
+		.oneshot = true,
+	};
+
+	int err = zsock_setsockopt(fd, SOL_SOCKET, SO_POLLCB, &pcb, sizeof(pcb));
+
+	if (err < 0) {
+		LOG_ERR("SO_POLLCB error: %d", -errno);
+		return -errno;
+	}
+	return 0;
+}
+
+/* Called in IRQ context */
+static void mqtt_poll_cb(const struct socket_ncs_pollcb_params *params)
+{
+	atomic_or(&mqtt_poll_revents, params->revents);
+	k_work_submit_to_queue(&sm_work_q, &mqtt_poll_work);
+}
+
+static void mqtt_poll_work_handler(struct k_work *work)
+{
+	ARG_UNUSED(work);
+
+	uint32_t revents = atomic_clear(&mqtt_poll_revents);
+	int err = 0;
+
+	if (!ctx.connected) {
+		return;
+	}
+
+	if (revents & ZSOCK_POLLIN) {
+		if (ctx.rx_topic_len == 0 && ctx.publish_payload_remaining == 0) {
 			err = mqtt_input(&client);
 			if (err != 0) {
 				LOG_ERR("ERROR: mqtt_input %d", err);
-				break;
-			}
-			/* MQTT v3.1.1: If a Client does not receive a PINGRESP Packet within a
-			 *  reasonable amount of time after it has sent a PINGREQ, it SHOULD close
-			 *  the Network Connection to the Server.
-			 */
-			if (client.unacked_ping > 1) {
-				LOG_ERR("ERROR: mqtt_ping nack %d", client.unacked_ping);
-				err = -ENETRESET;
-				break;
+				goto abort;
 			}
 		}
 
-		/* MQTT v3.1.1: Note that a Server is permitted to disconnect a Client that it
-		 * determines to be inactive or non-responsive at any time, regardless of the
-		 * Keep Alive value provided by that Client.
-		 */
-		if ((fds.revents & ZSOCK_POLLERR) == ZSOCK_POLLERR) {
-			LOG_ERR("ZSOCK_POLLERR");
-			err = -EIO;
-			break;
-		}
-		if ((fds.revents & ZSOCK_POLLHUP) == ZSOCK_POLLHUP) {
-			LOG_ERR("ZSOCK_POLLHUP");
-			err = -ECONNRESET;
-			break;
-		}
-		if ((fds.revents & ZSOCK_POLLNVAL) == ZSOCK_POLLNVAL) {
-			if (ctx.disconnect_requested) {
-				/* POLLNVAL is expected because the MQTT library closes the socket
-				 * during disconnection. Suppress this error when handling socket
-				 * events after a disconnect.
+		if (ctx.rx_topic_len > 0 || ctx.publish_payload_remaining > 0) {
+			if (ctx.rx_topic_len > 0) {
+				sm_at_host_lock(ctx.pipe);
+				/* Use rsp_send_to (immediate) so the header precedes the
+				 * payload; urc_send_to buffers and would trail the data.
 				 */
-				err = 0;
-				break;
+				rsp_send_to(ctx.pipe, "\r\n#XMQTTMSG: %zu,%zu\r\n",
+					    ctx.rx_topic_len, ctx.publish_payload_remaining);
+				data_send(ctx.pipe, mqtt_conn->payload_drain, ctx.rx_topic_len);
+				data_send(ctx.pipe, "\r\n", 2);
+				ctx.rx_topic_len = 0;
 			}
-			LOG_ERR("ZSOCK_POLLNVAL");
-			err = -ENOTCONN;
-			break;
+			if (drain_publish_payload(&client) == -EAGAIN) {
+				(void)mqtt_arm_poll_cb();
+				return;
+			}
+			data_send(ctx.pipe, "\r\n", 2);
+			rsp_send_to(ctx.pipe, "\r\n#XMQTTEVT: %d,0\r\n", MQTT_EVT_PUBLISH);
+			sm_at_host_unlock(ctx.pipe);
 		}
 
-		/* poll timeout or revent, send KEEPALIVE */
-		err = mqtt_live(&client);
-		if (err != 0 && err != -EAGAIN) {
-			LOG_ERR("ERROR: mqtt_live %d", err);
-			break;
+		/* Reschedule keepalive from now after receiving data. */
+		k_work_reschedule_for_queue(&sm_work_q, &mqtt_keepalive_work,
+					    K_MSEC(mqtt_keepalive_time_left(&client)));
+	}
+
+	/* MQTT v3.1.1: Note that a Server is permitted to disconnect a Client that it
+	 * determines to be inactive or non-responsive at any time, regardless of the
+	 * Keep Alive value provided by that Client.
+	 */
+	if (revents & ZSOCK_POLLERR) {
+		LOG_ERR("ZSOCK_POLLERR");
+		err = -EIO;
+		goto abort;
+	}
+	if (revents & ZSOCK_POLLHUP) {
+		LOG_ERR("ZSOCK_POLLHUP");
+		err = -ECONNRESET;
+		goto abort;
+	}
+	if (revents & ZSOCK_POLLNVAL) {
+		if (ctx.disconnect_requested) {
+			/* MQTT library closed the socket during disconnect. */
+			return;
 		}
+		LOG_ERR("ZSOCK_POLLNVAL");
+		err = -ENOTCONN;
+		goto abort;
 	}
 
-	if (ctx.connected && err != 0) {
-		LOG_ERR("Abort MQTT connection (error %d)", err);
-		(void)mqtt_abort(&client);
+	/* Re-arm oneshot poll callback for next event. */
+	(void)mqtt_arm_poll_cb();
+	return;
+
+abort:
+	mqtt_connection_abort(err);
+}
+
+static void mqtt_keepalive_work_handler(struct k_work *work)
+{
+	ARG_UNUSED(work);
+
+	if (!ctx.connected) {
+		return;
 	}
 
-	ctx.connected = false;
-	client.broker = NULL;
+	/* MQTT v3.1.1: If a Client does not receive a PINGRESP Packet within a
+	 * reasonable amount of time after it has sent a PINGREQ, it SHOULD close
+	 * the Network Connection to the Server.
+	 */
+	if (client.unacked_ping > 1) {
+		LOG_ERR("ERROR: mqtt_ping nack %d", client.unacked_ping);
+		mqtt_connection_abort(-ENETRESET);
+		return;
+	}
 
-	LOG_INF("MQTT thread terminated");
+	int err = mqtt_live(&client);
+
+	if (err != 0 && err != -EAGAIN) {
+		LOG_ERR("ERROR: mqtt_live %d", err);
+		mqtt_connection_abort(err);
+		return;
+	}
+
+	k_work_reschedule_for_queue(&sm_work_q, &mqtt_keepalive_work,
+				    K_MSEC(mqtt_keepalive_time_left(&client)));
 }
 
 /**@brief Resolves the configured hostname and
@@ -314,7 +427,7 @@ static int broker_init(void)
 		.sa_family = AF_UNSPEC
 	};
 
-	err = util_resolve_host(0, mqtt_broker_url, mqtt_broker_port, ctx.family, &sa);
+	err = util_resolve_host(0, mqtt_conn->broker_url, mqtt_broker_port, ctx.family, &sa);
 	if (err) {
 		return -EAGAIN;
 	}
@@ -347,11 +460,7 @@ static int do_mqtt_config(uint16_t keep_alive, uint8_t clean_session)
 	client.client_id.utf8 = mqtt_clientid;
 	client.client_id.size = strlen(mqtt_clientid);
 
-	/* MQTT buffers configuration */
-	client.rx_buf = rx_buffer;
-	client.rx_buf_size = sizeof(rx_buffer);
-	client.tx_buf = tx_buffer;
-	client.tx_buf_size = sizeof(tx_buffer);
+	/* MQTT buffers are assigned in do_mqtt_connect() once mqtt_conn is allocated. */
 
 	/* MQTT Keep Alive configuration */
 	client.keepalive = keep_alive;
@@ -365,16 +474,17 @@ static int do_mqtt_connect(void)
 {
 	int err;
 
-	if (ctx.connected) {
-		return -EISCONN;
-	}
-
 	ctx.pipe = sm_at_host_get_current_pipe();
+
+	client.rx_buf = mqtt_conn->rx;
+	client.rx_buf_size = sizeof(mqtt_conn->rx);
+	client.tx_buf = mqtt_conn->tx;
+	client.tx_buf_size = sizeof(mqtt_conn->tx);
 
 	/* Init MQTT broker */
 	err = broker_init();
 	if (err) {
-		return err;
+		goto fail;
 	}
 
 	/* MQTT client configuration */
@@ -403,7 +513,7 @@ static int do_mqtt_connect(void)
 		tls_config->cipher_count  = 0;
 		tls_config->sec_tag_count = 1;
 		tls_config->sec_tag_list  = (int *)&ctx.sec_tag;
-		tls_config->hostname      = mqtt_broker_url;
+		tls_config->hostname      = mqtt_conn->broker_url;
 		client.transport.type     = MQTT_TRANSPORT_SECURE;
 	} else {
 		client.transport.type     = MQTT_TRANSPORT_NON_SECURE;
@@ -416,17 +526,27 @@ static int do_mqtt_connect(void)
 	err = mqtt_connect(&client);
 	if (err != 0) {
 		LOG_ERR("ERROR: mqtt_connect %d", err);
-		return err;
+		goto fail;
 	}
 
 	ctx.connected = true;
 	ctx.disconnect_requested = false;
-	k_thread_create(&mqtt_thread, mqtt_thread_stack,
-			K_THREAD_STACK_SIZEOF(mqtt_thread_stack),
-			mqtt_thread_fn, NULL, NULL, NULL,
-			THREAD_PRIORITY, K_USER, K_NO_WAIT);
+
+	err = mqtt_arm_poll_cb();
+	if (err) {
+		ctx.connected = false;
+		client.broker = NULL;
+		goto fail;
+	}
+
+	k_work_reschedule_for_queue(&sm_work_q, &mqtt_keepalive_work,
+				    K_MSEC(mqtt_keepalive_time_left(&client)));
 
 	return 0;
+
+fail:
+	mqtt_conn_release();
+	return err;
 }
 
 static int do_mqtt_disconnect(void)
@@ -444,22 +564,27 @@ static int do_mqtt_disconnect(void)
 		return err;
 	}
 
-	if (k_thread_join(&mqtt_thread, K_SECONDS(CONFIG_MQTT_KEEPALIVE)) != 0) {
-		LOG_WRN("Wait for thread terminate failed");
-	}
+	k_work_cancel_delayable(&mqtt_keepalive_work);
+	ctx.connected = false;
+	client.broker = NULL;
+	mqtt_conn_release();
 
-	return err;
+	return 0;
 }
 
 static int do_mqtt_publish(uint8_t *msg, size_t msg_len)
 {
+	if (!ctx.connected || mqtt_conn == NULL) {
+		return -ENOTCONN;
+	}
+
 	/* MQTT client does not store packets, so we will not retransmit packets
 	 * that are lacking response. This deviates from MQTT v3.1.1.
 	 */
-	pub_param.message.payload.data = msg;
-	pub_param.message.payload.len  = msg_len;
+	mqtt_conn->pub_param.message.payload.data = msg;
+	mqtt_conn->pub_param.message.payload.len  = msg_len;
 
-	return mqtt_publish(&client, &pub_param);
+	return mqtt_publish(&client, &mqtt_conn->pub_param);
 }
 
 static int do_mqtt_subscribe(uint16_t op,
@@ -562,36 +687,50 @@ static int handle_at_mqtt_connect(enum at_parser_cmd_type cmd_type, struct at_pa
 			return err;
 		}
 		if (op == MQTTC_CONNECT || op == MQTTC_CONNECT6)  {
-			size_t username_sz = sizeof(mqtt_username);
-			size_t password_sz = sizeof(mqtt_password);
-			size_t url_sz = sizeof(mqtt_broker_url);
+			if (ctx.connected) {
+				return -EISCONN;
+			}
 
-			err = util_string_get(parser, 2, mqtt_username, &username_sz);
-			if (err) {
-				return err;
-			} else {
-				ctx.username.utf8 = mqtt_username;
-				ctx.username.size = strlen(mqtt_username);
+			mqtt_conn = calloc(1, sizeof(*mqtt_conn));
+			if (!mqtt_conn) {
+				return -ENOMEM;
 			}
-			err = util_string_get(parser, 3, mqtt_password, &password_sz);
+
+			size_t username_sz = sizeof(mqtt_conn->username);
+			size_t password_sz = sizeof(mqtt_conn->password);
+			size_t url_sz = sizeof(mqtt_conn->broker_url);
+
+			err = util_string_get(parser, 2, mqtt_conn->username, &username_sz);
 			if (err) {
+				mqtt_conn_release();
 				return err;
-			} else {
-				ctx.password.utf8 = mqtt_password;
-				ctx.password.size = strlen(mqtt_password);
 			}
-			err = util_string_get(parser, 4, mqtt_broker_url, &url_sz);
+			ctx.username.utf8 = mqtt_conn->username;
+			ctx.username.size = strlen(mqtt_conn->username);
+
+			err = util_string_get(parser, 3, mqtt_conn->password, &password_sz);
 			if (err) {
+				mqtt_conn_release();
+				return err;
+			}
+			ctx.password.utf8 = mqtt_conn->password;
+			ctx.password.size = strlen(mqtt_conn->password);
+
+			err = util_string_get(parser, 4, mqtt_conn->broker_url, &url_sz);
+			if (err) {
+				mqtt_conn_release();
 				return err;
 			}
 			err = at_parser_num_get(parser, 5, &mqtt_broker_port);
 			if (err) {
+				mqtt_conn_release();
 				return err;
 			}
 			ctx.sec_tag = SEC_TAG_TLS_INVALID;
 			if (param_count > 6) {
 				err = at_parser_num_get(parser, 6, &ctx.sec_tag);
 				if (err) {
+					mqtt_conn_release();
 					return err;
 				}
 			}
@@ -608,11 +747,11 @@ static int handle_at_mqtt_connect(enum at_parser_cmd_type cmd_type, struct at_pa
 		if (ctx.connected) {
 			if (ctx.sec_tag != SEC_TAG_TLS_INVALID) {
 				rsp_send("\r\n#XMQTTCON: %d,\"%s\",\"%s\",%d,%d\r\n",
-					 ctx.connected, mqtt_clientid, mqtt_broker_url,
+					 ctx.connected, mqtt_clientid, mqtt_conn->broker_url,
 					 mqtt_broker_port, ctx.sec_tag);
 			} else {
 				rsp_send("\r\n#XMQTTCON: %d,\"%s\",\"%s\",%d\r\n",
-					 ctx.connected, mqtt_clientid, mqtt_broker_url,
+					 ctx.connected, mqtt_clientid, mqtt_conn->broker_url,
 					 mqtt_broker_port);
 			}
 		} else {
@@ -679,7 +818,7 @@ static int handle_at_mqtt_publish(enum at_parser_cmd_type cmd_type, struct at_pa
 
 	switch (cmd_type) {
 	case AT_PARSER_CMD_TYPE_SET:
-		err = util_string_get(parser, 1, pub_topic, &topic_sz);
+		err = util_string_get(parser, 1, mqtt_conn->pub_topic, &topic_sz);
 		if (err) {
 			return err;
 		}
@@ -720,21 +859,21 @@ static int handle_at_mqtt_publish(enum at_parser_cmd_type cmd_type, struct at_pa
 
 		/* common publish parameters*/
 		if (qos <= MQTT_QOS_2_EXACTLY_ONCE) {
-			pub_param.message.topic.qos = (uint8_t)qos;
+			mqtt_conn->pub_param.message.topic.qos = (uint8_t)qos;
 		} else {
 			return -EINVAL;
 		}
 		if (retain <= 1) {
-			pub_param.retain_flag = (uint8_t)retain;
+			mqtt_conn->pub_param.retain_flag = (uint8_t)retain;
 		} else {
 			return -EINVAL;
 		}
-		pub_param.message.topic.topic.utf8 = pub_topic;
-		pub_param.message.topic.topic.size = topic_sz;
-		pub_param.dup_flag = 0;
-		pub_param.message_id++;
-		if (pub_param.message_id == UINT16_MAX) {
-			pub_param.message_id = 1;
+		mqtt_conn->pub_param.message.topic.topic.utf8 = mqtt_conn->pub_topic;
+		mqtt_conn->pub_param.message.topic.topic.size = topic_sz;
+		mqtt_conn->pub_param.dup_flag = 0;
+		mqtt_conn->pub_param.message_id++;
+		if (mqtt_conn->pub_param.message_id == UINT16_MAX) {
+			mqtt_conn->pub_param.message_id = 1;
 		}
 		if (pub_msg_ptr == NULL || msg_sz == 0) {
 			/* Publish payload in data mode */
@@ -838,7 +977,6 @@ static int handle_at_mqtt_unsubscribe(enum at_parser_cmd_type cmd_type,
 
 static int sm_at_mqtt_init(void)
 {
-	pub_param.message_id = 0;
 	memset(&ctx, 0, sizeof(ctx));
 	ctx.sec_tag = SEC_TAG_TLS_INVALID;
 
