@@ -81,6 +81,7 @@ struct coap_request {
 	struct k_sem staging_consumed;  /* Signaled: coap_client has consumed staging[] */
 	bool payload_aborted;           /* Set on data mode error; payload_cb returns -EIO */
 	atomic_t cancelled;             /* Set by AT#XCOAPCCANCEL */
+	bool observe;                   /* Observe register: keep alive across notifications */
 	/* Response tracking */
 	size_t bytes_sent;              /* Bytes delivered to host via URCs */
 	int status_code;                /* CoAP response code (or -1 on failure) */
@@ -275,12 +276,29 @@ static void coap_callback(const struct coap_client_response_data *data, void *us
 					return;
 				}
 			}
-		} else {
+		} else if (!atomic_get(&req->cancelled)) {
+			/* Suppress delivery of a notification that is already in flight
+			 * when AT#XCOAPCCANCEL sets the cancelled flag.
+			 */
 			coap_send_data(req, data->payload, data->payload_len);
 		}
 	}
 
 	if (data->last_block) {
+		if (req->observe && !atomic_get(&req->cancelled)) {
+			/* Observe notification fully delivered. coap_client keeps the
+			 * request active, so keep our state alive too and reset the
+			 * offset for the next notification. Teardown happens only on
+			 * AT#XCOAPCCANCEL or an error/failure result.
+			 *
+			 * Take coap_mutex: in manual receive mode AT#XCOAPCDATA
+			 * reads/updates bytes_sent under the same lock.
+			 */
+			k_mutex_lock(&coap_mutex, K_FOREVER);
+			req->bytes_sent = 0;
+			k_mutex_unlock(&coap_mutex);
+			return;
+		}
 		coap_finish_request(req);
 	}
 }
@@ -775,6 +793,17 @@ STATIC int handle_at_coap_req(enum at_parser_cmd_type cmd_type, struct at_parser
 			}
 			opt->len = (uint16_t)decoded_len;
 			req->num_extra_options++;
+
+			/* Observe register (value 0) turns this into a persistent
+			 * subscription; deregister (value 1) stays a one-shot request.
+			 * The value is an unsigned integer in network byte order, so
+			 * register is only an empty value or a single 0x00 byte.
+			 */
+			if (opt_num == COAP_OPTION_OBSERVE &&
+			    (decoded_len == 0 ||
+			     (decoded_len == 1 && opt->value[0] == 0))) {
+				req->observe = true;
+			}
 		}
 
 		if (payload_len > 0) {
