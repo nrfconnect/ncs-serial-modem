@@ -37,6 +37,16 @@ void uart_stub_rx(const uint8_t *data, size_t len)
 	k_sem_take(&tx_done, K_SECONDS(1));
 }
 
+/* Discard any tx_done credits accumulated by transmits with no waiter (e.g.
+ * from work-queue callbacks invoked directly rather than via uart_stub_rx).
+ * Call this after such callbacks settle before the next send_at_command.
+ */
+void uart_stub_tx_done_drain(void)
+{
+	/* Wait for the 10 ms tx_done_work timer to fire, then consume the credit. */
+	k_sem_take(&tx_done, K_MSEC(200));
+}
+
 static int pipe_open(void *data)
 {
 	struct modem_pipe *pipe = (struct modem_pipe *)data;

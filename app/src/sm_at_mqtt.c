@@ -625,7 +625,7 @@ static int do_mqtt_subscribe(uint16_t op,
 }
 
 SM_AT_CMD_CUSTOM(xmqttcfg, "AT#XMQTTCFG", handle_at_mqtt_config);
-static int handle_at_mqtt_config(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+STATIC int handle_at_mqtt_config(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 				 uint32_t param_count)
 {
 	int err = -EINVAL;
@@ -674,7 +674,7 @@ static int handle_at_mqtt_config(enum at_parser_cmd_type cmd_type, struct at_par
 }
 
 SM_AT_CMD_CUSTOM(xmqttcon, "AT#XMQTTCON", handle_at_mqtt_connect);
-static int handle_at_mqtt_connect(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+STATIC int handle_at_mqtt_connect(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 				  uint32_t param_count)
 {
 	int err = -EINVAL;
@@ -800,7 +800,7 @@ static int mqtt_datamode_callback(uint8_t op, const uint8_t *data, int len, uint
 }
 
 SM_AT_CMD_CUSTOM(xmqttpub, "AT#XMQTTPUB", handle_at_mqtt_publish);
-static int handle_at_mqtt_publish(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+STATIC int handle_at_mqtt_publish(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 				  uint32_t param_count)
 {
 	int err = -EINVAL;
@@ -896,7 +896,7 @@ static int handle_at_mqtt_publish(enum at_parser_cmd_type cmd_type, struct at_pa
 }
 
 SM_AT_CMD_CUSTOM(xmqttsub, "AT#XMQTTSUB", handle_at_mqtt_subscribe);
-static int handle_at_mqtt_subscribe(enum at_parser_cmd_type cmd_type,
+STATIC int handle_at_mqtt_subscribe(enum at_parser_cmd_type cmd_type,
 				    struct at_parser *parser, uint32_t param_count)
 {
 	int err = -EINVAL;
@@ -938,7 +938,7 @@ static int handle_at_mqtt_subscribe(enum at_parser_cmd_type cmd_type,
 }
 
 SM_AT_CMD_CUSTOM(xmqttunsub, "AT#XMQTTUNSUB", handle_at_mqtt_unsubscribe);
-static int handle_at_mqtt_unsubscribe(enum at_parser_cmd_type cmd_type,
+STATIC int handle_at_mqtt_unsubscribe(enum at_parser_cmd_type cmd_type,
 				      struct at_parser *parser, uint32_t param_count)
 {
 	int err = -EINVAL;
