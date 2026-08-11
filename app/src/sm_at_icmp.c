@@ -522,8 +522,8 @@ STATIC int handle_at_icmp_ping(enum at_parser_cmd_type cmd_type, struct at_parse
 			       uint32_t param_count)
 {
 	int err = -EINVAL;
-	char target[SM_MAX_URL];
-	int size = SM_MAX_URL;
+	char target[SM_MAX_DNS_LEN + 1] = {0};
+	size_t size = sizeof(target);
 
 	switch (cmd_type) {
 	case AT_PARSER_CMD_TYPE_SET:

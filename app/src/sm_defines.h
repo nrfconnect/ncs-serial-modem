@@ -25,9 +25,10 @@ enum {
 /** The maximum allowed length of data send/receive through the Serial Modem */
 #define SM_MAX_MESSAGE_SIZE 2048
 
-#define SM_MAX_URL          128  /** max size of URL string */
+#define SM_MAX_DNS_LEN      128  /** max size of DNS name */
 #define SM_MAX_USERNAME     32   /** max size of username in login */
 #define SM_MAX_PASSWORD     32   /** max size of password in login */
+#define SM_MAX_URL          SM_AT_MAX_CMD_LEN  /** max size of URL string */
 
 #define SM_SYNC_STR     "Ready\r\n"
 #define SM_SYNC_ERR_STR "INIT ERROR\r\n"

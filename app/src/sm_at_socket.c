@@ -59,7 +59,7 @@ enum sm_socket_send_result_mode {
 	AT_SOCKET_SEND_RESULT_NW_ACK_URC = 1 /* URC from network acknowledgment will follow. */
 };
 
-static char udp_url[SM_MAX_URL];
+static char udp_url[SM_MAX_DNS_LEN + 1];
 static uint16_t udp_port;
 
 struct sm_async_poll {
@@ -931,7 +931,7 @@ static int sec_sockopt_get(struct sm_socket *sock, enum at_sec_sockopt at_option
 			rsp_send("\r\n#XSSOCKETOPT: %d,0x%x\r\n", sock->fd, value);
 		}
 	} else if (level == SOL_TLS && option == TLS_HOSTNAME) {
-		char hostname[SM_MAX_URL] = {0};
+		char hostname[SM_MAX_DNS_LEN] = {0};
 
 		len = sizeof(hostname);
 		ret = zsock_getsockopt(sock->fd, level, option, &hostname, &len);
@@ -1629,8 +1629,8 @@ STATIC int handle_at_secure_socketopt(enum at_parser_cmd_type cmd_type,
 		}
 		if (op == AT_SOCKETOPT_SET) {
 			int value_int = 0;
-			char value_str[SM_MAX_URL] = {0};
-			int size = SM_MAX_URL;
+			char value_str[SM_MAX_DNS_LEN + 1] = {0};
+			size_t size = sizeof(value_str);
 
 			err = at_parser_num_get(parser, 4, &value_int);
 			if (err == -EOPNOTSUPP) {
@@ -1702,8 +1702,8 @@ STATIC int handle_at_connect(enum at_parser_cmd_type cmd_type, struct at_parser 
 {
 	int err = -EINVAL;
 	int fd;
-	char url[SM_MAX_URL] = {0};
-	int size = SM_MAX_URL;
+	char url[SM_MAX_DNS_LEN + 1] = {0};
+	size_t size = sizeof(url);
 	uint16_t port;
 	struct sm_socket *sock = NULL;
 
@@ -2192,8 +2192,8 @@ STATIC int handle_at_getaddrinfo(enum at_parser_cmd_type cmd_type, struct at_par
 {
 	int err = -EINVAL;
 	char hostname[NI_MAXHOST];
-	char host[SM_MAX_URL];
-	int size = SM_MAX_URL;
+	char host[SM_MAX_DNS_LEN + 1] = {0};
+	size_t size = sizeof(host);
 	struct zsock_addrinfo *result;
 	struct zsock_addrinfo *res;
 	char rsp_buf[256];

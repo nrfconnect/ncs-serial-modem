@@ -49,7 +49,7 @@ static struct sm_mqtt_ctx {
 	struct modem_pipe *pipe;
 } ctx;
 
-static char mqtt_broker_url[SM_MAX_URL + 1];
+static char mqtt_broker_url[SM_MAX_DNS_LEN + 1];
 static uint16_t mqtt_broker_port;
 static char mqtt_clientid[MQTT_MAX_CID_LEN + 1];
 static char mqtt_username[SM_MAX_USERNAME + 1];
