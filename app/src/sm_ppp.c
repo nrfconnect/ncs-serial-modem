@@ -783,7 +783,10 @@ static void ppp_data_passing_thread(void*, void*, void*)
 						LOG_ERR("Failed to read eventfd (%d).", errno);
 					}
 				}
-				continue;
+				/* Restart the polling loop as STOP/START/RESTART may
+				 * have changed the socket descriptors
+				 */
+				break;
 			}
 
 			/* Determine the source index for PPP data sockets */
@@ -807,7 +810,7 @@ static void ppp_data_passing_thread(void*, void*, void*)
 				}
 				ppp_state = PPP_STATE_STOPPING;
 				delegate_ppp_event(PPP_STOP, PPP_REASON_NETWORK);
-				continue;
+				break;
 			}
 
 			/* Networks can send packets larger than the MTU, so use the buffer size. */
