@@ -8,6 +8,7 @@
 #define SM_DEFINES_
 
 #include "sm_trap_macros.h"
+#include <stdbool.h>
 
 #define INVALID_SOCKET       -1
 
