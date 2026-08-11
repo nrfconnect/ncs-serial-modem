@@ -5,6 +5,7 @@
  */
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <modem/nrf_modem_lib.h>
 #include <nrf_modem_delta_dfu.h>
 #include <zephyr/kernel.h>
@@ -203,9 +204,9 @@ static int do_fota_start(const char *file_uri, size_t file_uri_len, int sec_tag,
 	size_t path_off;
 
 	/* Safety free in case a terminal event was somehow missed. */
-	k_free(fota_hostname);
+	free(fota_hostname);
 	fota_hostname = NULL;
-	k_free(fota_path);
+	free(fota_path);
 	fota_path = NULL;
 
 	http_parser_url_init(&parser);
@@ -240,7 +241,7 @@ static int do_fota_start(const char *file_uri, size_t file_uri_len, int sec_tag,
 	}
 
 	/* host: scheme + authority (everything before the path), e.g. "https://host:port" */
-	fota_hostname = k_malloc(path_off + 1);
+	fota_hostname = malloc(path_off + 1);
 	if (!fota_hostname) {
 		return -ENOMEM;
 	}
@@ -248,9 +249,9 @@ static int do_fota_start(const char *file_uri, size_t file_uri_len, int sec_tag,
 	fota_hostname[path_off] = '\0';
 
 	/* path: URI content after the leading '/' */
-	fota_path = k_malloc(file_uri_len - path_off);
+	fota_path = malloc(file_uri_len - path_off);
 	if (!fota_path) {
-		k_free(fota_hostname);
+		free(fota_hostname);
 		fota_hostname = NULL;
 		return -ENOMEM;
 	}
@@ -275,9 +276,9 @@ static int do_fota_start(const char *file_uri, size_t file_uri_len, int sec_tag,
 
 	if (ret) {
 		/* Failed to start; fota_download won't fire a terminal event, so free now. */
-		k_free(fota_hostname);
+		free(fota_hostname);
 		fota_hostname = NULL;
-		k_free(fota_path);
+		free(fota_path);
 		fota_path = NULL;
 	}
 
@@ -302,9 +303,9 @@ static void fota_dl_handler(const struct fota_download_evt *evt)
 		break;
 	case FOTA_DOWNLOAD_EVT_FINISHED:
 		/* fota_download is done; release the URI buffers. */
-		k_free(fota_hostname);
+		free(fota_hostname);
 		fota_hostname = NULL;
-		k_free(fota_path);
+		free(fota_path);
 		fota_path = NULL;
 		sm_fota_stage = FOTA_STAGE_ACTIVATE;
 		sm_fota_info = 0;
@@ -329,9 +330,9 @@ static void fota_dl_handler(const struct fota_download_evt *evt)
 		break;
 	case FOTA_DOWNLOAD_EVT_ERROR:
 		/* fota_download is done; release the URI buffers. */
-		k_free(fota_hostname);
+		free(fota_hostname);
 		fota_hostname = NULL;
-		k_free(fota_path);
+		free(fota_path);
 		fota_path = NULL;
 		sm_fota_status = FOTA_STATUS_ERROR;
 		sm_fota_info = evt->cause;
@@ -342,9 +343,9 @@ static void fota_dl_handler(const struct fota_download_evt *evt)
 		break;
 	case FOTA_DOWNLOAD_EVT_CANCELLED:
 		/* fota_download is done; release the URI buffers. */
-		k_free(fota_hostname);
+		free(fota_hostname);
 		fota_hostname = NULL;
-		k_free(fota_path);
+		free(fota_path);
 		fota_path = NULL;
 		sm_fota_status = FOTA_STATUS_CANCELLED;
 		sm_fota_info = 0;
