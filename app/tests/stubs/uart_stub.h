@@ -5,6 +5,7 @@
  */
 
 void uart_stub_rx(const uint8_t *data, size_t len);
+void uart_stub_tx_done_drain(void);
 
 static inline void send_at_command(const char *cmd)
 {
