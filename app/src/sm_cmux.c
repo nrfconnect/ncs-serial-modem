@@ -262,7 +262,7 @@ static int cmux_start(void)
 }
 
 SM_AT_CMD_CUSTOM(xcmux, "AT#XCMUX", handle_at_xcmux);
-static int handle_at_xcmux(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+STATIC int handle_at_xcmux(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			  uint32_t param_count)
 {
 	unsigned int at_dlci;
@@ -314,7 +314,7 @@ static int handle_at_xcmux(enum at_parser_cmd_type cmd_type, struct at_parser *p
 }
 
 SM_AT_CMD_CUSTOM(xcmuxcld, "AT#XCMUXCLD", handle_at_xcmuxcld);
-static int handle_at_xcmuxcld(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+STATIC int handle_at_xcmuxcld(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			     uint32_t param_count)
 {
 	if (cmd_type != AT_PARSER_CMD_TYPE_SET || param_count != 1) {
@@ -334,7 +334,7 @@ static int handle_at_xcmuxcld(enum at_parser_cmd_type cmd_type, struct at_parser
 }
 
 SM_AT_CMD_CUSTOM(atcmux, "AT+CMUX", handle_at_cmux);
-static int handle_at_cmux(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+STATIC int handle_at_cmux(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			  uint32_t param_count)
 {
 	/* AT+CMUX follows the 3GPP TS 27.010 specification.
@@ -400,7 +400,7 @@ static int handle_at_cmux(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 #if CONFIG_SM_MODEM_TRACE_BACKEND_CMUX
 
 SM_AT_CMD_CUSTOM(xcmuxtrace, "AT#XCMUXTRACE", handle_at_xcmuxtrace);
-static int handle_at_xcmuxtrace(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+STATIC int handle_at_xcmuxtrace(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			       uint32_t param_count)
 {
 	struct modem_pipe *pipe;

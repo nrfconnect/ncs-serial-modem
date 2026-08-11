@@ -21,6 +21,7 @@
 #include <zephyr/random/random.h>
 #include <zephyr/pm/device.h>
 #include <assert.h>
+#include <stdio.h>
 #include <strings.h>
 
 LOG_MODULE_REGISTER(sm_ppp, CONFIG_SM_LOG_LEVEL);
@@ -500,7 +501,7 @@ static void sm_ppp_activate_pdp_dwork_fn(struct k_work *work)
  */
 AT_CMD_CUSTOM(at_cgerep_interceptor, "AT+CGEREP", at_cgerep_callback);
 
-static int at_cgerep_callback(char *buf, size_t len, char *at_cmd)
+STATIC int at_cgerep_callback(char *buf, size_t len, char *at_cmd)
 {
 	int ret;
 	unsigned int subscribe = 0;
@@ -593,7 +594,7 @@ static void at_notif_on_cgev(const char *notify)
  */
 AT_CMD_CUSTOM(at_cfun_set_interceptor, "AT+CFUN=", at_cfun_set_callback);
 
-static int at_cfun_set_callback(char *buf, size_t len, char *at_cmd)
+STATIC int at_cfun_set_callback(char *buf, size_t len, char *at_cmd)
 {
 	unsigned int mode;
 	int ret;
@@ -714,7 +715,7 @@ static int sm_ppp_init(void)
 SYS_INIT(sm_ppp_init, APPLICATION, 0);
 
 SM_AT_CMD_CUSTOM(xppp, "AT#XPPP", handle_at_ppp);
-static int handle_at_ppp(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+STATIC int handle_at_ppp(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			 uint32_t param_count)
 {
 	int ret;
@@ -784,7 +785,7 @@ static int handle_at_ppp(enum at_parser_cmd_type cmd_type, struct at_parser *par
 }
 
 SM_AT_CMD_CUSTOM(cgdata, "AT+CGDATA", handle_at_cgdata);
-static int handle_at_cgdata(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+STATIC int handle_at_cgdata(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			    uint32_t param_count)
 {
 	/* AT+CGDATA per 3GPP TS 27.007 section 10.1.12.
