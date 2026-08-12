@@ -405,8 +405,8 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 			if (err) {
 				break;
 			}
-			/* The URI comes straight from the AT command buffer, which is
-			 * CONFIG_SM_AT_BUF_SIZE (4096) bytes. Bound it before it is
+			/* The URI comes straight from the AT command buffer, which
+			 * grows dynamically up to 8192 bytes. Bound it before it is
 			 * used to size any buffer (CERT STR31-C).
 			 */
 			if (uri_len == 0 || uri_len > SM_MAX_URL) {

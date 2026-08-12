@@ -335,7 +335,6 @@ int n   = sm_util_at_scanf("AT+CFUN?", "+CFUN: %d", &cfun);
 
 | Symbol | Default | Purpose |
 |---|---|---|
-| `CONFIG_SM_AT_BUF_SIZE` | 4096 | AT command buffer (bytes) |
 | `CONFIG_SM_UART_RX_BUF_SIZE` | 256 (2048 on Thingy:91 X) | UART RX single-buffer size |
 | `CONFIG_SM_UART_TX_BUF_SIZE` | 256 | UART TX buffer size |
 | `CONFIG_SM_URC_BUFFER_SIZE` | 4096 | URC queue buffer |
