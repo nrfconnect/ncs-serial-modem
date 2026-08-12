@@ -211,7 +211,7 @@ Syntax
   * ``0`` - Do not include Wi-Fi access point information in the location request.
   * ``1`` - Use Wi-Fi access point information.
     The access points must be given as additional parameters to the command.
-    The minimum number of access points to provide is two (``NRF_CLOUD_LOCATION_WIFI_AP_CNT_MIN``), and the maximum is limited by the AT command buffer size (:ref:`CONFIG_SM_AT_BUF_SIZE <CONFIG_SM_AT_BUF_SIZE>`).
+    The minimum number of access points to provide is two (``NRF_CLOUD_LOCATION_WIFI_AP_CNT_MIN``), and the maximum is limited by the maximum size of the AT command, which is 8190 bytes, including the terminator character.
 
 * The ``<MAC x>`` parameter is a string.
   It indicates the MAC address of a Wi-Fi access point and must be formatted as ``%02x:%02x:%02x:%02x:%02x:%02x`` (``WIFI_MAC_ADDR_TEMPLATE``).

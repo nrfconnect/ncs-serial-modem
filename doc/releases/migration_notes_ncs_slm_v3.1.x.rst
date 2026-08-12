@@ -745,6 +745,8 @@ If you need any of those features with this |SM|, please contact customer suppor
     Use ``AT#XAPOLL`` instead.
   * The ``CONFIG_SLM_DATAMODE_URC`` Kconfig option.
   * The ``CONFIG_SLM_START_SLEEP`` Kconfig option.
+  * The ``CONFIG_SLM_AT_BUF_SIZE`` Kconfig option.
+    The maximum size of the AT command is 8190 bytes, which includes the terminator character.
   * The :file:`overlay-zephyr-modem.conf` file as the default behavior of the |SM| application is compatible with the Zephyr modem driver.
   * The :file:`overlay-ppp-cmux-linux.conf` Kconfig fragment file.
     Use the :file:`ppp.conf` and :file:`cmux.conf` files instead.

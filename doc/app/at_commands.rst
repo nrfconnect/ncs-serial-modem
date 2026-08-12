@@ -27,6 +27,8 @@ There are 3 types of AT commands:
 
 AT responds to all commands with a final response.
 
+The maximum AT command length is 8190 bytes, including the terminator character.
+
 See the following subpages for documentation of the proprietary AT commands.
 The modem specific AT commands are documented in the `nRF91x1 AT Commands Reference Guide`_.
 

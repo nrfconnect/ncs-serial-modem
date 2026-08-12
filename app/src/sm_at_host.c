@@ -33,10 +33,11 @@ extern FUNC_NORETURN void sm_reset(void);
 
 LOG_MODULE_REGISTER(sm_at_host, CONFIG_SM_LOG_LEVEL);
 
-#define HEXDUMP_LIMIT     16
-#define URC_RETRY_DELAY   K_MSEC(100)
-#define AT_BUF_MIN_SIZE   128
-#define AT_BUF_MAX_SIZE   8192
+#define HEXDUMP_LIMIT       16
+#define URC_RETRY_DELAY     K_MSEC(100)
+#define AT_BUF_MIN_SIZE     128
+#define AT_BUF_MAX_SIZE     8192
+#define MODEM_RSP_BUF_SIZE  4096
 #define AT_XDFU_INIT_CMD  "AT#XDFUINIT"
 #define AT_XDFU_WRITE_CMD "AT#XDFUWRITE"
 #define AT_XDFU_APPLY_CMD "AT#XDFUAPPLY"
@@ -189,7 +190,7 @@ K_MSGQ_DEFINE(sm_at_host_msgq, sizeof(struct sm_at_host_msg), 10, 1);
 static sys_slist_t instance_list = SYS_SLIST_STATIC_INIT(instance_list);
 static K_WORK_DEFINE(sm_at_host_work, sm_at_host_work_fn);
 RING_BUF_DECLARE(urc_buf, CONFIG_SM_URC_BUFFER_SIZE);
-static uint8_t sm_response_buf[CONFIG_SM_AT_BUF_SIZE + 1];
+static uint8_t sm_response_buf[MODEM_RSP_BUF_SIZE + 1];
 /* Current executing context (set by entry points) */
 static struct sm_at_host_ctx *current_ctx;
 static struct k_spinlock sm_at_host_lock;

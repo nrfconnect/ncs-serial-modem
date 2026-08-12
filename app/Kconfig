@@ -11,13 +11,6 @@ config SM_CUSTOMER_VERSION
 	help
 	   This version is reported together with baseline versions by AT command "#XSMVER".
 
-config SM_AT_BUF_SIZE
-	int "AT command buffer size"
-	range 128 8192
-	default 4096
-	help
-	  Size of the buffer for incoming AT commands and modem responses.
-
 #
 # external XTAL for UART
 #

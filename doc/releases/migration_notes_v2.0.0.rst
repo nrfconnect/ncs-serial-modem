@@ -62,6 +62,9 @@ The following changes are mandatory to make your application work in the same wa
 
        #XNRFCLOUDPOS: <status>[,<type>,<latitude>,<longitude>,<uncertainty>]
 
+* The ``CONFIG_SM_AT_BUF_SIZE`` Kconfig option has been removed.
+  The maximum size of the AT command is 8190 bytes, which includes the terminator character.
+
 Custom static partition layout migration
 ----------------------------------------
 
