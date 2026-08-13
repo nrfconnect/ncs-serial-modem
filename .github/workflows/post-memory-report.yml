@@ -1,0 +1,34 @@
+name: Post Memory Report
+
+on:
+  workflow_run:
+    workflows: ["Build"]
+    types: [completed]
+
+jobs:
+  post-comment:
+    if: >
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    permissions:
+      pull-requests: write
+      actions: read
+    steps:
+      - name: Download memory report artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: memory-report
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Read PR number
+        id: pr
+        run: echo "number=$(cat pr-number.txt)" >> "$GITHUB_OUTPUT"
+
+      - name: Post memory report comment
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: nrf91m1-app-memory-report
+          number: ${{ steps.pr.outputs.number }}
+          path: memory-report.md
