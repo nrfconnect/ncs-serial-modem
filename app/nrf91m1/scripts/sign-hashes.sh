@@ -3,9 +3,9 @@
 # sign-hashes.sh - THE ONLY STEP THAT RUNS IN THE SECURE ENVIRONMENT.
 #
 # Reads the signing requests from manifest-tosign.env (produced by
-# sign-build-unsigned.sh), signs each hash with Vault, and writes the
+# sign_build_unsigned.py), signs each hash with Vault, and writes the
 # signatures into manifest-signed.env. Bring manifest-signed.env back to
-# build environment and run sign-assemble.sh to produce the flashable release images.
+# build environment and run sign_assemble.py to produce the flashable release images.
 #
 # This script intentionally has NO toolchain dependencies: it requires only
 # the vault CLI and an authenticated Vault session. It is the sole script
@@ -64,7 +64,7 @@ get_field() {
 }
 
 SIGN_ITEMS="$(get_field SIGN_ITEMS)" \
-    || die "${IN} has no SIGN_ITEMS (run sign-build-unsigned.sh to regenerate the manifest)"
+    || die "${IN} has no SIGN_ITEMS (run sign_build_unsigned.py to regenerate the manifest)"
 [ -n "${SIGN_ITEMS}" ] || die "${IN} has an empty SIGN_ITEMS"
 
 # Validate item names before using them in grep patterns and Vault paths.

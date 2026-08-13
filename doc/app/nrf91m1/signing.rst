@@ -17,17 +17,20 @@ All commands below assume ``ncs-serial-modem/app`` as the working directory.
 Signing pipeline
 ================
 
-``sign-hashes.sh`` is the only step that runs in the secure environment and the
-only script that contacts Vault. All other scripts run on a normal build machine
-and never touch private key material.
+All build-side scripts are Python and run on a normal build machine, never
+touching private key material. For the secure signing step, both
+``sign_hashes.py`` (requires Python ≥ 3.9) and ``sign-hashes.sh`` (requires
+only bash and the vault CLI) are provided — use the shell version on signing
+machines without Python.
 
 Typical split:
 
-1. **Build machine** — ``sign-build-unsigned.sh`` produces ``manifest-tosign.env``
+1. **Build machine** — ``sign_build_unsigned.py`` produces ``manifest-tosign.env``
    (opaque base64 hashes, no secrets).
-2. **Secure environment** — carries in ``manifest-tosign.env`` and ``sign-hashes.sh``,
-   authenticates to Vault, produces ``manifest-signed.env`` (signatures, no key material).
-3. **Build machine** — ``sign-assemble.sh`` applies the signatures and produces
+2. **Secure environment** — carries in ``manifest-tosign.env`` and
+   ``sign_hashes.py`` (or ``sign-hashes.sh``), authenticates to Vault, produces
+   ``manifest-signed.env`` (signatures, no key material).
+3. **Build machine** — ``sign_assemble.py`` applies the signatures and produces
    the flashable images.
 
 To authenticate in the secure environment:
@@ -38,7 +41,7 @@ To authenticate in the secure environment:
    export VAULT_TRANSIT_MOUNT=vault/location
    vault login
 
-When a procedure involves two ``sign-hashes.sh`` calls (MCUboot update), the
+When a procedure involves two ``sign_hashes.py`` calls (MCUboot update), the
 Vault session must still be valid for the second call, or re-authenticate.
 
 .. warning::
@@ -60,14 +63,14 @@ B0 key rotation.
 
 .. code-block:: sh
 
-   ./nrf91m1/scripts/sign-build-unsigned.sh --dev
+   ./nrf91m1/scripts/sign_build_unsigned.py --dev
 
    # In secure environment:
-   ./nrf91m1/scripts/sign-hashes.sh \
+   ./nrf91m1/scripts/sign_hashes.py \
        --in  ./signing-out/unsigned/manifest-tosign.env \
        --out ./signing-out/manifest-signed.env
 
-   ./nrf91m1/scripts/sign-assemble.sh \
+   ./nrf91m1/scripts/sign_assemble.py \
        --signed       ./signing-out/manifest-signed.env \
        --unsigned-dir ./signing-out/unsigned
 
@@ -84,14 +87,14 @@ file (debugging only).
 
 .. code-block:: sh
 
-   ./nrf91m1/scripts/sign-build-unsigned.sh --dev --app-update-only
+   ./nrf91m1/scripts/sign_build_unsigned.py --dev --app-update-only
 
    # In secure environment:
-   ./nrf91m1/scripts/sign-hashes.sh \
+   ./nrf91m1/scripts/sign_hashes.py \
        --in  ./signing-out/unsigned/manifest-tosign.env \
        --out ./signing-out/manifest-signed.env
 
-   ./nrf91m1/scripts/sign-assemble.sh \
+   ./nrf91m1/scripts/sign_assemble.py \
        --signed       ./signing-out/manifest-signed.env \
        --unsigned-dir ./signing-out/unsigned \
        --app-update-only
@@ -112,26 +115,26 @@ Set ``CONFIG_FW_INFO_FIRMWARE_VERSION`` to 2 in MCUboot Kconfig before building.
 
 .. code-block:: sh
 
-   ./nrf91m1/scripts/sign-build-unsigned.sh --dev
+   ./nrf91m1/scripts/sign_build_unsigned.py --dev
 
    # In secure environment:
-   ./nrf91m1/scripts/sign-hashes.sh \
+   ./nrf91m1/scripts/sign_hashes.py \
        --in  ./signing-out/unsigned/manifest-tosign.env \
        --out ./signing-out/manifest-signed.env
 
-   ./nrf91m1/scripts/sign-assemble.sh \
+   ./nrf91m1/scripts/sign_assemble.py \
        --signed       ./signing-out/manifest-signed.env \
        --unsigned-dir ./signing-out/unsigned
 
-   ./nrf91m1/scripts/sign-prepare-mcuboot.sh
+   ./nrf91m1/scripts/sign_prepare_mcuboot.py
 
    # Another round in secure environment:
    # Re-authenticate to Vault if the session has expired
-   ./nrf91m1/scripts/sign-hashes.sh \
+   ./nrf91m1/scripts/sign_hashes.py \
        --in  ./signing-out/manifest-mcuboot-tosign.env \
        --out ./signing-out/manifest-mcuboot-signed.env
 
-   ./nrf91m1/scripts/sign-assemble-mcuboot.sh \
+   ./nrf91m1/scripts/sign_assemble_mcuboot.py \
        --mcuboot-signed ./signing-out/manifest-mcuboot-signed.env
 
    ./scripts/sm_dfu_host.py --port /dev/ttyACM0 --baudrate 115200 \
@@ -154,24 +157,24 @@ Step 1 — Rotate to B0_V1 (revokes B0_V0)
 
 .. code-block:: sh
 
-   ./nrf91m1/scripts/sign-build-unsigned.sh --override-mcuboot-version 3 --b0-key-name B0_V1 --dev
+   ./nrf91m1/scripts/sign_build_unsigned.py --override-mcuboot-version 3 --b0-key-name B0_V1 --dev
 
    # In secure environment:
-   ./nrf91m1/scripts/sign-hashes.sh \
+   ./nrf91m1/scripts/sign_hashes.py \
        --in  signing-out/unsigned/manifest-tosign.env \
        --out signing-out/manifest-signed.env
 
-   ./nrf91m1/scripts/sign-assemble.sh
+   ./nrf91m1/scripts/sign_assemble.py
 
-   ./nrf91m1/scripts/sign-prepare-mcuboot.sh
+   ./nrf91m1/scripts/sign_prepare_mcuboot.py
 
    # Another round in secure environment:
    # Re-authenticate to Vault if the session has expired
-   ./nrf91m1/scripts/sign-hashes.sh \
+   ./nrf91m1/scripts/sign_hashes.py \
        --in  signing-out/manifest-mcuboot-tosign.env \
        --out signing-out/manifest-mcuboot-signed.env
 
-   ./nrf91m1/scripts/sign-assemble-mcuboot.sh
+   ./nrf91m1/scripts/sign_assemble_mcuboot.py
 
    # Note: Use signed_by_mcuboot_and_b0_mcuboot_s1_variant.bin if you did not update MCUboot.
    # AT#XBOOTINFO=1 can be used to check the slot that is currently active.
@@ -189,24 +192,24 @@ Step 2 — Verify revocation: sign with B0_V0 (expected to fail)
 
 .. code-block:: sh
 
-   ./nrf91m1/scripts/sign-build-unsigned.sh --override-mcuboot-version 4 --b0-key-name B0_V0 --dev
+   ./nrf91m1/scripts/sign_build_unsigned.py --override-mcuboot-version 4 --b0-key-name B0_V0 --dev
 
    # In secure environment:
-   ./nrf91m1/scripts/sign-hashes.sh \
+   ./nrf91m1/scripts/sign_hashes.py \
        --in  signing-out/unsigned/manifest-tosign.env \
        --out signing-out/manifest-signed.env
 
-   ./nrf91m1/scripts/sign-assemble.sh
+   ./nrf91m1/scripts/sign_assemble.py
 
-   ./nrf91m1/scripts/sign-prepare-mcuboot.sh
+   ./nrf91m1/scripts/sign_prepare_mcuboot.py
 
    # Another round in secure environment:
    # Re-authenticate to Vault if the session has expired
-   ./nrf91m1/scripts/sign-hashes.sh \
+   ./nrf91m1/scripts/sign_hashes.py \
        --in  signing-out/manifest-mcuboot-tosign.env \
        --out signing-out/manifest-mcuboot-signed.env
 
-   ./nrf91m1/scripts/sign-assemble-mcuboot.sh
+   ./nrf91m1/scripts/sign_assemble_mcuboot.py
 
    ./scripts/sm_dfu_host.py --port /dev/ttyACM0 --baudrate 115200 \
        --type mcuboot-bootloader \
@@ -239,23 +242,23 @@ existing devices can verify it before and after the MCUboot update.
 
 .. code-block:: sh
 
-   ./nrf91m1/scripts/sign-build-unsigned.sh --dev --override-mcuboot-version 5 --next-mcuboot-key MCUBOOT_V1
+   ./nrf91m1/scripts/sign_build_unsigned.py --dev --override-mcuboot-version 5 --next-mcuboot-key MCUBOOT_V1
 
    # In secure environment:
-   ./nrf91m1/scripts/sign-hashes.sh \
+   ./nrf91m1/scripts/sign_hashes.py \
        --in  signing-out/unsigned/manifest-tosign.env \
        --out signing-out/manifest-signed.env
 
-   ./nrf91m1/scripts/sign-assemble.sh
+   ./nrf91m1/scripts/sign_assemble.py
 
-   ./nrf91m1/scripts/sign-prepare-mcuboot.sh
+   ./nrf91m1/scripts/sign_prepare_mcuboot.py
 
    # Another round in secure environment:
-   ./nrf91m1/scripts/sign-hashes.sh \
+   ./nrf91m1/scripts/sign_hashes.py \
        --in  signing-out/manifest-mcuboot-tosign.env \
        --out signing-out/manifest-mcuboot-signed.env
 
-   ./nrf91m1/scripts/sign-assemble-mcuboot.sh
+   ./nrf91m1/scripts/sign_assemble_mcuboot.py
 
    ./scripts/sm_dfu_host.py --port /dev/ttyACM0 --baudrate 115200 \
        --type mcuboot-bootloader \
@@ -286,23 +289,23 @@ first; the MCUboot update is used in Phase 3.
 
 .. code-block:: sh
 
-   ./nrf91m1/scripts/sign-build-unsigned.sh --dev --override-mcuboot-version 6 --mcuboot-key-name MCUBOOT_V1
+   ./nrf91m1/scripts/sign_build_unsigned.py --dev --override-mcuboot-version 6 --mcuboot-key-name MCUBOOT_V1
 
    # In secure environment:
-   ./nrf91m1/scripts/sign-hashes.sh \
+   ./nrf91m1/scripts/sign_hashes.py \
        --in  signing-out/unsigned/manifest-tosign.env \
        --out signing-out/manifest-signed.env
 
-   ./nrf91m1/scripts/sign-assemble.sh
+   ./nrf91m1/scripts/sign_assemble.py
 
-   ./nrf91m1/scripts/sign-prepare-mcuboot.sh
+   ./nrf91m1/scripts/sign_prepare_mcuboot.py
 
    # Another round in secure environment:
-   ./nrf91m1/scripts/sign-hashes.sh \
+   ./nrf91m1/scripts/sign_hashes.py \
        --in  signing-out/manifest-mcuboot-tosign.env \
        --out signing-out/manifest-mcuboot-signed.env
 
-   ./nrf91m1/scripts/sign-assemble-mcuboot.sh
+   ./nrf91m1/scripts/sign_assemble_mcuboot.py
 
    ./scripts/sm_dfu_host.py --port /dev/ttyACM0 --baudrate 115200 \
        --type application \
@@ -351,25 +354,25 @@ key and attempt to install them. Both must be rejected by the device.
 .. code-block:: sh
 
    # MCUboot update signed with revoked MCUBOOT_V0 — expected to fail
-   ./nrf91m1/scripts/sign-build-unsigned.sh --dev \
+   ./nrf91m1/scripts/sign_build_unsigned.py --dev \
        --override-mcuboot-version 7 \
        --mcuboot-key-name MCUBOOT_V0
 
    # In secure environment:
-   ./nrf91m1/scripts/sign-hashes.sh \
+   ./nrf91m1/scripts/sign_hashes.py \
        --in  signing-out/unsigned/manifest-tosign.env \
        --out signing-out/manifest-signed.env
 
-   ./nrf91m1/scripts/sign-assemble.sh
+   ./nrf91m1/scripts/sign_assemble.py
 
-   ./nrf91m1/scripts/sign-prepare-mcuboot.sh
+   ./nrf91m1/scripts/sign_prepare_mcuboot.py
 
    # Another round in secure environment:
-   ./nrf91m1/scripts/sign-hashes.sh \
+   ./nrf91m1/scripts/sign_hashes.py \
        --in  signing-out/manifest-mcuboot-tosign.env \
        --out signing-out/manifest-mcuboot-signed.env
 
-   ./nrf91m1/scripts/sign-assemble-mcuboot.sh
+   ./nrf91m1/scripts/sign_assemble_mcuboot.py
 
    ./scripts/sm_dfu_host.py --port /dev/ttyACM0 --baudrate 115200 \
        --type mcuboot-bootloader \
