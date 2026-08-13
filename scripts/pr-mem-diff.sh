@@ -2,13 +2,13 @@
 # Generate a sticky-comment-ready markdown body comparing the PR HEAD app
 # image against its merge base
 #
-# Required env vars: PR_HEAD_ELF PR_HEAD_BUILD_LOG BASE_SHA BOARD SIZE_COMMENT_PATH
+# Required env vars: PR_HEAD_ELF PR_HEAD_BUILD_LOG BASE_SHA BOARD MEMORY_REPORT_PATH
 #   PR_HEAD_ELF and PR_HEAD_BUILD_LOG are relative to the west workspace dir
 #   (parent of this checkout). PR_HEAD_BUILD_LOG is the per-scenario Twister
 #   build.log (it carries the "Memory region" table flash%/ram% are read from).
 # Optional env vars:
 #   CI_RUN_URL   Link to the CI run, embedded in the comment.
-#   SCENARIO     Twister scenario to size (default: serial_modem.nrf91m1).
+#   SCENARIO     Twister scenario for memory report (default: serial_modem.nrf91m1).
 #   TWISTER_ROOT Twister testsuite root, relative to the repo (default: app).
 #
 # The baseline is built the same way CI builds the PR: a single Twister
@@ -16,20 +16,20 @@
 # and the diff reflects code changes, not config drift.
 
 set -euo pipefail
-: "${PR_HEAD_ELF:?}" "${PR_HEAD_BUILD_LOG:?}" "${BASE_SHA:?}" "${BOARD:?}" "${SIZE_COMMENT_PATH:?}"
+: "${PR_HEAD_ELF:?}" "${PR_HEAD_BUILD_LOG:?}" "${BASE_SHA:?}" "${BOARD:?}" "${MEMORY_REPORT_PATH:?}"
 SCENARIO="${SCENARIO:-serial_modem.nrf91m1}"
 TWISTER_ROOT="${TWISTER_ROOT:-app}"
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"       # serial_modem/
 WORKSPACE_DIR="$(cd "$REPO_ROOT/.." && pwd)"        # west workspace
-SIZE_DIR="$WORKSPACE_DIR/artifacts/size"
-mkdir -p "$SIZE_DIR" "$(dirname "$SIZE_COMMENT_PATH")"
+MEMORY_REPORT_DIR="$WORKSPACE_DIR/artifacts/size"
+mkdir -p "$MEMORY_REPORT_DIR" "$(dirname "$MEMORY_REPORT_PATH")"
 
 PR_SHA=$(git -C "$REPO_ROOT" rev-parse HEAD)
 
 if ! command -v size >/dev/null 2>&1; then
-  echo "App size report unavailable: 'size' (binutils) not found on PATH." \
-       "See [CI run](${CI_RUN_URL:-})" > "$SIZE_COMMENT_PATH"
+  echo "App memory report unavailable: 'size' (binutils) not found on PATH." \
+       "See [CI run](${CI_RUN_URL:-})" > "$MEMORY_REPORT_PATH"
   exit 0
 fi
 
@@ -80,7 +80,7 @@ restore_pr_checkout() {
 report_failed() {
   trap - ERR EXIT
   restore_pr_checkout
-  echo "App size report failed. See [CI run](${CI_RUN_URL:-})" > "$SIZE_COMMENT_PATH"
+  echo "App memory report failed. See [CI run](${CI_RUN_URL:-})" > "$MEMORY_REPORT_PATH"
   exit 0
 }
 
@@ -89,11 +89,11 @@ trap restore_pr_checkout EXIT
 
 PR_ELF="$WORKSPACE_DIR/$PR_HEAD_ELF"
 PR_LOG="$WORKSPACE_DIR/$PR_HEAD_BUILD_LOG"
-BASELINE_OUT="$SIZE_DIR/twister-baseline"
+BASELINE_OUT="$MEMORY_REPORT_DIR/twister-baseline"
 
 [ -f "$PR_ELF" ] && [ -f "$PR_LOG" ] || report_failed
-size_report "$PR_ELF" "$PR_LOG" > "$SIZE_DIR/pr.size"
-require_size_file "$SIZE_DIR/pr.size" || report_failed
+size_report "$PR_ELF" "$PR_LOG" > "$MEMORY_REPORT_DIR/pr.size"
+require_size_file "$MEMORY_REPORT_DIR/pr.size" || report_failed
 
 git -C "$REPO_ROOT" fetch --depth=1 origin "$BASE_SHA"
 git -C "$REPO_ROOT" checkout --detach "$BASE_SHA"
@@ -104,23 +104,24 @@ git -C "$REPO_ROOT" checkout --detach "$BASE_SHA"
 BASELINE_ELF="$(find "$BASELINE_OUT" -type f -path "*/$SCENARIO/app/zephyr/zephyr.elf" | head -n1)"
 BASELINE_LOG="$(find "$BASELINE_OUT" -type f -path "*/$SCENARIO/build.log" | head -n1)"
 [ -n "$BASELINE_ELF" ] && [ -f "$BASELINE_ELF" ] || report_failed
-size_report "$BASELINE_ELF" "$BASELINE_LOG" > "$SIZE_DIR/baseline.size"
-require_size_file "$SIZE_DIR/baseline.size" || report_failed
+size_report "$BASELINE_ELF" "$BASELINE_LOG" > "$MEMORY_REPORT_DIR/baseline.size"
+require_size_file "$MEMORY_REPORT_DIR/baseline.size" || report_failed
 
 restore_pr_checkout
 trap - ERR EXIT
 
 diff -u0 --label baseline --label pr \
-  "$SIZE_DIR/baseline.size" "$SIZE_DIR/pr.size" \
-  > "$SIZE_DIR/size_change.diff" || true
-if [ -s "$SIZE_DIR/size_change.diff" ]; then
+  "$MEMORY_REPORT_DIR/baseline.size" "$MEMORY_REPORT_DIR/pr.size" \
+  > "$MEMORY_REPORT_DIR/size_change.diff" || true
+if [ -s "$MEMORY_REPORT_DIR/size_change.diff" ]; then
   {
-    echo "App size changed. See [CI run](${CI_RUN_URL:-})"
+    echo "Memory usage changed for nRF91M1 configuration. See [CI run](${CI_RUN_URL:-})"
     echo '```diff'
-    printf ' '; head -n 1 "$SIZE_DIR/baseline.size"
-    cat "$SIZE_DIR/size_change.diff"
+    printf ' '; head -n 1 "$MEMORY_REPORT_DIR/baseline.size"
+    cat "$MEMORY_REPORT_DIR/size_change.diff"
     echo '```'
-  } > "$SIZE_COMMENT_PATH"
+  } > "$MEMORY_REPORT_PATH"
 else
-  echo "App size did not change. See [CI run](${CI_RUN_URL:-})" > "$SIZE_COMMENT_PATH"
+  echo "Memory usage did not change for nRF91M1 configuration. See [CI run](${CI_RUN_URL:-})" \
+    > "$MEMORY_REPORT_PATH"
 fi
