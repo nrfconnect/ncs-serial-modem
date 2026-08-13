@@ -77,12 +77,12 @@ cmux_close() {
 }
 
 # If channel is still open, force-close with raw CMUX CLD frame
-if [ $CHAT_ERR -ne 0 ]; then
+if [ $CHAT_ERR -ne 0 ] && [ -c "$MODEM" ]; then
 	log_dbg "Force-closing CMUX with raw CLD frame..."
 	cmux_close
 fi
 
-if [ $IPR_BAUD -ne 0 ]; then
+if [ $IPR_BAUD -ne 0 ] && [ -c "$MODEM" ]; then
 	log_dbg "Restoring baud rate on modem to $IPR_BAUD"
 	stty -F $MODEM $BAUD
 	chat $CHATOPT -t1 '' "AT+IPR=$IPR_BAUD" "OK" >$MODEM <$MODEM || true
