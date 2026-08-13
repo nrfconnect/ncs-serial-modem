@@ -107,7 +107,7 @@ cleanup() {
 trap cleanup ERR
 
 # Configure serial port
-stty -F $MODEM $BAUD pass8 raw crtscts clocal
+stty -F $MODEM $BAUD pass8 raw crtscts clocal -hupcl
 
 log_dbg "Wait modem to boot"
 if chat -t1 "Ready--" "AT" "OK" <$MODEM >$MODEM; then
@@ -125,7 +125,7 @@ if [ $IPR_BAUD -ne 0 ]; then
 	log_dbg "Set baud rate on modem to $IPR_BAUD"
 	chat $CHATOPT -t1 '' "AT+IPR=$IPR_BAUD" "OK" >$MODEM <$MODEM
 	# Reconfigure serial port
-	stty -F $MODEM $IPR_BAUD pass8 raw crtscts clocal
+	stty -F $MODEM $IPR_BAUD pass8 raw crtscts clocal -hupcl
 fi
 
 log_dbg "Attach CMUX channel to modem..."
@@ -158,18 +158,20 @@ check_devices_or_exit
 echo "DLC 1 (PPP):       $DLC1"
 echo "DLC 2 (AT):        $DLC2"
 
-stty -F $DLC1 clocal
+stty -F $DLC1 clocal -hupcl
+stty -F $DLC2 clocal -hupcl
 
 if [ $TRACE -gt 0 ]; then
 	echo "DLC 3 (TRACE):        $DLC3"
 	echo "Starting trace collection to $MODEM_TRACE_FILE"
-	stty -F $DLC3 raw clocal -icrnl -ixon -opost
+	stty -F $DLC3 raw clocal -icrnl -ixon -opost -hupcl
 	chat $CHATOPT -t1 '' 'AT#XCMUXTRACE=3' 'OK' >$DLC1 <$DLC1
 
 	# Prefer to use socat, if installed.
 	if command -v socat >/dev/null 2>&1; then
 		start-stop-daemon --start --pidfile $TRACE_PID_FILE --make-pidfile \
-			--background --exec $(command -v socat) -- -u $DLC3,cfmakeraw,clocal=1 \
+			--background --exec $(command -v socat) -- \
+			-u $DLC3,cfmakeraw,clocal=1,hupcl=0 \
 			CREATE:$MODEM_TRACE_FILE
 	else
 		start-stop-daemon --start --pidfile $TRACE_PID_FILE --make-pidfile \
