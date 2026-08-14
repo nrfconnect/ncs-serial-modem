@@ -33,16 +33,21 @@ extern FUNC_NORETURN void sm_reset(void);
 
 LOG_MODULE_REGISTER(sm_at_host, CONFIG_SM_LOG_LEVEL);
 
-#define HEXDUMP_LIMIT       16
-#define URC_RETRY_DELAY     K_MSEC(100)
-#define AT_BUF_MIN_SIZE     128
-#define AT_BUF_MAX_SIZE     8192
-#define MODEM_RSP_BUF_SIZE  4096
+#define HEXDUMP_LIMIT     16
+#define URC_RETRY_DELAY   K_MSEC(100)
+#define AT_BUF_MIN_SIZE   128  /** min size of the dynamic incoming AT command buffer */
+#define AT_BUF_MAX_SIZE   8192 /** max size of the dynamic incoming AT command buffer */
 #define AT_XDFU_INIT_CMD  "AT#XDFUINIT"
 #define AT_XDFU_WRITE_CMD "AT#XDFUWRITE"
 #define AT_XDFU_APPLY_CMD "AT#XDFUAPPLY"
 #define AT_XRESET_CMD     "AT#XRESET"
 #define URC_ALL_CHANNELS  99
+
+/* Sized with the maximum response the nrf modem can generate. Modem URC's use a separate buffer. */
+#define MODEM_RSP_BUF_SIZE  2048
+
+/* Sized for the longest formatted response for AT#X...; large payloads must use data_send(). */
+#define SM_AT_MAX_RSP_LEN   512
 
 /* Operation mode variables */
 enum sm_operation_mode {
@@ -190,7 +195,6 @@ K_MSGQ_DEFINE(sm_at_host_msgq, sizeof(struct sm_at_host_msg), 10, 1);
 static sys_slist_t instance_list = SYS_SLIST_STATIC_INIT(instance_list);
 static K_WORK_DEFINE(sm_at_host_work, sm_at_host_work_fn);
 RING_BUF_DECLARE(urc_buf, CONFIG_SM_URC_BUFFER_SIZE);
-static uint8_t sm_response_buf[MODEM_RSP_BUF_SIZE + 1];
 /* Current executing context (set by entry points) */
 static struct sm_at_host_ctx *current_ctx;
 static struct k_spinlock sm_at_host_lock;
@@ -1143,6 +1147,8 @@ static void cmd_send(struct sm_at_host_ctx *ctx, uint8_t *buf, size_t cmd_length
 	int err;
 	size_t offset = 0;
 	char *at_cmd = buf;
+	/* This is safe as long as we process AT-commands sequentially in one work queue. */
+	static uint8_t response_buf[MODEM_RSP_BUF_SIZE + 1];
 
 	LOG_HEXDUMP_DBG(buf, cmd_length, "RX");
 
@@ -1171,7 +1177,7 @@ static void cmd_send(struct sm_at_host_ctx *ctx, uint8_t *buf, size_t cmd_length
 
 	/* If bootloader mode is enabled, handle custom AT commands. */
 	if (sm_bootloader_mode_enabled) {
-		handle_bootloader_at_cmd(sm_response_buf, sizeof(sm_response_buf), at_cmd);
+		handle_bootloader_at_cmd(response_buf, sizeof(response_buf), at_cmd);
 		return;
 	}
 
@@ -1181,8 +1187,8 @@ static void cmd_send(struct sm_at_host_ctx *ctx, uint8_t *buf, size_t cmd_length
 	/* Send to modem.
 	 * Reserve space for CRLF in the response buffer.
 	 */
-	err = nrf_modem_at_cmd(sm_response_buf + strlen(CRLF_STR),
-			       sizeof(sm_response_buf) - strlen(CRLF_STR), "%s", at_cmd);
+	err = nrf_modem_at_cmd(response_buf + strlen(CRLF_STR),
+			       sizeof(response_buf) - strlen(CRLF_STR), "%s", at_cmd);
 
 	if (err == -AT_COMMAND_CONTINUE_RET) {
 		return;
@@ -1202,12 +1208,12 @@ static void cmd_send(struct sm_at_host_ctx *ctx, uint8_t *buf, size_t cmd_length
 	/** Format as TS 27.007 command V1 with verbose response format,
 	 *  based on current return of API nrf_modem_at_cmd() and MFWv1.3.x
 	 */
-	sm_response_buf[0] = CR;
-	sm_response_buf[1] = LF;
-	if (strlen(sm_response_buf) > strlen(CRLF_STR)) {
-		format_final_result(sm_response_buf, strlen(sm_response_buf),
-				    sizeof(sm_response_buf));
-		err = sm_at_send_internal(ctx, sm_response_buf, strlen(sm_response_buf), false,
+	response_buf[0] = CR;
+	response_buf[1] = LF;
+	if (strlen(response_buf) > strlen(CRLF_STR)) {
+		format_final_result(response_buf, strlen(response_buf),
+				    sizeof(response_buf));
+		err = sm_at_send_internal(ctx, response_buf, strlen(response_buf), false,
 					  SM_DEBUG_PRINT_FULL);
 		if (err) {
 			LOG_ERR("AT command response failed: %d", err);
@@ -1489,7 +1495,15 @@ static void rsp_send_internal(struct sm_at_host_ctx *ctx, bool urc, const char *
 	k_mutex_lock(&mutex_rsp_buf, K_FOREVER);
 
 	rsp_len = vsnprintf(rsp_buf, sizeof(rsp_buf), fmt, arg_ptr);
-	rsp_len = MIN(rsp_len, sizeof(rsp_buf) - 1);
+	if (rsp_len < 0) {
+		LOG_ERR("rsp_send format error: %d", rsp_len);
+		k_mutex_unlock(&mutex_rsp_buf);
+		return;
+	} else if (rsp_len >= (int)sizeof(rsp_buf)) {
+		LOG_ERR("FIXME: rsp_send truncated: %d bytes, max %zu", rsp_len,
+			sizeof(rsp_buf) - 1);
+		rsp_len = sizeof(rsp_buf) - 1;
+	}
 
 	if (IS_ENABLED(CONFIG_SM_CMUX) && !ctx && urc && urc_mode_all_channels()) {
 		for (uint8_t ch = 1; ch <= CONFIG_SM_CMUX_CHANNEL_COUNT; ++ch) {

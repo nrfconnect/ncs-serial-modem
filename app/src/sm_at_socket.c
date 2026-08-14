@@ -26,6 +26,7 @@ LOG_MODULE_REGISTER(sm_sock, CONFIG_SM_LOG_LEVEL);
 BUILD_ASSERT(NRF_MODEM_MAX_SOCKET_COUNT == 8, "NRF_MODEM_MAX_SOCKET_COUNT must be 8");
 
 #define SM_MAX_SOCKET_COUNT NRF_MODEM_MAX_SOCKET_COUNT
+#define SM_MAX_SOCKET_RECV_SIZE 2048 /* max size to receive with AT-command at once */
 
 /**@brief Socketopt operations. */
 enum sm_socketopt_operation {
@@ -98,7 +99,7 @@ static struct sm_socket {
 } socks[SM_MAX_SOCKET_COUNT];
 
 static uint8_t bin_data[1400]; /* Buffer for hex2bin data conversion */
-uint8_t sm_data_buf[SM_MAX_MESSAGE_SIZE];
+static uint8_t recv_buf[SM_MAX_SOCKET_RECV_SIZE]; /* Buffer for socket receive data */
 
 /* forward declarations */
 #define SOCKET_SEND_TMO_SEC 30
@@ -248,12 +249,12 @@ static void auto_reception(struct sm_socket *sock)
 		err = do_recv(sock, 0, MSG_DONTWAIT,
 			      sock->async_poll.adr_hex ? AT_SOCKET_MODE_HEX
 						      : AT_SOCKET_MODE_UNFORMATTED,
-			      sizeof(sm_data_buf));
+			      sizeof(recv_buf));
 	} else {
 		err = do_recvfrom(sock, 0, MSG_DONTWAIT,
 				  sock->async_poll.adr_hex ? AT_SOCKET_MODE_HEX
 							  : AT_SOCKET_MODE_UNFORMATTED,
-				  sizeof(sm_data_buf));
+				  sizeof(recv_buf));
 	}
 	if (err) {
 		LOG_ERR("auto_reception() error: %d", err);
@@ -1128,7 +1129,7 @@ static int do_recv(struct sm_socket *sock, int timeout, int flags,
 		LOG_ERR("zsock_setsockopt(%d) error: %d", SO_RCVTIMEO, -errno);
 		return -errno;
 	}
-	ret = zsock_recv(sockfd, (void *)sm_data_buf, data_len, flags);
+	ret = zsock_recv(sockfd, (void *)recv_buf, data_len, flags);
 	if (ret < 0) {
 		LOG_WRN("zsock_recv() error: %d", -errno);
 		return -errno;
@@ -1149,13 +1150,13 @@ static int do_recv(struct sm_socket *sock, int timeout, int flags,
 		}
 
 		if (mode == AT_SOCKET_MODE_HEX) {
-			ret = data_send_hex(sock, sm_data_buf, ret);
+			ret = data_send_hex(sock, recv_buf, ret);
 			if (ret) {
 				sm_at_host_unlock(sock->pipe);
 				return ret;
 			}
 		} else {
-			data_send(sock->pipe, sm_data_buf, ret);
+			data_send(sock->pipe, recv_buf, ret);
 		}
 		ret = 0;
 		sm_at_host_unlock(sock->pipe);
@@ -1243,7 +1244,7 @@ static int do_recvfrom(struct sm_socket *sock, int timeout, int flags,
 		LOG_ERR("zsock_setsockopt(%d) error: %d", SO_RCVTIMEO, -errno);
 		return -errno;
 	}
-	ret = zsock_recvfrom(sock->fd, (void *)sm_data_buf, data_len, flags,
+	ret = zsock_recvfrom(sock->fd, (void *)recv_buf, data_len, flags,
 			   (struct sockaddr *)&remote, &addrlen);
 	if (ret < 0) {
 		LOG_ERR("zsock_recvfrom() error: %d", -errno);
@@ -1268,13 +1269,13 @@ static int do_recvfrom(struct sm_socket *sock, int timeout, int flags,
 		}
 
 		if (mode == AT_SOCKET_MODE_HEX) {
-			ret = data_send_hex(sock, sm_data_buf, ret);
+			ret = data_send_hex(sock, recv_buf, ret);
 			if (ret) {
 				sm_at_host_unlock(sock->pipe);
 				return ret;
 			}
 		} else {
-			data_send(sock->pipe, sm_data_buf, ret);
+			data_send(sock->pipe, recv_buf, ret);
 		}
 		sm_at_host_unlock(sock->pipe);
 
@@ -1828,7 +1829,7 @@ STATIC int handle_at_recv(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 	uint16_t mode;
 	int timeout;
 	int flags = 0;
-	int data_len = sizeof(sm_data_buf);
+	int data_len = sizeof(recv_buf);
 	struct sm_socket *sock = NULL;
 
 	switch (cmd_type) {
@@ -1861,7 +1862,7 @@ STATIC int handle_at_recv(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 			if (err) {
 				return err;
 			}
-			if (data_len > sizeof(sm_data_buf)) {
+			if (data_len > sizeof(recv_buf)) {
 				LOG_ERR("data_len is too large for receive buffer");
 				return -ENOBUFS;
 			}
@@ -1981,7 +1982,7 @@ STATIC int handle_at_recvfrom(enum at_parser_cmd_type cmd_type, struct at_parser
 	uint16_t mode;
 	int timeout;
 	int flags = 0;
-	int data_len = sizeof(sm_data_buf);
+	int data_len = sizeof(recv_buf);
 	struct sm_socket *sock = NULL;
 
 	switch (cmd_type) {
@@ -2014,7 +2015,7 @@ STATIC int handle_at_recvfrom(enum at_parser_cmd_type cmd_type, struct at_parser
 			if (err) {
 				return err;
 			}
-			if (data_len > sizeof(sm_data_buf)) {
+			if (data_len > sizeof(recv_buf)) {
 				LOG_ERR("data_len is too large for receive buffer");
 				return -ENOBUFS;
 			}
