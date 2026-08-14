@@ -279,9 +279,10 @@ On success, sends `Ready\r\n` over UART. On failure, sends `INIT ERROR\r\n`.
 
 ### AT Command Engine (`app/src/sm_at_host.c/.h`)
 Central module. Key public API:
-- `rsp_send(fmt, ...)` — send AT response to current pipe
+- `rsp_send(fmt, ...)` — send formatted AT response to current pipe (512-byte limit; truncation is logged)
 - `rsp_send_ok()` / `rsp_send_error()` — send `\r\nOK\r\n` / `\r\nERROR\r\n`
 - `urc_send(fmt, ...)` — queue a URC for async delivery
+- `data_send(pipe, data, len)` — send a pre-formatted binary or large payload directly; use this instead of `rsp_send()` when the response exceeds ~256 bytes or is not a `printf`-style string
 - `enter_datamode(handler, data_len)` — switch to raw data mode
 - `sm_at_host_echo(bool)` — enable/disable ATE echo
 - `in_datamode(X)` / `in_at_mode(X)` — mode query generics (accept ctx or pipe)
@@ -381,3 +382,4 @@ int n   = sm_util_at_scanf("AT+CFUN?", "+CFUN: %d", &cfun);
 - The `STATIC` macro (defined in `sm_at_host.h`) expands to `static` in production and to nothing when `CONFIG_UNITY` is set, to allow unit tests to access internal functions.
 - The `SILENT_AT_COMMAND_RET` and `AT_COMMAND_CONTINUE_RET` sentinel values (defined in `sm_defines.h`) signal special handling to the AT host dispatcher — returning them from a handler suppresses automatic OK/ERROR sending.
 - `urc_send()` is safe to call from any thread; it queues the URC and sends it from `sm_work_q`.
+- `rsp_send()` has a 512-byte static buffer (`SM_AT_MAX_RSP_LEN`). Responses that exceed this must use `data_send()` with a pre-allocated, pre-formatted buffer. The incoming AT command buffer is dynamic and grows from 128 to 8192 bytes (`SM_AT_BUF_MIN_SIZE` / `SM_AT_BUF_MAX_SIZE` in `sm_defines.h`).

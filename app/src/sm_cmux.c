@@ -18,13 +18,13 @@
 /* This makes use of part of the Zephyr modem subsystem which has a CMUX module. */
 LOG_MODULE_REGISTER(sm_cmux, CONFIG_SM_LOG_LEVEL);
 
-#define RECV_BUF_LEN     SM_AT_MAX_CMD_LEN
-/* The CMUX module reserves some spare buffer bytes. To achieve a maximum
- * response length of SM_AT_MAX_RSP_LEN (comprising the "OK" or "ERROR"
- * that is sent separately), the transmit buffer must be made a bit bigger.
- * 49 extra bytes was manually found to allow SM_AT_MAX_RSP_LEN long responses.
+/* The Zephyr CMUX module drops data silently when this buffer is full. At 1 Mbit/s
+ * the buffer fills in ~40 ms, so it must be large enough to absorb scheduling jitter.
+ *
+ * Note: It is possible to receive an AT command that is larger than this buffer as it will be split
+ * into multiple CMUX frames which are pushed through this buffer to the AT command buffer.
  */
-#define TRANSMIT_BUF_LEN (49 + SM_AT_MAX_RSP_LEN)
+#define DLCI_RECV_BUF_LEN 4096
 
 #define DLCI_TO_INDEX(dlci)  ((dlci) - 1)
 #define INDEX_TO_DLCI(index) ((index) + 1)
@@ -45,7 +45,7 @@ static struct {
 	struct cmux_dlci {
 		struct modem_cmux_dlci instance;
 		struct modem_pipe *pipe;
-		uint8_t receive_buf[RECV_BUF_LEN];
+		uint8_t receive_buf[DLCI_RECV_BUF_LEN];
 		struct k_work open_work;
 	} dlcis[CONFIG_SM_CMUX_CHANNEL_COUNT];
 	/* Index of the DLCI used for AT communication; defaults to 0. */
