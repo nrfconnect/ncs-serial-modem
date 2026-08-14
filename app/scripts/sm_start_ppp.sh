@@ -20,50 +20,44 @@
 # Connection is closed by running "sm_stop_ppp.sh" script or using "poff" command.
 #
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+COMMON_FUNCTIONS="$SCRIPT_DIR/common_functions.sh"
+# shellcheck source=common_functions.sh
+source "$COMMON_FUNCTIONS"
+
 #
-# Default parameters
+# Script specific default parameters
 #
-MODEM=/dev/ttyACM0
-BAUD=115200
-IPR_BAUD=0
 TIMEOUT=60
 APN="internet"
 TYPE="IPV4V6"
 PDN=0
-VERBOSE=0
-CHATOPT=""
-PPP_DEBUG=""
-PIDFILE="/var/run/nrf91-modem.pid"
-PPP_PIDFILE="/var/run/ppp-nrf91.pid"
-MODEM_TRACE_FILE="/var/log/nrf91-modem-trace.bin"
-TRACE_PID_FILE="/var/run/nrf91-modem-trace.pid"
-TRACE=0
 
 usage() {
-    echo "Usage: $0 [-s serial_port] [-b baud_rate] [-B new_speed] [-t timeout] [-a APN]"
-    echo "          [-f IP|IPV6|IPV4V6] [-p PDN] [-T] [-v] [-h]"
-    echo ""
-    echo "  -s serial_port : Serial port where the modem is connected (default: $MODEM)"
-    echo "  -b baud_rate   : Current baud rate of Serial Modem (default: $BAUD)"
-    echo "  -B new_speed   : Use AT+IPR to change baud rate to <new_speed>"
-    echo "                   Start with current baud rate and switch to new_speed after modem is"
-    echo "                   responsive. If not set, baud rate will not be changed."
-    echo "                   When terminated, baud rate will be switched back to original."
-    echo "  -t timeout     : Timeout for dialup commands in seconds (default: $TIMEOUT)"
-    echo "  -a APN         : Access Point Name for cellular connection (default: $APN)"
-    echo "  -f FAMILY      : PDP_type, one of IP, IPV6, IPV4V6 (default: $TYPE)"
-    echo "  -p PDN         : PDN ID to use (default: $PDN), 0 means use default PDN"
-    echo "  -T             : Enable modem trace collection (file: $MODEM_TRACE_FILE)"
-    echo "  -v             : Enable verbose output"
-    echo "  -h             : Show this help message"
-    echo ""
-    exit 0
+	echo "Usage: $0 [-s serial_port] [-b baud_rate] [-B new_speed] [-t timeout] [-a APN]"
+	echo "          [-f IP|IPV6|IPV4V6] [-p PDN] [-T] [-v] [-h]"
+	echo ""
+	echo "  -s serial_port : Serial port where the modem is connected (default: $MODEM)"
+	echo "  -b baud_rate   : Current baud rate of Serial Modem (default: $BAUD)"
+	echo "  -B new_speed   : Use AT+IPR to change baud rate to <new_speed>"
+	echo "                   Start with current baud rate and switch to new_speed after modem"
+	echo "                   is responsive. If not set, baud rate will not be changed."
+	echo "                   When terminated, baud rate will be switched back to original."
+	echo "  -t timeout     : Timeout for dialup commands in seconds (default: $TIMEOUT)"
+	echo "  -a APN         : Access Point Name for cellular connection (default: $APN)"
+	echo "  -f FAMILY      : PDP_type, one of IP, IPV6, IPV4V6 (default: $TYPE)"
+	echo "  -p PDN         : PDN ID to use (default: $PDN), 0 means use default PDN"
+	echo "  -T             : Enable modem trace collection (file: $MODEM_TRACE_FILE)"
+	echo "  -v             : Enable verbose output"
+	echo "  -h             : Show this help message"
+	echo ""
+	exit 0
 }
 
 # Parse command line parameters
 while getopts s:b:B:t:a::f:p:Thv flag
 do
-    case "${flag}" in
+	case "${flag}" in
 	s) MODEM=${OPTARG};;
 	b) BAUD=${OPTARG};;
 	B) IPR_BAUD=${OPTARG};;
@@ -74,22 +68,10 @@ do
 	T) TRACE=1;;
 	v) VERBOSE=1; CHATOPT="-v"; PPP_DEBUG="debug";;
 	h|?) usage;;
-    esac
+	esac
 done
 
-log_dbg() {
-    if [ $VERBOSE -eq 1 ]; then
-        echo "$@" >&2
-        logger --id=$$ "$@"
-    fi
-}
-
-log_inf() {
-    echo "$@" >&2
-    logger --id=$$ "$@"
-}
-
-if [ $PDN -gt 0 ]; then
+if [ "$PDN" -gt 0 ]; then
 	log_dbg "Using PDN ID: $PDN on APN: $APN"
 	PDN_CMD="AT+CGDCONT=$PDN,\"$TYPE\",\"$APN\" OK"
 	PDN_DIAL="AT+CGACT=1,$PDN OK"
@@ -122,14 +104,6 @@ $PPP_DIAL
 )
 
 #
-# AT commands to close down CMUX and cellular link
-#
-SHUTDOWN_SCRIPT="
-\d\dAT+CFUN=0 OK
-AT#XCMUXCLD OK
-"
-
-#
 # PPPD options
 #
 PPP_OPTIONS="
@@ -153,154 +127,87 @@ asyncmap 0xffffffff
 $PPP_DEBUG
 "
 
-if [[ ! -c $MODEM ]]; then
-	log_inf "Serial port not found: $MODEM"
-	exit 1
-fi
+require_serial_port_or_exit
 
 # Remove stale PID files if processes are not running
-if [ -f "$PIDFILE" ]; then
-	if ! kill -0 $(cat "$PIDFILE" 2>/dev/null) 2>/dev/null; then
-		log_dbg "Removing stale PID file: $PIDFILE"
-		rm -f "$PIDFILE"
-	fi
-fi
+remove_stale_pidfile "$PIDFILE"
+remove_stale_pidfile "$TRACE_PID_FILE"
 
-if [ -f "$TRACE_PID_FILE" ]; then
-	if ! kill -0 $(cat "$TRACE_PID_FILE" 2>/dev/null) 2>/dev/null; then
-		log_dbg "Removing stale trace PID file: $TRACE_PID_FILE"
-		rm -f "$TRACE_PID_FILE"
-	fi
-fi
-
-if find /dev -type c -name 'gsmtty*' | grep -q . ; then
-	log_inf "Error: existing CMUX devices found (/dev/gsmtty*)"
-	exit 1
-fi
-
-if pgrep ldattach >/dev/null; then
-	log_inf "Error: existing ldattach process found"
-	exit 1
-fi
-
-cmux_close() {
-	printf "\xF9\xF9\xF9\xF9\xF9\xF9\xF9\xF9" > $MODEM
-	printf "\xF9\x03\xEF\x05\xC3\x01\xF2\xF9" > $MODEM
-	sleep 2
-}
+check_no_existing_cmux_or_exit
 
 cleanup() {
 	set +eu
-	start-stop-daemon --stop --pidfile $TRACE_PID_FILE --remove-pidfile --oknodo
+	trace_stop
 	pkill pppd
 	pkill ldattach
-	printf "\xF9\x03\xEF\x05\xC3\x01\xF2\xF9" > $MODEM
-	log_inf "Failed to start..."
+	cmux_close
+	log_err "Failed to start..."
 	exit 1
 }
 
 trap cleanup ERR
 
-# Configure serial port
-stty -F $MODEM $BAUD pass8 raw crtscts clocal -hupcl
+configure_serial_port
 
-log_dbg "Wait modem to boot"
-if chat -t1 "Ready--" "AT" "OK" <$MODEM >$MODEM; then
-	log_dbg "Modem is in AT mode"
-else
-	log_dbg "Modem not responding, try CMUX Close down..."
-	cmux_close
-	sleep 1
-	if ! chat -t1 "" "AT" "OK" <$MODEM >$MODEM; then
-		log_inf "Error: Modem not responding"
-		exit 1
-	fi
+wait_modem_ready_or_exit
+
+if [ "$IPR_BAUD" -ne 0 ]; then
+	set_modem_baud "$IPR_BAUD"
 fi
 
-if [ $IPR_BAUD -ne 0 ]; then
-	log_dbg "Set baud rate on modem to $IPR_BAUD"
-	chat $CHATOPT -t1 '' "AT+IPR=$IPR_BAUD" "OK" >$MODEM <$MODEM
-	# Reconfigure serial port
-	stty -F $MODEM $IPR_BAUD pass8 raw crtscts clocal -hupcl
-fi
+cmux_attach "AT#XCMUX=1" 2
 
-log_dbg "Attach CMUX channel to modem..."
-ldattach -c $'\rAT#XCMUX=1\r' GSM0710 $MODEM
-
-AT_CMUX=$(ls /dev/gsmtty* | sort -V | head -n 1)
-PPP_CMUX=$(ls /dev/gsmtty* | sort -V | head -n 2 | tail -n 1)
+# DLC 1: AT command channel for host
+# DLC 2: PPP data channel
+# DLC 3: Trace channel
+AT_CMUX=${DLCS[0]}
+PPP_CMUX=${DLCS[1]}
 log_inf "DLC 1 (AT):        $AT_CMUX"
 log_inf "DLC 2 (PPP):       $PPP_CMUX"
 
-MT_CMUX=""
-if [ $TRACE -gt 0 ]; then
-	MT_CMUX=$(ls /dev/gsmtty* | sort -V | head -n 3 | tail -n 1)
-	log_inf "DLC 3 (TRACE):     $MT_CMUX"
-	log_inf "Starting trace collection to $MODEM_TRACE_FILE"
-	stty -F $MT_CMUX raw clocal -icrnl -ixon -opost -hupcl
-fi
-sleep 3
-
-stty -F $AT_CMUX clocal -hupcl
-stty -F $PPP_CMUX clocal -hupcl
-test -c $AT_CMUX
-
-if [ $TRACE -gt 0 ]; then
-	log_inf "Starting trace collection..."
-	# Prefer to use socat, if installed.
-	if command -v socat >/dev/null 2>&1; then
-		start-stop-daemon --start --pidfile $TRACE_PID_FILE --make-pidfile \
-			--background --exec $(command -v socat) -- \
-			-u $MT_CMUX,cfmakeraw,clocal=1,hupcl=0 \
-			CREATE:$MODEM_TRACE_FILE
-	else
-		start-stop-daemon --start --pidfile $TRACE_PID_FILE --make-pidfile \
-		--background --exec /bin/dd -- if=$MT_CMUX of=$MODEM_TRACE_FILE bs=1024
-	fi
-fi
-log_inf "Connect and wait for PPP link..."
-
-chat $CHATOPT -t$TIMEOUT "${CHAT_SCRIPT[@]}" >$AT_CMUX <$AT_CMUX
-
-check_devices_or_exit() {
-	# Verify that UART devices are still present
-	if [ ! -c $PPP_CMUX ] || [ ! -c $AT_CMUX ] || [ ! -c $MODEM ]; then
-		log_inf "Error: UART devices not found, exiting..."
-		start-stop-daemon --stop --pidfile $TRACE_PID_FILE --remove-pidfile \
-				  --oknodo --retry 1
-		pkill ldattach
+if [ "$TRACE" -gt 0 ]; then
+	if [ ${#DLCS[@]} -lt 3 ]; then
+		log_err "Error: CMUX trace device (/dev/gsmtty*) not found"
 		exit 1
 	fi
-}
+	MT_CMUX=${DLCS[2]}
+	log_inf "DLC 3 (TRACE):     $MT_CMUX"
+	trace_start "$MT_CMUX"
+fi
+
+log_inf "Connect and wait for PPP link..."
+# shellcheck disable=SC2086,SC2094 # CHATOPT must not be quoted, it may be empty
+chat $CHATOPT -t"$TIMEOUT" "${CHAT_SCRIPT[@]}" >"$AT_CMUX" <"$AT_CMUX"
 
 shutdown_modem() {
 	set +eu
-	check_devices_or_exit
-	start-stop-daemon --stop --pidfile $TRACE_PID_FILE --remove-pidfile --oknodo --retry 1
-	chat $CHATOPT -t5 '' $SHUTDOWN_SCRIPT >$AT_CMUX <$AT_CMUX
+	check_devices_or_exit "$AT_CMUX" "$PPP_CMUX"
+	trace_stop
+	# shellcheck disable=SC2086,SC2094 # CHATOPT must not be quoted, it may be empty
+	chat $CHATOPT -t5 '' $SM_SHUTDOWN_SCRIPT >"$AT_CMUX" <"$AT_CMUX"
 	CHAT_ERR=$?
 	pkill ldattach
 	sleep 1
 	if [ "$CHAT_ERR" -ne 0 ]; then
 		cmux_close
-		chat $CHATOPT -t5 '' $SHUTDOWN_SCRIPT >$MODEM <$MODEM
+		# shellcheck disable=SC2086,SC2094
+		chat $CHATOPT -t5 '' $SM_SHUTDOWN_SCRIPT >"$MODEM" <"$MODEM"
 	fi
-	if [ $IPR_BAUD -ne 0 ]; then
-		# Restore baud rate on modem
-		chat $CHATOPT -t1 '' "AT+IPR=$BAUD" "OK" >$MODEM <$MODEM
-		stty -F $MODEM $BAUD
+	if [ "$IPR_BAUD" -ne 0 ]; then
+		restore_modem_baud "$BAUD"
 	fi
 }
 
 ppp_start() {
 	set +eu
 	set -x
-	check_devices_or_exit
-	pppd $PPP_CMUX $PPP_OPTIONS
+	check_devices_or_exit "$AT_CMUX" "$PPP_CMUX"
+	# shellcheck disable=SC2086 # PPP_OPTIONS is a list of options
+	pppd "$PPP_CMUX" $PPP_OPTIONS
 	if [ "$?" -eq 5 ]; then
 		log_inf "pppd terminated with signal, shutting down modem..."
 		shutdown_modem
-		test -O $PIDFILE && rm -f $PIDFILE
+		test -O "$PIDFILE" && rm -f "$PIDFILE"
 		exit 0
 	fi
 	sleep 1
@@ -311,36 +218,27 @@ ppp_start() {
 export PPP_CMUX
 export AT_CMUX
 export MODEM
-export SHUTDOWN_SCRIPT
 export PPP_OPTIONS
 export PIDFILE
+export PPP_PIDFILE
 export CHATOPT
 export BAUD
 export IPR_BAUD
 export TRACE_PID_FILE
+export VERBOSE
+export COMMON_FUNCTIONS
 export -f ppp_start
 export -f shutdown_modem
-export -f cmux_close
-export -f check_devices_or_exit
-export -f log_inf
-export -f log_dbg
 
 # Start PPPD in a subshell
 # Logs go to syslog so redirect output to /dev/null
-setsid bash -c ppp_start  </dev/null >/dev/null 2>&1 &
-echo $! > $PIDFILE
+setsid bash -c "source \"\$COMMON_FUNCTIONS\"; ppp_start" </dev/null >/dev/null 2>&1 &
+echo $! > "$PIDFILE"
 
 # Wait for PPPD to start
-for i in {1..5}; do
-	if [ -f $PPP_PIDFILE ]; then
-		if grep "ppp[0-9]" $PPP_PIDFILE >/dev/null; then
-			log_inf "PPP link started"
-			log_dbg "Interface $(cat $PPP_PIDFILE| tail -1)"
-			exit 0
-		fi
-	fi
-	sleep 1
-done
+if wait_for_ppp 5; then
+	exit 0
+fi
 
-log_inf "Failed to start PPP link"
+log_err "Failed to start PPP link"
 cleanup

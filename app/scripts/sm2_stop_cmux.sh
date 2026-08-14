@@ -11,15 +11,9 @@
 # restores the serial port baud rate if AT+IPR was used.
 #
 
-#
-# Default parameters
-#
-MODEM=/dev/ttyACM0
-BAUD=115200
-IPR_BAUD=0
-VERBOSE=0
-CHATOPT=""
-TRACE_PID_FILE="/var/run/nrf91-modem-trace.pid"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=common_functions.sh
+source "$SCRIPT_DIR/common_functions.sh"
 
 usage() {
 	echo "Usage: $0 [-s serial_port] [-b baud_rate] [-B original_baud] [-v] [-h]"
@@ -46,47 +40,33 @@ do
 	esac
 done
 
-log_dbg() {
-	if [ $VERBOSE -eq 1 ]; then
-		logger --id=$$ -s "$@"
-	fi
-}
-
-AT_CMUX=$(ls /dev/gsmtty* 2>/dev/null | sort -V | head -n 1 || true)
+AT_CMUX=$(cmux_dlc_list | head -n 1)
 
 # Stop modem trace collection if running
-start-stop-daemon -q --stop --pidfile $TRACE_PID_FILE --remove-pidfile --oknodo --retry 1
+trace_stop
 
 # Send CMUX CLD frame via AT command on channel 1 if available
+CHAT_ERR=1
 if [ -n "$AT_CMUX" ] && [ -c "$AT_CMUX" ]; then
 	log_dbg "Sending AT#XCMUXCLD on $AT_CMUX"
-	chat $CHATOPT -t5 '' 'AT#XCMUXCLD' 'OK' >$AT_CMUX <$AT_CMUX
+	# shellcheck disable=SC2086,SC2094 # CHATOPT must not be quoted, it may be empty
+	chat $CHATOPT -t5 '' 'AT#XCMUXCLD' 'OK' >"$AT_CMUX" <"$AT_CMUX"
 	CHAT_ERR=$?
-else
-	CHAT_ERR=1
 fi
 
 log_dbg "Killing ldattach..."
-pkill ldattach || true
+pkill ldattach
 sleep 1
 
-cmux_close() {
-	printf "\xF9\xF9\xF9\xF9\xF9\xF9\xF9\xF9" > $MODEM
-	printf "\xF9\x03\xEF\x05\xC3\x01\xF2\xF9" > $MODEM
-	sleep 2
-}
-
 # If channel is still open, force-close with raw CMUX CLD frame
-if [ $CHAT_ERR -ne 0 ] && [ -c "$MODEM" ]; then
+if [ $CHAT_ERR -ne 0 ]; then
 	log_dbg "Force-closing CMUX with raw CLD frame..."
 	cmux_close
 fi
 
-if [ $IPR_BAUD -ne 0 ] && [ -c "$MODEM" ]; then
-	log_dbg "Restoring baud rate on modem to $IPR_BAUD"
-	stty -F $MODEM $BAUD
-	chat $CHATOPT -t1 '' "AT+IPR=$IPR_BAUD" "OK" >$MODEM <$MODEM || true
-	stty -F $MODEM $IPR_BAUD
+if [ "$IPR_BAUD" -ne 0 ] && [ -c "$MODEM" ]; then
+	stty -F "$MODEM" "$BAUD"
+	restore_modem_baud "$IPR_BAUD"
 fi
 
 log_dbg "CMUX stopped"
