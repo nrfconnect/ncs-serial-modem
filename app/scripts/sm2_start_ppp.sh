@@ -176,6 +176,13 @@ if [ $CMUX_ATTACHED -eq 0 ]; then
 		log_inf "Error: existing ldattach process found"
 		exit 1
 	fi
+
+	# Remove non "character special" files from /dev/gsmtty*
+	# These might be a residue from bug in the script.
+	# For example: 'chat PARAMS... >/dev/gsmtty1 </dev/gsmtty1' after device disappeared
+	if [[ -n $(find /dev -name 'gsmtty*' -print -delete) ]]; then
+		log_inf "Warning: invalid CMUX devices found (/dev/gsmtty*), removed"
+	fi
 else
 	if ! find /dev -type c -name 'gsmtty*' | grep -q . ; then
 		log_inf "Error: no CMUX devices found (/dev/gsmtty*). Run sm2_start_cmux.sh first."
@@ -184,9 +191,11 @@ else
 fi
 
 cmux_close() {
-	printf "\xF9\xF9\xF9\xF9\xF9\xF9\xF9\xF9" > $MODEM
-	printf "\xF9\x03\xEF\x05\xC3\x01\xF2\xF9" > $MODEM
-	sleep 2
+	if [[ -c $MODEM ]]; then
+		printf "\xF9\xF9\xF9\xF9\xF9\xF9\xF9\xF9" > $MODEM
+		printf "\xF9\x03\xEF\x05\xC3\x01\xF2\xF9" > $MODEM
+		sleep 2
+	fi
 }
 
 stop_trace() {
@@ -236,7 +245,9 @@ if [ $CMUX_ATTACHED -eq 0 ]; then
 	log_dbg "Attach CMUX channel to modem..."
 	chat $CHATOPT -t1 '' "AT+CMUX=0" "OK" >$MODEM <$MODEM
 	ldattach GSM0710 $MODEM
+	log_dbg "Wait for CMUX to open"
 	sleep 3
+	log_dbg "continue"
 fi
 
 # DLC 1: PPP data channel
@@ -264,8 +275,8 @@ check_devices_or_exit
 log_inf "DLC 1 (PPP):       $DLC1"
 log_inf "DLC 2 (AT):        $DLC2"
 
-stty -F $DLC1 clocal -hupcl
-stty -F $DLC2 clocal -hupcl
+stty -F $DLC1 clocal
+stty -F $DLC2 clocal
 
 if [ $TRACE -gt 0 ]; then
 	echo "DLC 3 (TRACE):        $DLC3"
@@ -297,11 +308,11 @@ shutdown_modem() {
 		pkill ldattach
 	fi
 	sleep 1
-	if [ "$CHAT_ERR" -ne 0 ]; then
+	if [[ "$CHAT_ERR" -ne 0 && -c $MODEM ]]; then
 		cmux_close
 		chat $CHATOPT -t5 '' $SHUTDOWN_SCRIPT >$MODEM <$MODEM
 	fi
-	if [ $IPR_BAUD -ne 0 ]; then
+	if [[ $IPR_BAUD -ne 0 && -c $MODEM ]]; then
 		# Restore baud rate on modem
 		chat $CHATOPT -t1 '' "AT+IPR=$BAUD" "OK" >$MODEM <$MODEM
 		stty -F $MODEM $BAUD
@@ -322,8 +333,10 @@ ppp_start() {
 	test -O $PIDFILE && rm -f $PIDFILE
 }
 
-export DLC1
 export CMUX_ATTACHED
+export DLC1
+export DLC2
+export DLC3
 export MODEM
 export SHUTDOWN_SCRIPT
 export PPP_OPTIONS

@@ -89,10 +89,19 @@ if pgrep ldattach >/dev/null; then
 	exit 1
 fi
 
+# Remove non "character special" files from /dev/gsmtty*
+# These might be a residue from bug in the script.
+# For example: 'chat PARAMS... >/dev/gsmtty1 </dev/gsmtty1' after device disappeared
+if [[ -n $(find /dev -name 'gsmtty*' -print -delete) ]]; then
+	echo "Warning: invalid CMUX devices found (/dev/gsmtty*), removed"
+fi
+
 cmux_close() {
-	printf "\xF9\xF9\xF9\xF9\xF9\xF9\xF9\xF9" > $MODEM
-	printf "\xF9\x03\xEF\x05\xC3\x01\xF2\xF9" > $MODEM
-	sleep 2
+	if [[ -c $MODEM ]]; then
+		printf "\xF9\xF9\xF9\xF9\xF9\xF9\xF9\xF9" > $MODEM
+		printf "\xF9\x03\xEF\x05\xC3\x01\xF2\xF9" > $MODEM
+		sleep 2
+	fi
 }
 
 cleanup() {
@@ -131,7 +140,9 @@ fi
 log_dbg "Attach CMUX channel to modem..."
 chat $CHATOPT -t1 '' "AT+CMUX=0" "OK" >$MODEM <$MODEM
 ldattach GSM0710 $MODEM
+log_dbg "Wait for CMUX to open"
 sleep 3
+log_dbg "continue"
 
 # DLC 1: PPP data channel
 # DLC 2: AT command channel for host
@@ -158,8 +169,8 @@ check_devices_or_exit
 echo "DLC 1 (PPP):       $DLC1"
 echo "DLC 2 (AT):        $DLC2"
 
-stty -F $DLC1 clocal -hupcl
-stty -F $DLC2 clocal -hupcl
+stty -F $DLC1 clocal
+stty -F $DLC2 clocal
 
 if [ $TRACE -gt 0 ]; then
 	echo "DLC 3 (TRACE):        $DLC3"

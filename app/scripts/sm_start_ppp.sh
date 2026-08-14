@@ -178,15 +178,24 @@ if find /dev -type c -name 'gsmtty*' | grep -q . ; then
 	exit 1
 fi
 
+# Remove non "character special" files from /dev/gsmtty*
+# These might be a residue from bug in the script.
+# For example: 'chat PARAMS... >/dev/gsmtty1 </dev/gsmtty1' after device disappeared
+if [[ -n $(find /dev -name 'gsmtty*' -print -delete) ]]; then
+	log_inf "Warning: invalid CMUX devices found (/dev/gsmtty*), removed"
+fi
+
 if pgrep ldattach >/dev/null; then
 	log_inf "Error: existing ldattach process found"
 	exit 1
 fi
 
 cmux_close() {
-	printf "\xF9\xF9\xF9\xF9\xF9\xF9\xF9\xF9" > $MODEM
-	printf "\xF9\x03\xEF\x05\xC3\x01\xF2\xF9" > $MODEM
-	sleep 2
+	if [[ -c $MODEM ]]; then
+		printf "\xF9\xF9\xF9\xF9\xF9\xF9\xF9\xF9" > $MODEM
+		printf "\xF9\x03\xEF\x05\xC3\x01\xF2\xF9" > $MODEM
+		sleep 2
+	fi
 }
 
 cleanup() {
@@ -194,7 +203,7 @@ cleanup() {
 	start-stop-daemon --stop --pidfile $TRACE_PID_FILE --remove-pidfile --oknodo
 	pkill pppd
 	pkill ldattach
-	printf "\xF9\x03\xEF\x05\xC3\x01\xF2\xF9" > $MODEM
+	cmux_close
 	log_inf "Failed to start..."
 	exit 1
 }
@@ -225,7 +234,12 @@ if [ $IPR_BAUD -ne 0 ]; then
 fi
 
 log_dbg "Attach CMUX channel to modem..."
-ldattach -c $'\rAT#XCMUX=1\r' GSM0710 $MODEM
+chat $CHATOPT -t1 '' "AT#XCMUX=1" "OK" >$MODEM <$MODEM
+ldattach GSM0710 $MODEM
+
+log_dbg "Wait for CMUX to open"
+sleep 3
+log_dbg "continue"
 
 AT_CMUX=$(ls /dev/gsmtty* | sort -V | head -n 1)
 PPP_CMUX=$(ls /dev/gsmtty* | sort -V | head -n 2 | tail -n 1)
@@ -237,13 +251,12 @@ if [ $TRACE -gt 0 ]; then
 	MT_CMUX=$(ls /dev/gsmtty* | sort -V | head -n 3 | tail -n 1)
 	log_inf "DLC 3 (TRACE):     $MT_CMUX"
 	log_inf "Starting trace collection to $MODEM_TRACE_FILE"
-	stty -F $MT_CMUX raw clocal -icrnl -ixon -opost -hupcl
+	stty -F "$MT_CMUX" raw clocal -icrnl -ixon -opost -hupcl
 fi
-sleep 3
 
-stty -F $AT_CMUX clocal -hupcl
-stty -F $PPP_CMUX clocal -hupcl
-test -c $AT_CMUX
+test -c "$AT_CMUX"
+test -c "$PPP_CMUX"
+stty -F "$AT_CMUX" clocal
 
 if [ $TRACE -gt 0 ]; then
 	log_inf "Starting trace collection..."
@@ -258,9 +271,6 @@ if [ $TRACE -gt 0 ]; then
 		--background --exec /bin/dd -- if=$MT_CMUX of=$MODEM_TRACE_FILE bs=1024
 	fi
 fi
-log_inf "Connect and wait for PPP link..."
-
-chat $CHATOPT -t$TIMEOUT "${CHAT_SCRIPT[@]}" >$AT_CMUX <$AT_CMUX
 
 check_devices_or_exit() {
 	# Verify that UART devices are still present
@@ -272,6 +282,10 @@ check_devices_or_exit() {
 		exit 1
 	fi
 }
+
+check_devices_or_exit
+log_inf "Connect and wait for PPP link..."
+chat $CHATOPT -t$TIMEOUT "${CHAT_SCRIPT[@]}" >$AT_CMUX <$AT_CMUX
 
 shutdown_modem() {
 	set +eu
