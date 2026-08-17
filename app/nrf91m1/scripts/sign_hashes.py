@@ -37,7 +37,7 @@ from typing import NoReturn
 
 
 def die(*args: str) -> NoReturn:
-    print(f"sign-hashes: error: {' '.join(args)}", file=sys.stderr)
+    print(f"sign_hashes: error: {' '.join(args)}", file=sys.stderr)
     sys.exit(1)
 
 
@@ -196,7 +196,7 @@ def main() -> None:
     else:
         tmp_out.replace(out_file)
 
-    print(f"sign-hashes: signed {' '.join(sign_items)} -> {out_file}", file=sys.stderr)
+    print(f"sign_hashes: signed {' '.join(sign_items)} -> {out_file}", file=sys.stderr)
 
 
 if __name__ == "__main__":

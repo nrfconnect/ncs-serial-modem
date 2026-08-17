@@ -29,6 +29,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common as C
 
+BOARD = "nrf9151dk/nrf9151/ns"
 
 # ---------------------------------------------------------------------------
 # Argument parsing
@@ -192,7 +193,7 @@ def main() -> None:
 
         west_cmd = [
             "west", "build", "--pristine", "-T", "./serial_modem.nrf91m1",
-            "--board", C.BOARD,
+            "--board", BOARD,
             "--build-dir", str(build_dir),
             "--sysbuild", str(C.APP_DIR),
             "--",
@@ -264,9 +265,9 @@ def main() -> None:
     app_align = _flag_from(app_cmd, "align")
     app_version_from_ninja = _flag_from(app_cmd, "version")
 
-    # App load address
-    load_m = re.search(r'app\.signed\.binload_address=(0x[0-9a-fA-F]+)', ninja)
-    app_load_addr = load_m.group(1) if load_m else ""
+    # App load address: sdk-nrf sets ih_load_addr via --rom-fixed (code
+    # partition address) when CONFIG_NCS_MCUBOOT_IMGTOOL_SET_ROM_FIXED_ADDRESS.
+    app_load_addr = _flag_from(app_cmd, "rom-fixed")
 
     # Version precedence: CLI override > build.ninja > mcuboot/.config
     if not app_version:
@@ -298,12 +299,12 @@ def main() -> None:
 
     # --- Write manifest-tosign.env header ------------------------------------
 
-    board_parts = C.BOARD.split("/")
+    board_parts = BOARD.split("/")
     board_name = board_parts[0]
     soc_name = board_parts[1] if len(board_parts) > 1 else ""
 
     r = subprocess.run(
-        ["git", "-C", str(C.NCS_DIR / "nrf"), "rev-parse", "HEAD"],
+        ["git", "-C", C._NRF_MODULE_DIR, "rev-parse", "HEAD"],
         capture_output=True, text=True,
     )
     ncs_revision = r.stdout.strip() if r.returncode == 0 else ""

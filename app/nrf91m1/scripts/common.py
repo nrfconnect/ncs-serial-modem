@@ -24,14 +24,20 @@ from typing import NoReturn
 
 SIGN_DIR: Path = Path(__file__).resolve().parent
 APP_DIR: Path = Path(os.environ.get("APP_DIR", str(SIGN_DIR / "../.."))).resolve()
-NCS_DIR: Path = Path(os.environ.get("NCS_DIR", str(APP_DIR / "../.."))).resolve()
 
-BOARD: str = os.environ.get("BOARD", "nrf9151dk/nrf9151/ns")
+# Module dirs: use env vars set by west/build system; fall back to the
+# standard NCS west workspace layout relative to APP_DIR.
+_ZEPHYR_BASE: Path = Path(os.environ.get(
+    "ZEPHYR_BASE", str(APP_DIR / "../../zephyr"))).resolve()
+_NRF_MODULE_DIR: Path = Path(os.environ.get(
+    "ZEPHYR_NRF_MODULE_DIR", str(APP_DIR / "../../nrf"))).resolve()
+_MCUBOOT_MODULE_DIR: Path = Path(os.environ.get(
+    "ZEPHYR_MCUBOOT_MODULE_DIR", str(APP_DIR / "../../bootloader/mcuboot"))).resolve()
 
-BUILD_DIR: Path = Path(os.environ.get("BUILD_DIR", str(APP_DIR / "build")))
-OUT_DIR: Path = Path(os.environ.get("OUT_DIR", str(APP_DIR / "signing-out")))
-UNSIGNED_DIR: Path = Path(os.environ.get("UNSIGNED_DIR", str(OUT_DIR / "unsigned")))
-RELEASE_DIR: Path = Path(os.environ.get("RELEASE_DIR", str(OUT_DIR / "release")))
+BUILD_DIR: Path = APP_DIR / "build"
+OUT_DIR: Path = APP_DIR / "signing-out"
+UNSIGNED_DIR: Path = OUT_DIR / "unsigned"
+RELEASE_DIR: Path = OUT_DIR / "release"
 MANIFEST_FILE_NAME = "manifest.env"
 TOSIGN_FILE_NAME = "manifest-tosign.env"
 
@@ -41,16 +47,16 @@ TOSIGN_FILE_NAME = "manifest-tosign.env"
 
 PYTHON: str = os.environ.get("PYTHON", "python3")
 IMGTOOL: Path = Path(os.environ.get(
-    "IMGTOOL", str(NCS_DIR / "bootloader/mcuboot/scripts/imgtool.py")))
+    "IMGTOOL", str(_MCUBOOT_MODULE_DIR / "scripts/imgtool.py")))
 MERGEHEX: Path = Path(os.environ.get(
-    "MERGEHEX", str(NCS_DIR / "zephyr/scripts/build/mergehex.py")))
+    "MERGEHEX", str(_ZEPHYR_BASE / "scripts/build/mergehex.py")))
 HASH_PY: Path = Path(os.environ.get(
-    "HASH_PY", str(NCS_DIR / "nrf/scripts/bootloader/hash.py")))
+    "HASH_PY", str(_NRF_MODULE_DIR / "scripts/bootloader/hash.py")))
 VALIDATION_DATA_PY: Path = Path(os.environ.get(
     "VALIDATION_DATA_PY",
-    str(NCS_DIR / "nrf/scripts/bootloader/validation_data.py")))
+    str(_NRF_MODULE_DIR / "scripts/bootloader/validation_data.py")))
 PROVISION_PY: Path = Path(os.environ.get(
-    "PROVISION_PY", str(NCS_DIR / "nrf/scripts/bootloader/provision.py")))
+    "PROVISION_PY", str(_NRF_MODULE_DIR / "scripts/bootloader/provision.py")))
 
 # ---------------------------------------------------------------------------
 # Output formatting
@@ -201,7 +207,7 @@ def _run(cmd: list[str | Path], **kwargs) -> subprocess.CompletedProcess:
 
 
 def app_sign_args(
-    version: str, slot_size: str, header_size: str, align: str, load_addr: str,
+    version: str, slot_size: str, header_size: str, align: str, rom_fixed: str,
 ) -> list[str]:
     return [
         "sign",
@@ -210,7 +216,7 @@ def app_sign_args(
         "--header-size", header_size,
         "--pad-header",
         "--align", align,
-        "--rom-fixed", load_addr,
+        "--rom-fixed", rom_fixed,
     ]
 
 
@@ -250,10 +256,10 @@ def app_digest(
     slot_size: str,
     header_size: str,
     align: str,
-    load_addr: str,
+    rom_fixed: str,
 ) -> bytes:
     """Compute the imgtool signing digest for the app (MCUboot Vault sign input)."""
-    args = app_sign_args(version, slot_size, header_size, align, load_addr)
+    args = app_sign_args(version, slot_size, header_size, align, rom_fixed)
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / "app.digest"
         _run([PYTHON, IMGTOOL, *args, "-k", pubkey,
@@ -334,10 +340,10 @@ def app_fixsig(
     slot_size: str,
     header_size: str,
     align: str,
-    load_addr: str,
+    rom_fixed: str,
 ) -> None:
     """Apply a Vault MCUboot signature to the unsigned app → signed app."""
-    args = app_sign_args(version, slot_size, header_size, align, load_addr)
+    args = app_sign_args(version, slot_size, header_size, align, rom_fixed)
     _run([PYTHON, IMGTOOL, *args,
           "--fix-sig", sig_b64der_file,
           "--fix-sig-pubkey", pubkey,

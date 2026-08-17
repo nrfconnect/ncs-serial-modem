@@ -9,26 +9,22 @@ All commands below assume ``ncs-serial-modem/app`` as the working directory.
 
    **Serial Modem connection**
 
-   After flashing, a working Serial Modem requires the correct UART wiring — in
-   particular the **DTR** pin wired to **GND** when using a PC host. See the
-   :ref:`uart_configuration` documentation for pin mapping, signal descriptions,
-   and host setup.
+   nRF91M1 requires the correct UART wiring — in particular the **DTR** pin wired to **GND** when using a PC host.
+   See the :ref:`uart_configuration` documentation for pin mapping, signal descriptions, and host setup.
 
 Signing pipeline
 ================
 
-All build-side scripts are Python and run on a normal build machine, never
-touching private key material. For the secure signing step, both
-``sign_hashes.py`` (requires Python ≥ 3.9) and ``sign-hashes.sh`` (requires
-only bash and the vault CLI) are provided — use the shell version on signing
-machines without Python.
+All build-side scripts are Python and are supposed to be run on an ordinary build machine, with **no access to a private key material**. For the secure signing step ``sign_hashes.py``  and ``sign_hashes.sh``; bash version is provided for signing on machines with no python.
+``sign_hashes.py`` requires python version  ≥ 3.9.
+``sign_hashes.sh`` has no external requirements except bash version ≥ 5.2.21.
 
 Typical split:
 
 1. **Build machine** — ``sign_build_unsigned.py`` produces ``manifest-tosign.env``
    (opaque base64 hashes, no secrets).
 2. **Secure environment** — carries in ``manifest-tosign.env`` and
-   ``sign_hashes.py`` (or ``sign-hashes.sh``), authenticates to Vault, produces
+   ``sign_hashes.py`` (or ``sign_hashes.sh``), authenticates to Vault, produces
    ``manifest-signed.env`` (signatures, no key material).
 3. **Build machine** — ``sign_assemble.py`` applies the signatures and produces
    the flashable images.
@@ -46,7 +42,7 @@ Vault session must still be valid for the second call, or re-authenticate.
 
 .. warning::
 
-   **Build machine trust boundary**
+   **Trust boundaries of a build machine**
 
    A compromised build environment could inject malicious code into the firmware
    before hashing, or substitute the hashes sent to the secure environment.
@@ -145,12 +141,12 @@ Set ``CONFIG_FW_INFO_FIRMWARE_VERSION`` to 2 in MCUboot Kconfig before building.
 
 Expected: MCUboot version counter using ``AT#XBOOTINFO=0`` returns 2.
 
-B0 key rotation
-===============
+B0 key revocation
+=================
 
 B0 provisions all public keys found in ``nrf91m1/certs/{env}/b0/`` at initial
 flash. The active signing key advances monotonically via the hardware counter;
-once a key is rotated out, it is permanently revoked.
+earlier keys are permanently revoked if a later key passes verification.
 
 Step 1 — Rotate to B0_V1 (revokes B0_V0)
 ----------------------------------------
