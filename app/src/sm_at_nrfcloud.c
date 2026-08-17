@@ -198,11 +198,11 @@ static void nrfcloud_conn_work_fn(struct k_work *work)
 	} else {
 		LOG_DBG("Disconnecting from nRF Cloud.");
 		err = nrf_cloud_coap_disconnect();
-		if (err) {
-			LOG_ERR("Cloud disconnection failed, error: %d", err);
-			urc_send_to(nrfcloud_pipe, "\r\n#XNRFCLOUD: %d,%d\r\n", 1,
-				    sm_nrf_cloud_send_location);
-			return;
+		if (err && err != -ENOTCONN) {
+			/* The socket fd is freed even when close() fails, so treat the
+			 * connection as down to keep sm_nrf_cloud_ready in sync.
+			 */
+			LOG_WRN("Cloud disconnection failed, error: %d", err);
 		}
 		on_cloud_disconnected();
 	}
