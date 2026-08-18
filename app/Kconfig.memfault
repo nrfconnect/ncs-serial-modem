@@ -76,3 +76,10 @@ configdefault COAP_EXTENDED_OPTIONS_LEN_VALUE
 
 configdefault COAP_CLIENT_MAX_EXTRA_OPTIONS
 	default 4 if MEMFAULT
+
+# The larger CoAP options above (COAP_EXTENDED_OPTIONS_LEN_VALUE and
+# COAP_CLIENT_MAX_EXTRA_OPTIONS) enlarge struct coap_client_request, which the
+# nRF Provisioning thread builds on its stack in send_coap_request(),
+# so the stack size must be increased to accommodate it.
+configdefault NRF_PROVISIONING_STACK_SIZE
+	default 2560 if MEMFAULT
