@@ -24,6 +24,10 @@
 LOG_MODULE_REGISTER(sm, CONFIG_SM_LOG_LEVEL);
 
 struct k_work_q sm_work_q;
+#if defined(CONFIG_SM_BLOCKING_WORK_Q)
+struct k_work_q sm_blocking_work_q;
+K_THREAD_STACK_DEFINE(sm_blocking_work_q_stack, CONFIG_SM_BLOCKING_WORK_Q_STACK_SIZE);
+#endif
 bool sm_init_failed = false;
 
 NRF_MODEM_LIB_ON_INIT(lwm2m_init_hook, on_modem_lib_init, NULL);
@@ -222,6 +226,9 @@ void lte_auto_connect(void)
 static int init_sm_work_q(void)
 {
 	k_work_queue_init(&sm_work_q);
+#if defined(CONFIG_SM_BLOCKING_WORK_Q)
+	k_work_queue_init(&sm_blocking_work_q);
+#endif
 	return 0;
 }
 SYS_INIT(init_sm_work_q, PRE_KERNEL_1, 0);
@@ -232,6 +239,15 @@ int main(void)
 		.name = "sm_work_q",
 		.essential = true,
 	};
+#if defined(CONFIG_SM_BLOCKING_WORK_Q)
+	static const struct k_work_queue_config blocking_cfg = {
+		.name = "sm_blocking_wq",
+	};
+
+	k_work_queue_start(&sm_blocking_work_q, sm_blocking_work_q_stack,
+			   K_THREAD_STACK_SIZEOF(sm_blocking_work_q_stack),
+			   K_LOWEST_APPLICATION_THREAD_PRIO, &blocking_cfg);
+#endif
 
 	k_thread_priority_set(k_current_get(), K_LOWEST_APPLICATION_THREAD_PRIO);
 	k_work_queue_run(&sm_work_q, &cfg);

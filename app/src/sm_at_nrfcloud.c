@@ -229,6 +229,9 @@ STATIC int handle_at_nrf_cloud(enum at_parser_cmd_type cmd_type, struct at_parse
 			return err;
 		}
 		if (op == SM_NRF_CLOUD_CONNECT && !sm_nrf_cloud_ready) {
+			if (k_work_busy_get(&nrfcloud_conn_work)) {
+				return -EBUSY;
+			}
 			if (param_count > 2) {
 				err = at_parser_num_get(parser, 2, &send_location);
 				if (send_location != 0 && send_location != 1) {
@@ -241,14 +244,17 @@ STATIC int handle_at_nrf_cloud(enum at_parser_cmd_type cmd_type, struct at_parse
 
 			nrfcloud_connect = true;
 			nrfcloud_conn_send_location = send_location;
-			k_work_submit_to_queue(&sm_work_q, &nrfcloud_conn_work);
+			sm_k_work_submit_blocking(&nrfcloud_conn_work);
 			err = 0;
 		} else if (op == SM_NRF_CLOUD_SEND && sm_nrf_cloud_ready) {
 			/* enter data mode */
 			err = enter_datamode(nrf_cloud_datamode_callback, 0);
 		} else if (op == SM_NRF_CLOUD_DISCONNECT && sm_nrf_cloud_ready) {
+			if (k_work_busy_get(&nrfcloud_conn_work)) {
+				return -EBUSY;
+			}
 			nrfcloud_connect = false;
-			k_work_submit_to_queue(&sm_work_q, &nrfcloud_conn_work);
+			sm_k_work_submit_blocking(&nrfcloud_conn_work);
 			err = 0;
 		} else {
 			err = -EBUSY;
@@ -447,7 +453,7 @@ STATIC int handle_at_nrf_cloud_pos(enum at_parser_cmd_type cmd_type,
 		/* To workqueue to be able to send OK response */
 		k_work_submit_to_queue(&sm_work_q, &sm_at_nrfcloud_ncellmeas_work);
 	} else {
-		k_work_submit_to_queue(&sm_work_q, &nrfcloud_loc_req_work);
+		sm_k_work_submit_blocking(&nrfcloud_loc_req_work);
 	}
 	return 0;
 }
@@ -580,7 +586,7 @@ static void ncellmeas_complete(void)
 	}
 
 	if (ncellmeas_send_loc_req_flag) {
-		k_work_submit_to_queue(&sm_work_q, &nrfcloud_loc_req_work);
+		sm_k_work_submit_blocking(&nrfcloud_loc_req_work);
 	} else {
 		/* Transfer cell_data ownership to the callback / caller. */
 		struct lte_lc_cells_info *cell_data = nrfcloud_cell_data;
@@ -613,7 +619,7 @@ int sm_at_nrfcloud_ncellmeas_start(uint8_t cell_count, bool send_loc_req,
 	if (cell_data == NULL) {
 		LOG_ERR("Failed to allocate memory for the nRF Cloud cell data");
 		if (send_loc_req) {
-			k_work_submit_to_queue(&sm_work_q, &nrfcloud_loc_req_work);
+			sm_k_work_submit_blocking(&nrfcloud_loc_req_work);
 		}
 		return -ENOMEM;
 	}

@@ -6,6 +6,14 @@
 
 menu "Nordic Serial Modem"
 
+config SM_BLOCKING_WORK_Q
+	bool
+
+config SM_BLOCKING_WORK_Q_STACK_SIZE
+	int "Stack size for the blocking operations work queue"
+	default 4096
+	depends on SM_BLOCKING_WORK_Q
+
 config SM_CUSTOMER_VERSION
 	string "Customer version string"
 	help
@@ -243,6 +251,7 @@ config SM_NRF_CLOUD
 	depends on NRF_CLOUD_COAP
 	depends on DATE_TIME
 	select EXPERIMENTAL
+	select SM_BLOCKING_WORK_Q
 
 if SM_NRF_CLOUD
 config HEAP_MEM_POOL_ADD_SIZE_SM_NRF_CLOUD

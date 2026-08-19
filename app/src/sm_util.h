@@ -21,7 +21,13 @@
 #include <hal/nrf_gpio.h>
 #include <zephyr/modem/pipe.h>
 
-extern struct k_work_q sm_work_q; /* Serial Modem's work queue. */
+extern struct k_work_q sm_work_q; /* Serial Modem's main work queue. */
+#if defined(CONFIG_SM_BLOCKING_WORK_Q)
+extern struct k_work_q sm_blocking_work_q; /* Work queue for long-blocking operations. */
+#define sm_k_work_submit_blocking(work) k_work_submit_to_queue(&sm_blocking_work_q, (work))
+#else
+#define sm_k_work_submit_blocking(work) k_work_submit_to_queue(&sm_work_q, (work))
+#endif
 
 /** @return Whether the modem is in the given functional mode. */
 bool sm_is_modem_functional_mode(enum lte_lc_func_mode mode);
