@@ -13,6 +13,9 @@
 #include <zephyr/sys/reboot.h>
 #include <zephyr/logging/log_ctrl.h>
 #include <net/fota_download.h>
+#if defined(CONFIG_MEMFAULT)
+#include <memfault/core/trace_event.h>
+#endif /* CONFIG_MEMFAULT */
 #include "sm_at_host.h"
 #include "sm_at_dfu.h"
 #include "sm_at_fota.h"
@@ -51,6 +54,11 @@ static void on_modem_failure(struct k_work *)
 	int ret;
 	struct modem_pipe *pipe = sm_at_host_get_urc_pipe();
 
+#if defined(CONFIG_MEMFAULT)
+	/* Record the modem fault as a Memfault trace event */
+	MEMFAULT_TRACE_EVENT_WITH_LOG(modem_fault, "Modem fault: reason=0x%x pc=0x%x",
+				      modem_fault_info.reason, modem_fault_info.program_counter);
+#endif /* CONFIG_MEMFAULT */
 	urc_send_to(pipe, "\r\n#XMODEM: FAULT,0x%x,0x%x\r\n", modem_fault_info.reason,
 		    modem_fault_info.program_counter);
 

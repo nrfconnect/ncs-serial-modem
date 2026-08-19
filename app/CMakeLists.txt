@@ -39,5 +39,6 @@ target_sources_ifdef(CONFIG_NRF_PROVISIONING app PRIVATE src/sm_at_provisioning.
 add_subdirectory_ifdef(CONFIG_SM_CARRIER src/lwm2m_carrier)
 
 zephyr_include_directories(src)
+zephyr_include_directories(memfault)
 
 include(cmake/sm_version.cmake)
