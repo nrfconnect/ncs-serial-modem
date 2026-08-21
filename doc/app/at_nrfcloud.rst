@@ -312,12 +312,13 @@ The ``#XNRFCLOUDOBS*`` commands control the Memfault data that the device collec
 
    * The commands that access the network (``#XNRFCLOUDOBSUPLOAD`` and ``#XNRFCLOUDOBSFORWARD``) require a connection to nRF Cloud.
      See ``AT#XNRFCLOUD``.
-   * ``#XNRFCLOUDOBSDEVINFO``, ``#XNRFCLOUDOBSCRASH`` and ``#XNRFCLOUDOBSEXPORT`` additionally require the :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG <CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG>` Kconfig option, which is disabled by default.
+   * ``#XNRFCLOUDOBSDEVINFO``, ``#XNRFCLOUDOBSCRASH``, and ``#XNRFCLOUDOBSEXPORT`` additionally require the :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG <CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG>` Kconfig option, which is disabled by default.
 
    Upload is host-driven.
-   The automatic upload starts disabled, and the host enables it with ``AT#XNRFCLOUDOBSAUTO=1`` or uploads on demand with ``AT#XNRFCLOUDOBSUPLOAD``.
+   Automatic uploads are disabled by default.
+   The host enables it with ``AT#XNRFCLOUDOBSAUTO=1`` or initiate uploads on demand with ``AT#XNRFCLOUDOBSUPLOAD``.
 
-The ``<project_key>`` parameter, which several of the commands accept, is a string.
+The ``<project_key>`` parameter, used by several commands, is a string.
 It is a 32-character Memfault project key.
 When it is present and not empty, it overrides the server-side project-key routing, sending the data to the specified Memfault project.
 For more information about Memfault project keys, see `Memfault Project Keys`_.
@@ -360,7 +361,7 @@ Syntax
 The first upload runs when the interval expires, not when the automatic upload is enabled.
 An upload that falls while there is no connection to nRF Cloud is skipped, and the next one is scheduled as usual.
 
-The automatic upload is silent: it sends no unsolicited notification.
+The automatic upload is silent and does not send any unsolicited notifications.
 
 Response
 ~~~~~~~~
@@ -501,8 +502,8 @@ The ``#XNRFCLOUDOBSHEARTBEAT`` command collects and finalizes a metrics heartbea
 
 The data is buffered on the device until it is uploaded, so the command does not require a connection to nRF Cloud.
 
-The heartbeat carries the LTE metrics that the modem reports: the modem firmware version, the network operator, RSRP, SNR, the current band, and the transmitted and received kilobytes.
-Values that the modem does not report, for example when it is deactivated, are left out of the heartbeat.
+The heartbeat carries the LTE metrics that the modem reports, such as the modem firmware version, the network operator, RSRP, SNR, the current band, and the transmitted and received data in kilobytes.
+Values not reported by the modem, such as when it is deactivated, are excluded from the heartbeat.
 
 Set command
 -----------
@@ -719,7 +720,7 @@ Response
 Chunk export #XNRFCLOUDOBSEXPORT
 ================================
 
-The ``#XNRFCLOUDOBSEXPORT`` command prints the buffered Memfault chunks to the AT interface instead of uploading them, in the Memfault chunk export format, which the Memfault tooling can parse.
+The ``#XNRFCLOUDOBSEXPORT`` command prints the buffered Memfault chunks to the AT interface instead of uploading them in the Memfault chunk export format, which the Memfault tooling can parse.
 
 This command requires the :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG <CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG>` Kconfig option.
 
