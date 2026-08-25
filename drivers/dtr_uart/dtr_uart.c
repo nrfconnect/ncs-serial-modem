@@ -607,7 +607,7 @@ static int dtr_uart_init(const struct device *dev)
 }
 
 /* --- UART driver API ---- */
-static const struct uart_driver_api dtr_uart_api = {
+static DEVICE_API(uart, dtr_uart_api) = {
 	.callback_set = api_callback_set,
 	.tx = api_tx,
 	.tx_abort = api_tx_abort,
