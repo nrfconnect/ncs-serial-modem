@@ -22,6 +22,3 @@ endif()
 
 find_package(Sysbuild REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(sysbuild LANGUAGES)
-
-set(MERGED_HEX_APP_IMAGE app)
-include(${CMAKE_CURRENT_LIST_DIR}/../../cmake/merged_hex.cmake)
