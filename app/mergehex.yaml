@@ -1,0 +1,6 @@
+merged_nrf9151dk.hex:
+- merged_nrf9151dk_nrf9151.hex
+- merged_nrf9151dk_nrf9151_ns.hex
+merged_thingy91x.hex:
+- merged_thingy91x_nrf9151.hex
+- merged_thingy91x_nrf9151_ns.hex
