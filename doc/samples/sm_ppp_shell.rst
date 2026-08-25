@@ -35,8 +35,7 @@ The sample supports the following development kits:
    * - `nRF54L15 DK <nRF54L15 DK_>`_
      - PCA10156
      - `nrf54l15dk`_
-     - | ``nrf54l15dk/nrf54l15/cpuapp``
-       | ``nrf54l15dk/nrf54l15/cpuapp/ns`` (`TF-M`_)
+     - ``nrf54l15dk/nrf54l15/cpuapp``
    * - Native simulator
      - N/A
      - ``native_sim``
@@ -128,10 +127,6 @@ Building and running
 
 This sample can be found under :file:`samples/sm_ppp_shell`.
 
-For more security, it is recommended to use the ``*/ns`` `variant <app_boards_names_>`_ of the board target (see the Requirements section above.)
-When built for this variant, the sample is configured to compile and run as a non-secure application using `security by separation <ug_tfm_security_by_separation_>`_.
-Therefore, it automatically includes `Trusted Firmware-M <ug_tfm_>`_ that prepares the required peripherals and secure services to be available for the application.
-
 nRF54L15 DK
 ===========
 
@@ -140,12 +135,6 @@ To build the sample for the nRF54L15 DK:
 .. code-block:: bash
 
    west build -b nrf54l15dk/nrf54l15/cpuapp
-
-For the TrustZone-enabled variant:
-
-.. code-block:: bash
-
-   west build -b nrf54l15dk/nrf54l15/cpuapp/ns
 
 Flash the sample to your board and open a serial terminal to view the shell interface.
 

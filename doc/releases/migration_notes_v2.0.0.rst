@@ -95,3 +95,5 @@ The following changes are listed for informational purposes, and many hosts will
 * HTTP client has been added and it's enabled by default. Use CONFIG_SM_HTTPC=n if you do not need it and want to save flash.
 * nRF Cloud transport has been changed from MQTT to CoAP.
 * ``CONFIG_SM_NRF_CLOUD_LOCATION`` is enabled by default whenever ``CONFIG_SM_NRF_CLOUD`` is enabled. Use ``CONFIG_SM_NRF_CLOUD_LOCATION=n`` if you do not need it and want to save flash.
+* The ``sm_ppp_shell`` sample no longer supports the ``nrf54l15dk/nrf54l15/cpuapp/ns`` (TF-M) board target.
+  Use ``nrf54l15dk/nrf54l15/cpuapp`` instead.
