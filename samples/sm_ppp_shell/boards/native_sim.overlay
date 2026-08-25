@@ -5,6 +5,10 @@
  */
 
 / {
+	aliases {
+		modem = &modem;
+	};
+
 	/*
 	 * Enable UART2 as the serial interface to the nRF91 Serial Modem application.
 	 * Assume that the UART which receives modem AT-commands is available at /dev/ttyACM0 on the host system.

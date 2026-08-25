@@ -36,8 +36,7 @@ struct modem_ppp {
 	struct modem_pipe *pipe;
 	bool attached;
 };
-
-#define MODEM_PPP_DEFINE(_name, _init_iface, _prio, _mtu, _buf_size)                               \
+#define MODEM_PPP_DEFINE(_name, _init_iface, _mtu, _buf_size)                                      \
 	static struct modem_ppp _name = {                                                          \
 		.name = #_name,                                                                    \
 		.mtu = (_mtu),                                                                     \

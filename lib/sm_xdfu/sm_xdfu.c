@@ -37,7 +37,7 @@ static void xdfu_chat_on_ready(struct modem_chat *chat, char **argv, uint16_t ar
 			       void *user_data);
 
 MODEM_CELLULAR_COMMON_CHAT_MATCHES();
-MODEM_CELLULAR_UNSOL_DEFINE(xdfu_unsol,
+MODEM_CHAT_MATCHES_DEFINE(xdfu_unsol,
 	MODEM_CHAT_MATCH("#XDATAMODE: ", ",", NULL),
 	MODEM_CHAT_MATCH("#XDFU:", ",", xdfu_chat_on_xdfu),
 	MODEM_CHAT_MATCH("Bootloader mode ready", NULL, xdfu_chat_on_blmode),
@@ -110,8 +110,8 @@ static int xdfu_chat_init(void)
 		.filter_size = sizeof("\n") - 1,
 		.argv = xdfu_chat_instance->argv,
 		.argv_size = XDFU_CHAT_ARGV_COUNT,
-		.unsol_matches = xdfu_unsol.matches,
-		.unsol_matches_size = xdfu_unsol.size,
+		.unsol_matches = xdfu_unsol,
+		.unsol_matches_size = ARRAY_SIZE(xdfu_unsol),
 		.user_data = NULL,
 	};
 
