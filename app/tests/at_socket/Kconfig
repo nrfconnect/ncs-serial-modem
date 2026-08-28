@@ -1,26 +1,11 @@
+#
 # Copyright (c) 2026 Nordic Semiconductor ASA
+#
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
-
-# Symbols used by sm_at_mqtt.c that are normally gated behind SM_MQTTC
-# (which selects MQTT_LIB and thus the full socket stack). Defined here
-# without parent constraints so the test build can set them while keeping
-# the MQTT library mocked.
-
-config SM_MQTTC_MESSAGE_BUFFER_LEN
-	int "Size of the MQTT RX/TX buffers"
-	default 512
-	range 1 65536
-
-config MQTT_KEEPALIVE
-	int "MQTT keep-alive interval (seconds)"
-	default 60
-
-config MQTT_CLEAN_SESSION
-	bool "MQTT clean session"
-	default n
+#
 
 # SM core symbols — normally defined inside menu "Nordic Serial Modem" in
-# app/Kconfig.  Redefined here as standalone symbols because the app Kconfig
+# app/Kconfig. Redefined here as standalone symbols because the app Kconfig
 # cannot be rsourced (it owns mainmenu and sources Kconfig.zephyr itself).
 
 # NRF_MODEM_LIB_MEM_DIAG is normally gated by NRF_MODEM_LIB; define it here
@@ -76,7 +61,7 @@ config SM_CMUX_CHANNEL_COUNT
 	default 1
 
 # subsys/net/ip/Kconfig is not sourced when the network stack is disabled,
-# so define this symbol explicitly to get the AF_INET/SOCK_STREAM etc. aliases.
+# so define this symbol explicitly to get the AF_INET/SOL_SOCKET etc. aliases.
 config NET_NAMESPACE_COMPAT_MODE
 	bool "Network namespace compatibility mode"
 	default y

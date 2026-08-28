@@ -1,0 +1,36 @@
+#
+# Copyright (c) 2026 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+# SM core and PPP/CMUX symbols — normally defined inside menu "Nordic Serial Modem"
+# in app/Kconfig. Redefined here as standalone symbols because the app Kconfig
+# cannot be rsourced (it owns mainmenu and sources Kconfig.zephyr itself).
+
+# Integer log level: 0=off 1=err 2=wrn 3=inf 4=dbg (Zephyr log_config template)
+config SM_LOG_LEVEL
+	int "Log level"
+	default 3
+
+config SM_PPP
+	bool "PPP support"
+
+config SM_PPP_FALLBACK_MTU
+	int "Fallback MTU to be used by PPP"
+	default 1280
+
+config SM_CMUX
+	bool "CMUX support"
+
+config SM_CMUX_CHANNEL_COUNT
+	int "CMUX channel count"
+	default 1
+
+# subsys/net/ip/Kconfig is not sourced when the network stack is disabled,
+# so define this symbol explicitly to get the AF_PACKET/SOL_SOCKET etc. aliases.
+config NET_NAMESPACE_COMPAT_MODE
+	bool "Network namespace compatibility mode"
+	default y
+
+source "Kconfig.zephyr"
