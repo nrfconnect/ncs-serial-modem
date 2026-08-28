@@ -83,3 +83,37 @@
 		};
 	};
 };
+
+/*
+ * Use external flash for littlefs storage.
+ */
+/ {
+	fstab {
+		compatible = "zephyr,fstab";
+
+		lfs: lfs {
+			compatible = "zephyr,fstab,littlefs";
+			mount-point = "/lfs";
+			partition = <&lfs_part>;
+			automount;
+			read-size = <16>;
+			prog-size = <16>;
+			cache-size = <64>;
+			lookahead-size = <32>;
+			block-cycles = <512>;
+		};
+	};
+};
+
+&mx25r64 {
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		lfs_part: partition@0 {
+			label = "littlefs";
+			reg = <0x00000000 DT_SIZE_M(8)>;
+		};
+	};
+};

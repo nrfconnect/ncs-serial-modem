@@ -24,4 +24,38 @@
 		};
 	};
 
+	/*
+	 * Use native_sim's simulated flash storage partition for littlefs storage.
+	 */
+	fstab {
+		compatible = "zephyr,fstab";
+
+		lfs: lfs {
+			compatible = "zephyr,fstab,littlefs";
+			mount-point = "/lfs";
+			partition = <&storage_partition>;
+			automount;
+			read-size = <16>;
+			prog-size = <16>;
+			cache-size = <64>;
+			lookahead-size = <32>;
+			block-cycles = <512>;
+		};
+	};
+};
+
+/* Define bigger flash for LitteFS
+ * 64Mbit = 8MByte
+ */
+&flashcontroller0 {
+	reg = <0x00000000 DT_SIZE_M(8)>;
+};
+
+&flash0 {
+	reg = <0x00000000 DT_SIZE_M(8)>;
+
+};
+
+&storage_partition {
+	reg = <0x000fc000 0x704000>;
 };
