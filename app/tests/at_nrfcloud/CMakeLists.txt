@@ -24,21 +24,7 @@ zephyr_include_directories(${ZEPHYR_NRFXLIB_MODULE_DIR}/nrf_modem/include/)
 
 # Compiler options to set configuration values
 target_compile_options(app PRIVATE
-  -DCONFIG_NRF_MODEM_LIB_MEM_DIAG=y
   -D__ELASTERROR=2000
-  -DCONFIG_SM_URC_BUFFER_SIZE=4096
-  -DCONFIG_SM_DATAMODE_BUF_SIZE=4096
-  -DCONFIG_SM_DATAMODE_TERMINATOR=\"+++\"
-  -DCONFIG_SM_LOG_LEVEL=0
-  -DCONFIG_SM_CR_LF_TERMINATION=1
-  -DCONFIG_SM_CUSTOMER_VERSION=\"\"
-  -DCONFIG_SM_URC_DELAY_WITH_INCOMPLETE_ECHO_MS=1000
-  -DCONFIG_SM_AT_ECHO_MAX_LEN=256
-  -DCONFIG_SM_UART_RX_BUF_SIZE=256
-  -DCONFIG_SM_UART_TX_BUF_SIZE=256
-  -DCONFIG_SM_NRF_CLOUD_LOCATION=1
-  -DCONFIG_NRF_CLOUD_SEC_TAG=16842753
-  -DCONFIG_SM_CMUX_CHANNEL_COUNT=1
   # Not a Kconfig symbol: shorten the wait for a chunk response so that the timeout path is
   # testable. The observability symbols are declared in Kconfig and set in prj.conf.
   -DOBS_COAP_RESPONSE_TIMEOUT_MS=50

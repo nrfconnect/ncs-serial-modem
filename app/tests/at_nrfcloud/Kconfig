@@ -9,6 +9,67 @@
 # and MEMFAULT_USE_NRF_CLOUD_COAP dependencies, which cannot be met on native_sim as the modem
 # and Memfault are mocked. prj.conf assigns their values.
 
+# NRF_MODEM_LIB_MEM_DIAG is normally gated by NRF_MODEM_LIB; define it here
+# so the nrf_modem_lib_diag_stats mock compiles with the full struct definition.
+config NRF_MODEM_LIB_MEM_DIAG
+	bool "modem lib diagnostics"
+
+config SM_CUSTOMER_VERSION
+	string "Customer version string"
+
+config SM_URC_BUFFER_SIZE
+	int "URC TX buffer size"
+	default 4096
+
+config SM_DATAMODE_BUF_SIZE
+	int "Data mode buffer size"
+	range 1024 8192
+	default 4096
+
+config SM_DATAMODE_TERMINATOR
+	string "Data mode terminator pattern"
+	default "+++"
+
+# Integer log level: 0=off 1=err 2=wrn 3=inf 4=dbg (Zephyr log_config template)
+config SM_LOG_LEVEL
+	int "Log level"
+	default 3
+
+config SM_CR_LF_TERMINATION
+	bool "CR+LF termination"
+
+config SM_URC_DELAY_WITH_INCOMPLETE_ECHO_MS
+	int "URC delay with incomplete echo (ms)"
+	default 1000
+
+config SM_AT_ECHO_MAX_LEN
+	int "Maximum AT command echo length"
+	range 2 4096
+	default 4096
+
+config SM_UART_RX_BUF_SIZE
+	int "UART RX buffer size"
+	range 128 4096
+	default 256
+
+config SM_UART_TX_BUF_SIZE
+	int "UART TX buffer size"
+	range 128 4096
+	default 256
+
+config SM_CMUX_CHANNEL_COUNT
+	int "CMUX channel count"
+	default 1
+
+config SM_NRF_CLOUD_LOCATION
+	bool "nRF Cloud Location support"
+
+# NRF_CLOUD_SEC_TAG is normally provided by nrf/subsys/net/lib/nrf_cloud/Kconfig,
+# which is not sourced in the test build. Redeclare it here with the same default.
+config NRF_CLOUD_SEC_TAG
+	int "Security tag to use for nRF Cloud connection"
+	default 16842753
+
 config SM_NRF_CLOUD_OBSERVABILITY
 	bool "nRF Cloud observability AT commands"
 	depends on SETTINGS

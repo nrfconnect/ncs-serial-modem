@@ -14,16 +14,8 @@ zephyr_include_directories(${ZEPHYR_NRFXLIB_MODULE_DIR}/nrf_modem/include/)
 # Compiler options to set configuration values
 target_compile_options(app PRIVATE
   -D__ELASTERROR=2000
-  -DCONFIG_SM_LOG_LEVEL=0
-  -DCONFIG_SM_PPP=1
-  -DCONFIG_SM_PPP_FALLBACK_MTU=1500
-  -DCONFIG_SM_CMUX=1
-  -DCONFIG_SM_CMUX_CHANNEL_COUNT=3
-  -DCONFIG_SM_MODEM_TRACE_BACKEND_CMUX=0
   # Suppress upstream Zephyr warnings in net_if.h (returns address of local var)
   -Wno-return-local-addr
-  # Enable POSIX-compat socket name aliases (AF_PACKET, SOL_SOCKET, sockaddr, ...)
-  -DCONFIG_NET_NAMESPACE_COMPAT_MODE=1
 )
 
 # Generate test runner

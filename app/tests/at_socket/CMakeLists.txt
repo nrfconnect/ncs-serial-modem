@@ -26,25 +26,9 @@ zephyr_include_directories("${GENERATED_DIR}")
 
 # Compiler options to set configuration values
 target_compile_options(app PRIVATE
-  -DCONFIG_NRF_MODEM_LIB_MEM_DIAG=y
   -D__ELASTERROR=2000
-  -DCONFIG_SM_URC_BUFFER_SIZE=4096
-  -DCONFIG_SM_DATAMODE_BUF_SIZE=4096
-  -DCONFIG_SM_DATAMODE_TERMINATOR=\"+++\"
-  -DCONFIG_SM_LOG_LEVEL=3
-  -DCONFIG_SM_CR_LF_TERMINATION=1
-  -DCONFIG_SM_TCP_POLL_TIME=10
-  -DCONFIG_SM_UDP_POLL_TIME=10
-  -DCONFIG_SM_CUSTOMER_VERSION=\"\"
-  -DCONFIG_SM_URC_DELAY_WITH_INCOMPLETE_ECHO_MS=1000
-  -DCONFIG_SM_AT_ECHO_MAX_LEN=256
-  -DCONFIG_SM_UART_RX_BUF_SIZE=256
-  -DCONFIG_SM_UART_TX_BUF_SIZE=256
-  -DCONFIG_SM_CMUX_CHANNEL_COUNT=1
   # Suppress upstream Zephyr warnings in net_if.h (returns address of local var)
   -Wno-return-local-addr
-  # Enable POSIX-compat socket name aliases (AF_INET, SOL_SOCKET, sockaddr, etc.)
-  -DCONFIG_NET_NAMESPACE_COMPAT_MODE=1
 )
 
 # Generate CMock mocks for external dependencies
