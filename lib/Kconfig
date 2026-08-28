@@ -4,5 +4,6 @@
 menu "Libraries"
 
 rsource "sm_at_client/Kconfig"
+rsource "sm_xdfu/Kconfig"
 
 endmenu
