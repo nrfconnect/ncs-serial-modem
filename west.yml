@@ -31,3 +31,4 @@ manifest:
           - trusted-firmware-m
           - zcbor
           - zephyr
+          - littlefs
