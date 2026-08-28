@@ -1,0 +1,24 @@
+#
+# Copyright (c) 2026 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+menuconfig SM_XDFU_LIB
+	bool "Serial Modem XDFU Library"
+	depends on MODEM_CELLULAR
+	depends on COMMON_LIBC_MALLOC
+	depends on FILE_SYSTEM
+	depends on ZCBOR
+	help
+	  Helper library for host device to implement the AT#XDFU update sequence
+	  (XDFUINIT/XDFUWRITE/XDFUAPPLY/XRESET) against nRF91 Serial Modem device.
+	  Uses Zephyr's modem_cellular device's UART backends.
+
+if SM_XDFU_LIB
+
+module = SM_XDFU_LIB
+module-str = SM XDFU Library
+source "$(ZEPHYR_BASE)/subsys/logging/Kconfig.template.log_config"
+
+endif # SM_XDFU_LIB
