@@ -771,7 +771,7 @@ These commands will print the following output in the log:
    [00:00:36.271,057] <inf> sm_at:   allocated:           0
    [00:00:36.271,057] <inf> sm_at:   max. allocated:   1280
 
-The output appears as follows when ``CONFIG_SM_DEBUG_STATS_THREAD_STACK`` and ``CONFIG_SYS_HEAP_INFO`` Kconfig options are enabled.
+The output appears as follows when :ref:`CONFIG_SM_DEBUG_STATS_THREAD_STACK <CONFIG_SM_DEBUG_STATS_THREAD_STACK>` and ``CONFIG_SYS_HEAP_INFO`` Kconfig options are enabled.
 ::
 
    [00:01:16.852,478] <inf> sm_at: System heap stats:
