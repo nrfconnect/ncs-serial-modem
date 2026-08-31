@@ -81,6 +81,10 @@ Send ``AT#XCMUXURC=2`` to route URCs to DLC channel 2, start CMUX with ``AT+CMUX
    The ``AT#XCMUXURC=2`` is optional, but it is recommended to route URCs to a static channel.
    When the URC channel is not selected, URCs are sent to the first open AT channel, which is not in data mode.
 
+.. note::
+
+   The sequence diagrams in this section show ``+CEREG:`` and ``+CGEV:`` URCs on the AT channel for illustration.
+   By default, |SM| does not forward these URCs to the host.
 
 Use case: Linux host
 ********************
@@ -370,7 +374,7 @@ Before using a Zephyr host to control the SiP, make sure the modem system mode i
 When the Zephyr's modem driver starts up, it will perform the following steps:
 
 * Enable the UART interface.
-* Enable notifications and query modem information.
+* Enable registration URC forwarding with ``AT+CEREG=1`` and query modem information.
 * Configure URCs to DLC channel 1 with ``AT#XCMUXURC=1``.
 * Enable CMUX with ``AT+CMUX=0``.
 * Set the modem to normal mode with ``AT+CFUN=1``.

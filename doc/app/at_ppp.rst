@@ -163,6 +163,12 @@ If you use the CMUX , the PPP connection starts at the alternative DLC channel, 
 Without CMUX, the PPP starts on the current UART, and AT commands cannot be used until PPP is stopped by the LCP termination message.
 Similarly, no more AT notifications are sent over the same UART and all URC messages are lost until PPP is stopped.
 
+.. note::
+
+   PPP auto-start uses ``+CGEV:`` URCs inside |SM|.
+   These URCs are not forwarded to the host unless you enable them with ``AT+CGEREP=1``.
+   The host receives PPP status through the ``#XPPP`` notification.
+
 .. sm_ppp_status_notif_end
 
 PPP Link termination
@@ -340,7 +346,7 @@ For the process described here, |SM|'s UARTs must be connected to the Linux host
 
 .. note::
 
-   You might encounter a packet domain event (``+CGEV: IPV6 FAIL 0``) indicating a failure in obtaining an IPv6 address.
+   If you enable packet-domain URC forwarding with ``AT+CGEREP=1``, you might see a packet domain event (``+CGEV: IPV6 FAIL 0``) indicating a failure in obtaining an IPv6 address.
    This is normal and can be ignored since the modem does not require an IPv6 address when PPP is used.
    IPv6 addressing is handled by the host's IP stack.
 

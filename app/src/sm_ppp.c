@@ -30,12 +30,6 @@ LOG_MODULE_REGISTER(sm_ppp, CONFIG_SM_LOG_LEVEL);
 #define NO_CARRIER "\r\nNO CARRIER\r\n"
 #define PDN_ACTIVATION_TIMEOUT K_SECONDS(30)
 
-/* This keeps track of whether the user is registered to the CGEV notifications.
- * We need them to know when to start/stop the PPP link, but that should not
- * influence what the user receives, so we do the filtering based on this.
- */
-bool sm_fwd_cgev_notifs;
-
 static struct net_if *ppp_iface;
 static bool sm_ppp_auto_start;
 static bool sm_ppp_detach_at_pipe;
@@ -495,64 +489,6 @@ static void sm_ppp_activate_pdp_dwork_fn(struct k_work *work)
 	delegate_ppp_event(PPP_START, PPP_REASON_CMD);
 }
 
-/* We need to receive CGEV notifications at all times.
- * CGEREP AT commands are intercepted to prevent the user
- * from unsubcribing us and make that behavior invisible.
- */
-AT_CMD_CUSTOM(at_cgerep_interceptor, "AT+CGEREP", at_cgerep_callback);
-
-STATIC int at_cgerep_callback(char *buf, size_t len, char *at_cmd)
-{
-	int ret;
-	unsigned int subscribe = 0;
-	const bool set_cmd = (sscanf(at_cmd, "%*[^=]=%u", &subscribe) == 1);
-
-	/* The modem interprets AT+CGEREP and AT+CGEREP= as AT+CGEREP=0.
-	 * Prevent those forms, only allowing AT+CGEREP=0, for simplicty.
-	 */
-	if (!set_cmd && (!strcasecmp(at_cmd, "AT+CGEREP") || !strcasecmp(at_cmd, "AT+CGEREP="))) {
-		LOG_ERR("The syntax %s is disallowed. Use AT+CGEREP=0 instead.", at_cmd);
-		return -EINVAL;
-	}
-	if (!set_cmd || subscribe) {
-		/* Forward the command to the modem only if not unsubscribing. */
-		ret = sm_util_at_cmd_no_intercept(buf, len, at_cmd);
-		if (ret) {
-			return ret;
-		}
-		/* Modify the output of the read command to reflect the user's
-		 * subscription status, not that of the Serial Modem.
-		 */
-		if (at_cmd[strlen("AT+CGEREP")] == '?') {
-			const size_t mode_idx = strlen("+CGEREP: ");
-
-			if (mode_idx < len) {
-				/* +CGEREP: <mode>,<bfr> */
-				buf[mode_idx] = '0' + sm_fwd_cgev_notifs;
-			}
-		}
-	} else { /* AT+CGEREP=0 */
-		snprintf(buf, len, "%s", "OK\r\n");
-	}
-
-	if (set_cmd) {
-		sm_fwd_cgev_notifs = subscribe;
-	}
-	return 0;
-}
-
-static void subscribe_cgev_notifications(void)
-{
-	char buf[sizeof("\r\nOK")];
-
-	/* Bypass the CGEREP interception above as it is meant for commands received externally. */
-	const int ret = sm_util_at_cmd_no_intercept(buf, sizeof(buf), "AT+CGEREP=1");
-
-	if (ret) {
-		LOG_ERR("Failed to subscribe to +CGEV notifications (%d).", ret);
-	}
-}
-
 static void at_notif_on_cgev(const char *notify)
 {
 	char *str;
@@ -587,34 +523,6 @@ static void at_notif_on_cgev(const char *notify)
 			}
 		}
 	}
-}
-
-/* Notification subscriptions are reset on CFUN=0.
- * We intercept CFUN set commands to automatically subscribe.
- */
-AT_CMD_CUSTOM(at_cfun_set_interceptor, "AT+CFUN=", at_cfun_set_callback);
-
-STATIC int at_cfun_set_callback(char *buf, size_t len, char *at_cmd)
-{
-	unsigned int mode;
-	int ret;
-
-	/* sscanf() doesn't match if this is a test command (it also gets intercepted). */
-	if (sscanf(at_cmd, "%*[^=]=%u", &mode) == 1) {
-		if (mode == LTE_LC_FUNC_MODE_NORMAL || mode == LTE_LC_FUNC_MODE_ACTIVATE_LTE) {
-			subscribe_cgev_notifications();
-		} else if (mode == LTE_LC_FUNC_MODE_POWER_OFF) {
-			/* Unsubscribe the user as would normally happen. */
-			sm_fwd_cgev_notifs = false;
-		}
-	}
-
-	/* Forward AT+CFUN command to the modem. */
-	ret = sm_util_at_cmd_no_intercept(buf, len, at_cmd);
-	if (ret) {
-		return ret;
-	}
-	return 0;
 }
 
 static void ppp_work_fn(void)

@@ -9,9 +9,6 @@
 #include <stdbool.h>
 #include <zephyr/modem/pipe.h>
 
-/* Whether to forward CGEV notifications to the Serial Modem UART. */
-extern bool sm_fwd_cgev_notifs;
-
 bool sm_ppp_is_stopped(void);
 bool ppp_is_running(void);
 void sm_ppp_set_auto_start(bool enable);
