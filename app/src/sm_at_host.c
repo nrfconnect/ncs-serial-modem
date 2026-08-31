@@ -1462,20 +1462,6 @@ static size_t sm_at_receive(struct sm_at_host_ctx *ctx, uint8_t c)
 	return ret;
 }
 
-AT_MONITOR(at_notify, ANY, notification_handler);
-
-static void notification_handler(const char *notification)
-{
-#if defined(CONFIG_SM_PPP)
-	if (!sm_fwd_cgev_notifs && !strncmp(notification, "+CGEV: ", strlen("+CGEV: "))) {
-		/* CGEV notifications are silenced. Do not forward them. */
-		return;
-	}
-#endif
-
-	urc_send(CRLF_STR "%s", notification);
-}
-
 void rsp_send_ok(void)
 {
 	rsp_send(OK_STR);

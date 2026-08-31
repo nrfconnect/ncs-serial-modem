@@ -36,6 +36,7 @@ target_sources(app PRIVATE
   ../stubs/at_cmd_custom_stubs.c
   ../../src/sm_ppp.c
   ../../src/sm_cmux.c
+  ../../src/sm_at_urc_filter.c
 )
 
 # Include directories - test-specific overrides first so that they shadow the
