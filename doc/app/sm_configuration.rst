@@ -108,14 +108,14 @@ CONFIG_SM_AUTO_CONNECT - Connect to the network at start-up or reset
       CONFIG_SM_AUTO_CONNECT_PDN_USERNAME - PDN authentication username
          This option specifies the username to use for PDN authentication during automatic network attach.
          Do not set the Kconfig option (default) if no username is required.
-         Use only when ``CONFIG_SM_AUTO_CONNECT_PDN_AUTH`` is set to 1 (PAP) or 2 (CHAP).
+         Use only when :ref:`CONFIG_SM_AUTO_CONNECT_PDN_AUTH <CONFIG_SM_AUTO_CONNECT_PDN_AUTH>` is set to 1 (PAP) or 2 (CHAP).
 
       .. _CONFIG_SM_AUTO_CONNECT_PDN_PASSWORD:
 
       CONFIG_SM_AUTO_CONNECT_PDN_PASSWORD - PDN authentication password
          This option specifies the password to use for PDN authentication during automatic network attach.
          Leave empty (default) if no password is required.
-         Use only when ``CONFIG_SM_AUTO_CONNECT_PDN_AUTH`` is set to 1 (PAP) or 2 (CHAP).
+         Use only when :ref:`CONFIG_SM_AUTO_CONNECT_PDN_AUTH <CONFIG_SM_AUTO_CONNECT_PDN_AUTH>` is set to 1 (PAP) or 2 (CHAP).
 
    Example configuration overlay for NB-IoT with Non-IP PDN::
 
@@ -180,7 +180,7 @@ CONFIG_SM_NRF_CLOUD_LOCATION - nRF Cloud Location support
 
 CONFIG_SM_NRF_CLOUD_OBSERVABILITY - nRF Cloud observability support
    This option enables the ``#XNRFCLOUDOBS*`` commands, which control the Memfault data upload over the nRF Cloud CoAP transport.
-   This requires :ref:`CONFIG_SM_NRF_CLOUD <CONFIG_SM_NRF_CLOUD>` and :kconfig:option:`CONFIG_MEMFAULT_USE_NRF_CLOUD_COAP` to be enabled.
+   This requires :ref:`CONFIG_SM_NRF_CLOUD <CONFIG_SM_NRF_CLOUD>` and ``CONFIG_MEMFAULT_USE_NRF_CLOUD_COAP`` to be enabled.
    See :ref:`SM_AT_NRFCLOUDOBS` for more information.
 
 .. _CONFIG_SM_NRF_CLOUD_OBSERVABILITY_AUTO_INTERVAL_SECONDS:
@@ -371,7 +371,7 @@ The following configuration files are provided:
 
   Memfault is enabled by default in :file:`prj.conf`, without this overlay.
   Only the core dump requires the overlay, because it reserves a flash partition.
-  To build without Memfault altogether, set :kconfig:option:`CONFIG_MEMFAULT` to ``n``.
+  To build without Memfault altogether, set ``CONFIG_MEMFAULT`` to ``n``.
 
   .. note::
 

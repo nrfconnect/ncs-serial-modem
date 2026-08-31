@@ -427,7 +427,7 @@ The approach differs depending on whether you are using the pre-programmed nRF91
 
 **Buffer configuration:**
 
-Increase ``CONFIG_SM_UART_RX_BUF_SIZE`` and possibly ``CONFIG_SM_UART_RX_BUF_COUNT`` to provide sufficient buffer space for your use case.
+Increase :ref:`CONFIG_SM_UART_RX_BUF_SIZE <CONFIG_SM_UART_RX_BUF_SIZE>` and possibly :ref:`CONFIG_SM_UART_RX_BUF_COUNT <CONFIG_SM_UART_RX_BUF_COUNT>` to provide sufficient buffer space for your use case.
 
 Automatic UART power management using Zephyr's Cellular Modem driver
 ====================================================================
