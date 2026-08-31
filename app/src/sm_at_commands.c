@@ -34,6 +34,7 @@
 #include "sm_version.h"
 #include "sm_at_nrfcloud.h"
 #include "sm_log.h"
+#include "sm_uart_handler.h"
 
 LOG_MODULE_REGISTER(sm_at, CONFIG_SM_LOG_LEVEL);
 
@@ -162,6 +163,7 @@ STATIC int handle_at_shutdown(enum at_parser_cmd_type cmd_type, struct at_parser
 FUNC_NORETURN void sm_reset(void)
 {
 	sm_power_off_modem();
+	sm_uart_tx_flush();
 	sm_log_flush();
 	sys_reboot(SYS_REBOOT_COLD);
 }

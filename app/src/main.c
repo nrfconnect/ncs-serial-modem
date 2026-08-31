@@ -328,6 +328,7 @@ static int sm_main(void)
 	return ret;
 
 exit_reboot:
+	sm_uart_tx_flush();
 	sm_log_flush();
 	sys_reboot(SYS_REBOOT_COLD);
 }

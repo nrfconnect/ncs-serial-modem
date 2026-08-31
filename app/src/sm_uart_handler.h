@@ -35,6 +35,13 @@ typedef int (*sm_pipe_tx_t)(const uint8_t *data, size_t len, bool urc);
  */
 struct modem_pipe *sm_uart_pipe_get(void);
 
+/**
+ * @brief Wait for UART TX queues to be empty.
+ *
+ * Do not block for more than 5 seconds, even if the TX queues are not empty.
+ */
+void sm_uart_tx_flush(void);
+
 /** @} */
 
 #endif /* SM_UART_HANDLER_ */
