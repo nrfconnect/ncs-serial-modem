@@ -17,9 +17,10 @@
 		hw-flow-control;
 
 		modem: modem {
-			compatible = "nordic,nrf91-slm";
+			compatible = "nordic,nrf91-sm-v2";
 			status = "okay";
 			zephyr,pm-device-runtime-auto;
+			autostarts;
 		};
 	};
 
