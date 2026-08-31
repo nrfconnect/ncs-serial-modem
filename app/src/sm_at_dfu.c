@@ -334,8 +334,11 @@ static int handle_at_xdfu_init(enum at_parser_cmd_type cmd_type, struct at_parse
 				return err;
 			}
 
+			rsp_send_ok();
+
 			(void)set_full_mfw_dfu_segment_type(DFU_FULL_MFW_SEGMENT_BOOTLOADER);
 
+			sm_uart_tx_flush();
 			sm_log_flush();
 			sys_reboot(SYS_REBOOT_COLD);
 		default:
@@ -626,6 +629,14 @@ static int handle_at_xdfu_apply(enum at_parser_cmd_type cmd_type, struct at_pars
 					   DFU_FULL_MFW_SEGMENT_FIRMWARE) {
 					(void)set_full_mfw_dfu_segment_type(
 						DFU_FULL_MFW_SEGMENT_BOOTLOADER);
+					/* We are still executing a AT command, so send OK
+					 * and #XDFU URC message using rsp_send() before the
+					 * device is rebooted.
+					 */
+					rsp_send_ok();
+					rsp_send("#XDFU: %u,%u,%d\r\n", DFU_TYPE_FULL_MFW,
+						 DFU_OPERATION_APPLY_UPDATE, 0);
+					sm_uart_tx_flush();
 					LOG_INF("Firmware update successful, rebooting...");
 					sm_log_flush();
 					sys_reboot(SYS_REBOOT_COLD);

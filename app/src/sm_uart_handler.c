@@ -360,6 +360,23 @@ static void notify_closed_fn(struct k_work *work)
 	modem_pipe_notify_closed(&sm_pipe.pipe);
 }
 
+void sm_uart_tx_flush(void)
+{
+	k_timepoint_t timeout = sys_timepoint_calc(K_SECONDS(5));
+
+	/* Note: ring_buf_is_empty() returns true, even if ring_buf_get_finish()
+	 * has not been called yet, so compare the free space instead.
+	 */
+	while ((ring_buf_space_get(&tx_buf) != ring_buf_capacity_get(&tx_buf))
+	       && atomic_test_bit(&uart_state, SM_UART_STATE_TX_ENABLED_BIT)) {
+		sm_wait_for_pipe_event(&sm_pipe.pipe, Z_PIPE_TRANSMIT_IDLE_BIT);
+
+		if (sys_timepoint_expired(timeout)) {
+			break;
+		}
+	}
+}
+
 static int sm_uart_handler_enable(void)
 {
 	int err;

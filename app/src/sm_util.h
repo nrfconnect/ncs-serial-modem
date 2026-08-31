@@ -231,7 +231,19 @@ int sm_util_mcuboot_active_slot(void);
  */
 int sm_util_mcuboot_active_version(uint32_t *version);
 
-#define Z_MODEM_PIPE_EVENT_OPENED_BIT BIT(0)
+/**
+ * @defgroup sm_modem_pipe_events Modem Pipe Event Bits
+ *
+ * These are not same as the enum modem_pipe_event.
+ * See modem_pipe.c from Zephyr.
+ *
+ * @{
+ */
+#define Z_PIPE_OPENED_BIT        BIT(0)
+#define Z_PIPE_CLOSED_BIT        BIT(1)
+#define Z_PIPE_RECEIVE_READY_BIT BIT(2)
+#define Z_PIPE_TRANSMIT_IDLE_BIT BIT(3)
+/* @}*/
 
 /**
  * @brief Check whether a modem pipe is open
@@ -242,8 +254,19 @@ int sm_util_mcuboot_active_version(uint32_t *version);
  */
 static inline bool sm_pipe_is_open(struct modem_pipe *pipe)
 {
-	return k_event_test(&pipe->event, Z_MODEM_PIPE_EVENT_OPENED_BIT) ==
-	       Z_MODEM_PIPE_EVENT_OPENED_BIT;
+	return k_event_test(&pipe->event, Z_PIPE_OPENED_BIT) ==
+	       Z_PIPE_OPENED_BIT;
+}
+
+/**
+ * @brief Wait for specific event using modem pipe's internal event structure.
+ *
+ * This allows waiting for specific event on the pipe without registering the callback.
+ * See Z_MODEM_PIPE_EVENT_* definitions for events.
+ */
+static inline void sm_wait_for_pipe_event(struct modem_pipe *pipe, uint32_t events)
+{
+	k_event_wait(&pipe->event, events, false, K_SECONDS(1));
 }
 
 /**

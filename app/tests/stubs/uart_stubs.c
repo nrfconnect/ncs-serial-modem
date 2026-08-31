@@ -98,3 +98,7 @@ struct modem_pipe *sm_uart_pipe_get(void)
 	}
 	return &pipe;
 }
+
+void sm_uart_tx_flush(void)
+{
+}
