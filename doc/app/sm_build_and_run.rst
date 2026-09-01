@@ -73,50 +73,56 @@ This overlay configures the UART_2 pins, DTR pin, and RI pin for the nRF9151 DK.
 
 If you use a different setup, you can customize the :file:`external-mcu.overlay` file to match your hardware configuration in (for example) the following ways:
 
-* Change the highlighted UART baud rate or DTR and RI pins::
+* Change the highlighted UART baud rate or DTR and RI pins:
 
-   &uart2 {
-      compatible = "nordic,nrf-uarte";
-      current-speed = <**115200**>;
-      hw-flow-control;
-      status = "okay";
+  .. parsed-literal::
+     :class: highlight
 
-      dtr_uart2: dtr-uart {
-         compatible = "nordic,dtr-uart";
-         dtr-gpios = <**&gpio0 31** (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
-         ri-gpios = <**&gpio0 30** GPIO_ACTIVE_LOW>;
-         status = "okay";
-      };
-      pinctrl-0 = <&uart2_default_alt>;
-      pinctrl-1 = <&uart2_sleep_alt>;
-      pinctrl-names = "default", "sleep";
-   };
+     &uart2 {
+        compatible = "nordic,nrf-uarte";
+        current-speed = <**115200**>;
+        hw-flow-control;
+        status = "okay";
 
-* Change the highlighted UART pins::
+        dtr_uart2: dtr-uart {
+           compatible = "nordic,dtr-uart";
+           dtr-gpios = <**&gpio0 31** (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+           ri-gpios = <**&gpio0 30** GPIO_ACTIVE_LOW>;
+           status = "okay";
+        };
+        pinctrl-0 = <&uart2_default_alt>;
+        pinctrl-1 = <&uart2_sleep_alt>;
+        pinctrl-names = "default", "sleep";
+     };
 
-   &pinctrl {
-      uart2_default_alt: uart2_default_alt {
-         group1 {
-            psels = <NRF_PSEL(UART_RX, **0, 3**)>,
-                    <NRF_PSEL(UART_CTS, **0, 7**)>;
-            bias-pull-up;
-         };
-         group2 {
-            psels = <NRF_PSEL(UART_TX, **0, 2**)>,
-                    <NRF_PSEL(UART_RTS, **0, 6**)>;
-         };
-      };
+* Change the highlighted UART pins:
 
-      uart2_sleep_alt: uart2_sleep_alt {
-         group1 {
-            psels = <NRF_PSEL(UART_TX, **0, 2**)>,
-                    <NRF_PSEL(UART_RX, **0, 3**)>,
-                    <NRF_PSEL(UART_RTS, **0, 6**)>,
-                    <NRF_PSEL(UART_CTS, **0, 7**)>;
-            low-power-enable;
-         };
-      };
-   };
+  .. parsed-literal::
+     :class: highlight
+
+     &pinctrl {
+        uart2_default_alt: uart2_default_alt {
+           group1 {
+              psels = <NRF_PSEL(UART_RX, **0, 3**)>,
+                      <NRF_PSEL(UART_CTS, **0, 7**)>;
+              bias-pull-up;
+           };
+           group2 {
+              psels = <NRF_PSEL(UART_TX, **0, 2**)>,
+                      <NRF_PSEL(UART_RTS, **0, 6**)>;
+           };
+        };
+
+        uart2_sleep_alt: uart2_sleep_alt {
+           group1 {
+              psels = <NRF_PSEL(UART_TX, **0, 2**)>,
+                      <NRF_PSEL(UART_RX, **0, 3**)>,
+                      <NRF_PSEL(UART_RTS, **0, 6**)>,
+                      <NRF_PSEL(UART_CTS, **0, 7**)>;
+              low-power-enable;
+           };
+        };
+     };
 
 The following table shows how to connect selected development kit to an nRF91 Series development kit to be able to communicate through UART:
 
