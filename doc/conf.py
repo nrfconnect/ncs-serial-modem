@@ -74,10 +74,55 @@ latex_table_style = ['booktabs', 'colorrows']
 latex_elements = {
     'papersize': 'a4paper',
     'pointsize': '11pt',
+    # Sphinx's xelatex default is FreeSerif; Open Sans is closer to the Nordic
+    # template. Keep the defaults as fallback so builds work without the font.
+    'fontpkg': r"""
+\IfFontExistsTF{Open Sans}
+  {\setmainfont{Open Sans}\setsansfont{Open Sans}}
+  {\setmainfont{FreeSerif}\setsansfont{FreeSans}}
+\IfFontExistsTF{DejaVu Sans Mono}
+  {\setmonofont{DejaVu Sans Mono}}
+  {\setmonofont{FreeMono}}
+""",
     # 'oneside' drops the blank verso pages; 'openany' lets chapters start on
     # either side instead of forcing them onto a right-hand page.
     'extraclassoptions': 'openany,oneside',
     'sphinxsetup': 'TableRowColorHeader={RGB}{0,162,198}',
+    # Replaces \sphinxmaketitle. The page-anchor and clearpage handling around
+    # the titlepage is what Sphinx itself does; only the layout differs.
+    'maketitle': r"""
+\makeatletter
+\let\sphinxrestorepageanchorsetting\relax
+\ifHy@pageanchor\def\sphinxrestorepageanchorsetting{\Hy@pageanchortrue}\fi
+\hypersetup{pageanchor=false}
+\begin{titlepage}
+  \begingroup
+    \def\endgraf{ }\def\and{\& }%
+    \pdfstringdefDisableCommands{\def\\{, }}%
+    \hypersetup{pdfauthor={\@author}, pdftitle={\@title}}%
+  \endgroup
+  \noindent\colorbox{nordicblue}{%
+    \begin{minipage}[t][0.55\textheight][b]{\dimexpr\textwidth-2\fboxsep\relax}
+      \sffamily\color{white}
+      {\Huge\@title\par}
+      \vspace{2.5em}
+      \begin{flushright}
+        {\Large\bfseries\@author\par}
+        \vspace{0.4em}
+        {\large\py@release\releaseinfo\par}
+      \end{flushright}
+      \vspace{2em}
+    \end{minipage}%
+  }
+\end{titlepage}
+\setcounter{footnote}{0}%
+\let\thanks\relax\let\maketitle\relax
+\clearpage
+\ifdefined\sphinxbackoftitlepage\sphinxbackoftitlepage\fi
+\if@openright\cleardoublepage\else\clearpage\fi
+\sphinxrestorepageanchorsetting
+\makeatother
+""",
     "preamble": r"""
 \usepackage{sectsty}
 
@@ -96,20 +141,20 @@ latex_elements = {
 % body pages and 'plain' the contents pages; the title page uses 'empty' and
 % therefore has no footer at all.
 \makeatletter
-\newcommand{\nordicfooterlogo}{\includegraphics[height=5mm]{logo.png}}
+\newcommand{\nordicfooterlogo}{\includegraphics[height=10mm]{logo.png}}
 \fancypagestyle{normal}{
   \fancyhf{}
-  \fancyfoot[L]{\nordicfooterlogo}
+  \fancyfoot[L]{{\py@HeaderFamily\thepage}}
   \fancyfoot[C]{{\py@HeaderFamily\nouppercase{\rightmark}}}
-  \fancyfoot[R]{{\py@HeaderFamily\thepage}}
+  \fancyfoot[R]{\nordicfooterlogo}
   \fancyhead[R]{{\py@HeaderFamily \@title\sphinxheadercomma\py@release}}
   \renewcommand{\headrulewidth}{0.4pt}
   \renewcommand{\footrulewidth}{0.4pt}
 }
 \fancypagestyle{plain}{
   \fancyhf{}
-  \fancyfoot[L]{\nordicfooterlogo}
-  \fancyfoot[R]{{\py@HeaderFamily\thepage}}
+  \fancyfoot[L]{{\py@HeaderFamily\thepage}}
+  \fancyfoot[R]{\nordicfooterlogo}
   \renewcommand{\headrulewidth}{0pt}
   \renewcommand{\footrulewidth}{0.4pt}
 }

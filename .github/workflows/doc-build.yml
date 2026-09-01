@@ -50,6 +50,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y texlive-full
           sudo apt-get install -y inkscape
+          sudo apt-get install -y fonts-open-sans
 
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
@@ -99,6 +100,9 @@ jobs:
             ARCHIVE="legacy-addon-serial_modem-${VERSION}.zip"
             echo "publish2 main ${VERSION} ${ARCHIVE}" > "${MONITOR}"
           fi
+
+          # Ship the PDF inside the archive so it is published next to the HTML
+          cp doc/_build_sphinx/latex/ncs-serial-modem.pdf doc/build/html/
 
           pushd "doc/build/html"
           zip -rq "${ARCHIVE}" .
