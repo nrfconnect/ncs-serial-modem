@@ -62,6 +62,12 @@ rst_epilog = """
 .. include:: /shortcuts.txt
 """
 
+rst_prolog = """
+.. raw:: html
+
+   <p><a class="btn ncs-btn-header" href="../ncs-serial-modem.pdf">Download PDF</a></p>
+"""
+
 # -- Options for LaTeX output -------------------------------------------------
 
 latex_engine = 'xelatex'
@@ -102,7 +108,7 @@ latex_elements = {
     \hypersetup{pdfauthor={\@author}, pdftitle={\@title}}%
   \endgroup
   \noindent\colorbox{nordicblue}{%
-    \begin{minipage}[t][0.55\textheight][b]{\dimexpr\textwidth-2\fboxsep\relax}
+    \begin{minipage}[t][0.34\paperheight][b]{0.90\paperwidth}
       \sffamily\color{white}
       {\Huge\@title\par}
       \vspace{2.5em}
@@ -144,15 +150,15 @@ latex_elements = {
 \newcommand{\nordicfooterlogo}{\includegraphics[height=10mm]{logo.png}}
 \fancypagestyle{normal}{
   \fancyhf{}
-  \fancyfoot[L]{{\py@HeaderFamily\thepage}}
-  \fancyfoot[C]{{\py@HeaderFamily\nouppercase{\rightmark}}}
-  \fancyfoot[R]{\nordicfooterlogo}
+  \fancyfoot[L]{\nordicfooterlogo}
   \fancyhead[R]{{\py@HeaderFamily \@title\sphinxheadercomma\py@release}}
   \renewcommand{\headrulewidth}{0.4pt}
   \renewcommand{\footrulewidth}{0.4pt}
 }
 \fancypagestyle{plain}{
   \fancyhf{}
+  \fancyfoot[L]{\nordicfooterlogo}
+  \fancyfoot[R]{{\py@HeaderFamily\thepage}}
   \fancyfoot[L]{{\py@HeaderFamily\thepage}}
   \fancyfoot[R]{\nordicfooterlogo}
   \renewcommand{\headrulewidth}{0pt}
@@ -170,3 +176,6 @@ latex_documents = [
 ]
 
 figure_align = 'H'
+
+def setup(app):
+    app.add_css_file("_static/css/custom.css")

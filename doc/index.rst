@@ -3,12 +3,12 @@
 |SM|
 ####
 
-The |SM| contains the |SM| application for nRF91-based devices, and is built on `nRF Connect SDK`_.
-It includes host examples in the form of the :ref:`sm_at_client_shell_sample` and the :ref:`sm_ppp_shell_sample`.
-
 .. only:: html
 
    This documentation is also available as a `PDF <ncs-serial-modem.pdf>`__.
+
+The |SM| contains the |SM| application for nRF91-based devices, and is built on `nRF Connect SDK`_.
+It includes host examples in the form of the :ref:`sm_at_client_shell_sample` and the :ref:`sm_ppp_shell_sample`.
 
 .. toctree::
    :maxdepth: 2

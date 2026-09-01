@@ -1,0 +1,14 @@
+.ncs-pdf-banner {
+  position: static;
+  right: auto;
+  margin-top: 0;
+  margin-bottom: 0;
+  align-items: center;
+  background-color: #e6f6f9;
+  border: 1px solid #00a9ce;
+  display: flex;
+  font-family: Carlito, sans-serif;
+  font-weight: 500;
+  gap: 6px;
+  padding: 6px;
+  }
