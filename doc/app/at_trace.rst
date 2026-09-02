@@ -27,6 +27,11 @@ Application log AT#XLOG
 
 The ``AT#XLOG`` command enables or disables the Zephyr application log backend and the shared UART.
 
+.. note::
+   Regardless of the logging mode, nRF Cloud Observability collects information, warning, and error level logs (with sensitive payloads redacted) on crash, even when the UART is silent.
+   You can only view these logs once uploaded to nRF Cloud.
+   See :ref:`SM_AT_NRFCLOUDOBS`.
+
 Set command
 -----------
 
@@ -42,9 +47,14 @@ Syntax
 The parameters and their defined values are the following:
 
 <mode>
-   * ``0`` - Disable the application log backend and suspend the UART.
-   * ``1`` - Resume the UART and enable the application log backend.
-
+  * ``0`` - Suspend the UART and disable the application log backend, no logs are shown.
+    Logs are still collected by nRF Cloud Observability.
+  * ``1`` - Resume the UART and enable the application log backend.
+    AT commands, responses, and URCs are logged as strings at information log level, with sensitive payloads redacted.
+  * ``2`` - Resume the UART and enable the application log backend.
+    AT commands, responses, and URCs are logged as raw hex dumps at debug level only.
+    These hex dumps are not collected by nRF Cloud Observability.
+    Requires the ``CONFIG_SM_LOG_LEVEL_DBG`` Kconfig option.
 
 .. note::
    Returns ``ERROR`` if ``AT#XTRACE=1`` has been issued.
@@ -74,7 +84,9 @@ The parameters and their defined values are the following:
    The current state.
 
    * ``0`` - Disabled.
-   * ``1`` - Enabled.
+   * ``1`` - Logging with sensitive AT command payloads redacted.
+   * ``2`` - Logging with sensitive AT command and response payloads logged as DBG hex dump only.
+     Only available if the ``CONFIG_SM_LOG_LEVEL_DBG`` Kconfig option is enabled.
 
 Test command
 ------------
@@ -92,6 +104,11 @@ Response syntax
 ~~~~~~~~~~~~~~~
 
 ::
+
+   #XLOG: (0,1,2)
+
+The ``2`` option is only listed if the ``CONFIG_SM_LOG_LEVEL_DBG`` Kconfig option is enabled.
+Otherwise, the response is the following::
 
    #XLOG: (0,1)
 
