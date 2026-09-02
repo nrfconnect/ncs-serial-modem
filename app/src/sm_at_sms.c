@@ -203,13 +203,18 @@ static void sms_concat_handle(struct sms_data *const data)
 	}
 	sms_ctx.count++;
 	if (sms_ctx.count == sms_ctx.total_msgs) {
-		/* Compact the header + all message-part slots into a single,
-		 * contiguous string at the front of the buffer. memmove() is
-		 * used (instead of strcat()/strncat()) because source and
-		 * destination regions can legitimately overlap once the
-		 * write cursor catches up with a slot's own storage.
+		/* Show the header (date + sender) via rsp, but send the reassembled body
+		 * through data_send so it is redacted at AT#XLOG=1. Lock the AT host so
+		 * URCs cannot interleave the header, body and trailer.
 		 */
-		size_t pos = strnlen(sms_ctx.concat_rsp_buf, SM_SMS_AT_HEADER_INFO_MAX_LEN - 1);
+		sm_at_host_lock(sms_ctx.pipe);
+		rsp_send_to(sms_ctx.pipe, "%s", sms_ctx.concat_rsp_buf);
+
+		/* Compact the body parts to the front of the buffer (the header has already
+		 * been sent). memmove() (via sms_concat_append) is used because the source
+		 * slots and the destination can overlap.
+		 */
+		size_t pos = 0;
 
 		for (int i = 0; i < sms_ctx.total_msgs; i++) {
 			char *slot = sms_ctx.concat_rsp_buf + SM_SMS_AT_HEADER_INFO_MAX_LEN +
@@ -218,9 +223,9 @@ static void sms_concat_handle(struct sms_data *const data)
 			sms_concat_append(sms_ctx.concat_rsp_buf, concat_msg_len, &pos, slot,
 					   SMS_MAX_PAYLOAD_LEN_CHARS);
 		}
-		sms_concat_append(sms_ctx.concat_rsp_buf, concat_msg_len, &pos, "\"\r\n", 3);
-		data_send(sms_ctx.pipe, (uint8_t *)sms_ctx.concat_rsp_buf,
-			  strlen(sms_ctx.concat_rsp_buf));
+		data_send(sms_ctx.pipe, (uint8_t *)sms_ctx.concat_rsp_buf, pos);
+		rsp_send_to(sms_ctx.pipe, "\"\r\n");
+		sm_at_host_unlock(sms_ctx.pipe);
 	} else {
 		/* If new messages for the concatenated message are not received
 		 * within 3 minutes, discard the concatenated message.
@@ -244,14 +249,21 @@ STATIC void sms_callback(struct sms_data *const data, void *context)
 		struct sms_deliver_header *header = &data->header.deliver;
 
 		if (!header->concatenated.present) {
-			urc_send_to(sms_ctx.pipe,
-				"\r\n#XSMS: \"%02d-%02d-%02d %02d:%02d:%02d UTC%+03d:%02d\",\""
-				"%s\",\"%s\"\r\n",
+			/* Send header, body and trailer separately (as HTTP/CoAP do): the body
+			 * passes through data_send so it is subject to AT#XLOG redaction, with no
+			 * local copy of the payload. Lock the AT host so URCs cannot interleave.
+			 */
+			sm_at_host_lock(sms_ctx.pipe);
+			rsp_send_to(sms_ctx.pipe,
+				"\r\n#XSMS: \"%02d-%02d-%02d %02d:%02d:%02d UTC%+03d:%02d\",\"%s\",\"",
 				header->time.year, header->time.month, header->time.day,
 				header->time.hour, header->time.minute, header->time.second,
 				header->time.timezone * 15 / 60,
 				abs(header->time.timezone) * 15 % 60,
-				header->originating_address.address_str, data->payload);
+				header->originating_address.address_str);
+			data_send(sms_ctx.pipe, (const uint8_t *)data->payload, data->payload_len);
+			rsp_send_to(sms_ctx.pipe, "\"\r\n");
+			sm_at_host_unlock(sms_ctx.pipe);
 		} else {
 			sms_concat_handle(data);
 		}
