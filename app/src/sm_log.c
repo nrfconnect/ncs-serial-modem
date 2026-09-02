@@ -30,6 +30,18 @@ LOG_MODULE_REGISTER(sm_log, CONFIG_SM_LOG_LEVEL);
 
 /* Zephyr console UART is used both for application logs and modem traces. */
 #define UART_DEVICE_NODE DT_CHOSEN(zephyr_console)
+
+#if DT_HAS_CHOSEN(ncs_sm_uart)
+/* sm_log_init() suspends this UART to save power. That cannot work if it is
+ * also the AT host UART: the AT host keeps asynchronous RX enabled, so
+ * pm_device_action_run(SUSPEND) returns -EAGAIN, reported as "INIT ERROR".
+ * Suspending it successfully would be worse, as it releases the pins.
+ */
+BUILD_ASSERT(!DT_SAME_NODE(DT_CHOSEN(zephyr_console), DT_CHOSEN(ncs_sm_uart)),
+	     "zephyr,console must not be the same node as ncs,sm-uart. "
+	     "Point the console at a different UART in the board devicetree.");
+#endif
+
 static const struct device *const uart_dev = DEVICE_DT_GET(UART_DEVICE_NODE);
 
 static bool log_active;
