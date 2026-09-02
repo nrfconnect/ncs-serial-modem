@@ -19,6 +19,10 @@ Use ``AT#XLOG=1`` to enable application logs and resume the UART.
 This avoids UART power overhead when logs are not needed during normal operation.
 See :ref:`SM_AT_trace` for the full command reference.
 
+The ``zephyr,console`` and ``ncs,sm-uart`` chosen nodes must point to different UARTs.
+|SM| enables asynchronous reception on the AT command UART and cannot suspend it.
+The build fails if both nodes point to the same UART.
+
 .. note::
    The negative error codes that are visible in logs are *errno* codes defined in `nrf_errno.h`_.
 
