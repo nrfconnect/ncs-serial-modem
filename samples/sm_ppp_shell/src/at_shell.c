@@ -11,12 +11,21 @@
 #include <zephyr/drivers/modem/modem_cellular.h>
 #include <zephyr/pm/device_runtime.h>
 
+
+#define AT_SHELL_HELP "\tat <command>\n" \
+		      "\tat --keep-open\n" \
+		      "\tat --close"
+
 struct at_shell_chat_instance {
-	struct modem_chat at_shell_chat;
-	uint8_t at_shell_chat_receive_buf[1024];
-	uint8_t *at_shell_chat_argv_buf[3];
+	struct modem_chat chat;
+	uint8_t chat_receive_buf[1024];
+	uint8_t *chat_argv_buf[3];
+	bool pipe_was_open;
+	struct modem_pipe *pipe;
+	const struct shell *sh;
 };
 
+static struct at_shell_chat_instance *active_at_instance;
 static const struct device *modem = DEVICE_DT_GET_ONE(nordic_nrf91_sm_v2);
 
 static void chat_callback(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data);
@@ -36,7 +45,7 @@ static inline bool sm_pipe_is_open(struct modem_pipe *pipe)
 	       Z_MODEM_PIPE_EVENT_OPENED_BIT;
 }
 
-static struct modem_chat *at_shell_init_chat(const struct shell *sh)
+static struct at_shell_chat_instance *at_shell_init_chat(const struct shell *sh)
 {
 	struct at_shell_chat_instance *instance =
 		(struct at_shell_chat_instance *)malloc(sizeof(struct at_shell_chat_instance));
@@ -46,33 +55,38 @@ static struct modem_chat *at_shell_init_chat(const struct shell *sh)
 		return NULL;
 	}
 
+	*instance = (struct at_shell_chat_instance){
+		.sh = sh,
+	};
+
 	const struct modem_chat_config at_shell_chat_config = {
-		.receive_buf = instance->at_shell_chat_receive_buf,
-		.receive_buf_size = sizeof(instance->at_shell_chat_receive_buf),
+		.receive_buf = instance->chat_receive_buf,
+		.receive_buf_size = sizeof(instance->chat_receive_buf),
 		.delimiter = "\r",
 		.delimiter_size = sizeof("\r") - 1,
 		.filter = "\n",
 		.filter_size = sizeof("\n") - 1,
-		.argv = instance->at_shell_chat_argv_buf,
-		.argv_size = ARRAY_SIZE(instance->at_shell_chat_argv_buf),
+		.argv = instance->chat_argv_buf,
+		.argv_size = ARRAY_SIZE(instance->chat_argv_buf),
 		.unsol_matches = &all_match,
 		.unsol_matches_size = 1,
-		.user_data = (void *)sh,
+		.user_data = (void *)instance,
 	};
 
-	modem_chat_init(&instance->at_shell_chat, &at_shell_chat_config);
-	return &instance->at_shell_chat;
+	modem_chat_init(&instance->chat, &at_shell_chat_config);
+	return instance;
 }
 
-static void at_shell_release_chat(struct modem_chat *chat)
+static void at_shell_release_chat(struct at_shell_chat_instance *instance)
 {
-	modem_chat_release(chat);
-	free(chat);
+	modem_chat_release(&instance->chat);
+	free(instance);
 }
 
 static void chat_callback(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
 {
-	const struct shell *sh = (const struct shell *)user_data;
+	struct at_shell_chat_instance *instance = (struct at_shell_chat_instance *)user_data;
+	const struct shell *sh = instance->sh;
 	char *s;
 	size_t len = 0;
 
@@ -165,7 +179,7 @@ static struct modem_pipe *at_shell_get_pipe(const struct shell *sh)
 	struct modem_cellular_config *config = (struct modem_cellular_config *)modem->config;
 	struct modem_cellular_data *data = (struct modem_cellular_data *)modem->data;
 
-	/* Ensure that modem is not used */
+	/* Check if modem is currently in use */
 	int cnt = pm_device_runtime_usage(modem);
 
 	if (cnt > 0) {
@@ -187,12 +201,54 @@ static struct modem_pipe *at_shell_get_pipe(const struct shell *sh)
 	return data->uart_pipe;
 }
 
-static int cmd_at(const struct shell *sh, size_t argc, char **argv)
+/* Check if pipe is still attached to our chat instance */
+static bool at_shell_is_attached(struct at_shell_chat_instance *instance)
+{
+	struct modem_pipe *pipe = instance->pipe;
+
+	if (pipe == NULL) {
+		return false;
+	}
+	if (pipe->callback == NULL) {
+		return false;
+	}
+	if (instance->chat.pipe != pipe) {
+		return false;
+	}
+	if (pipe->user_data != &instance->chat) {
+		return false;
+	}
+	return sm_pipe_is_open(pipe);
+}
+
+static int open_and_attach(struct at_shell_chat_instance *instance, struct modem_pipe *pipe)
 {
 	int ret;
 
-	if (argc < 2) {
-		shell_error(sh, "Usage: at <command>");
+	instance->pipe = pipe;
+	instance->pipe_was_open = sm_pipe_is_open(pipe);
+
+	modem_pipe_release(pipe);
+	ret = modem_pipe_open(pipe, K_SECONDS(1));
+	if (ret < 0) {
+		instance->pipe = NULL;
+		shell_error(instance->sh, "Failed to open pipe: %d", ret);
+		return ret;
+	}
+
+	modem_chat_attach(&instance->chat, pipe);
+
+	return 0;
+}
+
+static int cmd_at(const struct shell *sh, size_t argc, char **argv)
+{
+	struct modem_pipe *pipe = NULL;
+	bool keep_open = false;
+	int ret = 0;
+
+	if (argc < 2 || strcmp(argv[1], "-h") == 0) {
+		shell_error(sh, "Usage:\n" AT_SHELL_HELP);
 		return -EINVAL;
 	}
 
@@ -201,46 +257,73 @@ static int cmd_at(const struct shell *sh, size_t argc, char **argv)
 		return -ENODEV;
 	}
 
-	struct modem_pipe *pipe = at_shell_get_pipe(sh);
+	if (!active_at_instance) {
+		pipe = at_shell_get_pipe(sh);
 
 		if (pipe == NULL) {
 			return -ENODEV;
 		}
 
-	bool pipe_was_open = sm_pipe_is_open(pipe);
+		active_at_instance = at_shell_init_chat(sh);
 
-	modem_pipe_release(pipe);
-	ret = modem_pipe_open(pipe, K_SECONDS(1));
-	if (ret < 0) {
-		shell_error(sh, "Failed to open UART pipe: %d", ret);
-		return ret;
+		if (active_at_instance == NULL) {
+			return -ENOMEM;
+		}
+		ret = open_and_attach(active_at_instance, pipe);
+		if (ret < 0) {
+			goto release_chat;
+		}
+	} else if (!at_shell_is_attached(active_at_instance)) {
+		shell_warn(sh, "Pipe is not attached to the active chat instance");
+		pipe = at_shell_get_pipe(sh);
+		if (pipe == NULL) {
+			shell_error(sh, "Failed to get a new pipe");
+			ret = -ENODEV;
+			goto release_chat;
+		}
+		shell_warn(sh, "switch pipe");
+		ret = open_and_attach(active_at_instance, pipe);
+		if (ret < 0) {
+			/* Don't close the unattached pipe */
+			pipe = NULL;
+			goto release_chat;
+		}
+		keep_open = true;
+	} else {
+		pipe = active_at_instance->pipe;
+		keep_open = true;
 	}
 
-	struct modem_chat *chat = at_shell_init_chat(sh);
+	if (strcmp(argv[1], "--keep-open") == 0) {
+		return 0;
+	}
 
-	if (chat == NULL) {
-		ret = -ENOMEM;
-		goto close_pipe;
-		}
+	if (strcmp(argv[1], "--close") == 0) {
+		keep_open = false;
+		goto release_chat;
+	}
 
-	modem_chat_attach(chat, pipe);
-
-	ret = chat_cmd(chat, "%s", argv[1]);
+	ret = chat_cmd(&active_at_instance->chat, "%s", argv[1]);
 	if (ret < 0) {
 		shell_error(sh, "Failed to run AT command: %d", ret);
 	} else {
 		shell_print(sh, "OK");
 	}
 
-	at_shell_release_chat(chat);
+release_chat:
+	bool pipe_was_open = active_at_instance->pipe_was_open;
 
-close_pipe:
-	if (!pipe_was_open) {
+	if (!keep_open) {
+		at_shell_release_chat(active_at_instance);
+		active_at_instance = NULL;
+	}
+
+	if (!keep_open && !pipe_was_open && pipe) {
 		modem_pipe_close(pipe, K_SECONDS(1));
 	}
 	return ret;
 }
-SHELL_CMD_ARG_REGISTER(at, NULL, "AT command\nat <AT command>", cmd_at, 2, 0);
+SHELL_CMD_ARG_REGISTER(at, NULL, "Execute AT command\n" AT_SHELL_HELP, cmd_at, 2, 0);
 
 #ifndef CONFIG_MODEM_AT_SHELL
 
