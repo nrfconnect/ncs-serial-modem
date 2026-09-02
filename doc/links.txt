@@ -127,7 +127,7 @@
 
 .. ### others
 
-.. _`Serial Modem`: https://nrfconnectdocs.nordicsemi.com/addons/addon-serial_modem/latest/index.html
+.. _`Serial Modem`: https://nrfconnectdocs.nordicsemi.com/addons/addon-serial_modem/latest/main/index.html
 
 .. _`DevZone`: https://devzone.nordicsemi.com/
 
