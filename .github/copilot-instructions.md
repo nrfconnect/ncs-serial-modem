@@ -172,10 +172,24 @@ This step is required before Sphinx; Breathe reads the Doxygen XML.
 cd doc
 make html
 # or equivalently:
-sphinx-build -M html . _build_sphinx
+python _scripts/build_docsets.py
 ```
 
-Output: `doc/_build_sphinx/html/`
+Output: `doc/build/html/`
+
+The documentation is split into **docsets**, each built by its own Sphinx run over the shared sources in `doc/`:
+
+| Docset | Config dir | Root document | Output |
+|---|---|---|---|
+| `main` | `doc/_docsets/main/` | `doc/index.rst` | `doc/build/html/main/` |
+| `nrf91m1` | `doc/_docsets/nrf91m1/` | `doc/index_nrf91m1.rst` | `doc/build/html/nrf91m1/` |
+
+The docsets must be sibling directories below the HTML root, because that is where the docset switcher of `sphinx_ncs_theme` looks for them. `doc/build/html/index.html` redirects to the `main` docset, and `versions.json` is copied next to the docsets for the version dropdown.
+
+- Shared Sphinx settings: `doc/_docsets/conf_common.py`. Per-docset settings (project title, root document, exclusions, intersphinx): `doc/_docsets/<docset>/conf.py`.
+- The docset list is declared once in `doc/_utils/docsets.py` (`ALL_DOCSETS`). Adding a docset means adding an entry there, a config directory, and a root document.
+- Relative paths in the config files resolve against the config directory, not `doc/`, so anchor new paths to `DOC_BASE`.
+- Build a single docset while iterating: `make main`, `make nrf91m1`, or `python _scripts/build_docsets.py --docset main`.
 
 ---
 
@@ -237,15 +251,20 @@ ncs-serial-modem/
 │   └── sysbuild.conf           # Sysbuild Kconfig (MCUBoot, B0)
 ├── doc/                        # Sphinx + Doxygen documentation source
 │   ├── Doxyfile                # Doxygen configuration
-│   ├── conf.py                 # Sphinx configuration
+│   ├── index.rst               # Root document of the main docset
+│   ├── index_nrf91m1.rst       # Root document of the nRF91M1 docset
 │   ├── requirements.txt        # Python doc build dependencies
 │   ├── app/                    # Application RST docs (AT commands, features, etc.)
 │   ├── lib/                    # sm_at_client library docs
 │   ├── samples/                # Sample app docs
 │   ├── images/                 # SVG/PNG diagrams
+│   ├── _docsets/               # Per-docset Sphinx configuration + conf_common.py
+│   ├── _scripts/               # build_docsets.py, merge_search_indexes.py
+│   ├── _static/html/index.html # Redirect from the published root to the main docset
+│   ├── _utils/docsets.py       # ALL_DOCSETS: the list of docsets
 │   ├── _doxygen/               # Doxygen main page source
 │   ├── _build_doxygen/xml/     # Doxygen output (auto-generated, not committed)
-│   └── _build_sphinx/html/     # Sphinx output (auto-generated, not committed)
+│   └── build/html/<docset>/    # Sphinx output (auto-generated, not committed)
 ├── lib/                        # Host-side AT client library
 │   └── sm_at_client/           # sm_at_client library (for host MCU samples)
 ├── samples/                    # Host device sample applications
@@ -373,7 +392,7 @@ int n   = sm_util_at_scanf("AT+CFUN?", "+CFUN: %d", &cfun);
 2. **Tests:** `west twister -T app/tests --platform native_sim -v` — all 2 tests PASSED.
 3. **Lint:** `clang-format --style=file --dry-run --Werror <changed files>` exits 0.
 4. **License header** present on any new `.c`/`.h` file.
-5. **Docs** (if RST or headers changed): `cd doc && doxygen && make html` completes without new errors.
+5. **Docs** (if RST or headers changed): `cd doc && doxygen && make html` builds every docset without new errors.
 
 ---
 

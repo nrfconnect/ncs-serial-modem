@@ -10,6 +10,8 @@ build
 build-*
 build_*
 _build_*
+# Not build output despite the name.
+!doc/_scripts/build_docsets.py
 cscope.*
 .dir
 venv
