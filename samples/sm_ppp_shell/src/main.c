@@ -58,4 +58,8 @@ static int cmd_xdfu(const struct shell *sh, size_t argc, char **argv)
 	return ret;
 }
 
-SHELL_CMD_ARG_REGISTER(xdfu, NULL, "Run #XDFU on modem\n xdfu <type> <file>", cmd_xdfu, 3, 0);
+SHELL_CMD_ARG_REGISTER(xdfu, NULL,
+			SHELL_HELP("Run #XDFU on modem",
+				   "<type> <file>\n"
+				   "type: 0=APP, 1=DELTA_MFW, 2=FULL_MFW, 3=MCUBOOT_BL"),
+			cmd_xdfu, 3, 0);
