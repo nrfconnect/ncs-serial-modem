@@ -97,7 +97,18 @@ latex_elements = {
     # 'oneside' drops the blank verso pages; 'openany' lets chapters start on
     # either side instead of forcing them onto a right-hand page.
     'extraclassoptions': 'openany,oneside',
-    'sphinxsetup': 'TableRowColorHeader={RGB}{0,162,198}',
+    # Sphinx frames code blocks in a 0.4pt black rule over white; the Nordic
+    # style is a flat grey panel with no border. Padding measured off the
+    # reference is about 11pt left of the text and 9pt above it, and one key
+    # covers all four sides. The verbatim* keys blank out the red
+    # visible-space and hook-arrow markers Sphinx prints where it wraps a long
+    # line, which the reference does not show either.
+    'sphinxsetup': ('TableRowColorHeader={RGB}{0,162,198},'
+                    'VerbatimColor={RGB}{240,240,240},'
+                    'verbatimborder=0pt,'
+                    'verbatimsep=10pt,'
+                    'verbatimvisiblespace={},'
+                    'verbatimcontinued={}'),
     # Replaces \sphinxmaketitle. The page-anchor and clearpage handling around
     # the titlepage is what Sphinx itself does; only the layout differs.
     'maketitle': r"""
@@ -155,6 +166,7 @@ latex_elements = {
 """,
     "preamble": r"""
 \usepackage{sectsty}
+\usepackage{etoolbox}
 
 \definecolor{nordicblue}{RGB}{0,162,198}
 
@@ -237,6 +249,28 @@ latex_elements = {
   \renewcommand{\footrulewidth}{0.4pt}
 }
 \makeatother
+
+% A parsed-literal block is emitted as sphinxalltt, which is plain alltt with
+% no box, so it misses the grey panel that VerbatimColor gives a code block.
+% Give it an equivalent panel. 'snugshade*' comes from the framed package that
+% Sphinx already loads for warning-style admonitions: it fills the current
+% text width, draws no rule and permits a page break inside. It is the variant
+% that keeps the panel aligned with the surrounding list indentation, which
+% every parsed-literal here relies on, and it takes its padding from \fboxsep,
+% matched to verbatimsep above. Hooking the environment from outside leaves
+% upstream's catcode setup untouched, and \begingroup keeps \fboxsep from
+% leaking, since the hook runs before the environment opens its own group.
+\definecolor{nordiccodebg}{RGB}{240,240,240}
+\BeforeBeginEnvironment{sphinxalltt}{%
+  \begingroup
+    \colorlet{shadecolor}{nordiccodebg}%
+    \setlength{\fboxsep}{10pt}%
+    \begin{snugshade*}%
+}
+\AfterEndEnvironment{sphinxalltt}{%
+    \end{snugshade*}%
+  \endgroup
+}
 """
 }
 
