@@ -7,6 +7,9 @@ from pathlib import Path
 import sys
 import os
 
+from docutils import nodes
+from sphinx.transforms.post_transforms import SphinxPostTransform
+
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
@@ -216,7 +219,13 @@ latex_elements = {
   \fancyhf{}
   \fancyfoot[C]{{\py@HeaderFamily\thepage}}
   \fancyfoot[R]{\nordicfooterlogo}
-  \fancyhead[R]{{\py@HeaderFamily \@title\sphinxheadercomma\py@release}}
+  \fancyhead[L]{{\py@HeaderFamily\py@release}}
+  \fancyhead[R]{{\py@HeaderFamily\leftmark}}
+  % \leftmark carries whatever \chaptermark marked. fancyhdr's stock version
+  % uppercases the title and prefixes it with "Chapter N.", so it is replaced
+  % with the bare title. The parameter is doubled because this whole body is
+  % stored as the \ps@normal macro.
+  \renewcommand{\chaptermark}[1]{\markboth{##1}{}}
   \renewcommand{\headrulewidth}{0.4pt}
   \renewcommand{\footrulewidth}{0.4pt}
 }
@@ -239,3 +248,23 @@ latex_documents = [
 ]
 
 figure_align = 'H'
+
+
+class RemoveLocalContents(SphinxPostTransform):
+    """Drop the per-page ``.. contents::`` topics from the PDF.
+
+    The PDF opens with a full table of contents, so a second one at the head
+    of every section only repeats it. HTML keeps them.
+    """
+
+    default_priority = 800
+    formats = ('latex',)
+
+    def run(self, **kwargs):
+        for node in list(self.document.findall(nodes.topic)):
+            if 'contents' in node['classes']:
+                node.parent.remove(node)
+
+
+def setup(app):
+    app.add_post_transform(RemoveLocalContents)
