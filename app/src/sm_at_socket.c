@@ -184,27 +184,64 @@ static int bind_to_pdn(struct sm_socket *sock)
 }
 
 /* Called in IRQ context */
-static void poll_cb(const struct socket_ncs_pollcb_params *pollfd)
+static void handle_poll_event(struct sm_socket *sock, short revents)
 {
-	LOG_DBG("Poll event fd %d, revents 0x%x", pollfd->fd, pollfd->revents);
-
-	struct sm_socket *sock = find_socket(pollfd->fd);
 	struct async_poll_ctx *poll_ctx = poll_ctx_from_sock(sock);
 
-	if (sock == NULL) {
-		LOG_DBG("Poll callback for unknown socket fd %d", pollfd->fd);
-		return;
-	}
 	if (!poll_ctx) {
 		LOG_ERR("No poll context found for socket fd %d", sock->fd);
 		/* TODO: Should we re-bind to a valid context here to recover from this error? */
 		return;
 	}
 
-	atomic_or(&sock->async_poll.revents, pollfd->revents);
+	atomic_or(&sock->async_poll.revents, revents);
 
 	k_work_submit_to_queue(&sm_work_q, &poll_ctx->poll_work);
 }
+
+#if defined(CONFIG_SM_APP_TLS)
+/*
+ * Per-slot poll callbacks: avoids relying on ctx->zvfs_fd for socket lookup.
+ * When CONFIG_NET_SOCKETS_OFFLOAD_DISPATCHER is enabled (required for TLS_NATIVE),
+ * ctx->zvfs_fd is set to an intermediate fd that is freed during dispatch and
+ * does not match the app-visible sock->fd returned by zsock_socket().
+ */
+#define DEFINE_POLL_CB(n) \
+	static void poll_cb_##n(const struct socket_ncs_pollcb_params *p) \
+	{ \
+		LOG_DBG("Poll event slot %d fd %d, revents 0x%x", n, socks[n].fd, p->revents); \
+		handle_poll_event(&socks[n], p->revents); \
+	}
+
+DEFINE_POLL_CB(0)
+DEFINE_POLL_CB(1)
+DEFINE_POLL_CB(2)
+DEFINE_POLL_CB(3)
+DEFINE_POLL_CB(4)
+DEFINE_POLL_CB(5)
+DEFINE_POLL_CB(6)
+DEFINE_POLL_CB(7)
+
+static const socket_ncs_pollcb_t poll_cb_table[SM_MAX_SOCKET_COUNT] = {
+	poll_cb_0, poll_cb_1, poll_cb_2, poll_cb_3,
+	poll_cb_4, poll_cb_5, poll_cb_6, poll_cb_7,
+};
+#else
+/* Called in IRQ context */
+static void poll_cb(const struct socket_ncs_pollcb_params *pollfd)
+{
+	LOG_DBG("Poll event fd %d, revents 0x%x", pollfd->fd, pollfd->revents);
+
+	struct sm_socket *sock = find_socket(pollfd->fd);
+
+	if (sock == NULL) {
+		LOG_DBG("Poll callback for unknown socket fd %d", pollfd->fd);
+		return;
+	}
+
+	handle_poll_event(sock, pollfd->revents);
+}
+#endif
 
 
 static int set_so_poll_cb(struct sm_socket *socket, uint8_t events)
@@ -217,11 +254,21 @@ static int set_so_poll_cb(struct sm_socket *socket, uint8_t events)
 
 	LOG_DBG("Set poll cb for socket %d, events %d", socket->fd, events);
 
+#if defined(CONFIG_SM_APP_TLS)
+	int idx = socket - socks;
+
+	struct socket_ncs_pollcb pcb = {
+		.callback = poll_cb_table[idx],
+		.events = events,
+		.oneshot = true,
+	};
+#else
 	struct socket_ncs_pollcb pcb = {
 		.callback = poll_cb,
 		.events = events,
 		.oneshot = true,
 	};
+#endif
 
 	err = zsock_setsockopt(socket->fd, SOL_SOCKET, SO_POLLCB, &pcb, sizeof(pcb));
 	if (err < 0) {
@@ -466,10 +513,47 @@ static void send_cb_fn(struct k_work *work)
 }
 
 /* Called in IRQ context */
-static void send_cb(const struct socket_ncs_sendcb_params *params)
+static void handle_send_event(struct sm_socket *sock, int status, size_t bytes_sent)
 {
 	static K_WORK_DEFINE(work, send_cb_fn);
 
+	LOG_DBG("Send cb fd %d, status %d, bytes_sent %d", sock->fd, status, bytes_sent);
+
+	if (atomic_get(&sock->send_ntf.ready)) {
+		LOG_ERR("Send notification pending for socket fd %d", sock->fd);
+		return;
+	}
+	sock->send_ntf.status = status;
+	sock->send_ntf.bytes_sent = bytes_sent;
+	atomic_set(&sock->send_ntf.ready, 1);
+
+	/* Schedule work to execute in AT context */
+	sm_at_host_queue_idle_work(sock->pipe, &work);
+}
+
+#if defined(CONFIG_SM_APP_TLS)
+/* Per-slot send callbacks: same rationale as poll_cb_table above. */
+#define DEFINE_SEND_CB(n) \
+	static void send_cb_##n(const struct socket_ncs_sendcb_params *p) \
+	{ handle_send_event(&socks[n], p->status, p->bytes_sent); }
+
+DEFINE_SEND_CB(0)
+DEFINE_SEND_CB(1)
+DEFINE_SEND_CB(2)
+DEFINE_SEND_CB(3)
+DEFINE_SEND_CB(4)
+DEFINE_SEND_CB(5)
+DEFINE_SEND_CB(6)
+DEFINE_SEND_CB(7)
+
+static const socket_ncs_sendcb_t send_cb_table[SM_MAX_SOCKET_COUNT] = {
+	send_cb_0, send_cb_1, send_cb_2, send_cb_3,
+	send_cb_4, send_cb_5, send_cb_6, send_cb_7,
+};
+#else
+/* Called in IRQ context */
+static void send_cb(const struct socket_ncs_sendcb_params *params)
+{
 	LOG_DBG("Send cb fd %d, status %d, bytes_sent %d",
 		params->fd, params->status, params->bytes_sent);
 
@@ -479,17 +563,10 @@ static void send_cb(const struct socket_ncs_sendcb_params *params)
 		LOG_DBG("Send callback for unknown socket fd %d", params->fd);
 		return;
 	}
-	if (atomic_get(&sock->send_ntf.ready)) {
-		LOG_ERR("Send notification pending for socket fd %d", params->fd);
-		return;
-	}
-	sock->send_ntf.status = params->status;
-	sock->send_ntf.bytes_sent = params->bytes_sent;
-	atomic_set(&sock->send_ntf.ready, 1);
 
-	/* Schedule work to execute in AT context */
-	sm_at_host_queue_idle_work(sock->pipe, &work);
+	handle_send_event(sock, params->status, params->bytes_sent);
 }
+#endif
 
 static int set_so_send_cb(struct sm_socket *socket)
 {
@@ -504,9 +581,17 @@ static int set_so_send_cb(struct sm_socket *socket)
 
 	LOG_DBG("Set send cb for socket %d", socket->fd);
 
+#if defined(CONFIG_SM_APP_TLS)
+	int idx = socket - socks;
+
+	struct socket_ncs_sendcb pcb = {
+		.callback = send_cb_table[idx],
+	};
+#else
 	struct socket_ncs_sendcb pcb = {
 		.callback = send_cb,
 	};
+#endif
 
 	err = zsock_setsockopt(socket->fd, SOL_SOCKET, SO_SENDCB, &pcb, sizeof(pcb));
 	if (err < 0) {
@@ -645,6 +730,16 @@ static int do_secure_socket_open(struct sm_socket *sock, int peer_verify)
 
 	struct timeval tmo = {.tv_sec = SOCKET_SEND_TMO_SEC};
 
+#if defined(CONFIG_SM_APP_TLS)
+	int tls_native = 1;
+
+	/* Must be the first socket option to set. */
+	ret = zsock_setsockopt(sock->fd, SOL_TLS, TLS_NATIVE, &tls_native, sizeof(tls_native));
+	if (ret) {
+		goto error;
+	}
+#endif
+
 	ret = zsock_setsockopt(sock->fd, SOL_SOCKET, SO_SNDTIMEO, &tmo, sizeof(tmo));
 	if (ret) {
 		LOG_ERR("zsock_setsockopt(%d) error: %d", SO_SNDTIMEO, -errno);
@@ -675,6 +770,21 @@ static int do_secure_socket_open(struct sm_socket *sock, int peer_verify)
 		ret = -errno;
 		goto error;
 	}
+
+#if defined(CONFIG_SM_APP_TLS)
+	/* Set up DTLS server role if applicable */
+	if (sock->role == AT_SOCKET_ROLE_SERVER) {
+		int dtls_role = ZSOCK_TLS_DTLS_ROLE_SERVER;
+
+		ret = zsock_setsockopt(sock->fd, SOL_TLS, ZSOCK_TLS_DTLS_ROLE, &dtls_role,
+				     sizeof(int));
+		if (ret) {
+			LOG_ERR("zsock_setsockopt(%d) error: %d", ZSOCK_TLS_DTLS_ROLE, -errno);
+			ret = -errno;
+			goto error;
+		}
+	}
+#endif
 
 	rsp_send("\r\n#XSSOCKET: %d,%d,%d\r\n", sock->fd, sock->type, proto);
 
@@ -1027,6 +1137,21 @@ static int do_connect(struct sm_socket *sock, const char *url, uint16_t port)
 	if (ret) {
 		return -EAGAIN;
 	}
+
+#if defined(CONFIG_SM_APP_TLS)
+	/* MbedTLS requires TLS_HOSTNAME to be set explicitly for SNI.
+	 * Modem-offloaded TLS derives it automatically; application-side TLS does not.
+	 */
+	if (sock->sec_tag != SEC_TAG_TLS_INVALID) {
+		ret = zsock_setsockopt(sock->fd, SOL_TLS, TLS_HOSTNAME,
+				       url, strlen(url) + 1);
+		if (ret) {
+			LOG_ERR("TLS_HOSTNAME error: %d", -errno);
+			return -errno;
+		}
+	}
+#endif
+
 	if (sa.sa_family == AF_INET) {
 		ret = zsock_connect(sock->fd, (struct sockaddr *)&sa,
 				  sizeof(struct sockaddr_in));
@@ -1448,6 +1573,12 @@ STATIC int handle_at_secure_socket(enum at_parser_cmd_type cmd_type,
 
 		uint16_t peer_verify = ZSOCK_TLS_PEER_VERIFY_REQUIRED;
 
+#if defined(CONFIG_SM_APP_TLS)
+		/* Server does not do peer verify. */
+		if (sock->role == AT_SOCKET_ROLE_SERVER) {
+			peer_verify = ZSOCK_TLS_PEER_VERIFY_NONE;
+		}
+#endif
 		if (param_count > 5) {
 			err = at_parser_num_get(parser, 5, &peer_verify);
 			if (err) {
@@ -2053,10 +2184,15 @@ static int do_listen(struct sm_socket *sock)
 {
 	int ret;
 
-	if (sock->type != SOCK_STREAM || sock->local_port == 0 ||
-	    sock->sec_tag != SEC_TAG_TLS_INVALID) {
+	if (sock->type != SOCK_STREAM || sock->local_port == 0) {
 		return -EOPNOTSUPP;
 	}
+
+#if !defined(CONFIG_SM_APP_TLS)
+	if (sock->sec_tag != SEC_TAG_TLS_INVALID) {
+		return -EOPNOTSUPP;
+	}
+#endif
 
 	/* Set the socket to non-blocking mode, so accept() won't block. */
 	ret = zsock_fcntl(sock->fd, ZVFS_F_SETFL, ZVFS_O_NONBLOCK);
