@@ -64,10 +64,10 @@ B0 key rotation.
    # In secure environment:
    ./nrf91m1/scripts/sign_hashes.py \
        --in  ./signing-out/unsigned/manifest-tosign.env \
-       --out ./signing-out/manifest-signed.env
+       --out ./signing-out/release/manifest-signed.env
 
    ./nrf91m1/scripts/sign_assemble.py \
-       --signed       ./signing-out/manifest-signed.env \
+       --signed       ./signing-out/release/manifest-signed.env \
        --unsigned-dir ./signing-out/unsigned
 
    nrfutil device program --firmware signing-out/release/full.hex
@@ -88,10 +88,10 @@ file (debugging only).
    # In secure environment:
    ./nrf91m1/scripts/sign_hashes.py \
        --in  ./signing-out/unsigned/manifest-tosign.env \
-       --out ./signing-out/manifest-signed.env
+       --out ./signing-out/release/manifest-signed.env
 
    ./nrf91m1/scripts/sign_assemble.py \
-       --signed       ./signing-out/manifest-signed.env \
+       --signed       ./signing-out/release/manifest-signed.env \
        --unsigned-dir ./signing-out/unsigned \
        --app-update-only
 
@@ -106,32 +106,39 @@ Updating MCUboot
 
 MCUboot update images are signed by both B0 and the MCUboot key.
 
-Set ``CONFIG_FW_INFO_FIRMWARE_VERSION`` to 2 in MCUboot Kconfig before building.
-``--override-mcuboot-version <N>`` overrides this value (debugging only).
+.. note::
+
+   In production:
+
+   1. Instead of using the ``--override-mcuboot-version`` option, update the MCUboot ``CONFIG_FW_INFO_FIRMWARE_VERSION`` Kconfig value to a higher version.
 
 .. code-block:: sh
 
-   ./nrf91m1/scripts/sign_build_unsigned.py --dev
+   ./nrf91m1/scripts/sign_build_unsigned.py --dev --override-mcuboot-version 2
 
    # In secure environment:
    ./nrf91m1/scripts/sign_hashes.py \
        --in  ./signing-out/unsigned/manifest-tosign.env \
-       --out ./signing-out/manifest-signed.env
+       --out ./signing-out/release/manifest-signed.env
 
    ./nrf91m1/scripts/sign_assemble.py \
-       --signed       ./signing-out/manifest-signed.env \
+       --signed       ./signing-out/release/manifest-signed.env \
        --unsigned-dir ./signing-out/unsigned
 
-   ./nrf91m1/scripts/sign_prepare_mcuboot.py
+   ./nrf91m1/scripts/sign_prepare_mcuboot.py \
+       --release-dir ./signing-out/release \
+       --release-manifest ./signing-out/release/manifest.env \
+       --output ./signing-out/release/manifest-mcuboot-tosign.env
 
    # Another round in secure environment:
    # Re-authenticate to Vault if the session has expired
    ./nrf91m1/scripts/sign_hashes.py \
-       --in  ./signing-out/manifest-mcuboot-tosign.env \
-       --out ./signing-out/manifest-mcuboot-signed.env
+       --in  ./signing-out/release/manifest-mcuboot-tosign.env \
+       --out ./signing-out/release/manifest-mcuboot-signed.env
 
    ./nrf91m1/scripts/sign_assemble_mcuboot.py \
-       --mcuboot-signed ./signing-out/manifest-mcuboot-signed.env
+       --release-dir ./signing-out/release \
+       --mcuboot-signed ./signing-out/release/manifest-mcuboot-signed.env
 
    ./scripts/sm_dfu_host.py --port /dev/ttyACM0 --baudrate 115200 \
        --type mcuboot-bootloader \
@@ -158,7 +165,7 @@ Step 1 — Rotate to B0_V1 (revokes B0_V0)
    # In secure environment:
    ./nrf91m1/scripts/sign_hashes.py \
        --in  signing-out/unsigned/manifest-tosign.env \
-       --out signing-out/manifest-signed.env
+       --out signing-out/release/manifest-signed.env
 
    ./nrf91m1/scripts/sign_assemble.py
 
@@ -167,8 +174,8 @@ Step 1 — Rotate to B0_V1 (revokes B0_V0)
    # Another round in secure environment:
    # Re-authenticate to Vault if the session has expired
    ./nrf91m1/scripts/sign_hashes.py \
-       --in  signing-out/manifest-mcuboot-tosign.env \
-       --out signing-out/manifest-mcuboot-signed.env
+       --in  signing-out/release/manifest-mcuboot-tosign.env \
+       --out signing-out/release/manifest-mcuboot-signed.env
 
    ./nrf91m1/scripts/sign_assemble_mcuboot.py
 
@@ -193,7 +200,7 @@ Step 2 — Verify revocation: sign with B0_V0 (expected to fail)
    # In secure environment:
    ./nrf91m1/scripts/sign_hashes.py \
        --in  signing-out/unsigned/manifest-tosign.env \
-       --out signing-out/manifest-signed.env
+       --out signing-out/release/manifest-signed.env
 
    ./nrf91m1/scripts/sign_assemble.py
 
@@ -202,8 +209,8 @@ Step 2 — Verify revocation: sign with B0_V0 (expected to fail)
    # Another round in secure environment:
    # Re-authenticate to Vault if the session has expired
    ./nrf91m1/scripts/sign_hashes.py \
-       --in  signing-out/manifest-mcuboot-tosign.env \
-       --out signing-out/manifest-mcuboot-signed.env
+       --in  signing-out/release/manifest-mcuboot-tosign.env \
+       --out signing-out/release/manifest-mcuboot-signed.env
 
    ./nrf91m1/scripts/sign_assemble_mcuboot.py
 
@@ -243,7 +250,7 @@ existing devices can verify it before and after the MCUboot update.
    # In secure environment:
    ./nrf91m1/scripts/sign_hashes.py \
        --in  signing-out/unsigned/manifest-tosign.env \
-       --out signing-out/manifest-signed.env
+       --out signing-out/release/manifest-signed.env
 
    ./nrf91m1/scripts/sign_assemble.py
 
@@ -251,8 +258,8 @@ existing devices can verify it before and after the MCUboot update.
 
    # Another round in secure environment:
    ./nrf91m1/scripts/sign_hashes.py \
-       --in  signing-out/manifest-mcuboot-tosign.env \
-       --out signing-out/manifest-mcuboot-signed.env
+       --in  signing-out/release/manifest-mcuboot-tosign.env \
+       --out signing-out/release/manifest-mcuboot-signed.env
 
    ./nrf91m1/scripts/sign_assemble_mcuboot.py
 
@@ -290,7 +297,7 @@ first; the MCUboot update is used in Phase 3.
    # In secure environment:
    ./nrf91m1/scripts/sign_hashes.py \
        --in  signing-out/unsigned/manifest-tosign.env \
-       --out signing-out/manifest-signed.env
+       --out signing-out/release/manifest-signed.env
 
    ./nrf91m1/scripts/sign_assemble.py
 
@@ -298,8 +305,8 @@ first; the MCUboot update is used in Phase 3.
 
    # Another round in secure environment:
    ./nrf91m1/scripts/sign_hashes.py \
-       --in  signing-out/manifest-mcuboot-tosign.env \
-       --out signing-out/manifest-mcuboot-signed.env
+       --in  signing-out/release/manifest-mcuboot-tosign.env \
+       --out signing-out/release/manifest-mcuboot-signed.env
 
    ./nrf91m1/scripts/sign_assemble_mcuboot.py
 
@@ -357,7 +364,7 @@ key and attempt to install them. Both must be rejected by the device.
    # In secure environment:
    ./nrf91m1/scripts/sign_hashes.py \
        --in  signing-out/unsigned/manifest-tosign.env \
-       --out signing-out/manifest-signed.env
+       --out signing-out/release/manifest-signed.env
 
    ./nrf91m1/scripts/sign_assemble.py
 
@@ -365,8 +372,8 @@ key and attempt to install them. Both must be rejected by the device.
 
    # Another round in secure environment:
    ./nrf91m1/scripts/sign_hashes.py \
-       --in  signing-out/manifest-mcuboot-tosign.env \
-       --out signing-out/manifest-mcuboot-signed.env
+       --in  signing-out/release/manifest-mcuboot-tosign.env \
+       --out signing-out/release/manifest-mcuboot-signed.env
 
    ./nrf91m1/scripts/sign_assemble_mcuboot.py
 

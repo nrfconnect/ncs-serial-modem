@@ -27,7 +27,7 @@ def _parse_args() -> argparse.Namespace:
         description="Apply Vault signatures to unsigned bundle and build flashable images.",
         allow_abbrev=False,
     )
-    p.add_argument("--signed", type=Path, default=C.OUT_DIR / "manifest-signed.env",
+    p.add_argument("--signed", type=Path, default=C.RELEASE_DIR / "manifest-signed.env",
                    metavar="FILE",
                    help="manifest-signed.env produced by sign_hashes.py.")
     p.add_argument("--unsigned-dir", type=Path, default=C.UNSIGNED_DIR, metavar="DIR",

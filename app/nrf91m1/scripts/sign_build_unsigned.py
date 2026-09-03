@@ -147,6 +147,7 @@ def main() -> None:
     mcuboot_key_name_explicit: str = args.mcuboot_key_name or ""
 
     unsigned_dir = C.UNSIGNED_DIR
+    release_dir = C.RELEASE_DIR
     tosign: Path = args.output or (unsigned_dir / C.TOSIGN_FILE_NAME)
 
     # Validate constraints
@@ -222,6 +223,7 @@ def main() -> None:
     # --- Harvest unsigned binaries -------------------------------------------
 
     unsigned_dir.mkdir(parents=True, exist_ok=True)
+    release_dir.mkdir(parents=True, exist_ok=True)
 
     def harvest(src: Path, dst_name: str) -> None:
         C.require_file(src, f"unsigned build artifact for {dst_name}")

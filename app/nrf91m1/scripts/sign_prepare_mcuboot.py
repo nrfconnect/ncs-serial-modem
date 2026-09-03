@@ -27,7 +27,9 @@ def _parse_args() -> argparse.Namespace:
     )
     p.add_argument("--release-dir", type=Path, default=C.RELEASE_DIR, metavar="DIR",
                    help="Directory with B0-signed MCUboot images.")
-    p.add_argument("--output", type=Path, metavar="FILE",
+    p.add_argument("--release-manifest", type=Path, default=C.RELEASE_DIR / C.MANIFEST_FILE_NAME, metavar="FILE",
+                   help="Release manifest.")
+    p.add_argument("--output", type=Path, default=C.RELEASE_DIR / "manifest-mcuboot-tosign.env", metavar="FILE",
                    help="Output manifest-mcuboot-tosign.env path.")
     return p.parse_args()
 
@@ -37,7 +39,7 @@ def main() -> None:
     args = _parse_args()
 
     release_dir: Path = args.release_dir
-    tosign: Path = args.output or (C.OUT_DIR / "manifest-mcuboot-tosign.env")
+    tosign: Path = args.output
 
     # --- Preconditions -------------------------------------------------------
 
@@ -48,7 +50,7 @@ def main() -> None:
     C.require_file(b0_s0, "B0-signed MCUboot S0 (run sign_assemble.py first)")
     C.require_file(b0_s1, "B0-signed MCUboot S1 variant (run sign_assemble.py first)")
 
-    release_manifest = release_dir / C.MANIFEST_FILE_NAME
+    release_manifest = args.release_manifest
     C.require_file(release_manifest, "release manifest (run sign_assemble.py first)")
 
     # --- Read signing parameters from the release manifest -------------------

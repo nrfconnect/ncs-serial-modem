@@ -34,7 +34,7 @@ def _parse_args() -> argparse.Namespace:
         allow_abbrev=False,
     )
     p.add_argument("--mcuboot-signed", type=Path,
-                   default=C.OUT_DIR / "manifest-mcuboot-signed.env", metavar="FILE",
+                   default=C.RELEASE_DIR / "manifest-mcuboot-signed.env", metavar="FILE",
                    help="manifest-mcuboot-signed.env from sign_hashes.py (second trip).")
     p.add_argument("--release-dir", type=Path, default=C.RELEASE_DIR, metavar="DIR",
                    help="Input/output directory.")
