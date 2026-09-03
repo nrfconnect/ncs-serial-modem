@@ -1,14 +1,23 @@
-.ncs-pdf-banner {
-  position: static;
-  right: auto;
-  margin-top: 0;
-  margin-bottom: 0;
+/* PDF button in the breadcrumb bar: #00a9ce outline and label on a pale blue
+   fill. Selector carries two classes so it outranks the theme's link colours. */
+.wy-breadcrumbs-aside a.ncs-pdf-button {
   align-items: center;
   background-color: #e6f6f9;
   border: 1px solid #00a9ce;
-  display: flex;
+  color: #00a9ce;
+  display: inline-flex;
   font-family: Carlito, sans-serif;
   font-weight: 500;
   gap: 6px;
   padding: 6px;
-  }
+  /* Opens a gap towards "View page source". The list item is floated right,
+     so widening it leaves the button's right edge where it is and pushes the
+     source link further left instead. */
+  margin-left: 12px;
+}
+
+.wy-breadcrumbs-aside a.ncs-pdf-button:hover {
+  background-color: #d5eef5;
+  color: #00a9ce;
+  text-decoration: none;
+}

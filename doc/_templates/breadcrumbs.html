@@ -1,0 +1,13 @@
+{% extends "!breadcrumbs.html" %}
+
+{#- The theme floats .wy-breadcrumbs-aside right, so the first aside in source
+    order ends up furthest right: emitting the button before super() places it
+    outside the theme's "View page source" link. pathto() with resource=1
+    resolves the depth of the current page, and the doc-build workflow copies
+    the PDF to the root of the HTML output. -#}
+{%- block breadcrumbs_aside %}
+      <li class="wy-breadcrumbs-aside">
+        <a class="ncs-pdf-button" href="{{ pathto('ncs-serial-modem.pdf', 1) }}"><span class="fa fa-file-pdf-o" aria-hidden="true"></span>Download PDF</a>
+      </li>
+      {{ super() }}
+{%- endblock %}

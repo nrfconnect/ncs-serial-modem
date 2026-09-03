@@ -46,6 +46,10 @@ html_theme_options = {'docsets': {},"addons_url": "https://nrfconnect.github.io/
 
 html_extra_path = ['versions.json']
 
+html_static_path = ['_static']
+
+html_css_files = ['css/custom.css']
+
 ## -- Options for Breathe ----------------------------------------------------
 # https://breathe.readthedocs.io/en/latest/index.html
 #
@@ -60,12 +64,6 @@ breathe_default_members = ('members', )
 rst_epilog = """
 .. include:: /links.txt
 .. include:: /shortcuts.txt
-"""
-
-rst_prolog = """
-.. raw:: html
-
-   <p><a class="btn ncs-btn-header" href="../ncs-serial-modem.pdf">Download PDF</a></p>
 """
 
 # -- Options for LaTeX output -------------------------------------------------
@@ -107,18 +105,38 @@ latex_elements = {
     \pdfstringdefDisableCommands{\def\\{, }}%
     \hypersetup{pdfauthor={\@author}, pdftitle={\@title}}%
   \endgroup
-  \noindent\colorbox{nordicblue}{%
-    \begin{minipage}[t][0.34\paperheight][b]{0.90\paperwidth}
-      \sffamily\color{white}
-      {\Huge\@title\par}
-      \vspace{2.5em}
-      \begin{flushright}
-        {\Large\bfseries\@author\par}
-        \vspace{0.4em}
-        {\large\py@release\releaseinfo\par}
-      \end{flushright}
-      \vspace{2em}
-    \end{minipage}%
+  % The band bleeds off the left paper edge, which sits 1in+\oddsidemargin
+  % outside the text block. \makebox keeps the line exactly \linewidth wide so
+  % the overhang does not report an overfull box. \fboxsep becomes the band's
+  % inner padding, keeping the title clear of the paper edge, and the minipage
+  % is sized so the band itself stays 0.90\paperwidth by 0.32\paperheight.
+  \begingroup
+    \setlength{\fboxsep}{16mm}%
+    \setlength{\nordicbandwidth}{\dimexpr0.90\paperwidth-2\fboxsep\relax}%
+    \setlength{\nordicbandheight}{\dimexpr0.32\paperheight-2\fboxsep\relax}%
+    \noindent\makebox[\linewidth][l]{%
+      \hspace*{\dimexpr-1in-\oddsidemargin\relax}%
+      \colorbox{nordicblue}{%
+        \begin{minipage}[t][\nordicbandheight][b]{\nordicbandwidth}
+          \sffamily\color{white}
+          {\Huge\@title\par}
+          \vspace{2.5em}
+          \begin{flushright}
+            {\Large\bfseries\@author\par}
+            \vspace{0.4em}
+            {\large\py@release\releaseinfo\par}
+          \end{flushright}
+        \end{minipage}%
+      }%
+    }%
+  \endgroup
+  \vfill
+  % logo.png surrounds the artwork with white padding, so the drawn logo is
+  % only 0.82 of the file height: 35mm here renders it about 28mm tall, the
+  % size in the reference. The negative kern carries it past the 1in text
+  % margin so it ends about 13mm from the paper's right edge.
+  \noindent\makebox[\linewidth][r]{%
+    \includegraphics[height=35mm]{logo.png}\hspace*{-14mm}%
   }
 \end{titlepage}
 \setcounter{footnote}{0}%
@@ -134,6 +152,10 @@ latex_elements = {
 
 \definecolor{nordicblue}{RGB}{0,162,198}
 
+% Title page band geometry, computed in \sphinxmaketitle from \fboxsep.
+\newlength{\nordicbandwidth}
+\newlength{\nordicbandheight}
+
 % hyperref is already loaded at this point, so these settings win. Without
 % colorlinks it frames every link with a border instead of tinting the text.
 \hypersetup{colorlinks=true, allcolors=nordicblue, pdfborder={0 0 0}}
@@ -148,17 +170,19 @@ latex_elements = {
 % therefore has no footer at all.
 \makeatletter
 \newcommand{\nordicfooterlogo}{\includegraphics[height=10mm]{logo.png}}
+% A 10mm logo is taller than the default footer skip, which fancyhdr warns
+% about, so reserve enough room for it.
+\setlength{\footskip}{34pt}
 \fancypagestyle{normal}{
   \fancyhf{}
-  \fancyfoot[L]{\nordicfooterlogo}
+  \fancyfoot[L]{{\py@HeaderFamily\thepage}}
+  \fancyfoot[R]{\nordicfooterlogo}
   \fancyhead[R]{{\py@HeaderFamily \@title\sphinxheadercomma\py@release}}
   \renewcommand{\headrulewidth}{0.4pt}
   \renewcommand{\footrulewidth}{0.4pt}
 }
 \fancypagestyle{plain}{
   \fancyhf{}
-  \fancyfoot[L]{\nordicfooterlogo}
-  \fancyfoot[R]{{\py@HeaderFamily\thepage}}
   \fancyfoot[L]{{\py@HeaderFamily\thepage}}
   \fancyfoot[R]{\nordicfooterlogo}
   \renewcommand{\headrulewidth}{0pt}
@@ -176,6 +200,3 @@ latex_documents = [
 ]
 
 figure_align = 'H'
-
-def setup(app):
-    app.add_css_file("_static/css/custom.css")
