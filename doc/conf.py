@@ -88,6 +88,9 @@ latex_elements = {
   {\setmonofont{DejaVu Sans Mono}}
   {\setmonofont{FreeMono}}
 """,
+    # Sphinx defaults to the Bjarne fncychap style, which is what prints the
+    # "Chapter" label above the title. The preamble styles the heads instead.
+    'fncychap': '',
     # 'oneside' drops the blank verso pages; 'openany' lets chapters start on
     # either side instead of forcing them onto a right-hand page.
     'extraclassoptions': 'openany,oneside',
@@ -160,7 +163,43 @@ latex_elements = {
 % colorlinks it frames every link with a border instead of tinting the text.
 \hypersetup{colorlinks=true, allcolors=nordicblue, pdfborder={0 0 0}}
 
-\chapterfont{\color{nordicblue}}
+% Contents entries are hyperlinks, so linkcolor is what colours them, and the
+% class numbers these pages in roman. Sphinx runs this hook inside the group
+% around \tableofcontents and restores arabic numbering after it, so both
+% overrides stay confined to the contents pages. Emptying \thepage would
+% otherwise leave hyperref writing a "page." destination per page, so its
+% page anchors go too.
+\makeatletter
+\g@addto@macro\sphinxtableofcontentshook{%
+  \hypersetup{linkcolor=black, pageanchor=false}%
+  \pagenumbering{gobble}%
+}
+\makeatother
+
+% Chapter heads need the number and title on one line, which means replacing
+% the macro the class provides rather than tinting it with \chapterfont.
+% Open Sans SemiBold where the system has it, plain regular weight otherwise:
+% the heads are blue already, so bold adds nothing.
+\IfFontExistsTF{Open Sans SemiBold}
+  {\newfontfamily\nordicheadingfont{Open Sans SemiBold}}
+  {\newcommand{\nordicheadingfont}{\mdseries}}
+\makeatletter
+\newcommand{\nordicchapterhead}[1]{%
+  \vspace*{50\p@}%
+  {\parindent\z@\raggedright\normalfont\sffamily\nordicheadingfont
+   \Huge\color{nordicblue}%
+   \interlinepenalty\@M
+   #1\par\nobreak
+   \vskip 40\p@}%
+}
+% \@chapapp is the "Chapter" label; dropping it leaves "1<gap>Title".
+\renewcommand{\@makechapterhead}[1]{%
+  \nordicchapterhead{\ifnum\c@secnumdepth>\m@ne\thechapter\hskip0.75em\fi#1}%
+}
+% Unnumbered chapters, such as the contents and index heads.
+\renewcommand{\@makeschapterhead}[1]{\nordicchapterhead{#1}}
+\makeatother
+
 \sectionfont{\color{nordicblue}}
 \subsectionfont{\color{nordicblue}}
 
@@ -175,7 +214,7 @@ latex_elements = {
 \setlength{\footskip}{34pt}
 \fancypagestyle{normal}{
   \fancyhf{}
-  \fancyfoot[L]{{\py@HeaderFamily\thepage}}
+  \fancyfoot[C]{{\py@HeaderFamily\thepage}}
   \fancyfoot[R]{\nordicfooterlogo}
   \fancyhead[R]{{\py@HeaderFamily \@title\sphinxheadercomma\py@release}}
   \renewcommand{\headrulewidth}{0.4pt}
@@ -183,7 +222,7 @@ latex_elements = {
 }
 \fancypagestyle{plain}{
   \fancyhf{}
-  \fancyfoot[L]{{\py@HeaderFamily\thepage}}
+  \fancyfoot[C]{{\py@HeaderFamily\thepage}}
   \fancyfoot[R]{\nordicfooterlogo}
   \renewcommand{\headrulewidth}{0pt}
   \renewcommand{\footrulewidth}{0.4pt}
