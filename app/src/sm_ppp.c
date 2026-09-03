@@ -82,8 +82,7 @@ enum ppp_states {
 };
 static enum ppp_states ppp_state;
 
-MODEM_PPP_DEFINE(ppp_module, NULL, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT,
-		 sizeof(ppp_data_buf), sizeof(ppp_data_buf));
+MODEM_PPP_DEFINE(ppp_module, NULL, sizeof(ppp_data_buf), sizeof(ppp_data_buf));
 AT_MONITOR(sm_ppp_on_cgev, "CGEV", at_notif_on_cgev, PAUSED);
 
 /* Default PPP PDN is the default PDP context (CID 0). */

@@ -1,15 +1,17 @@
 #include <zephyr/drivers/modem/modem_cellular.h>
 #include <zephyr/device.h>
 
+#define DT_DRV_COMPAT nordic_nrf91_sm_v2
+
 MODEM_CELLULAR_COMMON_CHAT_MATCHES();
 
-MODEM_CELLULAR_UNSOL_DEFINE(nordic_nrf91_unsol, MODEM_CELLULAR_COMMON_UNSOL_MATCHES);
+MODEM_CHAT_MATCHES_DEFINE(nordic_nrf91_unsol, MODEM_CELLULAR_COMMON_UNSOL_MATCHES);
 
 MODEM_CHAT_MATCH_DEFINE(xiccid_match, "%XICCID: ", "", modem_cellular_chat_on_iccid);
 MODEM_CHAT_MATCH_DEFINE(uicc_initialized, "%XSIM: 1", "", NULL);
 
-MODEM_CHAT_SCRIPT_CMDS_DEFINE(
-	init_chat_script_cmds, MODEM_CHAT_SCRIPT_CMD_RESP("AT", ok_match),
+MODEM_CHAT_SCRIPT_CMDS_DEFINE(init_chat_script_cmds,
+	MODEM_CHAT_SCRIPT_CMD_RESP("AT", ok_match),
 	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CMEE=1", ok_match),
 	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CGSN", imei_match), MODEM_CHAT_SCRIPT_CMD_RESP("", ok_match),
 	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CGMM", cgmm_match), MODEM_CHAT_SCRIPT_CMD_RESP("", ok_match),
@@ -46,15 +48,28 @@ MODEM_CHAT_SCRIPT_CMDS_DEFINE(shutdown_chat_script_cmds,
 MODEM_CHAT_SCRIPT_DEFINE(shutdown_chat_script, shutdown_chat_script_cmds, abort_matches,
 			 modem_cellular_chat_callback_handler, 10);
 
-static const struct modem_cellular_config_scripts nrf91_sm_scripts = {
-	.init = &init_chat_script,
-	.network = &network_chat_script,
-	.dial = &dial_chat_script,
-	.shutdown = &shutdown_chat_script,
+static const struct modem_cellular_vendor_config nrf91_sm_vendor = {
+	/* clang-format off */
+	.scripts = {
+		.init = &init_chat_script,
+		.network = &network_chat_script,
+		.dial = &dial_chat_script,
+		.shutdown = &shutdown_chat_script,
+	},
+	.unsol_matches = {
+		.matches = nordic_nrf91_unsol,
+		.size = ARRAY_SIZE(nordic_nrf91_unsol),
+	},
+	/* clang-format on */
+	.power_pulse_duration_ms = 0,
+	.reset_pulse_duration_ms = 500,
+	.startup_time_ms = 2000,
+	.shutdown_time_ms = 100,
+	.force_autostart = true,
 };
 
 #define NRF91SM_DEVICE(inst)                                                                       \
-	MODEM_DT_INST_PPP_DEFINE(inst, MODEM_CELLULAR_INST_NAME(ppp, inst), NULL, 98, 1500, 64);   \
+	MODEM_DT_INST_PPP_DEFINE(inst, MODEM_CELLULAR_INST_NAME(ppp, inst), NULL, 1500, 1500);     \
                                                                                                    \
 	static struct modem_cellular_data MODEM_CELLULAR_INST_NAME(data, inst) = {                 \
 		.chat_delimiter = "\r\n",                                                          \
@@ -63,9 +78,7 @@ static const struct modem_cellular_config_scripts nrf91_sm_scripts = {
                                                                                                    \
 	MODEM_CELLULAR_DEFINE_AND_INIT_USER_PIPES(inst, (user_pipe_0, 3), (user_pipe_1, 4))        \
                                                                                                    \
-	MODEM_CELLULAR_DEFINE_INSTANCE(inst, 0, 500, 2000, 100, true, &nrf91_sm_scripts,           \
-				       &nordic_nrf91_unsol)
+	MODEM_CELLULAR_DEFINE_INSTANCE(inst, &nrf91_sm_vendor)
 
-#define DT_DRV_COMPAT nordic_nrf91_sm_v2
+
 DT_INST_FOREACH_STATUS_OKAY(NRF91SM_DEVICE)
-#undef DT_DRV_COMPAT
