@@ -130,10 +130,6 @@ tests:
       - thingy91x/nrf9151/ns
     integration_platforms:
       - nrf9151dk/nrf9151/ns
-  # Memfault is enabled in prj.conf, so this guards the opposite configuration: every
-  # option Memfault needs is a configdefault in Kconfig.memfault, and assigning any of
-  # them in prj.conf instead both warns and leaves an unbuildable configuration, because
-  # nothing implements nrf_cloud_coap_get_user_options() without the Memfault CoAP port.
   serial_modem.no_memfault:
     sysbuild: true
     build_only: true
@@ -141,8 +137,16 @@ tests:
       - CONFIG_MEMFAULT=n
     platform_allow:
       - nrf9151dk/nrf9151/ns
-    integration_platforms:
+    tags: exclude_integration
+  serial_modem.no_nrfcloud:
+    sysbuild: true
+    build_only: true
+    extra_configs:
+      - CONFIG_SM_NRF_CLOUD=n
+      - CONFIG_MEMFAULT=n
+    platform_allow:
       - nrf9151dk/nrf9151/ns
+    tags: exclude_integration
   serial_modem.mfw_full_fota_and_dfu:
     sysbuild: true
     build_only: true
