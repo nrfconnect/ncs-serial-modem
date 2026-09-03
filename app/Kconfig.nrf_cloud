@@ -1,0 +1,98 @@
+#
+# Copyright (c) 2026 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+# Application defaults for nRF Cloud.
+#
+# This file must be sourced before Kconfig.zephyr, which is what pulls in the Kconfig of
+# the nRF Cloud modules: a default is inserted at the position where it appears relative to
+# the definition of the symbol, and the first matching default wins. Sourced afterwards,
+# every default here would silently lose to the one of the module.
+
+config SM_NRF_CLOUD
+	bool "nRF Cloud support"
+	default y
+	select EXPERIMENTAL
+	select SM_BLOCKING_WORK_Q
+
+if SM_NRF_CLOUD
+
+config SM_NRF_CLOUD_LOCATION
+	bool "nRF Cloud Location support"
+	default y
+	depends on SM_NRF_CLOUD
+	help
+	  Enable the nRF Cloud Location service for cloud-assisted geolocation.
+	  Supports cellular and Wi-Fi positioning.
+
+# Enable the nRF Cloud library.
+configdefault NRF_CLOUD
+	default y
+
+# Enable nRF Cloud CoAP transport.
+configdefault NRF_CLOUD_COAP
+	default y
+
+# Disable file downloads over CoAP: prefer HTTPS when downloads are active
+# (FOTA and P-GPS are both disabled, so NRF_CLOUD_DOWNLOADS is inactive and
+# the NRF_CLOUD_DOWNLOADS_PROTOCOL choice is invisible. This default only takes
+# effect if either is ever enabled.)
+choice NRF_CLOUD_DOWNLOADS_PROTOCOL
+	default NRF_CLOUD_HTTPS_DOWNLOADS
+endchoice
+
+# Disable nRF Cloud FOTA: modem FOTA is handled by the dedicated FOTA subsystem.
+configdefault NRF_CLOUD_FOTA
+	default n
+
+# Enable A-GNSS (Assisted GNSS) via nRF Cloud.
+configdefault NRF_CLOUD_AGNSS
+	default y
+
+# Disable A-GNSS filtered mode: download all satellite ephemerides.
+configdefault NRF_CLOUD_AGNSS_FILTERED
+	default n
+
+# Disable P-GPS (Predicted GPS) as it is not used.
+configdefault NRF_CLOUD_PGPS
+	default n
+
+# Set INFO as the compiled-in log level for the nRF Cloud library. A choice symbol cannot
+# be given a configdefault, which warns that it has no effect, so the default of the choice
+# itself is overridden instead. Assigning the symbol in prj.conf would warn with
+# CONFIG_NRF_CLOUD=n.
+choice NRF_CLOUD_LOG_LEVEL_CHOICE
+	default NRF_CLOUD_LOG_LEVEL_INF
+endchoice
+
+# Set INFO as the compiled-in log level for the nRF Cloud GPS assistance library.
+choice NRF_CLOUD_GPS_LOG_LEVEL_CHOICE
+	default NRF_CLOUD_GPS_LOG_LEVEL_INF
+endchoice
+
+# Use the modem device UUID as the nRF Cloud client ID.
+choice NRF_CLOUD_CLIENT_ID_SRC
+	default NRF_CLOUD_CLIENT_ID_SRC_MDM_DEVICE_UUID
+endchoice
+
+# Encode MAC address and RSSI value in Wi-Fi location requests.
+choice NRF_CLOUD_WIFI_LOCATION_ENCODE_OPT
+	default NRF_CLOUD_WIFI_LOCATION_ENCODE_OPT_MAC_RSSI
+endchoice
+
+# Enable the date-time library, a dependency of SM_NRF_CLOUD.
+configdefault DATE_TIME
+	default y
+
+# Enable modem info, used by nRF Cloud A-GNSS and by Memfault LTE metrics.
+configdefault MODEM_INFO
+	default y
+
+# Disable adding the modem's real-time clock to modem info: time is managed by the
+# DATE_TIME library, not by MODEM_INFO.
+configdefault MODEM_INFO_ADD_DATE_TIME
+	default n
+
+endif # SM_NRF_CLOUD

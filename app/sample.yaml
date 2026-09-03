@@ -24,6 +24,7 @@ tests:
       - mcuboot_EXTRA_DTC_OVERLAY_FILE="${APP_DIR}/nrfcloud-coredump-flash.overlay"
     extra_configs:
       - CONFIG_SM_LOG_LEVEL_DBG=y
+      - CONFIG_SM_DFU_MODEM_FULL=y
     platform_allow:
       - nrf9151dk/nrf9151/ns
     integration_platforms:
@@ -153,6 +154,14 @@ tests:
       - nrf9151dk/nrf9151/ns
     integration_platforms:
       - nrf9151dk/nrf9151/ns
+  serial_modem.no_nrfcloud:
+    sysbuild: true
+    build_only: true
+    extra_configs:
+      - CONFIG_SM_NRF_CLOUD=n
+    platform_allow:
+      - nrf9151dk/nrf9151/ns
+    #tags: exclude_integration
   serial_modem.mfw_full_fota_and_dfu:
     sysbuild: true
     build_only: true
