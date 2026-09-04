@@ -32,12 +32,19 @@ Syntax
     Can be used as a way to pause and resume the download, by issuing the same FOTA start command to resume.
   * ``1`` - Start FOTA for application update.
   * ``2`` - Start FOTA for modem delta update.
-  * ``3`` - Start FOTA for full modem update.
-    Can only be used when the :file:`full-fota.conf` configuration file and :file:`full-fota.overlay` devicetree overlay are used.
-  * ``5`` - Start FOTA for MCUboot second-stage bootloader update.
-    Only available when the device uses the NSIB (B0) and MCUboot as a second-stage bootloader.
 
-    Not supported on the Thingy:91 X.
+  .. only:: not nrf91m1
+
+    * ``3`` - Start FOTA for full modem update.
+      Can only be used when the :file:`full-fota.conf` configuration file and :file:`full-fota.overlay` devicetree overlay are used.
+
+  * ``5`` - Start FOTA for MCUboot second-stage bootloader update.
+
+  .. only:: not nrf91m1
+
+      Only available when the device uses the NSIB (B0) and MCUboot as a second-stage bootloader.
+
+      Not supported on the Thingy:91 X.
 
   * ``7`` - Read modem DFU area size and firmware image offset (for modem delta update).
   * ``9`` - Erase modem DFU area (for modem delta update).
