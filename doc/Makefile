@@ -31,8 +31,11 @@ html: docsets
 docsets:
 	@$(BUILDDOCSETS)
 
-main nrf91m1:
+main:
 	@$(BUILDDOCSETS) --docset $@
+
+nrf91m1:
+	@$(BUILDDOCSETS) --docset $@ -t nrf91m1
 
 clean:
 	rm -rf "$(BUILDDIR)"
