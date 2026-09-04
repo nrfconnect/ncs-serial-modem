@@ -46,7 +46,8 @@ Syntax
 * The ``<mode>`` parameter is an integer:
 
   * ``0`` - Disable the application log backend and suspend the UART.
-  * ``1`` - Resume the UART and enable the application log backend.
+  * ``1`` - Resume the UART and enable the application log backend. The payloads of sensitive commands are redacted from the log.
+  * ``2`` - As ``1``, but also show the payloads of sensitive commands. Use only in a trusted environment, as credentials and application data are then written to the log in clear text.
 
 
 .. note::
@@ -71,7 +72,7 @@ Response syntax
 
    #XLOG: <mode>
 
-* The ``<mode>`` parameter reflects the current state (``0`` = disabled, ``1`` = enabled).
+* The ``<mode>`` parameter reflects the current state (``0`` = disabled, ``1`` = enabled with sensitive payloads redacted, ``2`` = enabled with all payloads shown).
 
 Test command
 ------------
@@ -90,7 +91,7 @@ Response syntax
 
 ::
 
-   #XLOG: (0,1)
+   #XLOG: (0,1,2)
 
 Example
 ~~~~~~~

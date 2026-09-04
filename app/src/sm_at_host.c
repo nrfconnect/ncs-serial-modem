@@ -13,6 +13,7 @@
 #include "sm_ppp.h"
 #include "sm_at_socket.h"
 #include "sm_cmux.h"
+#include "sm_log.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -744,8 +745,13 @@ static void raw_send(uint8_t flags)
 			send_flags |= SM_DATAMODE_FLAGS_MORE_DATA;
 		}
 
-		/* Send received data onward. */
-		LOG_HEXDUMP_DBG(data, MIN(claim, HEXDUMP_LIMIT), "RX");
+		/* Send received data onward. Data-mode payload is redacted unless AT#XLOG=2. */
+		if (sm_log_level() >= SM_LOG_ON_FULL) {
+			LOG_HEXDUMP_DBG(data, MIN(claim, HEXDUMP_LIMIT), "RX");
+		} else {
+			LOG_DBG("RX: %d bytes data-mode payload [redacted; AT#XLOG=2 to show]",
+				claim);
+		}
 		LOG_INF("Send: %d bytes, Data: %p", claim, (void *)data);
 
 		if (ctx->data_mode.handler) {
@@ -1053,8 +1059,7 @@ static int sm_at_send_internal(struct sm_at_host_ctx *ctx, const uint8_t *data, 
 				LOG_DBG("No context available for URC: %s", (const char *)data);
 				return -EIO;
 			}
-			LOG_DBG("URC default pipe=%p: %.*s", ctx->pipe, (int)len,
-				(const char *)data);
+			sm_log_urc("default", ctx->pipe, data, len);
 			ret = ring_buf_put(&urc_buf, data, len);
 			if (ret < len) {
 				LOG_ERR("URC buffer full, dropped %d bytes", len - ret);
@@ -1063,7 +1068,7 @@ static int sm_at_send_internal(struct sm_at_host_ctx *ctx, const uint8_t *data, 
 				return -EIO;
 			}
 		} else {
-			LOG_DBG("URC to pipe=%p: %.*s", ctx->pipe, (int)len, (const char *)data);
+			sm_log_urc("to", ctx->pipe, data, len);
 			/* Pipe specific URC */
 			struct urc_msg *msg = calloc(1, sizeof(struct urc_msg) + len + 1);
 
@@ -1151,7 +1156,7 @@ static void cmd_send(struct sm_at_host_ctx *ctx, uint8_t *buf, size_t cmd_length
 	/* This is safe as long as we process AT-commands sequentially in one work queue. */
 	static uint8_t response_buf[MODEM_RSP_BUF_SIZE + 1];
 
-	LOG_HEXDUMP_DBG(buf, cmd_length, "RX");
+	sm_log_rx_command(buf, cmd_length);
 
 	/* UART can send additional characters when the device is powered on.
 	 * We ignore everything before the start of the AT-command.
@@ -1214,8 +1219,15 @@ static void cmd_send(struct sm_at_host_ctx *ctx, uint8_t *buf, size_t cmd_length
 	if (strlen(response_buf) > strlen(CRLF_STR)) {
 		format_final_result(response_buf, strlen(response_buf),
 				    sizeof(response_buf));
+		/* Redact the response of sensitive commands unless AT#XLOG=2. */
+		enum sm_debug_print resp_print = SM_DEBUG_PRINT_FULL;
+
+		if (sm_log_level() < SM_LOG_ON_FULL &&
+		    sm_log_cmd_sensitive_prefix(at_cmd, cmd_length)) {
+			resp_print = SM_DEBUG_PRINT_NONE;
+		}
 		err = sm_at_send_internal(ctx, response_buf, strlen(response_buf), false,
-					  SM_DEBUG_PRINT_FULL);
+					  resp_print);
 		if (err) {
 			LOG_ERR("AT command response failed: %d", err);
 		}
@@ -1576,7 +1588,13 @@ void data_send(struct modem_pipe *pipe, const uint8_t *data, size_t len)
 		flush_pipe_urcs(ctx);
 	}
 
-	sm_at_send_internal(ctx, data, len, false, SM_DEBUG_PRINT_SHORT);
+	/* Inbound app data. Redacted unless AT#XLOG=2. */
+	if (sm_log_level() >= SM_LOG_ON_FULL) {
+		sm_at_send_internal(ctx, data, len, false, SM_DEBUG_PRINT_SHORT);
+	} else {
+		LOG_DBG("TX: %zu bytes received data [redacted; AT#XLOG=2 to show]", len);
+		sm_at_send_internal(ctx, data, len, false, SM_DEBUG_PRINT_NONE);
+	}
 }
 
 static uint16_t get_min_data_mode_idle_timeout_ms(void)
