@@ -166,14 +166,6 @@ jobs:
           # nRF9151 DK builds for nRF91M1
           zip_artifacts "app" "${NRF9151DK_DIR}/serial_modem.nrf91m1" "serial_modem_${VERSION}_nrf9151dk_nrf91m1"
 
-          # nRF9151 DK ext MCU builds
-          zip_artifacts "app" "${NRF9151DK_DIR}/serial_modem.ppp_cmux_with_extmcu" "serial_modem_${VERSION}_nrf9151dk_extmcu"
-          zip_artifacts "app" "${NRF9151DK_DIR}/serial_modem.ppp_cmux_with_extmcu.mtrace" "serial_modem_${VERSION}_nrf9151dk_extmcu_mtrace"
-
-          # nRF9151 DK normal builds (serial_modem.ppp_cmux)
-          zip_artifacts "app" "${NRF9151DK_DIR}/serial_modem.ppp_cmux" "serial_modem_${VERSION}_nrf9151dk_normal"
-          zip_artifacts "app" "${NRF9151DK_DIR}/serial_modem.ppp_cmux.mtrace" "serial_modem_${VERSION}_nrf9151dk_normal_mtrace"
-
           # nRF54L15 DK AT client shell build
           zip_artifacts "sm_at_client_shell" "${NRF54L15DK_DIR}/sm_at_client_shell/sample.sm_at_client_shell" "sm_at_client_shell_${VERSION}_nrf54l15dk" 1
 
