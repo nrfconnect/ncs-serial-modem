@@ -103,12 +103,20 @@ latex_elements = {
     # covers all four sides. The verbatim* keys blank out the red
     # visible-space and hook-arrow markers Sphinx prints where it wraps a long
     # line, which the reference does not show either.
+    # By default a code-block line only breaks at a space or at ASCII
+    # punctuation, so a long run of letters and digits with no break point
+    # overflows the grey panel into the margin. verbatimforcewraps lets Sphinx
+    # fall back to breaking such a line at any character, and maxoverfull=0
+    # applies that fallback as soon as the line is wider than the panel rather
+    # than tolerating the default three characters of overhang.
     'sphinxsetup': ('TableRowColorHeader={RGB}{0,162,198},'
                     'VerbatimColor={RGB}{240,240,240},'
                     'verbatimborder=0pt,'
                     'verbatimsep=10pt,'
                     'verbatimvisiblespace={},'
-                    'verbatimcontinued={}'),
+                    'verbatimcontinued={},'
+                    'verbatimforcewraps=true,'
+                    'verbatimmaxoverfull=0'),
     # Replaces \sphinxmaketitle. The page-anchor and clearpage handling around
     # the titlepage is what Sphinx itself does; only the layout differs.
     'maketitle': r"""
@@ -271,6 +279,27 @@ latex_elements = {
     \end{snugshade*}%
   \endgroup
 }
+
+% The console, shell and Python lexers all read '#' as the start of a comment,
+% so an AT command example such as AT#XSOCKET=0 is highlighted as a comment
+% from the '#' onwards and comes out teal and italic. Emptying the comment
+% token macros drops the colour and the shape together, which leaves those
+% tokens in the upright black of the surrounding block; every other token type
+% keeps its highlighting. The names below are the abbreviations Pygments uses
+% for Comment and its subtypes. They are defined in sphinxhighlight.sty, which
+% Sphinx loads after this preamble, so the redefinition is deferred to the
+% start of the document.
+\makeatletter
+\AtBeginDocument{%
+  \@namedef{PYG@tok@c}{}%
+  \@namedef{PYG@tok@c1}{}%
+  \@namedef{PYG@tok@ch}{}%
+  \@namedef{PYG@tok@cm}{}%
+  \@namedef{PYG@tok@cp}{}%
+  \@namedef{PYG@tok@cpf}{}%
+  \@namedef{PYG@tok@cs}{}%
+}
+\makeatother
 """
 }
 
