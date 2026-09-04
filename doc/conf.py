@@ -109,6 +109,10 @@ latex_elements = {
     # fall back to breaking such a line at any character, and maxoverfull=0
     # applies that fallback as soon as the line is wider than the panel rather
     # than tolerating the default three characters of overhang.
+    # caution is one of the "heavy" notices, so it is already drawn as a box
+    # and only needs the grey fill; dropping the border leaves the flat panel
+    # the Nordic style uses. note, important and tip are "light" notices and
+    # need the preamble treatment below instead.
     'sphinxsetup': ('TableRowColorHeader={RGB}{0,162,198},'
                     'VerbatimColor={RGB}{240,240,240},'
                     'verbatimborder=0pt,'
@@ -116,7 +120,9 @@ latex_elements = {
                     'verbatimvisiblespace={},'
                     'verbatimcontinued={},'
                     'verbatimforcewraps=true,'
-                    'verbatimmaxoverfull=0'),
+                    'verbatimmaxoverfull=0,'
+                    'cautionBgColor={RGB}{200,215,222},'
+                    'cautionborder=0pt'),
     # Replaces \sphinxmaketitle. The page-anchor and clearpage handling around
     # the titlepage is what Sphinx itself does; only the layout differs.
     'maketitle': r"""
