@@ -70,7 +70,7 @@ B0 key rotation.
        --signed       ./signing-out/release/manifest-signed.env \
        --unsigned-dir ./signing-out/unsigned
 
-   nrfutil device program --firmware signing-out/release/full.hex
+   nrfutil device program --firmware signing-out/release/merged_nrf91m1.hex
 
    nrfutil device reset
 

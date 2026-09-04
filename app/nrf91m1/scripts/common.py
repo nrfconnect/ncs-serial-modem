@@ -48,8 +48,6 @@ TOSIGN_FILE_NAME = "manifest-tosign.env"
 PYTHON: str = os.environ.get("PYTHON", "python3")
 IMGTOOL: Path = Path(os.environ.get(
     "IMGTOOL", str(_MCUBOOT_MODULE_DIR / "scripts/imgtool.py")))
-MERGEHEX: Path = Path(os.environ.get(
-    "MERGEHEX", str(_ZEPHYR_BASE / "scripts/build/mergehex.py")))
 HASH_PY: Path = Path(os.environ.get(
     "HASH_PY", str(_NRF_MODULE_DIR / "scripts/bootloader/hash.py")))
 VALIDATION_DATA_PY: Path = Path(os.environ.get(

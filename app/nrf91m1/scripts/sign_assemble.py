@@ -5,7 +5,7 @@ sign_hashes.py in the secure env) to the unsigned bundle and build the final
 flashable images.
 
 Emits (under signing-out/release/):
-  full build:        app_signed.hex/.bin, full.hex, manifest.env
+  full build:        app_signed.hex/.bin, merged_nrf91m1.hex, manifest.env
   --app-update-only: app_signed.hex/.bin, manifest.env
 """
 
@@ -50,7 +50,6 @@ def main() -> None:
     # --- Preconditions -------------------------------------------------------
 
     C.require_python_imgtool()
-    C.require_file(C.MERGEHEX, "mergehex.py")
     C.require_file(signed, "signed manifest (run sign_hashes.py in the secure env)")
 
     # --- Read parameters from the signed manifest ----------------------------
@@ -132,6 +131,7 @@ def main() -> None:
             u_s1 = unsigned_dir / "mcuboot_s1.hex"
             for f in (u_b0, u_s0, u_s1):
                 C.require_file(f, "unsigned artifact")
+            shutil.copy2(u_b0, release_dir / "b0.hex")
 
             def apply_mcuboot_slot(in_hex: Path, item: str, out_name: str) -> None:
                 C.log(f"  {out_name}: apply B0 signature -> validation_data")
@@ -180,13 +180,13 @@ def main() -> None:
         C.log(f"Signed app : {app_hex} / {app_bin}")
         C.log(f"{app_bin} is ready for the FOTA service.")
     else:
-        full_hex = release_dir / "full.hex"
+        full_hex = release_dir / "merged_nrf91m1.hex"
         C.log(f"Merging full flashable image -> {full_hex}")
-        C._run([C.PYTHON, C.MERGEHEX, "-o", full_hex,
-                u_b0, provision_hex,
-                release_dir / "signed_by_b0_mcuboot.hex",
-                release_dir / "signed_by_b0_mcuboot_s1_variant.hex",
-                app_hex])
+        C._run(["west", "ncs-mergehex",
+                str(C.APP_DIR / "nrf91m1/mergehex.yaml"),
+                "--no-rebuild",
+                "--build-dir", str(release_dir),
+                "--fail-on-missing"])
 
         shutil.copy2(signed, manifest_dst)
         C.ok("Release assembled.")

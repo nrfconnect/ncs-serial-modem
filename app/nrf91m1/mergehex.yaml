@@ -1,0 +1,6 @@
+merged_nrf91m1.hex:
+- b0.hex
+- provision.hex
+- signed_by_b0_mcuboot.hex
+- signed_by_b0_mcuboot_s1_variant.hex
+- app_signed.hex
