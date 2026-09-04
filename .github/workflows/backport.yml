@@ -6,7 +6,7 @@ on:
       - labeled
     branches:
       - main
-      - v1-branch
+      - v*-branch
 
 
 permissions:
