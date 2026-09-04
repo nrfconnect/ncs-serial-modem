@@ -2,3 +2,4 @@
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 
 add_subdirectory_ifdef(CONFIG_SM_AT_CLIENT sm_at_client)
+add_subdirectory_ifdef(CONFIG_SM_XDFU_LIB sm_xdfu)
