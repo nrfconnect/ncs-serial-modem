@@ -82,14 +82,35 @@ The |SM| application uses DTR (Data Terminal Ready) and RI (Ring Indicator) pins
 See :ref:`uart_configuration` for more information on how DTR and RI pins work in the |SM| application.
 See :ref:`sm_cellular_modem` for information on how to configure DTR and RI pins when using the |SM| application as a Zephyr modem.
 
-Custom static partition layout migration
-----------------------------------------
+Partition Manager removal
+-------------------------
 
 The |SM| no longer uses the |NCS| Partition Manager.
+
+Custom static partition layout migration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 All flash and SRAM partitions are now defined in devicetree overlays instead of ``pm_static_*.yml`` files.
 
 If you maintained a custom ``pm_static_*.yml`` file, recreate the partition layout as a devicetree overlay, using the files in :file:`app/boards/` and :file:`app/*.overlay` as a reference.
 For a general guide on migrating from Partition Manager to DTS, see the |NCS| `PM to DTS migration <migration_partitions_>`_ page.
+
+Merged hex generation
+~~~~~~~~~~~~~~~~~~~~~
+
+Previously, Partition Manager automatically generated a :file:`merged.hex` file in the build directory.
+This file is no longer generated automatically.
+After running ``west build``, run the following command to generate the combined hex file:
+
+.. code-block:: bash
+
+   west ncs-mergehex --no-rebuild
+
+The output file name is now board-specific instead of the generic :file:`merged.hex`:
+
+* For ``nrf9151dk/nrf9151/ns``, use :file:`build/merged_nrf9151dk.hex`.
+* For ``thingy91x/nrf9151/ns``, use :file:`build/merged_thingy91x.hex`.
+* For ``nrf54l15dk/nrf54l15/cpuapp``, use :file:`build/merged_nrf54l15dk.hex`.
 
 Socket AT command changes
 -------------------------
