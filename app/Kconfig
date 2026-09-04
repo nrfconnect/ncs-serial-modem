@@ -6,6 +6,16 @@
 
 menu "Nordic Serial Modem"
 
+config HEAP_MEM_POOL_ADD_SIZE_SERIAL_MODEM
+	int "Additional heap memory pool size for Serial Modem"
+	default 3072 if NRF_PROVISIONING
+	default 1700 if SM_NRF_CLOUD
+	default 0
+	help
+	  modem_jwt library used by nrf_cloud libraries, uses kernel heap for querying UUID.
+	  2x CONFIG_MODEM_JWT_MAX_LEN is the maximum it can use.
+	  nrf_provisioning uses over 2kB of heap.
+
 config SM_BLOCKING_WORK_Q
 	bool
 
@@ -244,69 +254,6 @@ config SM_GNSS
 	bool "GNSS support"
 	default y
 
-config SM_NRF_CLOUD
-	bool "nRF Cloud support"
-	default y
-	depends on NRF_CLOUD
-	depends on NRF_CLOUD_COAP
-	depends on DATE_TIME
-	select EXPERIMENTAL
-	select SM_BLOCKING_WORK_Q
-
-if SM_NRF_CLOUD
-config HEAP_MEM_POOL_ADD_SIZE_SM_NRF_CLOUD
-	int "Additional heap memory pool size for nRF Cloud support"
-	default 1700
-	help
-	  modem_jwt library used by nrf_cloud libraries, uses kernel heap for querying UUID.
-	  2x CONFIG_MODEM_JWT_MAX_LEN is the maximum it can use.
-endif # SM_NRF_CLOUD
-
-config SM_NRF_CLOUD_LOCATION
-	bool "nRF Cloud Location support"
-	default y
-	depends on SM_NRF_CLOUD
-	help
-	  Enable the nRF Cloud Location service for cloud-assisted geolocation.
-	  Supports cellular and Wi-Fi positioning.
-
-config SM_NRF_CLOUD_OBSERVABILITY
-	bool "nRF Cloud observability AT commands"
-	default y
-	depends on SM_NRF_CLOUD
-	depends on MEMFAULT_USE_NRF_CLOUD_COAP
-	depends on SETTINGS
-	select BASE64
-	help
-	  Enable the AT#XNRFCLOUDOBS* commands, which control Memfault
-	  over the nRF Cloud CoAP transport.
-
-config SM_NRF_CLOUD_OBSERVABILITY_AUTO_INTERVAL_SECONDS
-	int "Default interval of the automatic upload"
-	depends on SM_NRF_CLOUD_OBSERVABILITY
-	default 3600
-	range 60 86400
-	help
-	  Interval used by AT#XNRFCLOUDOBSAUTO when the host enables the
-	  automatic upload without giving one, and no interval has been stored
-	  yet. The interval the host gives is persistent, so this value only
-	  applies until the host configures one.
-
-config SM_NRF_CLOUD_OBSERVABILITY_DEBUG
-	bool "Debug nRF Cloud observability AT commands"
-	depends on SM_NRF_CLOUD_OBSERVABILITY
-	help
-	  Enable the debug observability commands:
-
-	  * AT#XNRFCLOUDOBSDEVINFO returns the Memfault device information.
-	  * AT#XNRFCLOUDOBSCRASH forces a crash so that coredump capture and
-	    upload can be tested.
-	  * AT#XNRFCLOUDOBSEXPORT prints the buffered Memfault chunks to the AT
-	    interface instead of uploading them.
-
-	  This is disabled by default: AT#XNRFCLOUDOBSCRASH deliberately crashes
-	  the application, so enable it only in development builds.
-
 config SM_COAPC
 	bool "CoAP client support"
 	default y
@@ -503,7 +450,8 @@ rsource "src/lwm2m_carrier/Kconfig"
 
 endmenu
 
-# Must be sourced before Kconfig.zephyr, see the file for the reason why.
+# Must be sourced before Kconfig.zephyr, see the respective files for the reason why.
+rsource "Kconfig.nrf_cloud"
 rsource "Kconfig.memfault"
 
 source "Kconfig.zephyr"
