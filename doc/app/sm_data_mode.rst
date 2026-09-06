@@ -56,7 +56,10 @@ Sending data in data mode
 Any arbitrary data received from the MCU is sent to LTE network *as-is*.
 
 .. note::
-   If the sending operation fails due to a network problem while in data mode, the |SM| application moves to a state where the data received from UART is dropped until the MCU sends the termination command :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>`.
+   If sending fails while in data mode, the |SM| application drops any further data received from the UART until data mode is exited, as described in the :ref:`exiting_data_mode` section.
+   For socket, HTTP client and CoAP client commands, the |SM| application also sends the termination string :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` to the MCU to indicate the error.
+
+.. _exiting_data_mode:
 
 Exiting data mode
 =================
@@ -66,18 +69,16 @@ To exit the data mode without the specification of ``<data_len>``, the MCU sends
 The pattern string could be sent alone or as an affix to the data.
 The pattern string must be sent in full.
 
-If ``<data_len>`` is specified in the AT command and the specified data length is reached, the |SM| application exits data mode. Termination command is not used in this case.
+If ``<data_len>`` is specified in the AT command and the specified data length is reached, the |SM| application exits data mode.
+The termination command is not used in this case.
+
+If a send operation fails while in data mode, such as when the socket in data mode encounters an error, the same exit conditions apply.
+The MCU must send the termination command if ``<data_len>`` is not specified.
+If ``<data_len>`` is specified, it must send the remaining bytes required to reach the specified length.
 
 When exiting the data mode, the |SM| application sends the ``#XDATAMODE`` unsolicited notification.
 
 After exiting the data mode, the |SM| application returns to the AT command mode.
-
-.. note::
-   The |SM| application sends the termination string :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` and moves to a state where the data received on the UART is dropped in the following scenarios:
-
-   * The socket in data mode encounters an error.
-
-   For |SM| to stop dropping the data received from UART and move to AT-command mode, the MCU needs to send the termination command :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` back to the |SM| application.
 
 Triggering the transmission
 ===========================
