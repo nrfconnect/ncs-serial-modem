@@ -1400,17 +1400,26 @@ cmd_finnish_or_fail:
 	return 1;
 }
 
-/* Search for quit_str and exit datamode when one is found. */
+/* Drop data until data mode is terminated: by quit_str, or when <data_len> was given,
+ * once the remaining bytes have been received.
+ */
 static size_t null_handler(struct sm_at_host_ctx *ctx, uint8_t c)
 {
 	const char *const quit_str = CONFIG_SM_DATAMODE_TERMINATOR;
+	const bool counted = (ctx->data_mode.data_len > 0);
 	bool match = false;
 
 	if (ctx->null_dropped_count == 0) {
 		LOG_WRN("Data pipe broken. Dropping data until data mode is terminated.");
 	}
 
-	if (c == quit_str[ctx->null_match_count]) {
+	if (counted) {
+		/* As in raw_rx_handler(), quit_str is not searched for when <data_len> is set. */
+		ctx->data_mode.data_len--;
+		if (ctx->data_mode.data_len == 0) {
+			match = true;
+		}
+	} else if (c == quit_str[ctx->null_match_count]) {
 		ctx->null_match_count++;
 		if (ctx->null_match_count == strlen(quit_str)) {
 			match = true;
@@ -1421,9 +1430,11 @@ static size_t null_handler(struct sm_at_host_ctx *ctx, uint8_t c)
 	ctx->null_dropped_count++;
 
 	if (match) {
-		ctx->null_dropped_count -= strlen(quit_str);
+		if (!counted) {
+			ctx->null_dropped_count -= strlen(quit_str);
+		}
 		ctx->null_dropped_count += ring_buf_size_get(&ctx->data_rb);
-		LOG_WRN("Terminating data mode. Dropped %d bytes", ctx->null_dropped_count);
+		LOG_WRN("Terminating data mode. Dropped %zu bytes", ctx->null_dropped_count);
 		(void)exit_datamode(ctx);
 
 		ctx->null_match_count = 0;
@@ -1683,7 +1694,7 @@ void exit_datamode_handler(struct sm_at_host_ctx *ctx, int result)
 		}
 		ctx->data_mode.handler = NULL;
 		ctx->data_mode.handler_result = result;
-		ctx->data_mode.data_len = 0;
+		/* Keep data_len: null_handler() drops the remaining bytes. */
 		sm_at_host_set_current_ctx(NULL);
 	}
 }
