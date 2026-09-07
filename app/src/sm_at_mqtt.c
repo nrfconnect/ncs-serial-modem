@@ -560,8 +560,15 @@ static int do_mqtt_disconnect(void)
 	ctx.disconnect_requested = true;
 	err = mqtt_disconnect(&client, NULL);
 	if (err) {
-		LOG_ERR("ERROR: mqtt_disconnect %d", err);
-		return err;
+		/* A graceful DISCONNECT is not always possible. mqtt_disconnect()
+		 * checks verify_tx_state(), so it fails with -ENOTCONN whenever the
+		 * CONNACK has not arrived yet, and it fails on a broken link. Close
+		 * the connection anyway: mqtt_abort() has no such check, and leaving
+		 * ctx.connected set would strand the client with no way out.
+		 */
+		LOG_WRN("mqtt_disconnect: %d, aborting instead", err);
+		mqtt_connection_abort(err);
+		return 0;
 	}
 
 	k_work_cancel_delayable(&mqtt_keepalive_work);
