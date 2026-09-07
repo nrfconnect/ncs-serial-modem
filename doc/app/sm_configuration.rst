@@ -337,6 +337,14 @@ The following configuration files are provided:
   Configures ``uart0`` and ``uart1`` with pins suitable for nRF9151 DK usage and for connecting to an external MCU.
   See :ref:`uart_configuration_nrf91m1` for pin details.
 
+* :file:`interposer-nrf9151-mk-bg95.overlay` - Devicetree overlay for an nRF9151 SiP on an nRF9151-MK-BG95 interposer board.
+  Configures the ``uart0`` pins to match the interposer footprint and removes ``hw-flow-control``, as the interposer does not use the RTS and CTS signals for flow control.
+  See :ref:`uart_configuration_interposer` for pin details.
+
+* :file:`interposer-nrf9151-mk-gm02s.overlay` - Devicetree overlay for an nRF9151 SiP on an nRF9151-MK-GM02S interposer board.
+  Configures the ``uart0`` pins to match the interposer footprint and moves the DTR pin off the UART0 TX pin.
+  See :ref:`uart_configuration_interposer` for pin details.
+
 * :file:`carrier.conf` - Configuration file that adds |NCS| `LwM2M carrier`_ support.
   Used in conjunction with :file:`carrier.overlay`.
   See :ref:`sm_carrier_library_support` for more information on how to connect to an operator's device management platform.
