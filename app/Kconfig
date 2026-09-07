@@ -65,11 +65,14 @@ config SM_UART_RX_BUF_COUNT
 config SM_UART_RX_BUF_SIZE
 	int "Receive buffer size for UART"
 	range 128 4096
-	default 2048 if BOARD_THINGY91X_NRF9151_NS
+	default 2048 if $(dt_nodelabel_enabled,uart0) = y && \
+			$(dt_nodelabel_bool_prop,uart0,hw-flow-control) = n
+	default 2048 if $(dt_nodelabel_enabled,uart2) = y && \
+			$(dt_nodelabel_bool_prop,uart2,hw-flow-control) = n
 	default 256
 	help
 	  Amount of received (RX), unprocessed, UART traffic that can be held by single buffer.
-	  Increase buffer space for Thingy:91 X as hardware flow control is not used.
+	  Increase buffer space if UART0 or UART2 lacks hardware flow control.
 	  These buffers are not used when CMUX is in use.
 
 config SM_UART_TX_BUF_SIZE
