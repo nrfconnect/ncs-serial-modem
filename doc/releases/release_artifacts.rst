@@ -18,6 +18,10 @@ The following release artifacts are available:
    * - ``sm_ppp_shell_{VERSION}_nrf54l15dk``
      - PPP shell build for nRF54L15 DK host that can be used as an external MCU.
        See :ref:`uart_configuration` for pin wiring.
+   * - ``serial_modem_{VERSION}_interposer_nrf9151_mk_bg95_nrf91m1``
+     - Adapts the nRF9151 SiP to the BG95 module footprint through the nRF9151-MK-BG95 interposer, using the nRF91M1 content.
+   * - ``serial_modem_{VERSION}_interposer_nrf9151_mk_gm02s_nrf91m1``
+     - Adapts the nRF9151 SiP to the GM02S module footprint through the nRF9151-MK-GM02S interposer, using the nRF91M1 content.
 
 The artifacts are zipped and contain build files such as:
 

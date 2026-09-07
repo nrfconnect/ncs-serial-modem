@@ -235,6 +235,85 @@ When working with `nrf9151dk`_ board with an external MCU host, you must disable
 
 This setup is provided in the :file:`app/nrf91m1.overlay` devicetree overlay file.
 
+.. _uart_configuration_interposer:
+
+Interposer boards
+=================
+
+An interposer board adapts the nRF9151 SiP to the footprint of another cellular module.
+The interposer wiring determines which nRF9151 pins carry the UART signals, so each interposer needs its own devicetree overlay.
+
+Both overlays target the `nrf9151dk`_ board.
+Each one assigns its own pinctrl states and points ``uart0`` at them, so the pin mapping does not depend on the states the board files happen to define.
+
+.. tabs::
+
+   .. group-tab:: nRF9151-MK-BG95 interposer
+
+      .. list-table::
+         :header-rows: 1
+
+         * - UART Signal
+           - nRF9151 Pin
+         * - TX
+           - P0.15
+         * - RX
+           - P0.14 (pull-up)
+         * - RTS
+           - P0.18
+         * - CTS
+           - P0.19 (pull-up)
+         * - DTR
+           - P0.08 (Button 1, pull-up, active high)
+         * - RI
+           - P0.00 (LED1)
+
+      * UART instance: UART0
+      * Baud rate: 115200
+      * Hardware flow control: Disabled
+
+      The overlay remaps the ``uart0`` pins to match the interposer footprint and removes ``hw-flow-control``.
+      DTR and RI keep the `nrf9151dk`_ board defaults.
+
+      The RTS and CTS pins are still assigned in the pinctrl states but are not used for flow control, and both can be left unconnected.
+      See :ref:`uart_without_flow_control` for further considerations.
+
+      This setup is provided in the :file:`app/interposer-nrf9151-mk-bg95.overlay` devicetree overlay file.
+
+   .. group-tab:: nRF9151-MK-GM02S interposer
+
+      .. list-table::
+         :header-rows: 1
+
+         * - UART Signal
+           - nRF9151 Pin
+         * - TX
+           - P0.08
+         * - RX
+           - P0.07 (pull-up)
+         * - RTS
+           - P0.05
+         * - CTS
+           - P0.04 (pull-up)
+         * - DTR
+           - P0.15 (pull-up, active high)
+         * - RI
+           - P0.00 (LED1)
+
+      * UART instance: UART0
+      * Baud rate: 115200
+      * Hardware flow control: Enabled
+
+      The interposer routes UART0 TX to **P0.08**, which the `nrf9151dk`_ board overlay uses for DTR.
+      The overlay therefore moves DTR to **P0.15**, which UART0 CTS no longer occupies.
+
+      .. note::
+
+         RI, together with the UART0 pins, overlaps **LED 1** (**P0.00**), **LED 3** (**P0.04**), **LED 4** (**P0.05**) and **Button 1** (**P0.08**) on the `nrf9151dk`_ board.
+         The overlay disables the LED, PWM LED and button nodes so that nothing else can drive those pins.
+
+      This setup is provided in the :file:`app/interposer-nrf9151-mk-gm02s.overlay` devicetree overlay file.
+
 Host application
 ================
 
