@@ -1,0 +1,11 @@
+/* Application LTE metrics collected via AT commands (see sm_at_nrfcloud_obs_lte_metrics.c).
+ * MODEM_INFO-backed metrics remain in the NCS Memfault integration.
+ */
+
+MEMFAULT_METRICS_KEY_DEFINE(ncs_lte_cell_id, kMemfaultMetricType_Signed)
+MEMFAULT_METRICS_KEY_DEFINE(ncs_lte_tracking_area_code, kMemfaultMetricType_Signed)
+MEMFAULT_METRICS_KEY_DEFINE(ncs_lte_mode, kMemfaultMetricType_Unsigned)
+MEMFAULT_METRICS_KEY_DEFINE(ncs_lte_psm_tau_seconds, kMemfaultMetricType_Signed)
+MEMFAULT_METRICS_KEY_DEFINE(ncs_lte_psm_active_time_seconds, kMemfaultMetricType_Signed)
+MEMFAULT_METRICS_KEY_DEFINE(ncs_lte_edrx_interval_ms, kMemfaultMetricType_Unsigned)
+MEMFAULT_METRICS_KEY_DEFINE(ncs_lte_edrx_ptw_ms, kMemfaultMetricType_Unsigned)
