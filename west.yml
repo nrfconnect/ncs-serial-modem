@@ -27,6 +27,7 @@ manifest:
           - nrfxlib
           - oberon-psa-crypto
           - segger
+          - tf-psa-crypto
           - trusted-firmware-m
           - zcbor
           - zephyr
