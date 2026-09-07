@@ -46,10 +46,16 @@ configdefault MEMFAULT_NCS_STACK_METRICS
 	default y
 
 # Collect the LTE metrics that MODEM_INFO provides: modem firmware version, operator, RSRP,
-# SNR, band and the connectivity statistics. The remaining LTE metrics need
-# LTE_LINK_CONTROL, which this application does not use because the host drives the link.
+# SNR, band and the connectivity statistics. The remaining LTE metrics are collected via
+# AT commands in sm_at_nrfcloud_obs_lte_metrics.c.
 configdefault MEMFAULT_NCS_LTE_METRICS
 	default y
+
+configdefault MEMFAULT_USER_CONFIG_ENABLE
+	default y if SM_NRF_CLOUD_OBSERVABILITY_LTE_METRICS
+
+configdefault MEMFAULT_NCS_IMPLEMENT_METRICS_COLLECTION
+	default n if SM_NRF_CLOUD_OBSERVABILITY_LTE_METRICS
 
 # Memfault depends on POSIX, disable unneeded POSIX features.
 configdefault POSIX_FILE_SYSTEM

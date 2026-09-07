@@ -503,6 +503,7 @@ The ``#XNRFCLOUDOBSHEARTBEAT`` command collects and finalizes a metrics heartbea
 The data is buffered on the device until it is uploaded, so the command does not require a connection to nRF Cloud.
 
 The heartbeat carries the LTE metrics that the modem reports, such as the modem firmware version, the network operator, RSRP, SNR, the current band, and the transmitted and received data in kilobytes.
+When :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_LTE_METRICS <CONFIG_SM_NRF_CLOUD_OBSERVABILITY_LTE_METRICS>` is enabled, the heartbeat also carries the cell ID, the tracking area code, the LTE mode, the PSM active time and periodic TAU, and the eDRX interval and paging time window.
 Values not reported by the modem, such as when it is deactivated, are excluded from the heartbeat.
 
 Set command

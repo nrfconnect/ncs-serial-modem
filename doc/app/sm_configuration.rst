@@ -199,6 +199,13 @@ CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG - Debug observability commands
    Enable it only in development builds.
    This requires :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY <CONFIG_SM_NRF_CLOUD_OBSERVABILITY>` to be enabled.
 
+.. _CONFIG_SM_NRF_CLOUD_OBSERVABILITY_LTE_METRICS:
+
+CONFIG_SM_NRF_CLOUD_OBSERVABILITY_LTE_METRICS - Additional LTE metrics for Memfault
+   This option collects the cell ID, the tracking area code, the LTE mode, the PSM active time and periodic TAU, and the eDRX interval and paging time window on each Memfault heartbeat.
+   It is enabled by default.
+   This requires :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY <CONFIG_SM_NRF_CLOUD_OBSERVABILITY>` and ``CONFIG_MEMFAULT_NCS_LTE_METRICS`` to be enabled.
+
 .. _CONFIG_SM_COAPC:
 
 CONFIG_SM_COAPC - CoAP client support in |SM|

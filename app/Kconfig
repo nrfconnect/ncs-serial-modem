@@ -307,6 +307,16 @@ config SM_NRF_CLOUD_OBSERVABILITY_DEBUG
 	  This is disabled by default: AT#XNRFCLOUDOBSCRASH deliberately crashes
 	  the application, so enable it only in development builds.
 
+config SM_NRF_CLOUD_OBSERVABILITY_LTE_METRICS
+	bool "Collect additional LTE metrics via AT commands for Memfault"
+	depends on MEMFAULT
+	depends on MEMFAULT_NCS_LTE_METRICS
+	depends on SM_NRF_CLOUD_OBSERVABILITY
+	default y
+	help
+	  Collect cell ID, tracking area code, LTE mode, PSM (TAU and active time) and
+	  eDRX (interval and paging time window) metrics on each Memfault heartbeat.
+
 config SM_COAPC
 	bool "CoAP client support"
 	default y
