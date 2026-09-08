@@ -571,6 +571,7 @@ The data is buffered on the device until it is uploaded, so the command does not
 
 The heartbeat carries the LTE metrics that the modem reports, such as the modem firmware version, the network operator, RSRP, SNR, the current band, and the transmitted and received data in kilobytes.
 When :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_LTE_METRICS <CONFIG_SM_NRF_CLOUD_OBSERVABILITY_LTE_METRICS>` is enabled, the heartbeat also carries the cell ID, the tracking area code, the LTE mode, the PSM active time and periodic TAU, and the eDRX interval and paging time window.
+The heartbeat additionally carries connection statistics that are tracked between heartbeats, including the time to connect to the network, the number of connection losses, and the time the LTE link has been active.
 Values not reported by the modem, such as when it is deactivated, are excluded from the heartbeat.
 
 Set command
