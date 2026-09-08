@@ -11,6 +11,7 @@
 
 #include "sm_at_host.h"
 #include "sm_defines.h"
+#include <errno.h>
 #include <modem/at_cmd_custom.h>
 #include <modem/at_monitor.h>
 #include <modem/lte_lc.h>
@@ -18,6 +19,9 @@
 #include <string.h>
 #include <strings.h>
 #include <zephyr/logging/log.h>
+#if IS_ENABLED(CONFIG_SM_NRF_CLOUD_OBSERVABILITY_LTE_METRICS)
+#include "sm_at_nrfcloud_obs_lte_metrics.h"
+#endif
 
 int sm_util_at_cmd_no_intercept(char *buf, size_t len, const char *at_cmd);
 
@@ -80,6 +84,10 @@ static void sm_urcf_on_cfun(unsigned int mode)
 		sm_urcf_fwd_cereg = false;
 		sm_urcf_fwd_xtime = false;
 	}
+
+#if IS_ENABLED(CONFIG_SM_NRF_CLOUD_OBSERVABILITY_LTE_METRICS)
+	sm_memfault_lte_metrics_on_cfun(mode);
+#endif
 }
 
 STATIC int sm_urcf_cereg_callback(char *buf, size_t len, char *at_cmd)
@@ -193,8 +201,23 @@ STATIC int sm_urcf_cfun_callback(char *buf, size_t len, char *at_cmd)
 	const bool set_cmd = (sscanf(at_cmd, "%*[^=]=%u", &mode) == 1);
 	int ret;
 
+#if IS_ENABLED(CONFIG_SM_NRF_CLOUD_OBSERVABILITY_LTE_METRICS)
+	if (set_cmd) {
+		/* Arm before forwarding: the modem may emit +CEREG: 0 while it processes
+		 * the deactivation, i.e. before this command returns.
+		 */
+		sm_memfault_lte_metrics_on_cfun_request(mode);
+	}
+#endif
+
 	ret = sm_util_at_cmd_no_intercept(buf, len, at_cmd);
 	if (ret) {
+#if IS_ENABLED(CONFIG_SM_NRF_CLOUD_OBSERVABILITY_LTE_METRICS)
+		if (set_cmd) {
+			/* Command rejected; clear any armed deactivation. */
+			sm_memfault_lte_metrics_on_cfun_request(LTE_LC_FUNC_MODE_NORMAL);
+		}
+#endif
 		return ret;
 	}
 
@@ -226,6 +249,15 @@ AT_MONITOR(sm_urcf_notify, ANY, sm_urcf_notification_handler);
 
 static void sm_urcf_notification_handler(const char *notification)
 {
+#if IS_ENABLED(CONFIG_SM_NRF_CLOUD_OBSERVABILITY_LTE_METRICS)
+	unsigned int reg_status;
+
+	/* <stat> is the first parameter of the +CEREG URC in every notification mode. */
+	if (sscanf(notification, "+CEREG: %u", &reg_status) == 1) {
+		sm_memfault_lte_metrics_on_cereg(reg_status);
+	}
+#endif
+
 	if (!sm_urcf_should_forward(notification)) {
 		return;
 	}
