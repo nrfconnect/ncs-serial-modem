@@ -76,6 +76,7 @@ config SM_UART_RX_BUF_SIZE
 	int "Receive buffer size for UART"
 	range 128 4096
 	default 2048 if BOARD_THINGY91X_NRF9151_NS
+	default 532 if SM_CMUX
 	default 256
 	help
 	  Amount of received (RX), unprocessed, UART traffic that can be held by single buffer.
@@ -85,6 +86,7 @@ config SM_UART_RX_BUF_SIZE
 config SM_UART_TX_BUF_SIZE
 	int "Send buffer size for UART"
 	range 128 4096
+	default 532 if SM_CMUX
 	default 256
 	help
 	  Amount of UART traffic waiting to be sent (TX), that can be held.
@@ -451,6 +453,8 @@ rsource "src/lwm2m_carrier/Kconfig"
 endmenu
 
 # Must be sourced before Kconfig.zephyr, see the respective files for the reason why.
+rsource "Kconfig.ppp"
+rsource "Kconfig.cmux"
 rsource "Kconfig.nrf_cloud"
 rsource "Kconfig.memfault"
 
