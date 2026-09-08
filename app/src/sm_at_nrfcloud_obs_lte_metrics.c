@@ -4,17 +4,16 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
-#include "sm_util.h"
-
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
-
 #include <memfault/metrics/metrics.h>
 #include <memfault_ncs.h>
 #include <modem/lte_lc.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include "sm_util.h"
+#include "sm_at_nrfcloud_obs_lte_metrics.h"
 
 LOG_MODULE_REGISTER(sm_nrfcloud_obs_lte_metrics, CONFIG_SM_LOG_LEVEL);
 
@@ -29,6 +28,14 @@ LOG_MODULE_REGISTER(sm_nrfcloud_obs_lte_metrics, CONFIG_SM_LOG_LEVEL);
 #define AT_CEDRXS_ACTT_WB     4
 #define AT_CEDRXS_ACTT_NB     5
 #define AT_CEDRXS_ACTT_NTN_NB 6
+
+static bool lte_connected;
+
+/* Set while an intentional AT+CFUN deactivation is in progress. The modem may emit
+ * +CEREG: 0 before the command returns, and that deregistration must not be counted
+ * as a connection loss.
+ */
+static bool cfun_deactivation_pending;
 
 /* GPRS timer unit-to-seconds lookups, indexed by the 3 unit bits (see 3GPP TS 24.008).
  * Copied from the NCS lte_lc parsing; reserved unit codes use 60 as a filler value.
@@ -357,6 +364,95 @@ static int collect_edrx(void)
 	}
 
 	return 0;
+}
+
+static void sm_memfault_lte_metrics_on_connection_lost(void)
+{
+	if (!lte_connected) {
+		return;
+	}
+
+	if (cfun_deactivation_pending) {
+		/* Deregistration caused by an intentional AT+CFUN deactivation. */
+		lte_connected = false;
+		return;
+	}
+
+	if (MEMFAULT_METRIC_ADD(ncs_lte_connection_loss_count, 1)) {
+		LOG_ERR("Failed to increment ncs_lte_connection_loss_count");
+	}
+
+	MEMFAULT_METRIC_TIMER_START(ncs_lte_time_to_connect_ms);
+
+	lte_connected = false;
+}
+
+void sm_memfault_lte_metrics_on_cfun_request(unsigned int mode)
+{
+	/* Called before AT+CFUN is forwarded to the modem, so the flag is set in time for
+	 * a +CEREG: 0 URC that the modem emits while processing the deactivation.
+	 */
+	switch (mode) {
+	case LTE_LC_FUNC_MODE_POWER_OFF:
+	case LTE_LC_FUNC_MODE_OFFLINE:
+	case LTE_LC_FUNC_MODE_DEACTIVATE_LTE:
+		cfun_deactivation_pending = true;
+		break;
+	default:
+		cfun_deactivation_pending = false;
+		break;
+	}
+}
+
+void sm_memfault_lte_metrics_on_cfun(unsigned int mode)
+{
+	/* Called after the modem has accepted AT+CFUN, to start the metrics timers on
+	 * activation and stop them on an intentional deactivation.
+	 */
+	switch (mode) {
+	case LTE_LC_FUNC_MODE_NORMAL:
+	case LTE_LC_FUNC_MODE_ACTIVATE_LTE:
+		cfun_deactivation_pending = false;
+		MEMFAULT_METRIC_TIMER_START(ncs_lte_on_time_ms);
+		/* Only time a fresh connection attempt; a repeated activation or a
+		 * registration that already completed must not restart the timer.
+		 */
+		if (!lte_connected) {
+			MEMFAULT_METRIC_TIMER_START(ncs_lte_time_to_connect_ms);
+		}
+		break;
+	case LTE_LC_FUNC_MODE_POWER_OFF:
+	case LTE_LC_FUNC_MODE_OFFLINE:
+	case LTE_LC_FUNC_MODE_DEACTIVATE_LTE:
+		/* Intentional deactivation is not a connection loss. */
+		lte_connected = false;
+		cfun_deactivation_pending = false;
+		MEMFAULT_METRIC_TIMER_STOP(ncs_lte_on_time_ms);
+		MEMFAULT_METRIC_TIMER_STOP(ncs_lte_time_to_connect_ms);
+		break;
+	default:
+		break;
+	}
+}
+
+void sm_memfault_lte_metrics_on_cereg(unsigned int reg_status)
+{
+	switch (reg_status) {
+	case LTE_LC_NW_REG_REGISTERED_HOME:
+	case LTE_LC_NW_REG_REGISTERED_ROAMING:
+		lte_connected = true;
+		MEMFAULT_METRIC_TIMER_STOP(ncs_lte_time_to_connect_ms);
+		break;
+	case LTE_LC_NW_REG_NOT_REGISTERED:
+	case LTE_LC_NW_REG_SEARCHING:
+	case LTE_LC_NW_REG_REGISTRATION_DENIED:
+	case LTE_LC_NW_REG_UNKNOWN:
+	case LTE_LC_NW_REG_UICC_FAIL:
+		sm_memfault_lte_metrics_on_connection_lost();
+		break;
+	default:
+		break;
+	}
 }
 
 static void sm_memfault_lte_metrics_collect(void)

@@ -318,6 +318,7 @@ config SM_NRF_CLOUD_OBSERVABILITY_LTE_METRICS
 	help
 	  Collect cell ID, tracking area code, LTE mode, PSM (TAU and active time) and
 	  eDRX (interval and paging time window) metrics on each Memfault heartbeat.
+	  Also track time to connect, connection-loss count, and LTE on-time.
 
 config SM_COAPC
 	bool "CoAP client support"

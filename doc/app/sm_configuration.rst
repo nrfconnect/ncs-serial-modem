@@ -203,6 +203,7 @@ CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG - Debug observability commands
 
 CONFIG_SM_NRF_CLOUD_OBSERVABILITY_LTE_METRICS - Additional LTE metrics for Memfault
    This option collects the cell ID, the tracking area code, the LTE mode, the PSM active time and periodic TAU, and the eDRX interval and paging time window on each Memfault heartbeat.
+   It also tracks connection statistics between heartbeats, including the time to connect to the network, the number of connection losses, and the time the LTE link has been active.
    It is enabled by default.
    This requires :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY <CONFIG_SM_NRF_CLOUD_OBSERVABILITY>` and ``CONFIG_MEMFAULT_NCS_LTE_METRICS`` to be enabled.
 
