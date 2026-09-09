@@ -5,6 +5,7 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
+#include <strings.h>
 #include <zephyr/shell/shell.h>
 #include <zephyr/modem/chat.h>
 #include <zephyr/modem/pipe.h>
@@ -14,7 +15,11 @@
 
 #define AT_SHELL_HELP "\tat <command>\n" \
 		      "\tat --keep-open\n" \
-		      "\tat --close"
+		      "\tat --close\n" \
+		      "\tFor AT%%CMNG=0, use \\n in place of line breaks in multi-line content."
+
+/* Command prefix that supports multi-line content (e.g. certificates). */
+#define CREDENTIALS_CMD "AT%CMNG=0"
 
 struct at_shell_chat_instance {
 	struct modem_chat chat;
@@ -298,6 +303,18 @@ static int cmd_at(const struct shell *sh, size_t argc, char **argv)
 	}
 
 	modem_chat_attach(&active_at_instance->chat, pipe);
+
+	/* For the AT%CMNG command, convert literal "\n" to CR LF to allow
+	 * writing of multi-line certificates as a single shell argument.
+	 */
+	if (strncasecmp(argv[1], CREDENTIALS_CMD, strlen(CREDENTIALS_CMD)) == 0) {
+		char *c = argv[1];
+
+		while ((c = strstr(c, "\\n")) != NULL) {
+			c[0] = '\r';
+			c[1] = '\n';
+		}
+	}
 
 	ret = chat_cmd(&active_at_instance->chat, argv[1]);
 	if (ret < 0) {
