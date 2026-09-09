@@ -60,7 +60,7 @@ static uint32_t fota_auto_interval = CONFIG_SM_NRF_CLOUD_FOTA_AUTO_INTERVAL_SECO
 static struct modem_pipe *fota_pipe;
 
 /* Modem project key override for the ongoing AT#XNRFCLOUDFOTA=modem check. Empty means that
- * CONFIG_MEMFAULT_FOTA_MODEM_PROJECT_KEY is used.
+ * CONFIG_MEMFAULT_FOTA_MODEM_PROJECT_KEY (possibly unset) is used.
  */
 static char fota_modem_key[FOTA_MODEM_KEY_MAX_LEN + 1];
 
@@ -73,12 +73,11 @@ static char fota_modem_key[FOTA_MODEM_KEY_MAX_LEN + 1];
  * fota_pipe already set by the caller.
  *
  * Note: for sm_fota_type == SM_FOTA_TYPE_APP, memfault_zephyr_fota_start() itself falls back to
- * checking the modem project when CONFIG_MEMFAULT_FOTA_MODEM_UPDATE is set (selected here) and
- * no application update is pending. In that case a modem update may start while sm_fota_type
- * still reads SM_FOTA_TYPE_APP; the modem firmware is still updated correctly, but the
- * AT#XMODEMRESET completion report is skipped since it only fires for SM_FOTA_TYPE_MFW. This
- * matches the SDK's documented behaviour (see CONFIG_MEMFAULT_FOTA_MODEM_UPDATE's help) and is
- * only reachable when no application update is pending.
+ * checking the modem project when no application update is pending. In that case a modem
+ * update may start while sm_fota_type still reads SM_FOTA_TYPE_APP; the modem firmware is
+ * still updated correctly, but the AT#XMODEMRESET completion report is skipped since it only
+ * fires for SM_FOTA_TYPE_MFW. This is only reachable when no application update is pending, and
+ * only when a modem project key is configured (see fota_modem_key).
  */
 static void nrfcloud_fota_check(void)
 {

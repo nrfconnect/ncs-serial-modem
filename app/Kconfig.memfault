@@ -41,6 +41,11 @@ configdefault MEMFAULT_PERIODIC_UPLOAD
 configdefault MEMFAULT_ZEPHYR_FOTA
 	default n
 
+# Forward the project key from the app-level prompt (Kconfig), so there is a single place to
+# set it. Only takes effect when SM_NRF_CLOUD_FOTA_MODEM_UPDATE selects MEMFAULT_FOTA_MODEM_UPDATE.
+configdefault MEMFAULT_FOTA_MODEM_PROJECT_KEY
+	default SM_NRF_CLOUD_FOTA_MODEM_PROJECT_KEY
+
 # Collect metrics for unused stack space.
 configdefault MEMFAULT_NCS_STACK_METRICS
 	default y

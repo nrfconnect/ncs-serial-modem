@@ -786,6 +786,11 @@ A modem update is staged the same way as ``AT#XFOTA=2``; the host activates it w
 Both share their FOTA session and progress/completion notifications with ``#XFOTA``: see :ref:`SM_AT_FOTA` for the ``#XFOTA`` unsolicited notification and the activation commands.
 Only one FOTA session, from either command, can be ongoing at a time.
 
+.. note::
+   ``<op>="modem"`` uses a dedicated Memfault project key for modem firmware, obtained from Settings > General in that project (a different project than the application's).
+   Set it with the :ref:`CONFIG_SM_NRF_CLOUD_FOTA_MODEM_PROJECT_KEY <CONFIG_SM_NRF_CLOUD_FOTA_MODEM_PROJECT_KEY>` Kconfig option, or override it at runtime with the ``<project_key>`` parameter.
+   When neither is set, ``<op>="modem"`` reports that no update is available.
+
 Set command
 -----------
 
@@ -804,7 +809,7 @@ Syntax
   * ``"modem"`` - Check for and download a modem firmware update.
 
 * The ``<project_key>`` parameter is a string.
-  It applies only to ``<op>="modem"`` and overrides :ref:`CONFIG_MEMFAULT_FOTA_MODEM_PROJECT_KEY <CONFIG_MEMFAULT_FOTA_MODEM_PROJECT_KEY>` for this check.
+  It applies only to ``<op>="modem"`` and overrides :ref:`CONFIG_SM_NRF_CLOUD_FOTA_MODEM_PROJECT_KEY <CONFIG_SM_NRF_CLOUD_FOTA_MODEM_PROJECT_KEY>` for this check.
 
 The command returns ``OK`` immediately and the check runs asynchronously.
 When it completes, an unsolicited notification is sent.
