@@ -509,9 +509,14 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 	return err;
 }
 
+int sm_at_fota_register_callback(void)
+{
+	return fota_download_init(fota_dl_handler);
+}
+
 static int sm_at_fota_init(void)
 {
-	int ret = fota_download_init(fota_dl_handler);
+	int ret = sm_at_fota_register_callback();
 
 	if (ret) {
 		LOG_ERR("fota_download_init failed: %d", ret);
