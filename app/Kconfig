@@ -317,6 +317,46 @@ config SM_NRF_CLOUD_OBSERVABILITY_LTE_METRICS
 	  Collect cell ID, tracking area code, LTE mode, PSM (TAU and active time) and
 	  eDRX (interval and paging time window) metrics on each Memfault heartbeat.
 
+config SM_NRF_CLOUD_FOTA
+	bool "nRF Cloud FOTA AT commands"
+	default y
+	depends on SM_NRF_CLOUD
+	depends on MEMFAULT_USE_NRF_CLOUD_COAP
+	depends on SETTINGS
+	select MEMFAULT_ZEPHYR_FOTA
+	select MEMFAULT_ZEPHYR_FOTA_BACKEND_NCS
+	select MEMFAULT_FOTA_DOWNLOAD_CALLBACK_CUSTOM
+	select MEMFAULT_FOTA_MODEM_UPDATE
+	select NRF_CLOUD_COAP_DOWNLOADS
+	help
+	  Enable the AT#XNRFCLOUDFOTA* commands, which check for and download
+	  application and modem firmware updates via Memfault release
+	  management (https://mflt.io/release-mgmt), delivered over the same
+	  nRF Cloud CoAP transport as AT#XNRFCLOUDOBS*.
+
+	  An application update is staged the same way as AT#XFOTA=1; the
+	  host activates it with AT#XRESET. A modem update is staged the
+	  same way as AT#XFOTA=2; the host activates it with AT#XMODEMRESET.
+	  Both report progress and completion via the #XFOTA URC.
+
+	  Set CONFIG_MEMFAULT_FOTA_MODEM_PROJECT_KEY to the dedicated modem
+	  firmware project key, or override it at runtime with the
+	  <project_key> parameter of AT#XNRFCLOUDFOTA=modem[,<project_key>].
+
+if SM_NRF_CLOUD_FOTA
+
+config SM_NRF_CLOUD_FOTA_AUTO_INTERVAL_SECONDS
+	int "Default interval of the automatic FOTA check"
+	default 3600
+	range 60 86400
+	help
+	  Interval used by AT#XNRFCLOUDFOTAAUTO when the host enables the
+	  automatic check without giving one, and no interval has been
+	  stored yet. The interval the host gives is persistent, so this
+	  value only applies until the host configures one.
+
+endif # SM_NRF_CLOUD_FOTA
+
 config SM_COAPC
 	bool "CoAP client support"
 	default y

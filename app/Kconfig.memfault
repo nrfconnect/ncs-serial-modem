@@ -37,7 +37,7 @@ configdefault MEMFAULT_HTTP_ENABLE
 configdefault MEMFAULT_PERIODIC_UPLOAD
 	default n
 
-# No Memfault release-management FOTA backend is wired up here.
+# Enabled by SM_NRF_CLOUD_FOTA (AT#XNRFCLOUDFOTA*); no backend is wired up otherwise.
 configdefault MEMFAULT_ZEPHYR_FOTA
 	default n
 
