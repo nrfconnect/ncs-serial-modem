@@ -839,3 +839,115 @@ Test command
 ------------
 
 The test command is not supported.
+
+.. _SM_AT_NRFCLOUDFOTA:
+
+nRF Cloud FOTA #XNRFCLOUDFOTA
+=============================
+
+The ``#XNRFCLOUDFOTA`` command checks for and downloads an application or modem firmware update via `Memfault release management`_, delivered over the same nRF Cloud CoAP transport as ``#XNRFCLOUDOBS*``.
+
+Requires the :ref:`CONFIG_SM_NRF_CLOUD_FOTA <CONFIG_SM_NRF_CLOUD_FOTA>` Kconfig option.
+
+An application update is staged the same way as ``AT#XFOTA=1``; the host activates it with ``AT#XRESET``.
+A modem update is staged the same way as ``AT#XFOTA=2``; the host activates it with ``AT#XMODEMRESET``.
+Both share their FOTA session and progress/completion notifications with ``#XFOTA``: see :ref:`SM_AT_FOTA` for the ``#XFOTA`` unsolicited notification and the activation commands.
+Only one FOTA session, from either command, can be ongoing at a time.
+
+.. note::
+   Unlike ``AT#XFOTA``, ``#XNRFCLOUDFOTA`` does not support MCUboot bootloader updates, because Memfault release management only distinguishes application and modem firmware.
+   This is expected to be a rare use case. Support for it is planned to be added together with the application update.
+
+.. note::
+   ``<op>=2`` uses a dedicated Memfault project key for modem firmware, obtained from Settings > General in that project (a different project than the application's).
+   Set it with the :ref:`CONFIG_SM_NRF_CLOUD_FOTA_MODEM_PROJECT_KEY <CONFIG_SM_NRF_CLOUD_FOTA_MODEM_PROJECT_KEY>` Kconfig option, or override it at runtime with the ``<project_key>`` parameter.
+   When neither is set, ``<op>=2`` reports that no update is available.
+
+Set command
+-----------
+
+The set command starts a FOTA check, and the download if an update is available.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XNRFCLOUDFOTA=<op>[,<project_key>]
+
+* The ``<op>`` parameter is an integer.
+
+  * ``0`` - Cancel an ongoing download.
+    This is effective only after a download has started, that is, after the first ``#XFOTA`` progress notification.
+  * ``1`` - Check for and download an application update.
+    The optional ``<project_key>`` overrides the application project key (``CONFIG_MEMFAULT_PROJECT_KEY``) for this check.
+    When no application update is available, the command falls back to a modem firmware update if the :ref:`CONFIG_SM_NRF_CLOUD_FOTA_MODEM_PROJECT_KEY <CONFIG_SM_NRF_CLOUD_FOTA_MODEM_PROJECT_KEY>` Kconfig option is set.
+    The ``<project_key>`` parameter does not apply to this fallback.
+  * ``2`` - Check for and download a modem firmware update.
+
+* The ``<project_key>`` parameter is a string.
+  For ``<op>=1`` it overrides the application project key (``CONFIG_MEMFAULT_PROJECT_KEY``), and for ``<op>=2`` it overrides :ref:`CONFIG_SM_NRF_CLOUD_FOTA_MODEM_PROJECT_KEY <CONFIG_SM_NRF_CLOUD_FOTA_MODEM_PROJECT_KEY>`, for this check.
+  It does not apply to the modem firmware fallback of ``<op>=1``.
+
+.. note::
+   When ``<op>=1`` falls back to a modem firmware update, the modem firmware is downloaded and applied, but the ``AT#XMODEMRESET`` completion report is not sent.
+   To receive that report, use ``<op>=2`` instead.
+
+The command returns ``OK`` immediately and the check runs asynchronously.
+When it completes, an unsolicited notification is sent.
+
+Unsolicited notification
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+::
+
+   #XNRFCLOUDFOTA: <result>[,<error>]
+
+* The ``<result>`` parameter is an integer.
+
+  * ``0`` - No update is available.
+  * ``-1`` - The check failed.
+    The ``<error>`` parameter follows with the error code.
+
+This notification is sent only when no download was started.
+When a download starts, progress and completion are reported over the ``#XFOTA`` notification instead, as described in :ref:`SM_AT_FOTA`.
+
+Example
+~~~~~~~
+
+::
+
+  AT#XNRFCLOUDFOTA=1
+
+  OK
+
+  #XFOTA: 1,0,45
+
+  #XFOTA: 1,0,100
+
+  #XFOTA: 4,0
+  AT#XRESET
+
+Read command
+------------
+
+The read command is not supported.
+
+Test command
+------------
+
+The test command returns the supported syntax.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XNRFCLOUDFOTA=?
+
+Response
+~~~~~~~~
+
+::
+
+   #XNRFCLOUDFOTA: (0,1,2)[,<project_key>]

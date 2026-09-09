@@ -63,6 +63,14 @@ void sm_fota_mcuboot_bl_boot_check(void);
 void sm_fota_post_process(void);
 
 /**
+ * @brief (Re-)registers this module's fota_download callback.
+ *
+ * AT#XNRFCLOUDFOTA temporarily takes over the shared fota_download singleton callback for its
+ * own session; call this after that session ends to restore AT#XFOTA's handler.
+ */
+int sm_at_fota_register_callback(void);
+
+/**
  * @brief Finishes the full modem firmware update.
  *
  * This is to be called after the application or modem
