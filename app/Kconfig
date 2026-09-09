@@ -448,6 +448,14 @@ config SM_HTTPC_RESPONSE_TIMEOUT_MS
 
 endif # SM_HTTPC
 
+config SM_APP_TLS
+	bool "Application-side TLS credential management (AT#XCMNG)"
+	depends on TLS_CREDENTIALS_BACKEND_PROTECTED_STORAGE
+	help
+	  Enables the AT#XCMNG command for storing, deleting, and listing
+	  TLS credentials (CA certificate, client certificate, private key,
+	  PSK, PSK identity) in TF-M Protected Storage via tls_credential_add().
+
 if NRF_MODEM_LIB_TRACE
 
 choice NRF_MODEM_LIB_TRACE_BACKEND
