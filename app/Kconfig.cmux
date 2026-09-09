@@ -1,0 +1,29 @@
+#
+# Copyright (c) 2026 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+# Application defaults for CMUX, which is enabled by setting CONFIG_SM_CMUX=y.
+#
+# This file must be sourced before Kconfig.zephyr, which is what pulls in the Kconfig of
+# the Zephyr modem subsystem: a default is inserted at the position where it appears
+# relative to the definition of the symbol, and the first matching default wins. Sourced
+# afterwards, every default here would silently lose to the one of the module.
+
+if SM_CMUX
+
+# Enable the Zephyr modem CMUX multiplexer.
+configdefault MODEM_CMUX
+	default y
+
+# Set CMUX MTU to 127 bytes to align with the Linux gsm_mux driver default.
+configdefault MODEM_CMUX_MTU
+	default 127
+
+# Extra work-buffer space for CMUX frame assembly.
+# 127 (MTU) + 272 (header + flag overhead per frame) = 399 bytes.
+configdefault MODEM_CMUX_WORK_BUFFER_SIZE_EXTRA
+	default 399
+
+endif # SM_CMUX

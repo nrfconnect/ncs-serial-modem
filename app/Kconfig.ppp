@@ -1,0 +1,110 @@
+#
+# Copyright (c) 2026 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+# Application defaults for PPP, which is enabled by setting CONFIG_SM_PPP=y.
+#
+# This file must be sourced before Kconfig.zephyr, which is what pulls in the Kconfig of
+# the Zephyr networking and modem subsystems: a default is inserted at the position where
+# it appears relative to the definition of the symbol, and the first matching default wins.
+# Sourced afterwards, every default here would silently lose to the one of the module.
+
+if SM_PPP
+
+# PPP requires the native Zephyr IP stack (not the offloaded modem socket layer).
+configdefault NET_NATIVE
+	default y
+
+# Enable the Zephyr PPP L2 network layer.
+configdefault NET_L2_PPP
+	default y
+
+# Enable the Zephyr modem PPP driver.
+configdefault MODEM_PPP
+	default y
+
+# PPP management interface (used to bring the interface up/down).
+configdefault NET_L2_PPP_MGMT
+	default y
+
+# Negotiate Maximum Receive Unit in LCP option negotiation.
+configdefault NET_L2_PPP_OPTION_MRU
+	default y
+
+# Serve an IP address to the PPP peer via IPCP.
+configdefault NET_L2_PPP_OPTION_SERVE_IP
+	default y
+
+# Serve a DNS address to the PPP peer via IPCP.
+configdefault NET_L2_PPP_OPTION_SERVE_DNS
+	default y
+
+# LCP state-machine retransmit timeout in milliseconds.
+configdefault NET_L2_PPP_TIMEOUT
+	default 1000
+
+# Maximum number of LCP Configure-Request retransmits before giving up.
+configdefault NET_L2_PPP_MAX_CONFIGURE_REQ_RETRANSMITS
+	default 5
+
+# Maximum number of LCP Terminate-Request retransmits before giving up.
+configdefault NET_L2_PPP_MAX_TERMINATE_REQ_RETRANSMITS
+	default 5
+
+# PPP creates one IPv4 network interface.
+configdefault NET_IF_MAX_IPV4_COUNT
+	default 1
+
+# PPP creates one IPv6 network interface.
+configdefault NET_IF_MAX_IPV6_COUNT
+	default 1
+
+# Disable source/destination address checking: the PPP peer address is dynamic.
+configdefault NET_IP_ADDR_CHECK
+	default n
+
+# Packet socket support, used alongside PPP.
+configdefault NET_SOCKETS_PACKET
+	default y
+
+# Network buffer support (required by the PPP stack).
+configdefault NET_BUF
+	default y
+
+# Track net_buf pool usage for diagnostics.
+configdefault NET_BUF_POOL_USAGE
+	default y
+
+# Larger RX/TX packet and buffer pools to sustain PPP throughput.
+configdefault NET_PKT_RX_COUNT
+	default 44
+
+configdefault NET_BUF_RX_COUNT
+	default 88
+
+configdefault NET_PKT_TX_COUNT
+	default 44
+
+configdefault NET_BUF_TX_COUNT
+	default 88
+
+# Disable traffic-class RX queues: not needed for a point-to-point link.
+configdefault NET_TC_RX_COUNT
+	default 0
+
+# Packet clone timeout in milliseconds.
+configdefault NET_CONN_PACKET_CLONE_TIMEOUT
+	default 1000
+
+# Disable IPv6 Neighbor Cache: PPP has exactly one peer, no discovery needed.
+configdefault NET_IPV6_NBR_CACHE
+	default n
+
+# PPP transfers larger chunks of data through the modem library; increase the
+# shared-memory TX region to avoid stalling under load.
+configdefault NRF_MODEM_LIB_SHMEM_TX_SIZE
+	default 22528
+
+endif # SM_PPP

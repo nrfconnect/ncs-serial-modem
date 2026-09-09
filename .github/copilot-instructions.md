@@ -78,8 +78,8 @@ west build -b nrf9151dk/nrf9151/ns app -- \
 Available Kconfig fragments and DTS overlays (in `app/`):
 | File | Purpose |
 |---|---|
-| `cmux.conf` | Enable CMUX multiplexing |
-| `ppp.conf` | Enable PPP networking |
+| `CONFIG_SM_CMUX=y` | Enable CMUX multiplexing |
+| `CONFIG_SM_PPP=y` | Enable PPP networking |
 | `carrier.conf` / `carrier.overlay` | LwM2M carrier library (Kconfig + flash partition) |
 | `carrier-lgu.conf` | LwM2M carrier: LG U+ variant |
 | `carrier-softbank.conf` / `sysbuild-softbank.conf` | LwM2M carrier: SoftBank variant |
