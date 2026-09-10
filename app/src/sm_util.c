@@ -14,8 +14,12 @@
 #include <nrf_errno.h>
 #include <nrf_modem_at.h>
 #include "sm_util.h"
+#if defined(CONFIG_FW_INFO)
 #include <fw_info.h>
+#endif
+#if defined(CONFIG_SM_DFU) || defined(CONFIG_SM_FOTA)
 #include <tfm/tfm_ioctl_api.h>
+#endif
 
 LOG_MODULE_REGISTER(sm_util, CONFIG_SM_LOG_LEVEL);
 
@@ -529,6 +533,7 @@ bool sm_util_is_cid_active(uint8_t cid)
 	return false;
 }
 
+#if defined(CONFIG_SM_DFU)
 int sm_util_mcuboot_active_slot(void)
 {
 #if FIXED_PARTITION_EXISTS(s1_partition)
@@ -545,7 +550,9 @@ int sm_util_mcuboot_active_slot(void)
 	return -ENOTSUP;
 #endif
 }
+#endif /* CONFIG_SM_DFU */
 
+#if defined(CONFIG_SM_DFU) || defined(CONFIG_SM_FOTA)
 int sm_util_mcuboot_active_version(uint32_t *version)
 {
 #if FIXED_PARTITION_EXISTS(s1_partition)
@@ -571,6 +578,6 @@ int sm_util_mcuboot_active_version(uint32_t *version)
 #else
 	ARG_UNUSED(version);
 	return -ENOTSUP;
-
 #endif
 }
+#endif /* CONFIG_SM_DFU || CONFIG_SM_FOTA */
