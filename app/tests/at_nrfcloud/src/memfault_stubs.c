@@ -132,6 +132,11 @@ bool memfault_packetizer_get_chunk(void *buf, size_t *buf_len)
 	return true;
 }
 
+void memfault_packetizer_set_active_sources(uint32_t mask)
+{
+	(void)mask;
+}
+
 /* Minimal base64 encoder; the real one is part of the Memfault SDK. */
 void memfault_base64_encode(const void *buf, size_t buf_len, void *base64_out)
 {

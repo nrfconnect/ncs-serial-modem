@@ -493,6 +493,77 @@ Response
 
    #XNRFCLOUDOBSUPLOAD: <project_key>
 
+.. _SM_AT_NRFCLOUDOBSCOREDUMP:
+
+Core dump upload #XNRFCLOUDOBSCOREDUMP
+======================================
+
+The ``#XNRFCLOUDOBSCOREDUMP`` command controls whether a stored core dump is included in an upload.
+
+When disabled, ``#XNRFCLOUDOBSUPLOAD`` and the automatic upload send the buffered events, logs, and CDRs but leave the core dump in storage, so it can be uploaded later by enabling this again.
+Core dump upload is enabled by default, and the setting is persisted.
+
+.. note::
+
+   Core dump storage holds a single core dump.
+   While a new core dump is stored, subsequent crashes do not capture a new core dump until the stored one has been uploaded.
+   Keeping the upload disabled prevents new core dumps from being captured.
+
+Set command
+-----------
+
+The set command enables or disables the core dump upload.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XNRFCLOUDOBSCOREDUMP=<enable>
+
+* The ``<enable>`` parameter is an integer.
+
+  * ``0`` - Exclude the stored core dump from uploads.
+  * ``1`` - Include the stored core dump in uploads.
+
+Read command
+------------
+
+The read command returns the current setting.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XNRFCLOUDOBSCOREDUMP?
+
+Response
+~~~~~~~~
+
+::
+
+   #XNRFCLOUDOBSCOREDUMP: <enable>
+
+Test command
+------------
+
+The test command returns the supported syntax.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XNRFCLOUDOBSCOREDUMP=?
+
+Response
+~~~~~~~~
+
+::
+
+   #XNRFCLOUDOBSCOREDUMP: (0,1)
+
 .. _SM_AT_NRFCLOUDOBSHEARTBEAT:
 
 Metrics heartbeat #XNRFCLOUDOBSHEARTBEAT

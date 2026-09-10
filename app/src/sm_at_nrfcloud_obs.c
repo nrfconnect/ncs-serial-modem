@@ -20,11 +20,10 @@
 #include <memfault/http/http_client.h>
 #include <memfault/metrics/metrics.h>
 #include <memfault/ports/zephyr/http.h>
-/* MEMFAULT_BASE64_MAX_DECODE_LEN(), used to size the buffer of a forwarded chunk. */
+#include <memfault/core/data_packetizer.h>
 #include <memfault/util/base64.h>
 #if defined(CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG)
 #include <memfault/core/data_export.h>
-#include <memfault/core/data_packetizer.h>
 #include <memfault/demo/cli.h>
 #endif /* CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG */
 #include "sm_util.h"
@@ -71,11 +70,17 @@ BUILD_ASSERT(!IS_ENABLED(CONFIG_MEMFAULT_NCS_POST_COREDUMP_ON_NETWORK_CONNECTED)
 #define OBS_FORWARD_PARAM_CHUNK		1
 #define OBS_FORWARD_PARAM_PROJECT_KEY	2
 #define OBS_CRASH_PARAM_TYPE		1
+#define OBS_COREDUMP_PARAM_ENABLE	1
 
 /* Configuration of the automatic upload, persisted under the "sm/obs" settings subtree. */
 static bool obs_auto_enabled;
 static uint32_t obs_auto_interval = CONFIG_SM_NRF_CLOUD_OBSERVABILITY_AUTO_INTERVAL_SECONDS;
 static char obs_auto_key[OBS_PROJECT_KEY_MAX_LEN + 1];
+
+/* Whether an upload drains the stored core dump, persisted under "sm/obs/coredump". When
+ * disabled the core dump stays buffered, so it can be uploaded later by re-enabling this.
+ */
+static bool obs_coredump_enabled = true;
 
 /* Whether an operation that accesses the network is ongoing. */
 static bool obs_busy;
@@ -133,6 +138,13 @@ static ssize_t obs_upload(void)
 {
 	/* Freeze the captured logs so that they are drained as well. */
 	memfault_log_trigger_collection();
+
+	/* Leave the core dump buffered when its upload is disabled. */
+	memfault_packetizer_set_active_sources(
+		obs_coredump_enabled
+			? kMfltDataSourceMask_All
+			: (kMfltDataSourceMask_Event | kMfltDataSourceMask_Log |
+			   kMfltDataSourceMask_Cdr));
 
 	return memfault_zephyr_port_post_data_return_size();
 }
@@ -201,6 +213,13 @@ STATIC int obs_settings_set(const char *name, size_t len, settings_read_cb read_
 		ret = read_cb(cb_arg, obs_auto_key, len);
 		if (ret >= 0) {
 			obs_auto_key[ret] = '\0';
+			return 0;
+		}
+	} else if (!strcmp(name, "coredump")) {
+		if (len != sizeof(obs_coredump_enabled)) {
+			return -EINVAL;
+		}
+		if (read_cb(cb_arg, &obs_coredump_enabled, len) > 0) {
 			return 0;
 		}
 	}
@@ -539,6 +558,54 @@ STATIC int handle_at_nrf_cloud_obs_auto(enum at_parser_cmd_type cmd_type, struct
 	case AT_PARSER_CMD_TYPE_TEST:
 		rsp_send("\r\n#XNRFCLOUDOBSAUTO: (0,1),(%d-%d),<project_key>\r\n",
 			 OBS_AUTO_INTERVAL_MIN, OBS_AUTO_INTERVAL_MAX);
+		return 0;
+
+	default:
+		return -ENOTSUP;
+	}
+}
+
+/*************************************************/
+/* AT#XNRFCLOUDOBSCOREDUMP                       */
+/*************************************************/
+
+SM_AT_CMD_CUSTOM(xnrfcloudobscoredump, "AT#XNRFCLOUDOBSCOREDUMP",
+		 handle_at_nrf_cloud_obs_coredump);
+STATIC int handle_at_nrf_cloud_obs_coredump(enum at_parser_cmd_type cmd_type,
+					    struct at_parser *parser, uint32_t param_count)
+{
+	ARG_UNUSED(param_count);
+
+	uint16_t enable;
+	int err;
+
+	switch (cmd_type) {
+	case AT_PARSER_CMD_TYPE_SET:
+		err = at_parser_num_get(parser, OBS_COREDUMP_PARAM_ENABLE, &enable);
+		if (err) {
+			return err;
+		}
+		if (enable > 1) {
+			return -EINVAL;
+		}
+
+		obs_coredump_enabled = enable;
+
+		err = settings_save_one("sm/obs/coredump", &obs_coredump_enabled,
+					sizeof(obs_coredump_enabled));
+		if (err) {
+			/* Applied for this session either way. */
+			LOG_WRN("Failed to store the core dump upload setting: %d", err);
+		}
+
+		return 0;
+
+	case AT_PARSER_CMD_TYPE_READ:
+		rsp_send("\r\n#XNRFCLOUDOBSCOREDUMP: %d\r\n", obs_coredump_enabled);
+		return 0;
+
+	case AT_PARSER_CMD_TYPE_TEST:
+		rsp_send("\r\n#XNRFCLOUDOBSCOREDUMP: (0,1)\r\n");
 		return 0;
 
 	default:
