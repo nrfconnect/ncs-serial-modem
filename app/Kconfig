@@ -333,12 +333,6 @@ config SM_MQTTC
 	select MQTT_LIB_TLS
 	select EXPERIMENTAL
 
-config SM_FULL_FOTA
-	bool "Full modem FOTA support"
-
-config SM_DFU_MODEM_FULL
-	bool "Full modem DFU support"
-
 config SM_PPP
 	bool "PPP support"
 
@@ -437,6 +431,7 @@ config SM_HTTPC
 	bool "HTTP client support"
 	default y
 	select EXPERIMENTAL
+	select HTTP_PARSER_URL
 	help
 	  Enable HTTP client AT commands for making HTTP/HTTPS requests.
 	  Uses non-blocking socket API with XAPOLL for asynchronous
@@ -513,7 +508,8 @@ rsource "src/lwm2m_carrier/Kconfig"
 
 endmenu
 
-# Must be sourced before Kconfig.zephyr, see the file for the reason why.
+# Must be sourced before Kconfig.zephyr.
+rsource "Kconfig.fota_dfu"
 rsource "Kconfig.memfault"
 
 source "Kconfig.zephyr"
