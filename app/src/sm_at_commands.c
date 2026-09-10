@@ -17,8 +17,6 @@
 #include <zephyr/sys/sys_heap.h>
 #include <zephyr/debug/thread_analyzer.h>
 #include <sys_malloc.h>
-#include <dfu/dfu_target.h>
-#include <tfm/tfm_ioctl_api.h>
 #include <modem/at_parser.h>
 #include <modem/lte_lc.h>
 #include <modem/modem_jwt.h>
@@ -209,9 +207,11 @@ static void sm_modemreset(void)
 
 	ret = nrf_modem_lib_init();
 
+#if defined(CONFIG_SM_FOTA)
 	if (sm_fota_type == SM_FOTA_TYPE_MFW || sm_fota_type == SM_FOTA_TYPE_FULL_MFW) {
 		sm_fota_post_process();
 	}
+#endif /* CONFIG_SM_FOTA */
 
 out:
 	if (ret) {
@@ -340,6 +340,8 @@ enum xbootinfo_op {
 	XBOOTINFO_OP_SLOT    = 1,
 };
 
+#if defined(CONFIG_SM_DFU)
+
 SM_AT_CMD_CUSTOM(xbootinfo, "AT#XBOOTINFO", handle_at_xbootinfo);
 STATIC int handle_at_xbootinfo(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			       uint32_t param_count)
@@ -383,6 +385,7 @@ STATIC int handle_at_xbootinfo(enum at_parser_cmd_type cmd_type, struct at_parse
 		return -EINVAL;
 	}
 }
+#endif /* CONFIG_SM_DFU */
 
 #if defined(CONFIG_SM_DEBUG_STATS_HEAP)
 

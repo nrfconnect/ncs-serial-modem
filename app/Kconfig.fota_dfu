@@ -1,0 +1,95 @@
+#
+# Copyright (c) 2026 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+# FOTA and DFU feature flags, together with the Kconfig defaults they pull in.
+#
+# SM_FOTA enables the AT#XFOTA command (OTA firmware download over HTTP/HTTPS).
+# SM_DFU  enables the AT#XDFU* commands (local firmware upload via data mode).
+#
+# All dependent settings are conditional on the respective feature flag so they have no
+# effect when the feature is disabled, and they can be overridden by explicit values in a
+# .conf file or on the command line.
+
+config SM_FOTA
+	bool "FOTA (Firmware Over-The-Air) support"
+	default y
+	help
+	  Enable FOTA support via the AT#XFOTA command.
+	  When disabled, the FOTA AT command handler (sm_at_fota.c) is excluded
+	  from the build together with all its Kconfig dependencies.
+
+config SM_FULL_FOTA
+	bool "Full modem FOTA support"
+	depends on SM_FOTA
+
+config SM_DFU
+	bool "DFU (Device Firmware Update) support"
+	default y
+	help
+	  Enable DFU support via the AT#XDFUINIT, AT#XDFUWRITE and AT#XDFUAPPLY commands.
+	  When disabled, the DFU AT command handlers (sm_at_dfu.c) are excluded
+	  from the build together with all their Kconfig dependencies.
+
+config SM_DFU_MODEM_FULL
+	bool "Full modem DFU support"
+	depends on SM_DFU
+
+# HTTP URL parser: used by sm_at_httpc.c and sm_at_fota.c to split URIs
+# into host and path components. Required regardless of FOTA/DFU.
+configdefault HTTP_PARSER_URL
+	default y
+
+if SM_FOTA
+
+# FOTA download library: handles OTA download and DFU target selection.
+configdefault FOTA_DOWNLOAD
+	default y
+
+configdefault FOTA_DOWNLOAD_PROGRESS_EVT
+	default y
+
+# Downloader library used by fota_download.
+configdefault DOWNLOADER
+	default y
+
+configdefault DOWNLOADER_STACK_SIZE
+	default 4096
+
+configdefault DOWNLOADER_MAX_FILENAME_SIZE
+	default 2048
+
+# fw_info is required by the MCUboot bootloader FOTA to validate the update
+# by checking that the active-slot version increased after reboot.
+configdefault FW_INFO
+	default y
+
+# Progressive slot erase during FOTA download.
+configdefault IMG_ERASE_PROGRESSIVELY
+	default y
+
+# HTTP URL parser
+configdefault HTTP_PARSER_URL
+	default y
+
+endif # SM_FOTA
+
+if SM_FOTA || SM_DFU
+
+# DFU target library: used by FOTA (streaming download targets) and DFU
+# (direct write targets: MCUboot, modem delta, full modem).
+configdefault DFU_TARGET
+	default y
+
+# Stream flash: required internally by the DFU target library for all targets
+# that write to flash in chunks.
+configdefault STREAM_FLASH
+	default y
+
+# MCUboot image manager: required for confirming and scheduling MCUboot updates.
+configdefault IMG_MANAGER
+	default y
+
+endif # SM_FOTA || SM_DFU
