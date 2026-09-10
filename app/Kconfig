@@ -250,7 +250,6 @@ config SM_NRF_CLOUD
 	depends on NRF_CLOUD
 	depends on NRF_CLOUD_COAP
 	depends on DATE_TIME
-	select EXPERIMENTAL
 	select SM_BLOCKING_WORK_Q
 
 if SM_NRF_CLOUD
@@ -322,7 +321,6 @@ config SM_COAPC
 	default y
 	select COAP
 	select COAP_CLIENT
-	select EXPERIMENTAL
 	help
 	  Enable CoAP client AT commands for making CoAP requests.
 
@@ -331,7 +329,6 @@ config SM_MQTTC
 	default y
 	select MQTT_LIB
 	select MQTT_LIB_TLS
-	select EXPERIMENTAL
 
 config SM_FULL_FOTA
 	bool "Full modem FOTA support"
@@ -436,7 +433,6 @@ endif # SM_GNSS
 config SM_HTTPC
 	bool "HTTP client support"
 	default y
-	select EXPERIMENTAL
 	help
 	  Enable HTTP client AT commands for making HTTP/HTTPS requests.
 	  Uses non-blocking socket API with XAPOLL for asynchronous
