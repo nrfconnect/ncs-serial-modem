@@ -1102,6 +1102,7 @@ static int sm_at_send_internal(struct sm_at_host_ctx *ctx, const uint8_t *data, 
 	return (ret == len) ? 0 : -EIO;
 }
 
+#if defined(CONFIG_SM_DFU)
 static void handle_bootloader_at_cmd(uint8_t *buf, size_t buf_size, char *at_cmd)
 {
 	int err;
@@ -1142,6 +1143,7 @@ static void handle_bootloader_at_cmd(uint8_t *buf, size_t buf_size, char *at_cmd
 		rsp_send_error();
 	}
 }
+#endif /* CONFIG_SM_DFU */
 
 static void cmd_send(struct sm_at_host_ctx *ctx, uint8_t *buf, size_t cmd_length)
 {
@@ -1177,10 +1179,12 @@ static void cmd_send(struct sm_at_host_ctx *ctx, uint8_t *buf, size_t cmd_length
 	}
 
 	/* If bootloader mode is enabled, handle custom AT commands. */
+#if defined(CONFIG_SM_DFU)
 	if (sm_bootloader_mode_enabled) {
 		handle_bootloader_at_cmd(response_buf, sizeof(response_buf), at_cmd);
 		return;
 	}
+#endif /* CONFIG_SM_DFU */
 
 	/* Block CMDs & URCs while command is executing, even if idle timer triggers */
 	atomic_inc(&ctx->executing_lock);
