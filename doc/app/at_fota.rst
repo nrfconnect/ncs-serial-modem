@@ -5,7 +5,7 @@ FOTA AT commands
 
 .. contents::
    :local:
-   :depth: 2
+   :depth: 1
 
 This page describes AT commands related to Firmware Over-The-Air (FOTA) updates.
 

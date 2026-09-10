@@ -5,7 +5,7 @@ PPP AT commands
 
 .. contents::
    :local:
-   :depth: 2
+   :depth: 1
 
 This page describes AT commands related to the Point-to-Point Protocol (PPP).
 

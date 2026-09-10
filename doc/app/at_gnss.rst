@@ -5,7 +5,7 @@ GNSS AT commands
 
 .. contents::
    :local:
-   :depth: 2
+   :depth: 1
 
 This page describes GNSS-related AT commands.
 

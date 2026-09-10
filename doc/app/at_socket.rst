@@ -6,7 +6,7 @@ Socket AT commands
 
 .. contents::
    :local:
-   :depth: 2
+   :depth: 1
 
 This page describes socket-related AT commands.
 The application can open up to 8 sockets.
