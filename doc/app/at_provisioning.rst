@@ -7,10 +7,6 @@ nRF Provisioning AT commands
    :local:
    :depth: 1
 
-.. note::
-
-   These AT commands are `Experimental <Software maturity levels_>`_.
-
 This page describes AT commands for the nRF Device Provisioning service.
 The provisioning client connects to the `nRF Cloud Provisioning Service`_ over CoAP or DTLS and applies device configuration commands (credentials, settings, and firmware updates) issued from the cloud.
 

@@ -7,10 +7,6 @@ Trace AT commands
    :local:
    :depth: 1
 
-.. note::
-
-   These AT commands are `Experimental <Software maturity levels_>`_.
-
 This page describes the AT commands for controlling the shared UART trace backend.
 
 The ``AT#XLOG`` command is always available in the default build.

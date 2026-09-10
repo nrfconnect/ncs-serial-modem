@@ -7,10 +7,6 @@ HTTP client AT commands
    :local:
    :depth: 1
 
-.. note::
-
-   These AT commands are `Experimental <Software maturity levels_>`_.
-
 This page describes AT commands for the HTTP client.
 The HTTP client operates on sockets managed by the :ref:`SM_AT_SOCKET`.
 You can perform the following using the Socket AT commands:
