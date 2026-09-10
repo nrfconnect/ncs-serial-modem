@@ -8,14 +8,15 @@
 #include <nrf_modem.h>
 #include <hal/nrf_power.h>
 #include <modem/nrf_modem_lib.h>
-#include <zephyr/dfu/mcuboot.h>
-#include <dfu/dfu_target.h>
 #include <zephyr/sys/reboot.h>
 #include <zephyr/logging/log_ctrl.h>
-#include <net/fota_download.h>
 #if defined(CONFIG_MEMFAULT)
 #include <memfault/core/trace_event.h>
 #endif /* CONFIG_MEMFAULT */
+#if defined(CONFIG_SM_FOTA)
+#include <zephyr/dfu/mcuboot.h>
+#include <net/fota_download.h>
+#endif /* CONFIG_SM_FOTA */
 #include "sm_at_host.h"
 #include "sm_at_dfu.h"
 #include "sm_at_fota.h"
@@ -39,7 +40,9 @@ uint8_t sm_modem_init_eio_retry_count;
 #define SM_MODEM_INIT_EIO_MAX_RETRIES 1
 
 NRF_MODEM_LIB_ON_INIT(lwm2m_init_hook, on_modem_lib_init, NULL);
+#if defined(CONFIG_SM_FOTA)
 NRF_MODEM_LIB_ON_DFU_RES(main_dfu_hook, on_modem_dfu_res, NULL);
+#endif /* CONFIG_SM_FOTA */
 
 static void on_modem_lib_init(int ret, void *ctx)
 {
@@ -83,6 +86,7 @@ void nrf_modem_fault_handler(struct nrf_modem_fault_info *fault_info)
 }
 #endif /* CONFIG_NRF_MODEM_LIB_ON_FAULT_APPLICATION_SPECIFIC */
 
+#if defined(CONFIG_SM_FOTA)
 static void on_modem_dfu_res(int dfu_res, void *ctx)
 {
 	switch (dfu_res) {
@@ -164,7 +168,9 @@ static void check_app_fota_status(void)
 	sm_fota_info   = (type == BOOT_SWAP_TYPE_REVERT) ? ret : type;
 	sm_fota_stage  = FOTA_STAGE_COMPLETE;
 }
+#endif /* CONFIG_SM_FOTA */
 
+#if defined(CONFIG_SM_DFU)
 static int bootloader_mode_init(void)
 {
 	int ret;
@@ -182,6 +188,7 @@ static int bootloader_mode_init(void)
 
 	return 0;
 }
+#endif /* CONFIG_SM_DFU */
 
 void lte_auto_connect(void)
 {
@@ -276,6 +283,7 @@ static int sm_main(void)
 	nrf_power_resetreas_clear(NRF_POWER_NS, 0x70017);
 	LOG_INF("RR: 0x%08x", rr);
 
+#if defined(CONFIG_SM_DFU)
 	if (sm_bootloader_mode_requested) {
 		/* Clear bootloader mode flag */
 		ret = bootloader_mode_request(false);
@@ -290,6 +298,7 @@ static int sm_main(void)
 			return ret;
 		}
 	}
+#endif /* CONFIG_SM_DFU */
 
 #if defined(CONFIG_SM_FULL_FOTA)
 	if (sm_fota_type == SM_FOTA_TYPE_FULL_MFW) {
@@ -312,16 +321,22 @@ static int sm_main(void)
 				LOG_WRN("Rebooting (%u/%u) before requesting bootloader mode",
 					sm_modem_init_eio_retry_count,
 					SM_MODEM_INIT_EIO_MAX_RETRIES);
+#if defined(CONFIG_SM_DFU)
 				(void)sm_settings_modem_eio_retried_save();
+#endif /* CONFIG_SM_DFU */
 				goto exit_reboot;
 			}
 
 			sm_modem_init_eio_retry_count = 0;
+#if defined(CONFIG_SM_DFU)
 			(void)sm_settings_modem_eio_retried_save();
+#endif /* CONFIG_SM_DFU */
 
 			LOG_ERR("Please program full modem firmware with the bootloader or "
 				"external tools");
+#if defined(CONFIG_SM_DFU)
 			(void)bootloader_mode_request(true);
+#endif /* CONFIG_SM_DFU */
 			goto exit_reboot;
 		}
 	} else if (sm_modem_init_eio_retry_count != 0) {
@@ -329,12 +344,16 @@ static int sm_main(void)
 		 * later, unrelated -EIO is not immediately escalated to bootloader mode.
 		 */
 		sm_modem_init_eio_retry_count = 0;
+#if defined(CONFIG_SM_DFU)
 		(void)sm_settings_modem_eio_retried_save();
+#endif /* CONFIG_SM_DFU */
 	}
 
+#if defined(CONFIG_SM_FOTA)
 	sm_fota_mcuboot_bl_boot_check();
 
 	check_app_fota_status();
+#endif /* CONFIG_SM_FOTA */
 
 	if (sm_init_failed) {
 		urc_send(SM_SYNC_ERR_STR);
@@ -345,7 +364,9 @@ static int sm_main(void)
 	/* This is here and not earlier because in case of firmware
 	 * update it will send an AT response so the UART must be up.
 	 */
+#if defined(CONFIG_SM_FOTA)
 	sm_fota_post_process();
+#endif /* CONFIG_SM_FOTA */
 
 	lte_auto_connect();
 
