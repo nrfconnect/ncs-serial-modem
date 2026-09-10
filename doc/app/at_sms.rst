@@ -5,7 +5,7 @@ SMS AT commands
 
 .. contents::
    :local:
-   :depth: 2
+   :depth: 1
 
 This page describes SMS-related AT commands.
 

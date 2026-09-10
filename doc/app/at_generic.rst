@@ -5,7 +5,7 @@ Generic AT commands
 
 .. contents::
    :local:
-   :depth: 2
+   :depth: 1
 
 This page describes generic AT commands.
 
