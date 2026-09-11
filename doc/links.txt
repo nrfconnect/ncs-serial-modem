@@ -79,6 +79,7 @@
 .. _`nRF Cloud Preconnect onboarding`: https://docs.memfault.com/docs/nrfcloud/onboarding#preconnect-onboarding
 .. _`Memfault Project Keys`: https://docs.memfault.com/docs/platform/data-routes
 .. _`Memfault Project Settings`: https://app.memfault.com/organizations/-/projects/-/settings/data-routes
+.. _`Release Management`: https://mflt.io/release-mgmt
 
 .. ### nRF Connect for Desktop
 

@@ -316,6 +316,67 @@ config SM_NRF_CLOUD_OBSERVABILITY_LTE_METRICS
 	  Collect cell ID, tracking area code, LTE mode, PSM (TAU and active time) and
 	  eDRX (interval and paging time window) metrics on each Memfault heartbeat.
 
+config SM_NRF_CLOUD_FOTA
+	bool "nRF Cloud FOTA AT commands"
+	default y
+	depends on SM_NRF_CLOUD
+	depends on MEMFAULT_USE_NRF_CLOUD_COAP
+	depends on SETTINGS
+	select MEMFAULT_ZEPHYR_FOTA
+	select MEMFAULT_FOTA_DOWNLOAD_CALLBACK_CUSTOM
+	select MEMFAULT_FOTA_MODEM_UPDATE
+	# MEMFAULT_ZEPHYR_FOTA_BACKEND_NCS and NRF_CLOUD_COAP_DOWNLOADS are choice symbols;
+	# select has no effect on those. MEMFAULT_ZEPHYR_FOTA_BACKEND_NCS already defaults to
+	# itself when MEMFAULT_NRF_CONNECT_SDK is set. NRF_CLOUD_COAP_DOWNLOADS needs
+	# NRF_CLOUD_DOWNLOADS enabled first, which in turn needs one of NRF_CLOUD_FOTA,
+	# NRF_CLOUD_PGPS or NRF_CLOUD_FOTA_POLL; select the lightweight helper library since
+	# the other two are unrelated features this app does not otherwise want. Once that
+	# choice is active, it defaults to NRF_CLOUD_COAP_DOWNLOADS because NRF_CLOUD_COAP=y.
+	select NRF_CLOUD_FOTA_POLL
+	help
+	  Enable the AT#XNRFCLOUDFOTA* commands, which check for and download
+	  application and modem firmware updates via Memfault release
+	  management (https://mflt.io/release-mgmt), delivered over the same
+	  nRF Cloud CoAP transport as AT#XNRFCLOUDOBS*.
+
+	  An application update is staged the same way as AT#XFOTA=1; the
+	  host activates it with AT#XRESET. A modem update is staged the
+	  same way as AT#XFOTA=2; the host activates it with AT#XMODEMRESET.
+	  Both report progress and completion via the #XFOTA URC.
+
+	  AT#XNRFCLOUDFOTA=modem[,<project_key>] takes an optional Memfault
+	  project key for modem firmware, overriding
+	  CONFIG_SM_NRF_CLOUD_FOTA_MODEM_PROJECT_KEY for that check.
+
+if SM_NRF_CLOUD_FOTA
+
+config SM_NRF_CLOUD_FOTA_MODEM_PROJECT_KEY
+	string "Default Memfault project key for modem firmware updates"
+	default ""
+	help
+	  Dedicated Memfault project key for modem firmware, obtained from
+	  Settings -> General in that Memfault project (a different project
+	  than the application's). Forwarded to
+	  CONFIG_MEMFAULT_FOTA_MODEM_PROJECT_KEY.
+
+	  Overridable at runtime with the <project_key> parameter of
+	  AT#XNRFCLOUDFOTA=modem[,<project_key>]. When neither this nor a
+	  runtime override is set, AT#XNRFCLOUDFOTA=modem and the
+	  "modem"/"all" targets of AT#XNRFCLOUDFOTAAUTO report that no
+	  update is available.
+
+config SM_NRF_CLOUD_FOTA_AUTO_INTERVAL_SECONDS
+	int "Default interval of the automatic FOTA check"
+	default 3600
+	range 60 86400
+	help
+	  Interval used by AT#XNRFCLOUDFOTAAUTO when the host enables the
+	  automatic check without giving one, and no interval has been
+	  stored yet. The interval the host gives is persistent, so this
+	  value only applies until the host configures one.
+
+endif # SM_NRF_CLOUD_FOTA
+
 config SM_COAPC
 	bool "CoAP client support"
 	default y

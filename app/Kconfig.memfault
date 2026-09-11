@@ -37,9 +37,14 @@ configdefault MEMFAULT_HTTP_ENABLE
 configdefault MEMFAULT_PERIODIC_UPLOAD
 	default n
 
-# No Memfault release-management FOTA backend is wired up here.
+# Enabled by SM_NRF_CLOUD_FOTA (AT#XNRFCLOUDFOTA*); no backend is wired up otherwise.
 configdefault MEMFAULT_ZEPHYR_FOTA
 	default n
+
+# Forward the project key from the app-level prompt (Kconfig), so there is a single place to
+# set it. Only takes effect when SM_NRF_CLOUD_FOTA_MODEM_UPDATE selects MEMFAULT_FOTA_MODEM_UPDATE.
+configdefault MEMFAULT_FOTA_MODEM_PROJECT_KEY
+	default SM_NRF_CLOUD_FOTA_MODEM_PROJECT_KEY
 
 # Collect metrics for unused stack space.
 configdefault MEMFAULT_NCS_STACK_METRICS
@@ -82,6 +87,9 @@ configdefault COAP_EXTENDED_OPTIONS_LEN_VALUE
 
 configdefault COAP_CLIENT_MAX_EXTRA_OPTIONS
 	default 4 if MEMFAULT
+
+configdefault COAP_CLIENT_MAX_PATH_LENGTH
+	default 160 if MEMFAULT
 
 # The larger CoAP options above (COAP_EXTENDED_OPTIONS_LEN_VALUE and
 # COAP_CLIENT_MAX_EXTRA_OPTIONS) enlarge struct coap_client_request, which the

@@ -23,7 +23,6 @@ manifest:
           - libmodem
           - mbedtls
           - mcuboot
-          - memfault-firmware-sdk
           - nrfxlib
           - oberon-psa-crypto
           - segger
@@ -32,3 +31,8 @@ manifest:
           - zcbor
           - zephyr
           - littlefs
+
+    - name: memfault-firmware-sdk
+      url: https://github.com/memfault/memfault-firmware-sdk
+      path: modules/lib/memfault-firmware-sdk
+      revision: 1.44.0

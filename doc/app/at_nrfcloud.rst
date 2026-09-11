@@ -838,3 +838,201 @@ Test command
 ------------
 
 The test command is not supported.
+
+.. _SM_AT_NRFCLOUDFOTA:
+
+nRF Cloud FOTA
+==============
+
+The ``#XNRFCLOUDFOTA`` command checks for and downloads an application or modem firmware update via `Memfault release management <Release Management_>`_, delivered over the same nRF Cloud CoAP transport as ``#XNRFCLOUDOBS*``.
+
+Requires the :ref:`CONFIG_SM_NRF_CLOUD_FOTA <CONFIG_SM_NRF_CLOUD_FOTA>` Kconfig option.
+
+An application update is staged the same way as ``AT#XFOTA=1``; the host activates it with ``AT#XRESET``.
+A modem update is staged the same way as ``AT#XFOTA=2``; the host activates it with ``AT#XMODEMRESET``.
+Both share their FOTA session and progress/completion notifications with ``#XFOTA``: see :ref:`SM_AT_FOTA` for the ``#XFOTA`` unsolicited notification and the activation commands.
+Only one FOTA session, from either command, can be ongoing at a time.
+
+.. note::
+   ``<op>="modem"`` uses a dedicated Memfault project key for modem firmware, obtained from Settings > General in that project (a different project than the application's).
+   Set it with the :ref:`CONFIG_SM_NRF_CLOUD_FOTA_MODEM_PROJECT_KEY <CONFIG_SM_NRF_CLOUD_FOTA_MODEM_PROJECT_KEY>` Kconfig option, or override it at runtime with the ``<project_key>`` parameter.
+   When neither is set, ``<op>="modem"`` reports that no update is available.
+
+Set command
+-----------
+
+The set command starts a FOTA check, and the download if an update is available.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XNRFCLOUDFOTA=<op>[,<project_key>]
+
+* The ``<op>`` parameter is a string.
+
+  * ``"app"`` - Check for and download an application update.
+  * ``"modem"`` - Check for and download a modem firmware update.
+
+* The ``<project_key>`` parameter is a string.
+  It applies only to ``<op>="modem"`` and overrides :ref:`CONFIG_SM_NRF_CLOUD_FOTA_MODEM_PROJECT_KEY <CONFIG_SM_NRF_CLOUD_FOTA_MODEM_PROJECT_KEY>` for this check.
+
+The command returns ``OK`` immediately and the check runs asynchronously.
+When it completes, an unsolicited notification is sent.
+
+Unsolicited notification
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+::
+
+   #XNRFCLOUDFOTA: <result>[,<error>]
+
+* The ``<result>`` parameter is an integer.
+
+  * ``0`` - No update is available.
+  * ``-1`` - The check failed.
+    The ``<error>`` parameter follows with the error code.
+
+This notification is sent only when no download was started.
+When a download starts, progress and completion are reported over the ``#XFOTA`` notification instead, as described in :ref:`SM_AT_FOTA`.
+
+Example
+~~~~~~~
+
+::
+
+  AT#XNRFCLOUDFOTA="app"
+
+  OK
+
+  #XFOTA: 1,0,45
+
+  #XFOTA: 1,0,100
+
+  #XFOTA: 4,0
+  AT#XRESET
+
+Read command
+------------
+
+The read command is not supported.
+
+Test command
+------------
+
+The test command returns the supported syntax.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XNRFCLOUDFOTA=?
+
+Response
+~~~~~~~~
+
+::
+
+   #XNRFCLOUDFOTA: ("app","modem")[,<project_key>]
+
+.. _SM_AT_NRFCLOUDFOTAAUTO:
+
+Automatic FOTA check #XNRFCLOUDFOTAAUTO
+========================================
+
+The ``#XNRFCLOUDFOTAAUTO`` command configures the periodic check for application and/or modem firmware updates via Memfault release management.
+
+The configuration is persistent, so it survives a reboot.
+
+Set command
+-----------
+
+The set command enables or disables the automatic check, and configures its target and interval.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XNRFCLOUDFOTAAUTO=<enable>[,<target>[,<interval_seconds>]]
+
+* The ``<enable>`` parameter can have the following integer values:
+
+  * ``0`` - Disable the automatic check.
+  * ``1`` - Enable the automatic check.
+
+* The ``<target>`` parameter is a string.
+  When it is omitted, the stored target is kept.
+
+  * ``"app"`` - Check for an application update only.
+  * ``"modem"`` - Check for a modem firmware update only.
+  * ``"all"`` - Check for an application update, falling back to a modem firmware update when no application update is available.
+
+* The ``<interval_seconds>`` parameter is an integer from ``60`` to ``86400``.
+  It is the interval between two checks.
+  When it is omitted, the stored interval is kept.
+  Its initial value is set by the :ref:`CONFIG_SM_NRF_CLOUD_FOTA_AUTO_INTERVAL_SECONDS <CONFIG_SM_NRF_CLOUD_FOTA_AUTO_INTERVAL_SECONDS>` Kconfig option.
+
+The first check runs when the interval expires, not when the automatic check is enabled.
+A check that falls while there is no connection to nRF Cloud, or while a FOTA session started by ``#XNRFCLOUDFOTA`` or ``#XFOTA`` is ongoing, is skipped, and the next one is scheduled as usual.
+
+The automatic check itself is silent; a download that it starts is reported the same way as one started by ``#XNRFCLOUDFOTA``, over the ``#XFOTA`` notification.
+
+Response
+~~~~~~~~
+
+The command returns ``OK``, also when the configuration could not be stored, in which case only its persistence is lost.
+
+Read command
+------------
+
+The read command returns the configuration of the automatic check.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XNRFCLOUDFOTAAUTO?
+
+Response
+~~~~~~~~
+
+::
+
+   #XNRFCLOUDFOTAAUTO: <enable>,<target>,<interval_seconds>
+
+Example
+~~~~~~~
+
+::
+
+  AT#XNRFCLOUDFOTAAUTO=1,"modem",3600
+
+  OK
+  AT#XNRFCLOUDFOTAAUTO?
+
+  #XNRFCLOUDFOTAAUTO: 1,"modem",3600
+
+  OK
+
+Test command
+------------
+
+The test command returns the supported syntax.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XNRFCLOUDFOTAAUTO=?
+
+Response
+~~~~~~~~
+
+::
+
+   #XNRFCLOUDFOTAAUTO: (0,1),("app","modem","all"),(60-86400)
