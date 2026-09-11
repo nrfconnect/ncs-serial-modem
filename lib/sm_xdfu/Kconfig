@@ -10,6 +10,7 @@ menuconfig SM_XDFU_LIB
 	depends on COMMON_LIBC_MALLOC
 	depends on FILE_SYSTEM
 	depends on ZCBOR
+	select EXPERIMENTAL
 	help
 	  Helper library for host device to implement the AT#XDFU update sequence
 	  (XDFUINIT/XDFUWRITE/XDFUAPPLY/XRESET) against nRF91 Serial Modem device.
