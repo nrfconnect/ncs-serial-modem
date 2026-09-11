@@ -154,7 +154,7 @@ CI compliance checks (run on PRs via `.github/workflows/compliance.yml`) also va
 
 ## Documentation Build
 
-Documentation is built in **two steps** from the `doc/` directory. The Zephyr/NCS Python virtualenv must be active.
+Documentation is built from the `doc/` directory: Doxygen first, then Sphinx for the HTML, and optionally Sphinx again for the PDF. The Zephyr/NCS Python virtualenv must be active.
 
 ### Step 1 — Doxygen (generates XML for API reference)
 
@@ -190,6 +190,21 @@ The docsets must be sibling directories below the HTML root, because that is whe
 - The docset list is declared once in `doc/_utils/docsets.py` (`ALL_DOCSETS`). Adding a docset means adding an entry there, a config directory, and a root document.
 - Relative paths in the config files resolve against the config directory, not `doc/`, so anchor new paths to `DOC_BASE`.
 - Build a single docset while iterating: `make main`, `make nrf91m1`, or `python _scripts/build_docsets.py --docset main`.
+
+### Step 3 — PDF (optional; needs a LaTeX toolchain)
+
+```bash
+cd doc
+make latexpdf
+# or equivalently:
+python _scripts/build_docsets.py --format pdf
+```
+
+Output: `doc/build/pdf/<docset>/latex/ncs-serial-modem.pdf`, also copied to `doc/build/html/<docset>/` for the "Download PDF" link in the breadcrumb bar.
+
+- Each docset renders its own PDF, from the same LaTeX settings in `doc/_docsets/conf_common.py`. Only `latex_documents` differs, and `docset_latex_documents()` derives it from `ALL_DOCSETS`, so per-docset LaTeX settings must not be added to `doc/_docsets/<docset>/conf.py`.
+- Needs XeLaTeX, Latexmk, and Inkscape (for the SVG figures) on `PATH`, plus the Open Sans font for the Nordic layout. Only the doc-build workflow installs these; the HTML build does not need them.
+- Run `make html` first. The PDF build reuses the intersphinx inventory of the HTML build, and the copy step needs the HTML output directory. The workflow builds both in one call: `python _scripts/build_docsets.py -b build --format html --format pdf`.
 
 ---
 

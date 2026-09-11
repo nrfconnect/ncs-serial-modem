@@ -22,4 +22,6 @@ project, root_doc = docsets.ALL_DOCSETS[DOCSET]  # noqa: F405
 
 exclude_patterns = docset_exclude_patterns(DOCSET)  # noqa: F405
 
+latex_documents = docset_latex_documents(DOCSET)  # noqa: F405
+
 html_theme_options["docset"] = DOCSET  # noqa: F405

@@ -5,4 +5,5 @@ sphinx-tabs>=3.4
 sphinx-togglebutton>=0.3.2
 Pillow>=9.0.1
 sphinxcontrib.jquery
+sphinxcontrib-svg2pdfconverter
 sphinx-copybutton
