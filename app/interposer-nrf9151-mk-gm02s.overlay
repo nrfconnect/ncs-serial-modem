@@ -1,0 +1,63 @@
+/*
+ * Copyright (c) 2026 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+ */
+
+&pinctrl {
+	uart0_default_nrf9151_mk_gm02s: uart0_default_nrf9151_mk_gm02s {
+		group1 {
+			psels = <NRF_PSEL(UART_TX, 0, 8)>,
+				<NRF_PSEL(UART_RTS, 0, 5)>;
+		};
+		group2 {
+			psels = <NRF_PSEL(UART_RX, 0, 7)>,
+				<NRF_PSEL(UART_CTS, 0, 4)>;
+			bias-pull-up;
+		};
+	};
+
+	uart0_sleep_nrf9151_mk_gm02s: uart0_sleep_nrf9151_mk_gm02s {
+		group1 {
+			psels = <NRF_PSEL(UART_TX, 0, 8)>,
+				<NRF_PSEL(UART_RTS, 0, 5)>,
+				<NRF_PSEL(UART_RX, 0, 7)>,
+				<NRF_PSEL(UART_CTS, 0, 4)>;
+			low-power-enable;
+		};
+	};
+};
+
+&uart0 {
+	status = "okay";
+	current-speed = <115200>;
+	pinctrl-0 = <&uart0_default_nrf9151_mk_gm02s>;
+	pinctrl-1 = <&uart0_sleep_nrf9151_mk_gm02s>;
+	pinctrl-names = "default", "sleep";
+};
+
+/* Disable external flash */
+&gd25wb256 {
+	status = "disabled";
+};
+
+/* RI, CTS and RTS pins are used as LED pins in nRF9151 DK default. */
+&led0 { status = "disabled"; };
+&led1 { status = "disabled"; };
+&led2 { status = "disabled"; };
+&led3 { status = "disabled"; };
+&pwm_led0 { status = "disabled"; };
+
+/* TX pin is used as a button pin in nRF9151 DK default. */
+&button0 { status = "disabled"; };
+&button1 { status = "disabled"; };
+&button2 { status = "disabled"; };
+&button3 { status = "disabled"; };
+
+&dtr_uart0 {
+	dtr-gpios = <&gpio0 15 (GPIO_PULL_UP | GPIO_ACTIVE_HIGH)>;
+};
+
+&gpio0 {
+	sense-edge-mask = <BIT(15)>;
+};
