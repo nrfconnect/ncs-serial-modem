@@ -75,10 +75,9 @@ In periodic navigation mode, the ``<interval>`` and ``<timeout>`` parameters are
 .. note::
 
    Make sure that the GNSS antenna is configured properly.
-   This can be achieved two ways:
+   You may need to issue the ``AT%XMAGPIO`` and ``AT%XCOEX0`` AT commands to configure the Low-Noise Amplifier (LNA), depending on the hardware (HW).
 
-   * Using the ``CONFIG_MODEM_ANTENNA_AT_MAGPIO`` and ``CONFIG_MODEM_ANTENNA_AT_COEX0`` Kconfig options.
-   * By issuing the ``%XMAGPIO`` and ``%XCOEX0`` AT commands manually at run time.
+   If you want to use the nRF9151 DK with an onboard antenna, use the ``AT%XCOEX0=1,1,1565,1586`` command.
 
 .. tip::
 
