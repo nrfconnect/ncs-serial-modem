@@ -388,6 +388,8 @@ PPP connection management changes
 Other changes
 *************
 
+  * On a fatal error (such as a CPU fault or stack overflow), the device now resets instead of halting, using the ``CONFIG_RESET_ON_FATAL_ERROR`` Kconfig option.
+
   * ``#XGNSS`` notification had two meanings with alternative syntaxes as follows:
 
     .. code-block:: none
