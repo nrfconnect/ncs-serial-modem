@@ -21,6 +21,10 @@ endchoice
 configdefault MEMFAULT_LOGGING_ENABLE
 	default y
 
+# Return from the fault handler to allow Zephyr's default fatal error handler to take over.
+configdefault MEMFAULT_FAULT_HANDLER_RETURN
+	default y
+
 configdefault MEMFAULT_RAM_BACKED_COREDUMP_SIZE
 	default 4096
 
