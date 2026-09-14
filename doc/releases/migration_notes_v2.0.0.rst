@@ -102,6 +102,8 @@ Informational changes
 
 The following changes are listed for informational purposes, and many hosts will work without any changes.
 
+* On a fatal error (such as a CPU fault or stack overflow), the device now resets instead of halting, using the ``CONFIG_RESET_ON_FATAL_ERROR`` Kconfig option.
+
 * Application rollback prevention - Application firmware DFU now uses MCUboot downgrade prevention (``CONFIG_MCUBOOT_DOWNGRADE_PREVENTION``).
   The device rejects signed application images older than the version currently running.
   Set :file:`app/VERSION` before each published build; see :ref:`sm_releasing`.

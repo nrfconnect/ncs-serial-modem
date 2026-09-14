@@ -269,7 +269,7 @@ static int sm_main(void)
 	const uint32_t rr = nrf_power_resetreas_get(NRF_POWER_NS);
 
 	nrf_power_resetreas_clear(NRF_POWER_NS, 0x70017);
-	LOG_DBG("RR: 0x%08x", rr);
+	LOG_INF("RR: 0x%08x", rr);
 
 	if (sm_bootloader_mode_requested) {
 		/* Clear bootloader mode flag */
