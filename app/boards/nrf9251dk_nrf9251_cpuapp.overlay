@@ -1,0 +1,40 @@
+/*
+ * Copyright (c) 2026 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+ */
+
+/ {
+	chosen {
+		ncs,sm-uart = &dtr_uart0;
+		zephyr,console = &uart132;
+	};
+};
+
+/* DTR with DK */
+&uart133 {
+	status = "okay";
+	hw-flow-control;
+
+	dtr_uart0: dtr-uart {
+		compatible = "nordic,dtr-uart";
+		dtr-gpios = <&gpio0 1 (GPIO_PULL_UP | GPIO_ACTIVE_HIGH)>;
+		ri-gpios = <&gpio2 2 GPIO_ACTIVE_LOW>;
+		status = "okay";
+	};
+};
+
+&gpio0 {
+	status = "okay";
+	/* Use PORT event for DTR (1) pin to save power */
+	sense-edge-mask = <BIT(1)>;
+};
+
+/* Enable UART132 as the shared backend for Zephyr logs and modem traces.
+ * Modem traces require 1 000 000 baud. Hardware flow control is not used.
+ */
+&uart132 {
+	status = "okay";
+	current-speed = <1000000>;
+	memory-regions = <&cpuapp_dma_region>;
+};
