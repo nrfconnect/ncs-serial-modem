@@ -6,10 +6,10 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/kernel.h>
 #include <nrf_modem.h>
-#include <hal/nrf_power.h>
 #include <modem/nrf_modem_lib.h>
 #include <zephyr/sys/reboot.h>
 #include <zephyr/logging/log_ctrl.h>
+#include <zephyr/drivers/hwinfo.h>
 #if defined(CONFIG_MEMFAULT)
 #include <memfault/core/trace_event.h>
 #endif /* CONFIG_MEMFAULT */
@@ -278,10 +278,13 @@ static int sm_main(void)
 {
 	int ret;
 
-	const uint32_t rr = nrf_power_resetreas_get(NRF_POWER_NS);
+#if !defined(CONFIG_MEMFAULT)
+	uint32_t rr;
 
-	nrf_power_resetreas_clear(NRF_POWER_NS, 0x70017);
-	LOG_INF("RR: 0x%08x", rr);
+	hwinfo_get_reset_cause(&rr);
+	hwinfo_clear_reset_cause();
+	LOG_DBG("Reset cause: 0x%08x", rr);
+#endif
 
 #if defined(CONFIG_SM_DFU)
 	if (sm_bootloader_mode_requested) {
