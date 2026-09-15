@@ -1,0 +1,17 @@
+#
+# Copyright (c) 2026 Nordic Semiconductor
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+choice BOOTLOADER
+	default BOOTLOADER_MCUBOOT if !SOC_NRF9251_CPUAPP
+endchoice
+
+config SECURE_BOOT_APPCORE
+	default y if !SOC_NRF9251_CPUAPP
+
+config SECURE_BOOT_NUM_VER_COUNTER_SLOTS
+	default 40 if !SOC_NRF9251_CPUAPP
+
+source "share/sysbuild/Kconfig"

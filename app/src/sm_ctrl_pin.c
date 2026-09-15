@@ -9,8 +9,8 @@
 #include <assert.h>
 #include <stdio.h>
 #include <zephyr/drivers/gpio.h>
-#include <hal/nrf_regulators.h>
 #include <zephyr/sys/reboot.h>
+#include <zephyr/sys/poweroff.h>
 #include "sm_at_host.h"
 #include "sm_defines.h"
 #include "sm_util.h"
@@ -106,7 +106,7 @@ void sm_ctrl_pin_enter_sleep_no_uninit(bool at_host_power_off)
 
 	k_sleep(K_MSEC(100));
 
-	nrf_regulators_system_off(NRF_REGULATORS_NS);
+	sys_poweroff();
 	assert(false);
 #endif
 }
@@ -156,7 +156,7 @@ void sm_ctrl_pin_enter_shutdown(void)
 	sm_log_flush();
 	k_sleep(K_MSEC(100));
 
-	nrf_regulators_system_off(NRF_REGULATORS_NS);
+	sys_poweroff();
 	assert(false);
 }
 
