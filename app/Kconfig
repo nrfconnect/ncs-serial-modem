@@ -69,20 +69,20 @@ config SM_UART_RX_BUF_SIZE
 			$(dt_nodelabel_bool_prop,uart0,hw-flow-control) = n
 	default 2048 if $(dt_nodelabel_enabled,uart2) = y && \
 			$(dt_nodelabel_bool_prop,uart2,hw-flow-control) = n
+	default 532 if SM_CMUX
 	default 256
 	help
 	  Amount of received (RX), unprocessed, UART traffic that can be held by single buffer.
 	  Increase buffer space if UART0 or UART2 lacks hardware flow control.
-	  These buffers are not used when CMUX is in use.
 
 config SM_UART_TX_BUF_SIZE
 	int "Send buffer size for UART"
 	range 128 4096
+	default 532 if SM_CMUX
 	default 256
 	help
 	  Amount of UART traffic waiting to be sent (TX), that can be held.
 	  If the buffers are full, will send synchronously.
-	  These buffers are not used when CMUX is in use.
 
 config SM_URC_BUFFER_SIZE
 	int "TX buffer size for unsolicited result codes (URC)"

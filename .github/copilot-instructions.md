@@ -355,8 +355,8 @@ int n   = sm_util_at_scanf("AT+CFUN?", "+CFUN: %d", &cfun);
 
 | Symbol | Default | Purpose |
 |---|---|---|
-| `CONFIG_SM_UART_RX_BUF_SIZE` | 256 (2048 on Thingy:91 X) | UART RX single-buffer size |
-| `CONFIG_SM_UART_TX_BUF_SIZE` | 256 | UART TX buffer size |
+| `CONFIG_SM_UART_RX_BUF_SIZE` | 256 (532 with CMUX, 2048 without UART HWFC) | UART RX single-buffer size |
+| `CONFIG_SM_UART_TX_BUF_SIZE` | 256 (532 with CMUX) | UART TX buffer size |
 | `CONFIG_SM_URC_BUFFER_SIZE` | 4096 | URC queue buffer |
 | `CONFIG_SM_DATAMODE_BUF_SIZE` | 4096 | Data mode buffer |
 | `CONFIG_SM_SMS` | n | SMS support |
