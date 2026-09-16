@@ -4,32 +4,113 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  *
  * Flash partition overlay for nRF9151DK with LwM2M carrier partition.
+ *
+ * LwM2M carrier does not leave enough flash for slot0/slot1 to also carve out a Memfault
+ * coredump partition, so this reclaims that 16 kB back into the application slots and falls
+ * back to a RAM-backed coredump.
  */
 
 / {
 	chosen {
 		nordic,lwm2m-carrier-partition = &lwm2m_carrier_partition;
+		zephyr,settings_partition = &storage_partition;
+		/delete-property/ nordic,memfault-coredump-partition;
 	};
 };
 
-&storage_partition {
-	compatible = "zephyr,mapped-partition";
-	label = "storage";
-	reg = <0x000fd000 0x3000>;
-	ranges = <0x0 0x000fd000 0x3000>;
-	#address-cells = <1>;
-	#size-cells = <1>;
+/delete-node/ &slot0_partition;
+/delete-node/ &slot1_partition;
+/delete-node/ &storage_partition;
 
-	/* Note: 4kB partition is not recommended for production use due to flash wear. */
-	settings_storage_partition: partition@0 {
-		compatible = "zephyr,mapped-partition";
-		label = "settings-storage";
-		reg = <0x00000000 0x1000>;
+&flash0 {
+	partitions {
+		ranges;
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		slot0_partition: partition@20000 {
+			compatible = "zephyr,mapped-partition";
+			label = "image-0";
+			reg = <0x20000 0x6f000>;
+			ranges = <0x0 0x20000 0x6f000>;
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			slot0_s_partition: partition@0 {
+				compatible = "zephyr,mapped-partition";
+				label = "image-0-secure";
+				reg = <0x0 0x8000>;
+			};
+
+			slot0_ns_partition: partition@8000 {
+				compatible = "zephyr,mapped-partition";
+				label = "image-0-nonsecure";
+				reg = <0x8000 0x67000>;
+			};
+		};
+
+		slot1_partition: partition@8f000 {
+			compatible = "zephyr,mapped-partition";
+			label = "image-1";
+			reg = <0x8f000 0x6e000>;
+			ranges = <0x0 0x8f000 0x6e000>;
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			slot1_s_partition: partition@0 {
+				compatible = "zephyr,mapped-partition";
+				label = "image-1-secure";
+				reg = <0x0 0x8000>;
+			};
+
+			slot1_ns_partition: partition@8000 {
+				compatible = "zephyr,mapped-partition";
+				label = "image-1-nonsecure";
+				reg = <0x8000 0x66000>;
+			};
+		};
+
+		storage_partition: partition@fd000 {
+			compatible = "zephyr,mapped-partition";
+			label = "storage";
+			reg = <0xfd000 0x3000>;
+			ranges = <0x0 0xfd000 0x3000>;
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			/* Note: 4kB partition is not recommended for production use due to flash wear. */
+			settings_storage_partition: partition@0 {
+				compatible = "zephyr,mapped-partition";
+				label = "settings-storage";
+				reg = <0x0 0x1000>;
+			};
+
+			lwm2m_carrier_partition: partition@1000 {
+				compatible = "zephyr,mapped-partition";
+				label = "lwm2m-carrier";
+				reg = <0x1000 0x2000>;
+			};
+		};
+	};
+};
+
+/ {
+	/delete-node/ nordic-tz-secure;
+	/delete-node/ nordic-tz-nonsecure;
+
+	nordic-tz-secure {
+		compatible = "nordic,tz-secure";
+		code-partitions = <&b0_partition>,
+				  <&s0_partition>,
+				  <&s1_partition>,
+				  <&slot0_s_partition>,
+				  <&slot1_s_partition>;
 	};
 
-	lwm2m_carrier_partition: partition@1000 {
-		compatible = "zephyr,mapped-partition";
-		label = "lwm2m-carrier";
-		reg = <0x00001000 0x2000>;
+	nordic-tz-nonsecure {
+		compatible = "nordic,tz-nonsecure";
+		code-partitions = <&slot0_ns_partition>,
+				  <&slot1_ns_partition>;
+		data-partitions = <&storage_partition>;
 	};
 };
