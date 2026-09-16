@@ -38,3 +38,4 @@ Both samples require the |SM| application to be running on an nRF91 Series devic
    sm_at_client_shell
    sm_ppp_shell
    ../lib/sm_at_client
+   ../lib/sm_xdfu
