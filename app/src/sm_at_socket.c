@@ -1295,10 +1295,6 @@ static int socket_datamode_callback(uint8_t op, const uint8_t *data, int len, ui
 		LOG_DBG("Data mode exit");
 		memset(udp_url, 0, sizeof(udp_url));
 		udp_port = 0;
-		if ((flags & SM_DATAMODE_FLAGS_EXIT_HANDLER) != 0) {
-			/* Datamode exited unexpectedly. */
-			rsp_send(CONFIG_SM_DATAMODE_TERMINATOR);
-		}
 		if (poll_ctx != NULL) {
 			poll_ctx->datamode_sock = NULL;
 		}

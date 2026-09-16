@@ -57,7 +57,9 @@ Any arbitrary data received from the MCU is sent to LTE network *as-is*.
 
 .. note::
    If sending fails while in data mode, the |SM| application drops any further data received from the UART until data mode is exited, as described in the :ref:`exiting_data_mode` section.
-   For socket, HTTP client and CoAP client commands, the |SM| application also sends the termination string :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` to the MCU to indicate the error.
+   When the data mode was entered without ``<data_len>``, the |SM| application also sends the termination string, set by the :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` Kconfig option, to the MCU to signal the error.
+   When data mode was entered with ``<data_len>``, no termination string is sent.
+   The MCU receives ``#XDATAMODE`` at the expected byte boundary instead.
 
 .. _exiting_data_mode:
 
@@ -73,8 +75,8 @@ If ``<data_len>`` is specified in the AT command and the specified data length i
 The termination command is not used in this case.
 
 If a send operation fails while in data mode, such as when the socket in data mode encounters an error, the same exit conditions apply.
-The MCU must send the termination command if ``<data_len>`` is not specified.
-If ``<data_len>`` is specified, it must send the remaining bytes required to reach the specified length.
+The MCU must send the termination command if ``<data_len>`` was not specified.
+If ``<data_len>`` was specified, the MCU must send the remaining bytes required to reach the specified length.
 
 When exiting the data mode, the |SM| application sends the ``#XDATAMODE`` unsolicited notification.
 
