@@ -7,6 +7,16 @@
 #ifndef SM_XDFU_H_
 #define SM_XDFU_H_
 
+/**
+ * @file sm_xdfu.h
+ *
+ * @defgroup sm_xdfu Serial Modem XDFU library
+ *
+ * @{
+ *
+ * @brief Public APIs for the Serial Modem XDFU library.
+ */
+
 #include <stddef.h>
 #include <stdbool.h>
 #include <zephyr/device.h>
@@ -34,7 +44,7 @@ enum sm_xdfu_image_type {
  *
  * @param modem Cellular modem device (compatible with the Zephyr modem_cellular driver).
  * @param type  Image type to update.
- * @param file  Path to the update file (e.g. on a mounted filesystem).
+ * @param file  Path to the update file (for example, on a mounted filesystem).
  *
  * @retval 0 on success.
  * @retval -EINVAL Invalid @p type, or @p file is missing/empty.
@@ -48,5 +58,7 @@ int sm_xdfu_run(const struct device *modem, enum sm_xdfu_image_type type, const 
 #ifdef __cplusplus
 }
 #endif
+
+/** @} */
 
 #endif /* SM_XDFU_H_ */
