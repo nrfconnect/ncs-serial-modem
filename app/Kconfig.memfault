@@ -47,7 +47,7 @@ configdefault MEMFAULT_ZEPHYR_FOTA
 
 # Collect metrics for unused stack space.
 configdefault MEMFAULT_NCS_STACK_METRICS
-	default y
+	default n
 
 # Collect the LTE metrics that MODEM_INFO provides: modem firmware version, operator, RSRP,
 # SNR, band and the connectivity statistics. The remaining LTE metrics are collected via
