@@ -13,7 +13,7 @@
 / {
 	chosen {
 		nordic,lwm2m-carrier-partition = &lwm2m_carrier_partition;
-		zephyr,settings_partition = &storage_partition;
+		zephyr,settings_partition = &settings_storage_partition;
 		/delete-property/ nordic,memfault-coredump-partition;
 	};
 };
@@ -31,8 +31,8 @@
 		slot0_partition: partition@20000 {
 			compatible = "zephyr,mapped-partition";
 			label = "image-0";
-			reg = <0x20000 0x6f000>;
-			ranges = <0x0 0x20000 0x6f000>;
+			reg = <0x20000 0x6e000>;
+			ranges = <0x0 0x20000 0x6e000>;
 			#address-cells = <1>;
 			#size-cells = <1>;
 
@@ -45,15 +45,15 @@
 			slot0_ns_partition: partition@8000 {
 				compatible = "zephyr,mapped-partition";
 				label = "image-0-nonsecure";
-				reg = <0x8000 0x67000>;
+				reg = <0x8000 0x66000>;
 			};
 		};
 
-		slot1_partition: partition@8f000 {
+		slot1_partition: partition@8e000 {
 			compatible = "zephyr,mapped-partition";
 			label = "image-1";
-			reg = <0x8f000 0x6e000>;
-			ranges = <0x0 0x8f000 0x6e000>;
+			reg = <0x8e000 0x6d000>;
+			ranges = <0x0 0x8e000 0x6d000>;
 			#address-cells = <1>;
 			#size-cells = <1>;
 
@@ -66,29 +66,28 @@
 			slot1_ns_partition: partition@8000 {
 				compatible = "zephyr,mapped-partition";
 				label = "image-1-nonsecure";
-				reg = <0x8000 0x66000>;
+				reg = <0x8000 0x65000>;
 			};
 		};
 
-		storage_partition: partition@fd000 {
+		storage_partition: partition@fb000 {
 			compatible = "zephyr,mapped-partition";
 			label = "storage";
-			reg = <0xfd000 0x3000>;
-			ranges = <0x0 0xfd000 0x3000>;
+			reg = <0xfb000 0x5000>;
+			ranges = <0x0 0xfb000 0x5000>;
 			#address-cells = <1>;
 			#size-cells = <1>;
 
-			/* Note: 4kB partition is not recommended for production use due to flash wear. */
 			settings_storage_partition: partition@0 {
 				compatible = "zephyr,mapped-partition";
 				label = "settings-storage";
-				reg = <0x0 0x1000>;
+				reg = <0x0 0x2000>;
 			};
 
-			lwm2m_carrier_partition: partition@1000 {
+			lwm2m_carrier_partition: partition@2000 {
 				compatible = "zephyr,mapped-partition";
 				label = "lwm2m-carrier";
-				reg = <0x1000 0x2000>;
+				reg = <0x2000 0x2000>;
 			};
 		};
 	};
