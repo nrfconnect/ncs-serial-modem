@@ -10,6 +10,8 @@
 	chosen {
 		nordic,pgps_partition = &pgps_partition;
 		zephyr,settings_partition = &settings_storage_partition;
+		/* P-GPS overlay does not reserve a flash partition for Memfault core dumps. */
+		/delete-property/ nordic,memfault-coredump-partition;
 	};
 };
 
