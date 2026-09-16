@@ -598,10 +598,6 @@ static int coap_datamode_callback(uint8_t op, const uint8_t *data, int len, uint
 			}
 			k_sem_give(&req->staging_ready);
 		}
-
-		if (flags & SM_DATAMODE_FLAGS_EXIT_HANDLER) {
-			rsp_send(CONFIG_SM_DATAMODE_TERMINATOR);
-		}
 	}
 
 	return 0;

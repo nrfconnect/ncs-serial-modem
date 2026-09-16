@@ -1069,7 +1069,6 @@ static int http_datamode_callback(uint8_t op, const uint8_t *data, int len, uint
 		if (datamode_req) {
 			if (flags & SM_DATAMODE_FLAGS_EXIT_HANDLER) {
 				/* Data mode exited unexpectedly - body not fully sent */
-				rsp_send(CONFIG_SM_DATAMODE_TERMINATOR);
 				LOG_WRN("HTTP %d: Data mode exited unexpectedly",
 					datamode_req->fd);
 				http_fail_request(datamode_req);
@@ -1094,10 +1093,6 @@ static int http_datamode_callback(uint8_t op, const uint8_t *data, int len, uint
 				}
 			}
 			datamode_req = NULL;
-		}
-
-		if (flags & SM_DATAMODE_FLAGS_EXIT_HANDLER) {
-			rsp_send(CONFIG_SM_DATAMODE_TERMINATOR);
 		}
 	}
 

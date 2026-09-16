@@ -73,8 +73,9 @@ enum sm_debug_print {
 struct data_mode {
 	sm_datamode_handler_t handler;
 	int handler_result;
-	uint16_t time_limit; /* Time limit for idle period before sending in ms. */
-	size_t data_len;     /* Expected data length in data mode. */
+	uint16_t time_limit;  /* Time limit for idle period before sending in ms. */
+	size_t data_len;      /* Remaining bytes in counted mode (0 in terminator mode). */
+	bool terminator_mode; /* True if data mode was entered without data_len. */
 };
 
 /** Buffered URC message targeting a specific pipe */
@@ -698,6 +699,7 @@ static bool exit_datamode(struct sm_at_host_ctx *ctx)
 		}
 		ctx->data_mode.handler = NULL;
 		ctx->data_mode.data_len = 0;
+		ctx->data_mode.terminator_mode = false;
 		ctx->quit_str_match = 0;
 
 		k_mutex_lock(&ctx->mutex_data, K_FOREVER);
@@ -1406,7 +1408,7 @@ cmd_finnish_or_fail:
 static size_t null_handler(struct sm_at_host_ctx *ctx, uint8_t c)
 {
 	const char *const quit_str = CONFIG_SM_DATAMODE_TERMINATOR;
-	const bool counted = (ctx->data_mode.data_len > 0);
+	const bool counted = !ctx->data_mode.terminator_mode;
 	bool match = false;
 
 	if (ctx->null_dropped_count == 0) {
@@ -1415,7 +1417,9 @@ static size_t null_handler(struct sm_at_host_ctx *ctx, uint8_t c)
 
 	if (counted) {
 		/* As in raw_rx_handler(), quit_str is not searched for when <data_len> is set. */
-		ctx->data_mode.data_len--;
+		if (ctx->data_mode.data_len > 0) {
+			ctx->data_mode.data_len--;
+		}
 		if (ctx->data_mode.data_len == 0) {
 			match = true;
 		}
@@ -1628,6 +1632,7 @@ int enter_datamode(sm_datamode_handler_t handler, size_t data_len)
 
 	ctx->data_mode.handler = handler;
 	ctx->data_mode.data_len = data_len;
+	ctx->data_mode.terminator_mode = (data_len == 0);
 	if (ctx->data_mode.time_limit == 0) {
 		ctx->data_mode.time_limit = get_min_data_mode_idle_timeout_ms();
 	}
@@ -1688,13 +1693,30 @@ void exit_datamode_handler(struct sm_at_host_ctx *ctx, int result)
 {
 	if (set_sm_mode(ctx, SM_NULL_MODE)) {
 		sm_at_host_set_current_ctx(ctx);
+
+		/* Guard against re-entry: a handler callback may call
+		 * exit_datamode_handler() itself before returning an error code.
+		 */
 		if (ctx->data_mode.handler) {
-			ctx->data_mode.handler(DATAMODE_EXIT, NULL, 0,
-					       SM_DATAMODE_FLAGS_EXIT_HANDLER);
+			const bool terminator_mode = ctx->data_mode.terminator_mode;
+			sm_datamode_handler_t handler = ctx->data_mode.handler;
+
+			ctx->data_mode.handler = NULL;
+			ctx->data_mode.handler_result = result;
+			handler(DATAMODE_EXIT, NULL, 0, SM_DATAMODE_FLAGS_EXIT_HANDLER);
+			/* Keep data_len and terminator_mode: null_handler() uses them. */
+
+			/* In terminator mode send the terminator string as an
+			 * out-of-band error signal.  In counted mode the MCU already
+			 * knows how many bytes to send and will receive #XDATAMODE at
+			 * the expected byte boundary.
+			 */
+			if (terminator_mode) {
+				rsp_send_to(sm_at_host_get_pipe(ctx),
+					    "%s", CONFIG_SM_DATAMODE_TERMINATOR);
+			}
 		}
-		ctx->data_mode.handler = NULL;
-		ctx->data_mode.handler_result = result;
-		/* Keep data_len: null_handler() drops the remaining bytes. */
+
 		sm_at_host_set_current_ctx(NULL);
 	}
 }
