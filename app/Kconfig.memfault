@@ -21,12 +21,37 @@ endchoice
 configdefault MEMFAULT_LOGGING_ENABLE
 	default y
 
+# The whole buffer is a static RAM array captured via .bss regardless of how much of it is in use.
+configdefault MEMFAULT_LOGGING_RAM_SIZE
+	default 4096 if $(dt_nodelabel_exists,memfault_coredump_partition)
+
 # Return from the fault handler to allow Zephyr's default fatal error handler to take over.
 configdefault MEMFAULT_FAULT_HANDLER_RETURN
 	default y
 
 configdefault MEMFAULT_RAM_BACKED_COREDUMP_SIZE
 	default 4096
+
+# The flash-backed coredump is enabled automatically when the board's devicetree defines a
+# memfault_coredump_partition falling back to a RAM-backed coredump otherwise.
+configdefault MEMFAULT_NCS_INTERNAL_FLASH_BACKED_COREDUMP
+	default y if $(dt_nodelabel_exists,memfault_coredump_partition)
+
+# Crashing thread benefits from a deep stack capture.
+configdefault MEMFAULT_COREDUMP_ACTIVE_TASK_STACK_SIZE_TO_COLLECT
+	default 2048 if $(dt_nodelabel_exists,memfault_coredump_partition)
+
+# The ~13 other blocked / idle threads need to show a couple of frames to tell
+# what the thread was waiting on.
+configdefault MEMFAULT_COREDUMP_STACK_SIZE_TO_COLLECT
+	default 256
+
+configdefault MEMFAULT_COREDUMP_MAX_TRACKED_TASKS
+	default 16
+
+# Disable .data collection.
+configdefault MEMFAULT_COREDUMP_COLLECT_DATA_REGIONS
+	default n if $(dt_nodelabel_exists,memfault_coredump_partition)
 
 # Upload Memfault data via the nRF Cloud CoAP transport.
 configdefault MEMFAULT_USE_NRF_CLOUD_COAP
