@@ -28,6 +28,18 @@ configdefault MEMFAULT_FAULT_HANDLER_RETURN
 configdefault MEMFAULT_RAM_BACKED_COREDUMP_SIZE
 	default 4096
 
+# Store the coredump directly in slot1_s_partition, the 32 KiB region of the secondary
+# MCUboot slot that TF-M's secure image would otherwise use (see
+# sm_memfault_coredump_storage.c and boards/nrf9151dk_nrf9151_ns.overlay), since there is
+# no flash budget left for a dedicated coredump partition.
+configdefault MEMFAULT_COREDUMP_STORAGE_CUSTOM
+	default y if $(dt_nodelabel_exists,memfault_coredump_partition)
+
+# The flash partition has much more room than the 4 KiB RAM-backed coredump, so collect more
+# stack per task when it is in use.
+configdefault MEMFAULT_COREDUMP_STACK_SIZE_TO_COLLECT
+	default 1024 if $(dt_nodelabel_exists,memfault_coredump_partition)
+
 # Upload Memfault data via the nRF Cloud CoAP transport.
 configdefault MEMFAULT_USE_NRF_CLOUD_COAP
 	default y

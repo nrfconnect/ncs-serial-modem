@@ -129,7 +129,10 @@ static void check_app_fota_status(void)
 	switch (type) {
 	/** Attempt to boot the contents of slot 0. */
 	case BOOT_SWAP_TYPE_NONE:
-		/* Normal boot, nothing happened, do nothing. */
+		/* Normal boot, nothing happened: slot1_s_partition holds no data anyone still
+		 * needs, so it is safe to also use for Memfault coredumps (see
+		 * sm_memfault_coredump_storage.c).
+		 */
 		return;
 	/** Swap to slot 1. Absent a confirm command, revert back on next boot. */
 	case BOOT_SWAP_TYPE_TEST:
@@ -137,6 +140,10 @@ static void check_app_fota_status(void)
 	case BOOT_SWAP_TYPE_PERM:
 	/** Swap failed because image to be run is not valid. */
 	case BOOT_SWAP_TYPE_FAIL:
+		/* slot1_s_partition still holds the previous image in case of a revert:
+		 * memfault_platform_coredump_storage_get_info() checks mcuboot_swap_type()
+		 * live and refuses to use it until this resolves to NONE.
+		 */
 		break;
 	/** Swap back to alternate slot. A confirm changes this state to NONE. */
 	case BOOT_SWAP_TYPE_REVERT:

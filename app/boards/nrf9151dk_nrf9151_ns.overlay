@@ -8,6 +8,10 @@
 	chosen {
 		ncs,sm-uart = &dtr_uart0;
 		zephyr,console = &uart1;
+		/* PROTOTYPE: slot1_s_partition doubles as Memfault coredump storage, see
+		 * sm_memfault_coredump_storage.c for the safety gating this requires.
+		 */
+		nordic,memfault-coredump-partition = &memfault_coredump_partition;
 	};
 };
 
@@ -87,7 +91,7 @@
  * 0x0002_0000  slot0 (primary app)          (444 kB)
  *   0x0002_0000  TF-M secure                ( 32 kB)
  *   0x0002_8000  Application (non-secure)   (412 kB - (MCUBoot swap sector + MCUboot trailer))
- * 0x0008_f000  slot1 (secondary app)        (440 kB)
+ * 0x0008_f000  slot1 (secondary app)        (440 kB) - also Memfault coredump storage (prototype)
  * 0x000f_d000  Non-secure storage           ( 12 kB)
  */
 
@@ -148,7 +152,7 @@
 			#address-cells = <1>;
 			#size-cells = <1>;
 
-			slot1_s_partition: partition@0 {
+			slot1_s_partition: memfault_coredump_partition: partition@0 {
 				compatible = "zephyr,mapped-partition";
 				label = "image-1-secure";
 				reg = <0x0 0x8000>;
@@ -237,14 +241,13 @@
 		code-partitions = <&b0_partition>,
 				  <&s0_partition>,
 				  <&s1_partition>,
-				  <&slot0_s_partition>,
-				  <&slot1_s_partition>;
+				  <&slot0_s_partition>;
 	};
 
 	nordic-tz-nonsecure {
 		compatible = "nordic,tz-nonsecure";
 		code-partitions = <&slot0_ns_partition>,
-				  <&slot1_ns_partition>;
+				  <&slot1_partition>;
 		data-partitions = <&storage_partition>;
 	};
 };

@@ -350,6 +350,8 @@ The following configuration files are provided:
   See :ref:`sm_carrier_library_support` for more information on how to connect to an operator's device management platform.
 
 * :file:`carrier.overlay` - Devicetree overlay that adds a dedicated flash partition for the LwM2M carrier library NVS storage.
+  Must also be passed to the ``mcuboot`` image using :makevar:`mcuboot_EXTRA_DTC_OVERLAY_FILE` so that MCUboot operates with the same partition layout.
+  The absolute path to the overlay file must be provided.
   Used in conjunction with :file:`carrier.conf`.
 
 * :file:`carrier-softbank.conf` and :file:`sysbuild-softbank.conf` - Configuration files that add SoftBank configurations needed by the carrier library.
@@ -380,24 +382,6 @@ The following configuration files are provided:
 * :file:`trace-backend.overlay` - Devicetree overlay that defines the SRAM partition used by the modem trace backend.
   Required when using :file:`trace-backend-uart.conf` or :file:`trace-backend-cmux.conf`.
 
-* :file:`nrfcloud-coredump-flash.conf` - Configuration file that adds the flash-backed core dump to `Memfault`_.
-  Must be combined with :file:`nrfcloud-coredump-flash.overlay`.
-  For more information about Memfault features in |NCS|, see the `Memfault library`_ docs.
-
-  Memfault is enabled by default in :file:`prj.conf`, without this overlay.
-  Only the core dump requires the overlay, because it reserves a flash partition.
-  To build without Memfault altogether, set ``CONFIG_MEMFAULT`` to ``n``.
-
-  .. note::
-
-     The use of Memfault features in |SM| are `Experimental <Software maturity levels_>`_.
-
-* :file:`nrfcloud-coredump-flash.overlay` - Devicetree overlay that adds a dedicated flash partition for Memfault core dump storage.
-  The overlay resizes the MCUboot primary and secondary slots to free up space for the ``memfault_coredump_partition``.
-  Must be combined with :file:`nrfcloud-coredump-flash.conf`.
-  Must also be passed to the ``mcuboot`` image using :makevar:`mcuboot_EXTRA_DTC_OVERLAY_FILE` so that MCUboot operates with the same partition layout.
-  The absolute path to the overlay file must be provided.
-
 * :file:`full-fota.conf` - Configuration file that adds full modem FOTA support.
   Must be combined with :file:`full-fota.overlay`.
   See :ref:`SM_AT_FOTA` for more information on how to use full modem FOTA functionality.
@@ -410,6 +394,7 @@ The following configuration files are provided:
   Required when ``CONFIG_NRF_CLOUD_PGPS`` is enabled.
   Must also be passed to the ``mcuboot`` image using :makevar:`mcuboot_EXTRA_DTC_OVERLAY_FILE` so that MCUboot operates with the same partition layout.
   The absolute path to the overlay file must be provided.
+  It does not reserve a ``memfault_coredump_partition``, so Memfault coredumps fall back to RAM in this configuration.
   See :ref:`SM_AT_GNSS` for more information.
 
 * :file:`disable-b0.overlay` - Devicetree overlay for a build configuration without the NSIB (B0) immutable bootloader.
