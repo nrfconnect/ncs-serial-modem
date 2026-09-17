@@ -1315,6 +1315,126 @@ void test_xsend_data_mode_partial_quit_string(void)
 }
 
 /*
+ * Regression test: terminator-mode data-mode callback failure
+ *
+ * When data mode is entered without <data_len> (terminator mode) and the
+ * network send fails, the SM must emit the terminator string as an
+ * out-of-band error signal so the MCU knows to stop sending, and must
+ * then report the failure via #XDATAMODE: -1.
+ *
+ * Sequence:
+ *   AT#XSEND=1,2,0          (enter terminator mode)
+ *   MCU sends "Hello+++"    (data + quit string triggers raw_send)
+ *   zsock_send returns -1   (simulated network failure)
+ *
+ * Expected outcome:
+ *   - SM sends "+++" to MCU (out-of-band error signal)
+ *   - SM sends #XDATAMODE: -1 (error exit notification)
+ */
+void test_xsend_data_mode_send_error_terminator_mode(void)
+{
+	const char *response;
+
+	/* Create TCP socket (fd=1). */
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 1);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
+	send_at_command("AT#XSOCKET=1,1,0\r\n");
+	clear_captured_response();
+
+	/* Enter terminator mode: no <data_len> argument. */
+	send_at_command("AT#XSEND=1,2,0\r\n");
+	response = get_captured_response();
+	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
+	clear_captured_response();
+
+	/* Arm failure mock: clear_so_send_cb (setsockopt) then failing zsock_send. */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* clear SO_SENDCB */
+	__cmock_zsock_send_Stub(mock_zsock_send_error_callback);
+
+	/* "Hello+++" — "Hello" is buffered in the data ring-buffer; the quit
+	 * string "+++" triggers raw_send("Hello") which fails.  The failure
+	 * path in exit_datamode_handler() must send the terminator string as
+	 * an out-of-band signal (terminator mode), then exit_datamode() must
+	 * report #XDATAMODE: -1.
+	 */
+	send_at_command("Hello+++");
+
+	response = get_captured_response();
+
+	/* Terminator mode: SM must emit the terminator string on failure. */
+	TEST_ASSERT_TRUE(strstr(response, CONFIG_SM_DATAMODE_TERMINATOR) != NULL);
+	/* SM must also report the error exit. */
+	TEST_ASSERT_TRUE(strstr(response, "#XDATAMODE: -1") != NULL);
+
+	/* Clean up. */
+	__cmock_zsock_send_Stub(NULL);
+	__cmock_zsock_close_ExpectAndReturn(1, 0);
+	send_at_command("AT#XCLOSE=1\r\n");
+}
+
+/*
+ * Regression test: counted-mode data-mode callback failure
+ *
+ * When data mode is entered with <data_len> (counted mode) and the network
+ * send fails, the SM must NOT emit the terminator string (the MCU already
+ * knows the byte count and needs no out-of-band signal).  Instead the MCU
+ * receives #XDATAMODE: -1 at the expected byte boundary — after all
+ * <data_len> bytes have been received by the SM.
+ *
+ * Sequence:
+ *   AT#XSEND=1,2,0,5        (enter counted mode, data_len = 5)
+ *   MCU sends 5 bytes        (last byte triggers raw_send)
+ *   zsock_send returns -1    (simulated network failure)
+ *
+ * Expected outcome:
+ *   - SM does NOT send "+++" (no out-of-band signal in counted mode)
+ *   - SM sends #XDATAMODE: -1 at the expected byte boundary (after byte 5)
+ */
+void test_xsend_data_mode_send_error_counted_mode(void)
+{
+	const char *response;
+
+	/* Create TCP socket (fd=1). */
+	__cmock_zsock_socket_ExpectAndReturn(AF_INET, SOCK_STREAM, IPPROTO_TCP, 1);
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_POLLCB */
+	send_at_command("AT#XSOCKET=1,1,0\r\n");
+	clear_captured_response();
+
+	/* Enter counted mode: data_len = 5. */
+	send_at_command("AT#XSEND=1,2,0,5\r\n");
+	response = get_captured_response();
+	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
+	clear_captured_response();
+
+	/* Arm failure mock: clear_so_send_cb (setsockopt) then failing zsock_send. */
+	__cmock_zsock_setsockopt_ExpectAnyArgsAndReturn(0); /* clear SO_SENDCB */
+	__cmock_zsock_send_Stub(mock_zsock_send_error_callback);
+
+	/* Send all 5 counted bytes.  Receiving the last byte makes data_len
+	 * reach zero, which triggers raw_send().  The failing zsock_send causes
+	 * exit_datamode_handler() to be called; because this is counted mode
+	 * (terminator_mode == false) it must NOT emit the terminator string.
+	 * exit_datamode() is then called immediately from raw_rx_handler(),
+	 * transitioning back to AT command mode and emitting #XDATAMODE: -1.
+	 */
+	uart_stub_rx((const uint8_t *)"Hello", 5);
+
+	response = get_captured_response();
+
+	/* Counted mode: SM must NOT emit the terminator string on failure. */
+	TEST_ASSERT_NULL(strstr(response, CONFIG_SM_DATAMODE_TERMINATOR));
+	/* SM must report the error exit at the expected byte boundary. */
+	TEST_ASSERT_TRUE(strstr(response, "#XDATAMODE: -1") != NULL);
+
+	/* Clean up. */
+	__cmock_zsock_send_Stub(NULL);
+	__cmock_zsock_close_ExpectAndReturn(1, 0);
+	send_at_command("AT#XCLOSE=1\r\n");
+}
+
+/*
  * Test: Send data via AT#XSENDTO with unformatted string
  * - Command: AT#XSENDTO=<handle>,<mode>,<flags>,"<url>",<port>,"<data>"\r\n
  * - Tests: Sending unformatted string data over UDP socket
