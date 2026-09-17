@@ -914,7 +914,6 @@ void sm_ppp_attach(struct modem_pipe *pipe)
 
 void sm_ppp_detach(void)
 {
-	ppp_pipe = NULL;
 	sm_ppp_keep_pipe_attached = false;
 	sm_ppp_auto_start = false;
 	if (!sm_ppp_is_stopped()) {
