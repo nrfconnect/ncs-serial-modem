@@ -25,6 +25,7 @@
 #include <zephyr/pm/device.h>
 
 #include "sm_at_host.h"
+#include "sm_at_dfu.h"
 
 LOG_MODULE_REGISTER(sm_log, CONFIG_SM_LOG_LEVEL);
 
@@ -145,16 +146,15 @@ STATIC int handle_at_log(enum at_parser_cmd_type cmd_type, struct at_parser *par
 	return -EINVAL;
 }
 
-/* Whether bootloader mode is enabled. */
-extern bool sm_bootloader_mode_enabled;
-
 static int sm_log_init(void)
 {
+#if defined(CONFIG_SM_DFU)
 	if (sm_bootloader_mode_enabled) {
 		/* Keep the logging (and logging UART) enabled in bootloader mode */
 		log_active = true;
 		return 0;
 	}
+#endif /* CONFIG_SM_DFU */
 
 	const struct log_backend *log_be = log_backend_get_by_name("log_backend_uart");
 

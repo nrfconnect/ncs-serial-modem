@@ -594,7 +594,8 @@ MCUboot bootloader info #XBOOTINFO
 
 Query information about the MCUboot second-stage bootloader.
 
-This command is only available when the firmware is built with the NSIB (B0) and MCUboot as a second-stage bootloader.
+This command is only available when the firmware is built with the NSIB (B0) and MCUboot as a second-stage bootloader
+and the :ref:`CONFIG_SM_DFU <CONFIG_SM_DFU>` Kconfig option is enabled.
 
 Set command
 -----------

@@ -60,4 +60,12 @@ config SM_CMUX_CHANNEL_COUNT
 	int "CMUX channel count"
 	default 1
 
+config SM_FOTA
+	bool "FOTA support"
+	default y
+
+config SM_DFU
+	bool "DFU support"
+	default y
+
 source "Kconfig.zephyr"
