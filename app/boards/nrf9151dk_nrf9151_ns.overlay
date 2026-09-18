@@ -8,6 +8,8 @@
 	chosen {
 		ncs,sm-uart = &dtr_uart0;
 		zephyr,console = &uart1;
+		zephyr,settings_partition = &settings_storage_partition;
+		nordic,memfault-coredump-partition = &memfault_coredump_partition;
 	};
 };
 
@@ -84,11 +86,13 @@
  * 0x0000_0000  b0 (NSIB)                    ( 32 kB)
  * 0x0000_8000  s0 (MCUBoot image, slot 0)   ( 48 kB)
  * 0x0001_4000  s1 (MCUBoot image, slot 1)   ( 48 kB)
- * 0x0002_0000  slot0 (primary app)          (444 kB)
+ * 0x0002_0000  slot0 (primary app)          (436 kB)
  *   0x0002_0000  TF-M secure                ( 32 kB)
- *   0x0002_8000  Application (non-secure)   (412 kB - (MCUBoot swap sector + MCUboot trailer))
- * 0x0008_f000  slot1 (secondary app)        (440 kB)
- * 0x000f_d000  Non-secure storage           ( 12 kB)
+ *   0x0002_8000  Application (non-secure)   (404 kB - (MCUBoot swap sector + MCUboot trailer))
+ * 0x0008_d000  slot1 (secondary app)        (432 kB)
+ * 0x000f_9000  storage (container)          ( 28 kB)
+ *   0x000f_9000  Memfault core dump         ( 16 kB)
+ *   0x000f_d000  Non-secure storage         ( 12 kB)
  */
 
 /delete-node/ &boot_partition;
@@ -122,8 +126,8 @@
 		slot0_partition: partition@20000 {
 			compatible = "zephyr,mapped-partition";
 			label = "image-0";
-			reg = <0x20000 0x6f000>;
-			ranges = <0x0 0x20000 0x6f000>;
+			reg = <0x20000 0x6d000>;
+			ranges = <0x0 0x20000 0x6d000>;
 			#address-cells = <1>;
 			#size-cells = <1>;
 
@@ -136,15 +140,15 @@
 			slot0_ns_partition: partition@8000 {
 				compatible = "zephyr,mapped-partition";
 				label = "image-0-nonsecure";
-				reg = <0x8000 0x67000>;
+				reg = <0x8000 0x65000>;
 			};
 		};
 
-		slot1_partition: partition@8f000 {
+		slot1_partition: partition@8d000 {
 			compatible = "zephyr,mapped-partition";
 			label = "image-1";
-			reg = <0x8f000 0x6e000>;
-			ranges = <0x0 0x8f000 0x6e000>;
+			reg = <0x8d000 0x6c000>;
+			ranges = <0x0 0x8d000 0x6c000>;
 			#address-cells = <1>;
 			#size-cells = <1>;
 
@@ -157,14 +161,29 @@
 			slot1_ns_partition: partition@8000 {
 				compatible = "zephyr,mapped-partition";
 				label = "image-1-nonsecure";
-				reg = <0x8000 0x66000>;
+				reg = <0x8000 0x64000>;
 			};
 		};
 
-		nonsecure_storage: storage_partition: partition@fd000 {
+		storage_partition: partition@f9000 {
 			compatible = "zephyr,mapped-partition";
 			label = "nonsecure-storage";
-			reg = <0xfd000 0x3000>;
+			reg = <0xf9000 0x7000>;
+			ranges = <0x0 0xf9000 0x7000>;
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			memfault_coredump_partition: partition@0 {
+				compatible = "zephyr,mapped-partition";
+				label = "memfault_coredump_partition";
+				reg = <0x0 0x4000>;
+			};
+
+			settings_storage_partition: partition@4000 {
+				compatible = "zephyr,mapped-partition";
+				label = "settings-storage";
+				reg = <0x4000 0x3000>;
+			};
 		};
 	};
 };
