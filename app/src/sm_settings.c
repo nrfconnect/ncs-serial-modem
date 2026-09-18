@@ -43,6 +43,12 @@ static int settings_set(const char *name, size_t len, settings_read_cb read_cb, 
 		if (read_cb(cb_arg, &sm_fota_type, len) > 0)
 			return 0;
 	}
+	if (!strcmp(name, "modem_eio_retried")) {
+		if (len != sizeof(sm_modem_init_eio_retry_count))
+			return -EINVAL;
+		if (read_cb(cb_arg, &sm_modem_init_eio_retry_count, len) > 0)
+			return 0;
+	}
 	/* Simply ignore obsolete settings that are not in use anymore.
 	 * settings_delete() does not completely remove settings.
 	 */
@@ -105,4 +111,10 @@ int sm_settings_full_mfw_dfu_segment_type_save(void)
 {
 	return settings_save_one("sm/full_mfw_dfu_segment_type",
 		&full_mfw_dfu_segment_type, sizeof(full_mfw_dfu_segment_type));
+}
+
+int sm_settings_modem_eio_retried_save(void)
+{
+	return settings_save_one("sm/modem_eio_retried",
+		&sm_modem_init_eio_retry_count, sizeof(sm_modem_init_eio_retry_count));
 }
