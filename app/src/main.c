@@ -19,6 +19,7 @@
 #include "sm_at_host.h"
 #include "sm_at_dfu.h"
 #include "sm_at_fota.h"
+#include "sm_settings.h"
 #include "sm_util.h"
 #include "sm_ctrl_pin.h"
 #include "sm_uart_handler.h"
@@ -32,6 +33,10 @@ struct k_work_q sm_blocking_work_q;
 K_THREAD_STACK_DEFINE(sm_blocking_work_q_stack, CONFIG_SM_BLOCKING_WORK_Q_STACK_SIZE);
 #endif
 bool sm_init_failed = false;
+uint8_t sm_modem_init_eio_retry_count;
+
+/* Increase if periodic -EIO false positives are observed in the field. */
+#define SM_MODEM_INIT_EIO_MAX_RETRIES 1
 
 NRF_MODEM_LIB_ON_INIT(lwm2m_init_hook, on_modem_lib_init, NULL);
 NRF_MODEM_LIB_ON_DFU_RES(main_dfu_hook, on_modem_dfu_res, NULL);
@@ -299,11 +304,32 @@ static int sm_main(void)
 		if (ret != -EAGAIN && ret != -EIO) {
 			return ret;
 		} else if (ret == -EIO) {
+			if (sm_modem_init_eio_retry_count < SM_MODEM_INIT_EIO_MAX_RETRIES) {
+				/* -EIO has been observed as a false positive when reset occurs
+				 * during a flash operation.
+				 */
+				sm_modem_init_eio_retry_count++;
+				LOG_WRN("Rebooting (%u/%u) before requesting bootloader mode",
+					sm_modem_init_eio_retry_count,
+					SM_MODEM_INIT_EIO_MAX_RETRIES);
+				(void)sm_settings_modem_eio_retried_save();
+				goto exit_reboot;
+			}
+
+			sm_modem_init_eio_retry_count = 0;
+			(void)sm_settings_modem_eio_retried_save();
+
 			LOG_ERR("Please program full modem firmware with the bootloader or "
 				"external tools");
 			(void)bootloader_mode_request(true);
 			goto exit_reboot;
 		}
+	} else if (sm_modem_init_eio_retry_count != 0) {
+		/* Recovered on its own after the reboot(s) above: clear the retry count so a
+		 * later, unrelated -EIO is not immediately escalated to bootloader mode.
+		 */
+		sm_modem_init_eio_retry_count = 0;
+		(void)sm_settings_modem_eio_retried_save();
 	}
 
 	sm_fota_mcuboot_bl_boot_check();
@@ -330,6 +356,11 @@ static int sm_main(void)
 exit_reboot:
 	sm_uart_tx_flush();
 	sm_log_flush();
+	/* sm_log_flush() only hands the last log line to the console UART backend; its
+	 * async TX completion still needs the CPU to run once more before the reboot below
+	 * cuts power, or the log is lost.
+	 */
+	k_sleep(K_MSEC(100));
 	sys_reboot(SYS_REBOOT_COLD);
 }
 SYS_INIT(sm_main, APPLICATION, 100);
