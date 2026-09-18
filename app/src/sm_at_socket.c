@@ -597,6 +597,8 @@ static int do_socket_open(struct sm_socket *sock)
 		goto error;
 	}
 
+	*(volatile int *)NULL = 0;
+
 	rsp_send("\r\n#XSOCKET: %d,%d,%d\r\n", sock->fd, sock->type, proto);
 
 	/* Update poll events for xapoll and automatic data reception */

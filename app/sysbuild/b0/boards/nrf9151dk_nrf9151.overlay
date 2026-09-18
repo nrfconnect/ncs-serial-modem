@@ -25,7 +25,7 @@
  * 0x0002_0000  slot0 (primary app)          (444 kB)
  *   0x0002_0000  TF-M secure                ( 32 kB)
  *   0x0002_8000  Application (non-secure)   (412 kB - (MCUBoot swap sector + MCUboot trailer))
- * 0x0008_f000  slot1 (secondary app)        (440 kB)
+ * 0x0008_f000  slot1 (secondary app)        (440 kB) - also Memfault coredump storage (prototype)
  * 0x000f_d000  Non-secure storage           ( 12 kB)
  */
 
@@ -99,7 +99,7 @@
 			};
 		};
 
-		nonsecure_storage: storage_partition: partition@fd000 {
+		storage_partition: partition@fd000 {
 			compatible = "zephyr,mapped-partition";
 			label = "nonsecure-storage";
 			reg = <0xfd000 0x3000>;

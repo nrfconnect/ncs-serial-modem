@@ -37,6 +37,7 @@ target_sources_ifdef(CONFIG_SM_MODEM_TRACE_BACKEND_CMUX app PRIVATE src/sm_trace
 target_sources_ifdef(CONFIG_SM_MODEM_TRACE_BACKEND_UART app PRIVATE src/sm_trace_backend_uart.c)
 target_sources_ifdef(CONFIG_NRF_PROVISIONING app PRIVATE src/sm_at_provisioning.c)
 target_sources_ifdef(CONFIG_SM_NRF_CLOUD_OBSERVABILITY_LTE_METRICS app PRIVATE src/sm_at_nrfcloud_obs_lte_metrics.c)
+target_sources_ifdef(CONFIG_MEMFAULT_COREDUMP_STORAGE_CUSTOM app PRIVATE src/sm_memfault_coredump_storage.c)
 
 add_subdirectory_ifdef(CONFIG_SM_CARRIER src/lwm2m_carrier)
 

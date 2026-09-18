@@ -9,6 +9,7 @@
 / {
 	chosen {
 		nordic,lwm2m-carrier-partition = &lwm2m_carrier_partition;
+		zephyr,settings_partition = &storage_partition;  // HACK
 	};
 };
 
