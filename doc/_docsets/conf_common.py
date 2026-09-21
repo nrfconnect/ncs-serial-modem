@@ -36,6 +36,10 @@ version = release = os.environ.get("VERSION", "latest")
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
+# AT commands contain '#' characters that must not be highlighted as comments.
+# Disable the default syntax highlighter for all literal blocks (``::``).
+highlight_language = "none"
+
 extensions = [
     "breathe",
     "sphinx_tabs.tabs",
