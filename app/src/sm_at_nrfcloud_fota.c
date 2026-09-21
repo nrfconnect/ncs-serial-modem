@@ -53,22 +53,13 @@ static char fota_project_key[FOTA_KEY_MAX_LEN + 1];
 /* Query Memfault release management and, if an update is available, start the download.
  * sm_fota_type selects app or modem; sm_fota_stage is already FOTA_STAGE_DOWNLOAD and
  * fota_pipe already set by the caller.
- *
- * Note: for sm_fota_type == SM_FOTA_TYPE_APP, memfault_zephyr_fota_start() itself falls back to
- * checking the modem project when no application update is pending. In that case a modem
- * update may start while sm_fota_type still reads SM_FOTA_TYPE_APP; the modem firmware is
- * still updated correctly, but the AT#XMODEMRESET completion report is skipped since it only
- * fires for SM_FOTA_TYPE_MFW. This is only reachable when no application update is pending, and
- * only when a modem project key is configured via CONFIG_MEMFAULT_FOTA_MODEM_PROJECT_KEY or
- * memfault_zephyr_fota_modem_project_key_set() (the <project_key> override of this op=1 check,
- * fota_project_key, is not used for this fallback).
  */
 static void nrfcloud_fota_check(void)
 {
 	int rv;
 
 	if (sm_fota_type == SM_FOTA_TYPE_APP) {
-		/* memfault_zephyr_fota_start() uses g_mflt_http_client_config.api_key as the
+		/* memfault_zephyr_fota_app_start() uses g_mflt_http_client_config.api_key as the
 		 * project key; swap in the override for the check, like the modem path does.
 		 */
 		const char *saved_key = g_mflt_http_client_config.api_key;
@@ -76,7 +67,7 @@ static void nrfcloud_fota_check(void)
 		if (fota_project_key[0] != '\0') {
 			g_mflt_http_client_config.api_key = fota_project_key;
 		}
-		rv = memfault_zephyr_fota_start();
+		rv = memfault_zephyr_fota_app_start();
 		g_mflt_http_client_config.api_key = saved_key;
 	} else {
 		memfault_zephyr_fota_modem_project_key_set(

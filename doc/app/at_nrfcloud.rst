@@ -881,17 +881,10 @@ Syntax
     This is effective only after a download has started, that is, after the first ``#XFOTA`` progress notification.
   * ``1`` - Check for and download an application update.
     The optional ``<project_key>`` overrides the application project key (``CONFIG_MEMFAULT_PROJECT_KEY``) for this check.
-    When no application update is available, the command falls back to a modem firmware update if the :ref:`CONFIG_SM_NRF_CLOUD_FOTA_MODEM_PROJECT_KEY <CONFIG_SM_NRF_CLOUD_FOTA_MODEM_PROJECT_KEY>` Kconfig option is set.
-    The ``<project_key>`` parameter does not apply to this fallback.
   * ``2`` - Check for and download a modem firmware update.
 
 * The ``<project_key>`` parameter is a string.
   For ``<op>=1`` it overrides the application project key (``CONFIG_MEMFAULT_PROJECT_KEY``), and for ``<op>=2`` it overrides :ref:`CONFIG_SM_NRF_CLOUD_FOTA_MODEM_PROJECT_KEY <CONFIG_SM_NRF_CLOUD_FOTA_MODEM_PROJECT_KEY>`, for this check.
-  It does not apply to the modem firmware fallback of ``<op>=1``.
-
-.. note::
-   When ``<op>=1`` falls back to a modem firmware update, the modem firmware is downloaded and applied, but the ``AT#XMODEMRESET`` completion report is not sent.
-   To receive that report, use ``<op>=2`` instead.
 
 The command returns ``OK`` immediately and the check runs asynchronously.
 When it completes, an unsolicited notification is sent.
