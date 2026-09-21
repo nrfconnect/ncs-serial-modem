@@ -28,7 +28,11 @@ Syntax
 
    AT+IPR=<baud_rate>
 
-The ``<baud_rate>`` parameter is an integer value specifying the desired baud rate.
+The parameters and their defined values are the following:
+
+<baud_rate>
+   Integer.
+   The desired baud rate.
 
 .. note::
 
@@ -181,17 +185,28 @@ Response syntax
 
    #XSMVER: "<sm_version>","<ncs_version>"[,"<customer_version>"]
 
-The ``<sm_version>`` parameter is the version of the |SM| application in Git-describe style.
-The ``major.minor.patch`` prefix comes from :file:`app/VERSION`; the optional ``-N-g<hash>`` suffix (and ``-dirty``) comes from ``git describe`` in the application tree.
-Example: ``"v1.99.0-68-gb2d3dde4dfa2"`` uses ``1.99.0`` from :file:`app/VERSION` and ``-68-gb2d3dde4dfa2`` from Git.
+The parameters and their defined values are the following:
 
-Hosts can use that ``major.minor.patch`` prefix to verify that application DFU moved to a newer image (compare ``AT#XSMVER`` before and after update).
-MCUboot applies the same ordering using the sign version from :file:`app/VERSION` (``major.minor.patch+tweak``); the Git suffix is not part of that check.
-See :ref:`sm_releasing` for release version updates.
+<sm_version>
+   String.
+   The version of the |SM| application in Git-describe style.
+   The ``major.minor.patch`` prefix comes from :file:`app/VERSION`.
+   The optional ``-N-g<hash>`` suffix (and ``-dirty``) comes from ``git describe`` in the application tree.
 
-The ``<ncs_version>`` parameter is a string containing the version of the |NCS|.
+   Example: ``"v1.99.0-68-gb2d3dde4dfa2"`` uses ``1.99.0`` from :file:`app/VERSION` and ``-68-gb2d3dde4dfa2`` from Git.
 
-The ``<customer_version>`` parameter is the :ref:`CONFIG_SM_CUSTOMER_VERSION <CONFIG_SM_CUSTOMER_VERSION>` string, if defined.
+   Hosts can use that ``major.minor.patch`` prefix to verify that application DFU moved to a newer image (compare ``AT#XSMVER`` before and after update).
+   MCUboot applies the same ordering using the sign version from :file:`app/VERSION` (``major.minor.patch+tweak``).
+   The Git suffix is not part of that check.
+   See :ref:`sm_releasing` for release version updates.
+
+<ncs_version>
+   String.
+   The version of the |NCS|.
+
+<customer_version>
+   String.
+   The :ref:`CONFIG_SM_CUSTOMER_VERSION <CONFIG_SM_CUSTOMER_VERSION>` string, if defined.
 
 Example
 ~~~~~~~
@@ -260,7 +275,11 @@ Response syntax
 
    <command list>
 
-The ``<command list>`` parameter returns a list of values representing all the ``#X*`` commands followed by <CR><LF>.
+The parameters and their defined values are the following:
+
+<command list>
+   String.
+   A list of values representing all the ``#X*`` commands followed by <CR><LF>.
 
 Example
 ~~~~~~~
@@ -325,20 +344,21 @@ Syntax
 
    AT#XSLEEP=<sleep_mode>
 
-The ``<sleep_mode>`` parameter accepts only the following integer values:
+The parameters and their defined values are the following:
 
-* ``1`` - Enter Sleep.
-  In this mode, both the |SM| service and the LTE connection are terminated.
+<sleep_mode>
+   * ``1`` - Enter Sleep.
+     In this mode, both the |SM| service and the LTE connection are terminated.
 
-  |SM| can be woken up using the DTR pin (``dtr-gpios``).
+     |SM| can be woken up using the DTR pin (``dtr-gpios``).
 
-* ``2`` - Enter Idle.
-  In this mode, both the |SM| service and the LTE connection are maintained, but the UART is disabled to save power.
-  Received data is buffered and sent to the host after idle mode is exited.
+   * ``2`` - Enter Idle.
+     In this mode, both the |SM| service and the LTE connection are maintained, but the UART is disabled to save power.
+     Received data is buffered and sent to the host after idle mode is exited.
 
-  |SM| can exit the idle mode using the DTR pin (``dtr-gpios``).
-  When the |SM| is in idle mode, and there is data to be read by the host, the RI pin (``ri-gpios``) is asserted for a short period of time to notify the host.
-  The host can then deassert and assert DTR to exit idle mode and read the data.
+     |SM| can exit the idle mode using the DTR pin (``dtr-gpios``).
+     When the |SM| is in idle mode, and there is data to be read by the host, the RI pin (``ri-gpios``) is asserted for a short period of time to notify the host.
+     The host can then deassert and assert DTR to exit idle mode and read the data.
 
 The DTR pin is defined either in the :file:`boards/*_ns.overlay` overlay file matching your board or in the :file:`external-mcu.overlay` overlay file, if it is included.
 
@@ -512,14 +532,16 @@ Response syntax
 
    #XMODEMRESET: <result>[,<error_code>]
 
-* The ``<result>`` parameter is an integer indicating the result of the command.
-  It can have the following values:
+The parameters and their defined values are the following:
 
-  * ``0`` - Success.
-  * *Positive value* - On failure, indicates the step that failed.
+<result>
+   * ``0`` - Success.
+   * *Positive value* - On failure, indicates the step that failed.
 
-* The ``<error_code>`` parameter is an integer.
-  It is only printed when the modem reset was not successful and is the error code indicating the reason for the failure.
+<error_code>
+   Integer.
+   Only printed when the modem reset was not successful.
+   It is the error code indicating the reason for the failure.
 
 Example
 ~~~~~~~~
@@ -566,7 +588,11 @@ Response syntax
 
    #XUUID: <device-uuid>
 
-The ``<device-uuid>`` parameter returns a string indicating the UUID of the device.
+The parameters and their defined values are the following:
+
+<device-uuid>
+   String.
+   The UUID of the device.
 
 Example
 ~~~~~~~
@@ -603,10 +629,11 @@ Set command
 
    AT#XBOOTINFO=<op>
 
-* ``<op>`` - Operation to perform:
+The parameters and their defined values are the following:
 
-  * ``0`` - Query the firmware version of the active MCUboot slot.
-  * ``1`` - Query which MCUboot slot is currently active.
+<op>
+   * ``0`` - Query the firmware version of the active MCUboot slot.
+   * ``1`` - Query which MCUboot slot is currently active.
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -615,8 +642,13 @@ Response syntax
 
    #XBOOTINFO: <value>
 
-* When ``<op>`` is ``0`` - ``<value>`` is an unsigned integer representing ``fw_info.version`` of the active MCUboot slot, set at build time using ``CONFIG_FW_INFO_FIRMWARE_VERSION`` and used by NSIB as a downgrade-protection counter.
-* When ``<op>`` is ``1`` - ``<value>`` is ``0`` if slot ``s0`` is active and ``1`` if slot ``s1`` is active.
+The parameters and their defined values are the following:
+
+<value>
+   Integer.
+
+   * When ``<op>`` is ``0``, it is an unsigned integer representing ``fw_info.version`` of the active MCUboot slot, set at build time using ``CONFIG_FW_INFO_FIRMWARE_VERSION`` and used by NSIB as a downgrade-protection counter.
+   * When ``<op>`` is ``1``, it is ``0`` if slot ``s0`` is active and ``1`` if slot ``s1`` is active.
 
 Examples
 ~~~~~~~~
@@ -675,8 +707,15 @@ The application sends the following unsolicited notification when it detects a m
 
    #XMODEM: FAULT,<reason>,<program_count>
 
-The ``<reason>`` parameter returns a hexadecimal integer indicating the reason of the modem fault.
-The ``<program_count>`` parameter returns a hexadecimal integer indicating the address of the modem fault.
+The parameters and their defined values are the following:
+
+<reason>
+   Integer.
+   A hexadecimal integer indicating the reason of the modem fault.
+
+<program_count>
+   Integer.
+   A hexadecimal integer indicating the address of the modem fault.
 
 The application sends the following unsolicited notification when it shuts down libmodem:
 
@@ -684,7 +723,11 @@ The application sends the following unsolicited notification when it shuts down 
 
    #XMODEM: SHUTDOWN,<result>
 
-The ``<result>`` parameter returns an integer indicating the result of the shutdown of libmodem.
+The parameters and their defined values are the following:
+
+<result>
+   Integer.
+   The result of the shutdown of libmodem.
 
 The application sends the following unsolicited notification when it re-initializes libmodem:
 
@@ -692,7 +735,11 @@ The application sends the following unsolicited notification when it re-initiali
 
    #XMODEM: INIT,<result>
 
-The ``<result>`` parameter returns an integer indicating the result of the re-initialization of libmodem.
+The parameters and their defined values are the following:
+
+<result>
+   Integer.
+   The result of the re-initialization of libmodem.
 
 .. note::
    After libmodem is re-initialized, the MCU side must restart the current active service as follows:

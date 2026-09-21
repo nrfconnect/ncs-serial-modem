@@ -32,19 +32,23 @@ Syntax
 
    AT#XMQTTCFG=<client_id>[,<keep_alive>[,<clean_session>]]
 
-* The ``<client_id>`` parameter is a string.
-  It indicates the MQTT Client ID.
-  If this command is not issued, |SM| uses the default value of ``sm_default_client_id``.
-* The ``<keep_alive>`` parameter is an integer.
-  It indicates the maximum Keep Alive time in seconds for MQTT.
-  The default Kepp Alive time is 60 seconds.
-* The ``<clean_session>`` parameter is an integer.
-  It can have one of the following values:
+The parameters and their defined values are the following:
 
-    * ``0`` - Connect to a MQTT broker using a persistent session.
-    * ``1`` - Connect to a MQTT broker using a clean session.
+<client_id>
+   String.
+   The MQTT Client ID.
+   If this command is not issued, |SM| uses the default value of ``sm_default_client_id``.
 
-  The default is using a persistent session.
+<keep_alive>
+   Integer.
+   The maximum Keep Alive time in seconds for MQTT.
+   The default Keep Alive time is 60 seconds.
+
+<clean_session>
+   * ``0`` - Connect to a MQTT broker using a persistent session.
+   * ``1`` - Connect to a MQTT broker using a clean session.
+
+   The default is using a persistent session.
 
 Examples
 ~~~~~~~~
@@ -73,15 +77,19 @@ Response syntax
 
    #XMQTTCFG: <client_id>,<keep_alive>,<clean_session>
 
-* The ``<client_id>`` parameter is a string.
-  It indicates the MQTT Client ID.
-* The ``<keep_alive>`` parameter is an integer.
-  It indicates the maximum Keep Alive time in seconds for MQTT.
-* The ``<clean_session>`` parameter is an integer.
-  It can have one of the following values:
+The parameters and their defined values are the following:
 
-    * ``0`` - Connect to a MQTT broker using a persistent session.
-    * ``1`` - Connect to a MQTT broker using a clean session.
+<client_id>
+   String.
+   The MQTT Client ID.
+
+<keep_alive>
+   Integer.
+   The maximum Keep Alive time in seconds for MQTT.
+
+<clean_session>
+   * ``0`` - Connect to a MQTT broker using a persistent session.
+   * ``1`` - Connect to a MQTT broker using a clean session.
 
 Examples
 ~~~~~~~~
@@ -144,23 +152,32 @@ Syntax
 
    AT#XMQTTCON=<op>[,<username>,<password>,<url>,<port>[,<sec_tag>]]
 
-* The ``<op>`` parameter is an integer.
-  It can accept one of the following values:
+The parameters and their defined values are the following:
 
-  * ``0`` - Disconnect from the MQTT broker.
-  * ``1`` - Connect to the MQTT broker using IP protocol family version 4.
-  * ``2`` - Connect to the MQTT broker using IP protocol family version 6.
+<op>
+   * ``0`` - Disconnect from the MQTT broker.
+   * ``1`` - Connect to the MQTT broker using IP protocol family version 4.
+   * ``2`` - Connect to the MQTT broker using IP protocol family version 6.
 
-* The ``<username>`` parameter is a string.
-  It indicates the MQTT client username.
-* The ``<password>`` parameter is a string.
-  It indicates the MQTT client password in cleartext.
-* The ``<url>`` parameter is a string.
-  It indicates the MQTT broker hostname.
-* The ``<port>`` parameter is an unsigned 16-bit integer (0 - 65535).
-  It indicates the MQTT broker port.
-* The ``<sec_tag>`` parameter is an integer.
-  It indicates the credential of the security tag used for establishing a secure connection.
+<username>
+   String.
+   The MQTT client username.
+
+<password>
+   String.
+   The MQTT client password in cleartext.
+
+<url>
+   String.
+   The MQTT broker hostname.
+
+<port>
+   Integer.
+   An unsigned 16-bit integer (0 - 65535) indicating the MQTT broker port.
+
+<sec_tag>
+   Integer.
+   The credential of the security tag used for establishing a secure connection.
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -169,17 +186,20 @@ Response syntax
 
    #XMQTTEVT: <evt_type>,<result>
 
-* The ``<evt_type>`` parameter is an integer indicating the type of the event.
-  It can return the following values for the ``#XMQTTCON`` command:
+The parameters and their defined values are the following:
 
-  * ``0`` - Acknowledgment of connection request (CONNACK).
-  * ``1`` - Disconnection notification (DISCONNECT).
-    The MQTT client is disconnected from the MQTT broker once this event is notified.
+<evt_type>
+   Integer.
+   The type of the event.
+   It can return the following values for the ``#XMQTTCON`` command:
 
-* The ``<result>`` parameter is an integer. It can return the following values:
+   * ``0`` - Acknowledgment of connection request (CONNACK).
+   * ``1`` - Disconnection notification (DISCONNECT).
+     The MQTT client is disconnected from the MQTT broker once this event is notified.
 
-  * ``0`` - Success.
-  * *Negative value* - Error code indicating the reason for the failure.
+<result>
+   * ``0`` - Success.
+   * *Negative value* - Error code indicating the reason for the failure.
 
 
 Unsolicited notification
@@ -189,14 +209,17 @@ Unsolicited notification
 
    #XMQTTEVT=<evt_type>,<result>
 
-* The ``<evt_type>`` parameter is an integer indicating the type of the event.
-  After the connection is established, it can return ``9`` to indicate a ping response from the MQTT broker (PINGRESP).
-  This is received when pinging (PINGREQ) the broker after the keep alive is reached.
+The parameters and their defined values are the following:
 
-* The ``<result>`` parameter is an integer. It can return the following values:
+<evt_type>
+   Integer.
+   The type of the event.
+   After the connection is established, it can return ``9`` to indicate a ping response from the MQTT broker (PINGRESP).
+   This is received when pinging (PINGREQ) the broker after the keep alive is reached.
 
-  * ``0`` - Success.
-  * *Negative value* - Error code indicating the reason for the failure.
+<result>
+   * ``0`` - Success.
+   * *Negative value* - Error code indicating the reason for the failure.
 
 Examples
 ~~~~~~~~
@@ -238,21 +261,30 @@ Response syntax
 
    #XMQTTCON: <status>[,<client_id>,<url>,<port>[,<sec_tag>]]
 
-* The ``<status>`` parameter is an integer.
-  It can have one of the following values:
+The parameters and their defined values are the following:
 
-    * ``0`` - MQTT is not connected.
-    * ``1`` - MQTT is connected.
+<status>
+   * ``0`` - MQTT is not connected.
+   * ``1`` - MQTT is connected.
 
-* The ``<url>`` parameter is a string.
-  It indicates the MQTT broker hostname.
-  Present only when ``<status>`` is ``1``.
-* The ``<port>`` parameter is an unsigned 16-bit integer (0 - 65535).
-  It indicates the MQTT broker port.
-  Present only when ``<status>`` is ``1``.
-* The ``<sec_tag>`` parameter is an integer.
-  It indicates the credential of the security tag used for establishing a secure connection.
-  Present only when ``<status>`` is ``1``.
+<client_id>
+   String.
+   The MQTT client ID.
+
+<url>
+   String.
+   The MQTT broker hostname.
+   Present only when ``<status>`` is ``1``.
+
+<port>
+   Integer.
+   An unsigned 16-bit integer (0 - 65535) indicating the MQTT broker port.
+   Present only when ``<status>`` is ``1``.
+
+<sec_tag>
+   Integer.
+   The credential of the security tag used for establishing a secure connection.
+   Present only when ``<status>`` is ``1``.
 
 Examples
 ~~~~~~~~
@@ -308,18 +340,21 @@ Syntax
 
    AT#XMQTTSUB=<topic>,<qos>
 
-* The ``<topic>`` parameter is a string.
-  It indicates the topic to subscribe to.
-* The ``<qos>`` parameter is an integer.
-  It indicates the MQTT Quality of Service type to use.
-  It can accept the following values:
+The parameters and their defined values are the following:
 
-  * ``0`` - Lowest Quality of Service.
-    No acknowledgment of the reception is needed for the published message.
-  * ``1`` - Medium Quality of Service.
-    If the acknowledgment of the reception is expected for the published message, publishing duplicate messages is permitted.
-  * ``2`` - Highest Quality of Service.
-    The acknowledgment of the reception is expected and the message should be published only once.
+<topic>
+   String.
+   The topic to subscribe to.
+
+<qos>
+   The MQTT Quality of Service type.
+
+   * ``0`` - Lowest Quality of Service.
+     No acknowledgment of the reception is needed for the published message.
+   * ``1`` - Medium Quality of Service.
+     If the acknowledgment of the reception is expected for the published message, publishing duplicate messages is permitted.
+   * ``2`` - Highest Quality of Service.
+     The acknowledgment of the reception is expected and the message should be published only once.
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -328,15 +363,14 @@ Response syntax
 
    #XMQTTEVT: <evt_type>,<result>
 
-* The ``<evt_type>`` parameter is an integer.
-  It can return the following values for the ``#XMQTTSUB`` command::
+The parameters and their defined values are the following:
 
-  * ``7`` - Acknowledgment of the subscribe request (SUBACK).
+<evt_type>
+   * ``7`` - Acknowledgment of the subscribe request (SUBACK).
 
-* The ``<result>`` parameter is an integer. It can return the following values:
-
-  * ``0`` - Success.
-  * *Negative value* - Error code indicating the reason for the failure.
+<result>
+   * ``0`` - Success.
+   * *Negative value* - Error code indicating the reason for the failure.
 
 Unsolicited notifications
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -349,29 +383,37 @@ When the MQTT client has successfully subscribed to a topic and a message is pub
    <topic_received>
    <message>
 
-* The ``<topic_length>`` parameter is an integer.
-  It indicates the length of the ``<topic_received>`` field.
-* The ``<message_length>`` parameter is an integer.
-  It indicates the length of the ``<message>`` field.
-* The ``<topic_received>`` parameter is a string.
-  It indicates the topic that received the message.
-* The ``<message>`` parameter can be a string or a HEX.
-  It contains the message received from the topic.
+The parameters and their defined values are the following:
+
+<topic_length>
+   Integer.
+   The length of the ``<topic_received>`` field.
+
+<message_length>
+   Integer.
+   The length of the ``<message>`` field.
+
+<topic_received>
+   String.
+   The topic that received the message.
+
+<message>
+   String or HEX.
+   The message received from the topic.
 
 ::
 
    #XMQTTEVT: <evt_type>,<result>
 
-* The ``<evt_type>`` parameter is an integer.
-  It can return the following values for the ``#XMQTTSUB`` command:
+The parameters and their defined values are the following:
 
-  * ``2`` - Message received on a topic the client is subscribed to (PUBLISH).
-  * ``5`` - Release of a published message with QoS 2 (PUBREL).
+<evt_type>
+   * ``2`` - Message received on a topic the client is subscribed to (PUBLISH).
+   * ``5`` - Release of a published message with QoS 2 (PUBREL).
 
-* The ``<result>`` parameter is an integer. It can return the following values:
-
-  * ``0`` - Success.
-  * *Negative value* - Error code indicating the reason for the failure.
+<result>
+   * ``0`` - Success.
+   * *Negative value* - Error code indicating the reason for the failure.
 
 
 Examples
@@ -445,8 +487,11 @@ Syntax
    AT#XMQTTUNSUB=<topic>
 
 
-* The ``<topic>`` parameter is a string.
-  It indicates the topic to unsubscribe from.
+The parameters and their defined values are the following:
+
+<topic>
+   String.
+   The topic to unsubscribe from.
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -455,13 +500,15 @@ Response syntax
 
    #XMQTTEVT: <evt_type>,<result>
 
-* The ``<evt_type>`` parameter is an integer.
-  It can return ``8`` for the ``#XMQTTUNSUB`` command to indicate an acknowledgment of the unsubscription request (UNSUBACK).
+The parameters and their defined values are the following:
 
-* The ``<result>`` parameter is an integer. It can return the following values:
+<evt_type>
+   Integer.
+   It can return ``8`` for the ``#XMQTTUNSUB`` command to indicate an acknowledgment of the unsubscription request (UNSUBACK).
 
-  * ``0`` - Success.
-  * *Negative value* - Error code indicating the reason for the failure.
+<result>
+   * ``0`` - Success.
+   * *Negative value* - Error code indicating the reason for the failure.
 
 Examples
 ~~~~~~~~
@@ -500,33 +547,39 @@ Syntax
    AT#XMQTTPUB=<topic>[,<msg>[,<qos>[,<retain>[,<data_len>]]]]
 
 
-* The ``<topic>`` parameter is a string.
-  It indicates the topic on which data is published.
-* The ``<msg>`` parameter is a string.
-  It contains the payload on the topic being published.
+The parameters and their defined values are the following:
 
-  If the payload is empty (for example, ``""``), |SM| enters :ref:`sm_data_mode`.
-* The ``<qos>`` parameter is an integer.
-  It indicates the MQTT Quality of Service type to use.
-  It can accept the following values:
+<topic>
+   String.
+   The topic on which data is published.
 
-  * ``0`` - Lowest Quality of Service (default value).
-    No acknowledgment of the reception is needed for the published message.
-  * ``1`` - Medium Quality of Service.
-    If the acknowledgment of the reception is expected for the published message, publishing duplicate messages is permitted.
-  * ``2`` - Highest Quality of Service.
-    The acknowledgment of the reception is expected and the message should be published only once.
+<msg>
+   String.
+   The payload on the topic being published.
+   If the payload is empty (for example, ``""``), |SM| enters :ref:`sm_data_mode`.
 
-* The ``<retain>`` parameter is an integer.
-  Its default value is ``0``.
-  When ``1``, it indicates that the broker should store the message persistently.
-* The ``<data_len>`` parameter is optional and only used when ``<msg>`` is empty (data mode).
-  It sets the number of bytes of payload to publish in data mode.
-  When the required number of bytes are received, the payload is published and the data mode is exited.
-  The termination command :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` is not used in this case.
-  The value must not exceed the value configured in the :ref:`CONFIG_SM_DATAMODE_BUF_SIZE <CONFIG_SM_DATAMODE_BUF_SIZE>` Kconfig option, as the payload must fit within the data mode buffer to be published as a single message.
-  The value ``0`` is equivalent to omitting the parameter.
-  Specifying a non-zero ``<data_len>`` together with a non-empty ``<msg>`` results in an error.
+<qos>
+   * ``0`` - Lowest Quality of Service (default value).
+     No acknowledgment of the reception is needed for the published message.
+   * ``1`` - Medium Quality of Service.
+     If the acknowledgment of the reception is expected for the published message, publishing duplicate messages is permitted.
+   * ``2`` - Highest Quality of Service.
+     The acknowledgment of the reception is expected and the message should be published only once.
+
+<retain>
+   Integer.
+   Its default value is ``0``.
+   When ``1``, it indicates that the broker should store the message persistently.
+
+<data_len>
+   Integer.
+   Optional, only used when ``<msg>`` is empty (data mode).
+   Sets the number of bytes of payload to publish in data mode.
+   When the required number of bytes are received, the payload is published and the data mode is exited.
+   The termination command :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` is not used in this case.
+   The value must not exceed the value configured in the :ref:`CONFIG_SM_DATAMODE_BUF_SIZE <CONFIG_SM_DATAMODE_BUF_SIZE>` Kconfig option, as the payload must fit within the data mode buffer to be published as a single message.
+   The value ``0`` is equivalent to omitting the parameter.
+   Specifying a non-zero ``<data_len>`` together with a non-empty ``<msg>`` results in an error.
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -535,17 +588,16 @@ Response syntax
 
    #XMQTTEVT: <evt_type>,<result>
 
-* The ``<evt_type>`` parameter is an integer.
-  It can return the following values for the ``#XMQTTPUB`` command:
+The parameters and their defined values are the following:
 
-  * ``3`` - Acknowledgment for the published message with QoS 1 (PUBACK).
-  * ``4`` - Reception confirmation for the published message with QoS 2 (PUBREC).
-  * ``6`` - Confirmation to a publish release message with QoS 2 (PUBCOMP).
+<evt_type>
+   * ``3`` - Acknowledgment for the published message with QoS 1 (PUBACK).
+   * ``4`` - Reception confirmation for the published message with QoS 2 (PUBREC).
+   * ``6`` - Confirmation to a publish release message with QoS 2 (PUBCOMP).
 
-* The ``<result>`` parameter is an integer. It can return the following values:
-
-  * ``0`` - Success.
-  * *Negative value* - Error code indicating the reason for the failure.
+<result>
+   * ``0`` - Success.
+   * *Negative value* - Error code indicating the reason for the failure.
 
 Examples
 ~~~~~~~~

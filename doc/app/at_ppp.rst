@@ -29,12 +29,18 @@ Syntax
 
    AT+CGDATA[=<L2P>[,<cid>]]
 
-* The ``<L2P>`` parameter is a string specifying the layer 2 protocol to use.
-  The only supported value is ``"PPP"``.
-  If omitted, ``"PPP"`` is assumed.
+The parameters and their defined values are the following:
 
-* The ``<cid>`` parameter is an integer indicating the PDN connection to use.
-  Its default value is ``0``, which represents the default PDN connection.
+<L2P>
+   String.
+   The layer 2 protocol to use.
+   The only supported value is ``"PPP"``.
+   If omitted, ``"PPP"`` is assumed.
+
+<cid>
+   Integer.
+   The PDN connection to use.
+   Its default value is ``0``, which represents the default PDN connection.
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -127,19 +133,22 @@ Syntax
 
    AT#XPPP=<op>[,<cid>]
 
-* The ``<op>`` parameter can be the following:
+The parameters and their defined values are the following:
 
-  * ``0`` - Stop PPP.
-  * ``1`` - Start PPP.
+<op>
+   * ``0`` - Stop PPP.
+   * ``1`` - Start PPP.
 
-* The ``<cid>`` parameter is an integer indicating the PDN connection to be used for PPP.
-  It represents ``cid`` in the ``+CGDCONT`` command.
-  Its default value is ``0``, which represents the default PDN connection.
+<cid>
+   Integer.
+   The PDN connection to be used for PPP.
+   It represents ``cid`` in the ``+CGDCONT`` command.
+   Its default value is ``0``, which represents the default PDN connection.
 
-  .. note::
+   .. note::
 
-     Other sockets cannot use the same PDN connection.
-     See :ref:`SM_AT_SOCKET_RAW_SOCKET_LIMITATION` for more information.
+      Other sockets cannot use the same PDN connection.
+      See :ref:`SM_AT_SOCKET_RAW_SOCKET_LIMITATION` for more information.
 
 Unsolicited notification
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -150,13 +159,19 @@ Unsolicited notification
 
    #XPPP: <running>,<peer_connected>,<cid>
 
-* The ``<running>`` parameter is an integer that indicates whether PPP is running.
-  It is ``1`` for running or ``0`` for stopped.
+The parameters and their defined values are the following:
 
-* The ``<peer_connected>`` parameter is an integer that indicates whether a peer is connected to PPP.
-  It is ``1`` for connected or ``0`` for not connected.
+<running>
+   * ``0`` - PPP is stopped.
+   * ``1`` - PPP is running.
 
-* The ``<cid>`` parameter is an integer that indicates the PDN connection used for PPP.
+<peer_connected>
+   * ``0`` - No peer is connected.
+   * ``1`` - A peer is connected.
+
+<cid>
+   Integer.
+   The PDN connection used for PPP.
 
 When you activate a PDN connection used for PPP, the ``#XPPP: 1,0,<cid>`` notification is sent and the PPP process starts and takes ownership of the associated serial channel.
 If you use the CMUX , the PPP connection starts at the alternative DLC channel, which can be controlled by the ``AT#XCMUX`` command.
