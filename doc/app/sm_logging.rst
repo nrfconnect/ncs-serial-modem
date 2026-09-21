@@ -37,7 +37,9 @@ Enabling RTT logs
 =================
 
 RTT logging is disabled by default.
-To switch from UART1 back to SEGGER RTT, add the following to your :file:`prj.conf`::
+To switch from UART1 back to SEGGER RTT, add the following to your :file:`prj.conf`:
+
+::
 
    # Disable UART logging
    CONFIG_UART_CONSOLE=n

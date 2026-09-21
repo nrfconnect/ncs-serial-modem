@@ -117,14 +117,18 @@ CONFIG_SM_AUTO_CONNECT - Connect to the network at start-up or reset
          Leave empty (default) if no password is required.
          Use only when :ref:`CONFIG_SM_AUTO_CONNECT_PDN_AUTH <CONFIG_SM_AUTO_CONNECT_PDN_AUTH>` is set to 1 (PAP) or 2 (CHAP).
 
-   Example configuration overlay for NB-IoT with Non-IP PDN::
+   Example configuration overlay for NB-IoT with Non-IP PDN:
+
+   ::
 
       CONFIG_SM_AUTO_CONNECT=y
       CONFIG_SM_AUTO_CONNECT_SYSTEM_MODE="0,1,0,0"
       CONFIG_SM_AUTO_CONNECT_PDN_CONFIG=y
       CONFIG_SM_AUTO_CONNECT_PDN_FAMILY_NON_IP=y
 
-   Example configuration overlay for LTE-M with custom APN and PAP authentication::
+   Example configuration overlay for LTE-M with custom APN and PAP authentication:
+
+   ::
 
       CONFIG_SM_AUTO_CONNECT=y
       CONFIG_SM_AUTO_CONNECT_SYSTEM_MODE="1,0,0,0"
