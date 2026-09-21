@@ -36,97 +36,108 @@ Syntax
 
    AT#XCOAPCREQ=<handle>,<path>,<method>[,<auto_reception>[,<format>[,<confirmable>[,<content_format>[,<payload_len>[,<opt_num_1>,<opt_val_1>[,<opt_num_2>,<opt_val_2>[...]]]]]]]]
 
-* The ``<handle>`` parameter is an integer.
-  It identifies the connected socket handle returned by ``AT#XSOCKET`` and connected by ``AT#XCONNECT``.
+The parameters and their defined values are the following:
 
-* The ``<path>`` parameter is a string.
-  It specifies the URI-path of the resource, for example ``"/sensors/temperature"``.
+<handle>
+   Integer.
+   Identifies the connected socket handle returned by ``AT#XSOCKET`` and connected by ``AT#XCONNECT``.
 
-* The ``<method>`` parameter must be one of the following values:
+<path>
+   String.
+   The URI-path of the resource, for example ``"/sensors/temperature"``.
 
-  * ``1`` - GET.
-  * ``2`` - POST.
-  * ``3`` - PUT.
-  * ``4`` - DELETE.
-  * ``5`` - FETCH.
-  * ``6`` - PATCH.
-  * ``7`` - iPATCH.
+<method>
+   * ``1`` - GET.
+   * ``2`` - POST.
+   * ``3`` - PUT.
+   * ``4`` - DELETE.
+   * ``5`` - FETCH.
+   * ``6`` - PATCH.
+   * ``7`` - iPATCH.
 
-* The ``<auto_reception>`` parameter is an optional integer.
-  When omitted, automatic reception is used.
-  It can accept the following values:
+<auto_reception>
+   Integer.
+   Optional.
+   When omitted, automatic reception is used.
 
-  * ``1`` - Automatic mode (default).
-    Response bytes are forwarded to the host automatically through ``#XCOAPCDATA`` URCs.
-  * ``0`` - Manual mode.
-    The firmware buffers each response block and emits ``#XCOAPCHEAD``.
-    The host must then retrieve the block using ``AT#XCOAPCDATA``.
+   * ``1`` - Automatic mode (default).
+     Response bytes are forwarded to the host automatically through ``#XCOAPCDATA`` URCs.
+   * ``0`` - Manual mode.
+     The firmware buffers each response block and emits ``#XCOAPCHEAD``.
+     The host must then retrieve the block using ``AT#XCOAPCDATA``.
 
-* The ``<format>`` parameter is an optional integer.
-  It controls the encoding used to deliver response payload bytes to the host.
-  It can accept the following values:
+<format>
+   Integer.
+   Optional.
+   Controls the encoding used to deliver response payload bytes to the host.
 
-  * ``0`` - Binary (default).
-    Response payload bytes are forwarded to the host as raw binary.
-  * ``1`` - Hex string.
-    Response payload bytes are encoded as a lowercase ASCII hex string before delivery.
-    Each raw byte becomes two hex characters.
-    The ``<length>`` field in ``#XCOAPCDATA`` URCs and responses always reports the raw byte count.
-    The actual data transmitted to the host is ``2×<length>`` ASCII hex characters.
+   * ``0`` - Binary (default).
+     Response payload bytes are forwarded to the host as raw binary.
+   * ``1`` - Hex string.
+     Response payload bytes are encoded as a lowercase ASCII hex string before delivery.
+     Each raw byte becomes two hex characters.
+     The ``<length>`` field in ``#XCOAPCDATA`` URCs and responses always reports the raw byte count.
+     The actual data transmitted to the host is ``2×<length>`` ASCII hex characters.
 
-* The ``<confirmable>`` parameter is an optional integer.
-  It can accept the following values:
+<confirmable>
+   Integer.
+   Optional.
 
-  * ``0`` - Non-confirmable (NON) message (default).
-  * ``1`` - Confirmable (CON) message.
+   * ``0`` - Non-confirmable (NON) message (default).
+   * ``1`` - Confirmable (CON) message.
 
-* The ``<content_format>`` parameter is an optional integer.
-  It specifies the CoAP Content-Format option number for the request payload (default ``0`` = ``text/plain``).
-  Common values:
+<content_format>
+   Integer.
+   Optional.
+   The CoAP Content-Format option number for the request payload (default ``0`` = ``text/plain``).
+   Common values:
 
-  * ``0`` - text/plain.
-  * ``42`` - application/octet-stream.
-  * ``50`` - application/json.
-  * ``60`` - application/cbor.
+   * ``0`` - text/plain.
+   * ``42`` - application/octet-stream.
+   * ``50`` - application/json.
+   * ``60`` - application/cbor.
 
-* The ``<payload_len>`` parameter is an optional integer.
-  When ``0`` or omitted and no option pairs follow, no request payload is sent and the command returns ``OK`` immediately.
-  A positive integer specifies the total payload length in bytes; the command then returns ``OK`` and enters data mode.
+<payload_len>
+   Integer.
+   Optional.
+   When ``0`` or omitted and no option pairs follow, no request payload is sent and the command returns ``OK`` immediately.
+   A positive integer specifies the total payload length in bytes; the command then returns ``OK`` and enters data mode.
 
-  .. note::
+   .. note::
 
-     When option pairs follow, ``<payload_len>`` must be written explicitly.
-     Use ``0`` if no payload is needed.
-     Omitting it shifts the option pairs one position left, which always causes the command to return ``ERROR``.
+      When option pairs follow, ``<payload_len>`` must be written explicitly.
+      Use ``0`` if no payload is needed.
+      Omitting it shifts the option pairs one position left, which always causes the command to return ``ERROR``.
 
-  The host must send exactly this many bytes as the request payload.
-  Data mode exits and ``#XDATAMODE: 0`` is reported when all bytes have been consumed.
-  Data mode is the only mechanism for supplying the payload - there is no inline parameter alternative.
+   The host must send exactly this many bytes as the request payload.
+   Data mode exits and ``#XDATAMODE: 0`` is reported when all bytes have been consumed.
+   Data mode is the only mechanism for supplying the payload - there is no inline parameter alternative.
 
-  The exact sending behavior depends on payload size:
+   The exact sending behavior depends on payload size:
 
-  * Small payload (≤ ``CONFIG_COAP_CLIENT_BLOCK_SIZE``, default 512 bytes) - All bytes are buffered until data mode exits, then the CoAP request is sent as a single packet.
-  * Large payload (> ``CONFIG_COAP_CLIENT_BLOCK_SIZE``) - The CoAP request starts transmitting while data mode is still active.
-    As soon as the first full block of ``CONFIG_COAP_CLIENT_BLOCK_SIZE`` bytes has arrived, the first CoAP Block1 packet is sent to the server.
-    Each subsequent block is sent as more data arrives, so the server exchange runs concurrently with the host's serial upload.
+   * Small payload (≤ ``CONFIG_COAP_CLIENT_BLOCK_SIZE``, default 512 bytes) - All bytes are buffered until data mode exits, then the CoAP request is sent as a single packet.
+   * Large payload (> ``CONFIG_COAP_CLIENT_BLOCK_SIZE``) - The CoAP request starts transmitting while data mode is still active.
+     As soon as the first full block of ``CONFIG_COAP_CLIENT_BLOCK_SIZE`` bytes has arrived, the first CoAP Block1 packet is sent to the server.
+     Each subsequent block is sent as more data arrives, so the server exchange runs concurrently with the host's serial upload.
 
-* The ``<opt_num_X>,<opt_val_X>`` parameters are optional CoAP option pairs:
+<opt_num_X>,<opt_val_X>
+   Optional CoAP option pairs.
 
-  * When present, ``<payload_len>`` must also be present as the positional separator before the first pair.
-  * ``<opt_num_X>`` is a decimal integer option number.
-  * ``<opt_val_X>`` is a quoted string.
-  * A value prefixed with ``0x`` or ``0X`` is decoded as raw hex bytes (for example, ``"0x3c"`` → byte ``0x3c``).
-  * The hex part after the prefix must be non-empty and even-length, otherwise, the command returns ``ERROR``.
-  * Any value without the ``0x`` prefix is used verbatim, including strings that look like hex (for example ``"abcd"`` → 4 ASCII bytes).
-  * Common option numbers:
+   * When present, ``<payload_len>`` must also be present as the positional separator before the first pair.
+   * ``<opt_num_X>`` is a decimal integer option number.
+   * ``<opt_val_X>`` is a quoted string.
+   * A value prefixed with ``0x`` or ``0X`` is decoded as raw hex bytes (for example, ``"0x3c"`` → byte ``0x3c``).
+   * The hex part after the prefix must be non-empty and even-length, otherwise, the command returns ``ERROR``.
+   * Any value without the ``0x`` prefix is used verbatim, including strings that look like hex (for example ``"abcd"`` → 4 ASCII bytes).
+   * Common option numbers:
 
-    * ``6`` - Observe (``"0x00"`` = register, ``"0x01"`` = deregister).
-    * ``17`` - Accept (content format the client will accept, hex-encoded).
-    * ``35`` - Proxy-Uri (full URI passed to a proxy, verbatim string).
+     * ``6`` - Observe (``"0x00"`` = register, ``"0x01"`` = deregister).
+     * ``17`` - Accept (content format the client will accept, hex-encoded).
+     * ``35`` - Proxy-Uri (full URI passed to a proxy, verbatim string).
 
-  Examples:
+   Examples:
 
-  ::
+   ::
 
      17,"0x00"                 Accept: text/plain (0x00)
      17,"0x3c"                 Accept: application/cbor (0x3c = 60)
@@ -154,13 +165,20 @@ The notification line is terminated with ``\r\n``, the response data follows imm
 In binary mode (default), the data is ``<length>`` raw bytes.
 In hex mode (``<format>=1``), the data is ``2×<length>`` lower-case ASCII hex characters.
 
-* The ``<handle>`` parameter is an integer.
-  It identifies the socket.
-* The ``<offset>`` parameter is an integer.
-  It contains the number of response bytes already delivered before this block.
-* The ``<length>`` parameter is an integer.
-  It contains the raw byte count of the response data in this block.
-  In hex mode (``<format>=1``), the payload following the header line is ``2×<length>`` ASCII hex characters.
+The parameters and their defined values are the following:
+
+<handle>
+   Integer.
+   Identifies the socket.
+
+<offset>
+   Integer.
+   The number of response bytes already delivered before this block.
+
+<length>
+   Integer.
+   The raw byte count of the response data in this block.
+   In hex mode (``<format>=1``), the payload following the header line is ``2×<length>`` ASCII hex characters.
 
 ``#XCOAPCHEAD`` is emitted in manual mode for each received response block.
 
@@ -168,14 +186,21 @@ In hex mode (``<format>=1``), the data is ``2×<length>`` lower-case ASCII hex c
 
    #XCOAPCHEAD: <handle>,<code>,<block_len>
 
-* The ``<handle>`` parameter is an integer.
-  It identifies the socket.
-* The ``<code>`` parameter is an integer.
-  It contains the CoAP response code for this block.
-* The ``<block_len>`` parameter is an integer.
-  It contains the raw byte count of the buffered block.
-  In hex mode (``<format>=1``), ``AT#XCOAPCDATA`` will deliver ``2×<block_len>`` ASCII hex characters.
-  The host must call ``AT#XCOAPCDATA`` to retrieve this block before the next one arrives.
+The parameters and their defined values are the following:
+
+<handle>
+   Integer.
+   Identifies the socket.
+
+<code>
+   Integer.
+   The CoAP response code for this block.
+
+<block_len>
+   Integer.
+   The raw byte count of the buffered block.
+   In hex mode (``<format>=1``), ``AT#XCOAPCDATA`` will deliver ``2×<block_len>`` ASCII hex characters.
+   The host must call ``AT#XCOAPCDATA`` to retrieve this block before the next one arrives.
 
 ``#XCOAPCSTAT`` is emitted when the request completes, fails, or is cancelled.
 
@@ -183,15 +208,22 @@ In hex mode (``<format>=1``), the data is ``2×<length>`` lower-case ASCII hex c
 
    #XCOAPCSTAT: <handle>,<status_code>,<total_bytes>
 
-* The ``<handle>`` parameter is an integer.
-  It identifies the socket.
-* The ``<status_code>`` parameter is an integer.
-  It contains the CoAP response code on success, or ``-1`` on failure or cancel.
-  CoAP response codes are encoded as ``(class << 5) | detail``.
-  For example, ``2.05 Content`` is encoded as ``69`` and ``2.04 Changed`` as ``68``.
-* The ``<total_bytes>`` parameter is an integer.
-  It contains the total number of raw response payload bytes received.
-  In hex mode (``<format>=1``), this is the raw byte count, not the number of hex characters delivered.
+The parameters and their defined values are the following:
+
+<handle>
+   Integer.
+   Identifies the socket.
+
+<status_code>
+   Integer.
+   The CoAP response code on success, or ``-1`` on failure or cancel.
+   CoAP response codes are encoded as ``(class << 5) | detail``.
+   For example, ``2.05 Content`` is encoded as ``69`` and ``2.04 Changed`` as ``68``.
+
+<total_bytes>
+   Integer.
+   The total number of raw response payload bytes received.
+   In hex mode (``<format>=1``), this is the raw byte count, not the number of hex characters delivered.
 
 .. note::
 
@@ -350,12 +382,17 @@ Syntax
 
    AT#XCOAPCDATA=<handle>[,<length>]
 
-* The ``<handle>`` parameter is an integer.
-  It identifies the socket used when starting the manual-mode request.
+The parameters and their defined values are the following:
 
-* The ``<length>`` parameter is an optional integer.
-  It specifies the maximum number of bytes to return in this pull.
-  When omitted, the full block buffer size (``CONFIG_COAP_CLIENT_BLOCK_SIZE``, default 512 bytes) is used.
+<handle>
+   Integer.
+   Identifies the socket used when starting the manual-mode request.
+
+<length>
+   Integer.
+   Optional.
+   The maximum number of bytes to return in this pull.
+   When omitted, the full block buffer size (``CONFIG_COAP_CLIENT_BLOCK_SIZE``, default 512 bytes) is used.
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -382,13 +419,20 @@ When no block has been buffered yet (the firmware is still waiting for the serve
    #XCOAPCDATA: <handle>,<offset>,<length>
    OK
 
-* The ``<handle>`` parameter is an integer.
-  It identifies the socket.
-* The ``<offset>`` parameter is an integer.
-  It contains the number of response bytes already delivered before this pull.
-* The ``<length>`` parameter is an integer.
-  It contains the number of response bytes delivered in this pull.
-  A value of ``0`` means no block is ready yet.
+The parameters and their defined values are the following:
+
+<handle>
+   Integer.
+   Identifies the socket.
+
+<offset>
+   Integer.
+   The number of response bytes already delivered before this pull.
+
+<length>
+   Integer.
+   The number of response bytes delivered in this pull.
+   A value of ``0`` means no block is ready yet.
 
 After the last block is drained, ``#XCOAPCSTAT`` is emitted as a URC after the final ``OK``.
 
@@ -466,9 +510,12 @@ Syntax
 
    AT#XCOAPCCANCEL=<handle>
 
-* The ``<handle>`` parameter is an integer.
-  It must match the socket handle that was passed to ``AT#XCOAPCREQ`` when the request was started.
-  This acts as an ownership assertion: the command returns ``ERROR`` if no request is active or if the active request belongs to a different handle.
+The parameters and their defined values are the following:
+
+<handle>
+   Integer.
+   Must match the socket handle that was passed to ``AT#XCOAPCREQ`` when the request was started.
+   This acts as an ownership assertion: the command returns ``ERROR`` if no request is active or if the active request belongs to a different handle.
 
 .. note::
 

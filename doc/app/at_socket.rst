@@ -38,28 +38,29 @@ Syntax
 
    AT#XSOCKET=<family>,<type>,<role>[,<cid>]
 
-* The ``<family>`` parameter can accept one of the following values:
+The parameters and their defined values are the following:
 
-  * ``1`` - IP protocol family version 4.
-  * ``2`` - IP protocol family version 6.
-  * ``3`` - Raw packet family.
-    The ``<type>`` parameter must be ``3`` and the ``<role>`` parameter must be ``0``.
+<family>
+   * ``1`` - IP protocol family version 4.
+   * ``2`` - IP protocol family version 6.
+   * ``3`` - Raw packet family.
+     The ``<type>`` parameter must be ``3`` and the ``<role>`` parameter must be ``0``.
 
-* The ``<type>`` parameter can accept one of the following values:
+<type>
+   * ``1`` - Set ``SOCK_STREAM`` for the stream socket type using the TCP protocol.
+   * ``2`` - Set ``SOCK_DGRAM`` for the datagram socket type using the UDP protocol.
+   * ``3`` - Set ``SOCK_RAW`` for the raw socket type using a generic packet protocol.
+     The ``<family>`` parameter must be ``3`` and the ``<role>`` parameter must be ``0``.
 
-  * ``1`` - Set ``SOCK_STREAM`` for the stream socket type using the TCP protocol.
-  * ``2`` - Set ``SOCK_DGRAM`` for the datagram socket type using the UDP protocol.
-  * ``3`` - Set ``SOCK_RAW`` for the raw socket type using a generic packet protocol.
-    The ``<family>`` parameter must be ``3`` and the ``<role>`` parameter must be ``0``.
+<role>
+   * ``0`` - Client.
+   * ``1`` - Server.
 
-* The ``<role>`` parameter can accept one of the following values:
-
-  * ``0`` - Client.
-  * ``1`` - Server.
-
-* The ``<cid>`` parameter is an integer indicating the used PDN connection.
-  It represents ``cid`` in the ``+CGDCONT`` command.
-  Its default value is ``0``.
+<cid>
+   Integer.
+   Indicates the used PDN connection.
+   It represents ``cid`` in the ``+CGDCONT`` command.
+   Its default value is ``0``.
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -68,22 +69,24 @@ Response syntax
 
    #XSOCKET: <handle>,<type>,<protocol>
 
-* The ``<handle>`` parameter is an integer and can be interpreted as follows:
+The parameters and their defined values are the following:
 
-  * Positive or ``0`` - The socket opened successfully.
-  * Negative - The socket failed to open.
+<handle>
+   Integer.
+   Socket handle (ID) that can be interpreted as follows:
 
-* The ``<type>`` parameter can be one of the following integers:
+   * Positive or ``0`` - The socket opened successfully.
+   * Negative - The socket failed to open.
 
-  * ``1`` - Set ``SOCK_STREAM`` for the stream socket type using the TCP protocol.
-  * ``2`` - Set ``SOCK_DGRAM`` for the datagram socket type using the UDP protocol.
-  * ``3`` - Set ``SOCK_RAW`` for the raw socket type using a generic IP protocol.
+<type>
+   * ``1`` - Set ``SOCK_STREAM`` for the stream socket type using the TCP protocol.
+   * ``2`` - Set ``SOCK_DGRAM`` for the datagram socket type using the UDP protocol.
+   * ``3`` - Set ``SOCK_RAW`` for the raw socket type using a generic IP protocol.
 
-* The ``<protocol>`` parameter can be one of the following integers:
-
-  * ``0`` - IPPROTO_IP.
-  * ``6`` - IPPROTO_TCP.
-  * ``17`` - IPPROTO_UDP.
+<protocol>
+   * ``0`` - IPPROTO_IP.
+   * ``6`` - IPPROTO_TCP.
+   * ``17`` - IPPROTO_UDP.
 
 Examples
 ~~~~~~~~
@@ -122,29 +125,32 @@ Response syntax
 
    #XSOCKET: <handle>,<family>,<role>,<type>,<cid>
 
-* The ``<handle>`` parameter is an integer.
-  When positive or ``0``, the socket is valid.
+The parameters and their defined values are the following:
 
-* The ``<family>`` parameter is present only in the response to a request to open the socket.
-  It can return one of the following values:
+<handle>
+   Integer.
+   When positive or ``0``, the socket is valid.
 
-  * ``1`` - IP protocol family version 4.
-  * ``2`` - IP protocol family version 6.
-  * ``3`` - Packet family.
+<family>
+   Present only in the response to a request to open the socket.
 
-* The ``<role>`` parameter can be one of the following integers:
+   * ``1`` - IP protocol family version 4.
+   * ``2`` - IP protocol family version 6.
+   * ``3`` - Packet family.
 
-  * ``0`` - Client.
-  * ``1`` - Server.
+<role>
+   * ``0`` - Client.
+   * ``1`` - Server.
 
-* The ``<type>`` parameter can be one of the following integers:
+<type>
+   * ``1`` - Set ``SOCK_STREAM`` for the stream socket type using the TCP protocol.
+   * ``2`` - Set ``SOCK_DGRAM`` for the datagram socket type using the UDP protocol.
+   * ``3`` - Set ``SOCK_RAW`` for the raw socket type using a generic packet protocol.
 
-  * ``1`` - Set ``SOCK_STREAM`` for the stream socket type using the TCP protocol.
-  * ``2`` - Set ``SOCK_DGRAM`` for the datagram socket type using the UDP protocol.
-  * ``3`` - Set ``SOCK_RAW`` for the raw socket type using a generic packet protocol.
-
-* The ``<cid>`` parameter is an integer indicating the used PDN connection.
-  It represents ``cid`` in the ``+CGDCONT`` command.
+<cid>
+   Integer.
+   Indicates the used PDN connection.
+   It represents ``cid`` in the ``+CGDCONT`` command.
 
 Example
 ~~~~~~~
@@ -210,38 +216,39 @@ Syntax
 
    AT#XSSOCKET=<family>,<type>,<role>,<sec_tag>[,<peer_verify>[,<cid>]]
 
-* The ``<family>`` parameter can accept one of the following values:
+The parameters and their defined values are the following:
 
-  * ``1`` - IP protocol family version 4.
-  * ``2`` - IP protocol family version 6.
+<family>
+   * ``1`` - IP protocol family version 4.
+   * ``2`` - IP protocol family version 6.
 
-* The ``<type>`` parameter can accept one of the following values:
+<type>
+   * ``1`` - Set ``SOCK_STREAM`` for the stream socket type using the TLS 1.2 protocol.
+   * ``2`` - Set ``SOCK_DGRAM`` for the datagram socket type using the DTLS 1.2 protocol.
 
-  * ``1`` - Set ``SOCK_STREAM`` for the stream socket type using the TLS 1.2 protocol.
-  * ``2`` - Set ``SOCK_DGRAM`` for the datagram socket type using the DTLS 1.2 protocol.
+<role>
+   * ``0`` - Client.
+   * ``1`` - Server.
 
-* The ``<role>`` parameter can accept one of the following values:
+<sec_tag>
+   Integer.
+   Indicates to the modem the credential of the security tag to be used for establishing a secure connection.
+   It is associated with a credential, that is, a certificate or PSK.
+   The credential must be stored on the modem side beforehand.
 
-  * ``0`` - Client.
-  * ``1`` - Server.
+   .. note::
+      When ``<role>`` has a value of ``1``, ``<sec_tag>`` is not supported.
 
-* The ``<sec_tag>`` parameter is an integer.
-  It indicates to the modem the credential of the security tag to be used for establishing a secure connection.
-  It is associated with a credential, that is, a certificate or PSK.
-  The credential must be stored on the modem side beforehand.
+<peer_verify>
+   * ``0`` - None (default for server role).
+   * ``1`` - Optional.
+   * ``2`` - Required (default for client role).
 
-  .. note::
-     When ``<role>`` has a value of ``1``, ``<sec_tag>`` is not supported.
-
-* The ``<peer_verify>`` parameter can accept one of the following values:
-
-  * ``0`` - None (default for server role).
-  * ``1`` - Optional.
-  * ``2`` - Required (default for client role).
-
-* The ``<cid>`` parameter is an integer indicating the used PDN connection.
-  It represents ``cid`` in the ``+CGDCONT`` command.
-  Its default value is ``0``.
+<cid>
+   Integer.
+   Indicates the used PDN connection.
+   It represents ``cid`` in the ``+CGDCONT`` command.
+   Its default value is ``0``.
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -250,20 +257,22 @@ Response syntax
 
    #XSSOCKET: <handle>,<type>,<protocol>
 
-* The ``<handle>`` parameter is an integer and can be interpreted as follows:
+The parameters and their defined values are the following:
 
-  * Positive or ``0`` - The socket opened successfully.
-  * Negative - The socket failed to open.
+<handle>
+   Integer.
+   Socket handle (ID) that can be interpreted as follows:
 
-* The ``<type>`` parameter can be one of the following integers:
+   * Positive or ``0`` - The socket opened successfully.
+   * Negative - The socket failed to open.
 
-  * ``1`` - ``SOCK_STREAM`` for the stream socket type using the TLS 1.2 protocol.
-  * ``2`` - ``SOCK_DGRAM`` for the datagram socket type using the DTLS 1.2 protocol.
+<type>
+   * ``1`` - ``SOCK_STREAM`` for the stream socket type using the TLS 1.2 protocol.
+   * ``2`` - ``SOCK_DGRAM`` for the datagram socket type using the DTLS 1.2 protocol.
 
-* The ``<protocol>`` parameter can be one of the following integers:
-
-  * ``258`` - IPPROTO_TLS_1_2.
-  * ``273`` - IPPROTO_DTLS_1_2.
+<protocol>
+   * ``258`` - IPPROTO_TLS_1_2.
+   * ``273`` - IPPROTO_DTLS_1_2.
 
 Examples
 ~~~~~~~~
@@ -296,29 +305,32 @@ Response syntax
 
    #XSSOCKET: <handle>,<family>,<role>,<type>,<sec_tag>,<cid>
 
-* The ``<handle>`` parameter is an integer.
-  When positive or ``0``, the socket is valid.
+The parameters and their defined values are the following:
 
-* The ``<family>`` parameter can be one of the following integers:
+<handle>
+   Integer.
+   When positive or ``0``, the socket is valid.
 
-  * ``1`` - IP protocol family version 4.
-  * ``2`` - IP protocol family version 6.
+<family>
+   * ``1`` - IP protocol family version 4.
+   * ``2`` - IP protocol family version 6.
 
-* The ``<role>`` parameter can be one of the following integers:
+<role>
+   * ``0`` - Client.
+   * ``1`` - Server.
 
-  * ``0`` - Client
-  * ``1`` - Server
+<type>
+   * ``1`` - ``SOCK_STREAM`` for the stream socket type using the TLS 1.2 protocol.
+   * ``2`` - ``SOCK_DGRAM`` for the datagram socket type using the DTLS 1.2 protocol.
 
-* The ``<type>`` parameter can be one of the following integers:
+<sec_tag>
+   Integer.
+   Indicates to the modem the credential of the security tag to be used for establishing a secure connection.
 
-  * ``1`` - ``SOCK_STREAM`` for the stream socket type using the TLS 1.2 protocol.
-  * ``2`` - ``SOCK_DGRAM`` for the datagram socket type using the DTLS 1.2 protocol.
-
-* The ``<sec_tag>`` parameter is an integer.
-  It indicates to the modem the credential of the security tag to be used for establishing a secure connection.
-
-* The ``<cid>`` parameter is an integer indicating the used PDN connection.
-  It represents ``cid`` in the ``+CGDCONT`` command.
+<cid>
+   Integer.
+   Indicates the used PDN connection.
+   It represents ``cid`` in the ``+CGDCONT`` command.
 
 Example
 ~~~~~~~
@@ -374,9 +386,14 @@ Syntax
 
    AT#XCLOSE[=<handle>]
 
-* The ``<handle>`` parameter is an optional integer that specifies the socket handle to close.
-  This is the handle value returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
-  If omitted, all open sockets will be closed.
+The parameters and their defined values are the following:
+
+<handle>
+   Integer.
+   Optional.
+   Specifies the socket handle to close.
+   This is the handle value returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
+   If omitted, all open sockets will be closed.
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -385,10 +402,16 @@ Response syntax
 
    #XCLOSE: <handle>,<result>
 
-* The ``<handle>`` parameter is an integer indicating the handle of the closed socket.
+The parameters and their defined values are the following:
 
-* The ``<result>`` parameter indicates the result of closing the socket.
-  When ``0``, the socket was closed successfully.
+<handle>
+   Integer.
+   The handle of the closed socket.
+
+<result>
+   Integer.
+   The result of closing the socket.
+   When ``0``, the socket was closed successfully.
 
 When closing all sockets (no handle parameter provided), multiple responses will be sent, one for each socket that was closed.
 
@@ -440,87 +463,89 @@ Syntax
 
    AT#XSOCKETOPT=<handle>,<op>,<name>[,<value>]
 
-* The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
+The parameters and their defined values are the following:
 
-* The ``<op>`` parameter can accept one of the following values:
+<handle>
+   Integer.
+   Specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
 
-  * ``0`` - Get
-  * ``1`` - Set
+<op>
+   * ``0`` - Get.
+   * ``1`` - Set.
 
-* The ``<name>`` parameter can accept one of the following values:
+<name>
+   * ``2`` - ``AT_SO_REUSEADDR`` (set-only).
 
-  * ``2`` - ``AT_SO_REUSEADDR`` (set-only).
+     * ``<value>`` is an integer that indicates whether the reuse of local addresses is enabled.
+       It is ``0`` for disabled or ``1`` for enabled.
 
-    * ``<value>`` is an integer that indicates whether the reuse of local addresses is enabled.
-      It is ``0`` for disabled or ``1`` for enabled.
+   * ``20`` - ``AT_SO_RCVTIMEO``.
 
-  * ``20`` - ``AT_SO_RCVTIMEO``.
+     * ``<value>`` is an integer that indicates the receive timeout in seconds.
 
-    * ``<value>`` is an integer that indicates the receive timeout in seconds.
+   * ``21`` - ``AT_SO_SNDTIMEO``.
 
-  * ``21`` - ``AT_SO_SNDTIMEO``.
+     * ``<value>`` is an integer that indicates the send timeout in seconds.
 
-    * ``<value>`` is an integer that indicates the send timeout in seconds.
+   * ``30`` - ``AT_SO_SILENCE_ALL``.
 
-  * ``30`` - ``AT_SO_SILENCE_ALL``.
+     * ``<value>`` is an integer that indicates whether ICMP echo replies for IPv4 and IPv6 are disabled.
+       It is ``0`` for allowing ICMP echo replies or ``1`` for disabling them.
 
-    * ``<value>`` is an integer that indicates whether ICMP echo replies for IPv4 and IPv6 are disabled.
-      It is ``0`` for allowing ICMP echo replies or ``1`` for disabling them.
+   * ``31`` - ``AT_SO_IP_ECHO_REPLY``.
 
-  * ``31`` - ``AT_SO_IP_ECHO_REPLY``.
+     * ``<value>`` is an integer that indicates whether ICMP echo replies for IPv4 are enabled.
+       It is ``0`` for disabled or ``1`` for enabled.
 
-    * ``<value>`` is an integer that indicates whether ICMP echo replies for IPv4 are enabled.
-      It is ``0`` for disabled or ``1`` for enabled.
+   * ``32`` - ``AT_SO_IPV6_ECHO_REPLY``.
 
-  * ``32`` - ``AT_SO_IPV6_ECHO_REPLY``.
+     * ``<value>`` is an integer that indicates whether ICMP echo replies for IPv6 are enabled.
+       It is ``0`` for disabled or ``1`` for enabled.
 
-    * ``<value>`` is an integer that indicates whether ICMP echo replies for IPv6 are enabled.
-      It is ``0`` for disabled or ``1`` for enabled.
+   * ``34`` - ``AT_SO_KEEPOPEN``.
 
-  * ``34`` - ``AT_SO_KEEPOPEN``.
+     * ``<value>`` is an integer that indicates whether socket is kept open when the modem enters the flight mode (``+CFUN=4``).
+       It is ``0`` for disabled or ``1`` for enabled.
 
-    * ``<value>`` is an integer that indicates whether socket is kept open when the modem enters the flight mode (``+CFUN=4``).
-      It is ``0`` for disabled or ``1`` for enabled.
+   * ``40`` - ``AT_SO_BINDTOPDN`` (set-only).
 
-  * ``40`` - ``AT_SO_BINDTOPDN`` (set-only).
+     * ``<value>`` is an integer that indicates the packet data network ID to bind to.
 
-    * ``<value>`` is an integer that indicates the packet data network ID to bind to.
+   * ``55`` - ``AT_SO_TCP_SRV_SESSTIMEO``.
 
-  * ``55`` - ``AT_SO_TCP_SRV_SESSTIMEO``.
+     * ``<value>`` is an integer that indicates the TCP server session inactivity timeout for a socket.
+       It accepts values from the range ``0`` to ``135``, where ``0`` is no timeout and ``135`` is 2 hours, 15 minutes.
 
-    * ``<value>`` is an integer that indicates the TCP server session inactivity timeout for a socket.
-      It accepts values from the range ``0`` to ``135``, where ``0`` is no timeout and ``135`` is 2 hours, 15 minutes.
+   * ``61`` - ``AT_SO_RAI`` (set-only).
+     Release Assistance Indication (RAI).
 
-  * ``61`` - ``AT_SO_RAI`` (set-only).
-    Release Assistance Indication (RAI).
+     * ``<value>`` The option accepts an integer, indicating the type of RAI.
+       Accepted values for the option are:
 
-    * ``<value>`` The option accepts an integer, indicating the type of RAI.
-      Accepted values for the option are:
+       * ``1`` - ``RAI_NO_DATA``.
+         Indicates that the application does not intend to send more data.
+         This socket option applies immediately and lets the modem exit connected mode more quickly.
 
-      * ``1`` - ``RAI_NO_DATA``.
-        Indicates that the application does not intend to send more data.
-        This socket option applies immediately and lets the modem exit connected mode more quickly.
+       * ``2`` - ``RAI_LAST``.
+         Indicates that the application does not intend to send more data after the next call to :c:func:`send` or :c:func:`sendto`.
+         This lets the modem exit connected mode more quickly after sending the data.
 
-      * ``2`` - ``RAI_LAST``.
-        Indicates that the application does not intend to send more data after the next call to :c:func:`send` or :c:func:`sendto`.
-        This lets the modem exit connected mode more quickly after sending the data.
+       * ``3`` - ``RAI_ONE_RESP``.
+         Indicates that the application is expecting to receive just one data packet after the next call to :c:func:`send` or :c:func:`sendto`.
+         This lets the modem exit connected mode more quickly after having received the data.
 
-      * ``3`` - ``RAI_ONE_RESP``.
-        Indicates that the application is expecting to receive just one data packet after the next call to :c:func:`send` or :c:func:`sendto`.
-        This lets the modem exit connected mode more quickly after having received the data.
+       * ``4`` - ``RAI_ONGOING``.
+         Indicates that the application is expecting to receive just one data packet after the next call to :c:func:`send` or :c:func:`sendto`.
+         This lets the modem exit connected mode more quickly after having received the data.
 
-      * ``4`` - ``RAI_ONGOING``.
-        Indicates that the application is expecting to receive just one data packet after the next call to :c:func:`send` or :c:func:`sendto`.
-        This lets the modem exit connected mode more quickly after having received the data.
+       * ``5`` - ``RAI_WAIT_MORE``.
+         Indicates that the socket is in active use by a server application.
+         This lets the modem stay in connected mode longer.
 
-      * ``5`` - ``RAI_WAIT_MORE``.
-        Indicates that the socket is in active use by a server application.
-        This lets the modem stay in connected mode longer.
+   * ``62`` - ``AT_SO_IPV6_DELAYED_ADDR_REFRESH``.
 
-  * ``62`` - ``AT_SO_IPV6_DELAYED_ADDR_REFRESH``.
-
-    * ``<value>`` is an integer that indicates whether delayed IPv6 address refresh is enabled.
-      It is ``0`` for disabled or ``1`` for enabled.
+     * ``<value>`` is an integer that indicates whether delayed IPv6 address refresh is enabled.
+       It is ``0`` for disabled or ``1`` for enabled.
 
 See `nRF socket options <nrfxlib_nrf_sockets_>`_ for explanation of the supported options.
 
@@ -590,79 +615,81 @@ Syntax
 
    AT#XSSOCKETOPT=<handle>,<op>,<name>[,<value>]
 
-* The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSSOCKET`` command.
+The parameters and their defined values are the following:
 
-* The ``<op>`` parameter can accept one of the following values:
+<handle>
+   Integer.
+   Specifies the socket handle returned from ``#XSSOCKET`` command.
 
-  * ``0`` - Get.
-  * ``1`` - Set.
+<op>
+   * ``0`` - Get.
+   * ``1`` - Set.
 
-* The ``<name>`` parameter can accept one of the following values:
+<name>
+   * ``2`` - ``AT_TLS_HOSTNAME``.
 
-  * ``2`` - ``AT_TLS_HOSTNAME``
+     * ``<value>`` is a string that indicates the hostname to check against during TLS handshakes.
+       It can be ``NULL`` to disable hostname verification.
 
-    * ``<value>`` is a string that indicates the hostname to check against during TLS handshakes.
-      It can be ``NULL`` to disable hostname verification.
+   * ``4`` - ``AT_TLS_CIPHERSUITE_USED`` (get-only).
+     The TLS cipher suite is chosen during the TLS handshake.
 
-  * ``4`` - ``AT_TLS_CIPHERSUITE_USED`` (get-only).
-    The TLS cipher suite is chosen during the TLS handshake.
+   * ``5`` - ``AT_TLS_PEER_VERIFY``.
 
-  * ``5`` - ``AT_TLS_PEER_VERIFY``.
+     * ``<value>`` is an integer that indicates the peer verification level.
+       It is ``0`` for none, ``1`` for optional, or ``2`` for required.
 
-    * ``<value>`` is an integer that indicates the peer verification level.
-      It is ``0`` for none, ``1`` for optional, or ``2`` for required.
+   * ``12`` - ``AT_TLS_SESSION_CACHE``.
 
-  * ``12`` - ``AT_TLS_SESSION_CACHE``.
+     * ``<value>`` is an integer that indicates whether to use TLS session caching.
+       It is ``0`` for disabled or ``1`` for enabled.
 
-    * ``<value>`` is an integer that indicates whether to use TLS session caching.
-      It is ``0`` for disabled or ``1`` for enabled.
+   * ``13`` - ``AT_TLS_SESSION_CACHE_PURGE`` (set-only).
+     Indicates that the TLS session cache must be deleted.
 
-  * ``13`` - ``AT_TLS_SESSION_CACHE_PURGE`` (set-only).
-    Indicates that the TLS session cache must be deleted.
+     * ``<value>`` can be any integer value.
 
-    * ``<value>`` can be any integer value.
+   * ``14`` - ``AT_TLS_DTLS_CID`` (set-only).
 
-  * ``14`` - ``AT_TLS_DTLS_CID`` (set-only).
+     * ``<value>`` is an integer that indicates the DTLS connection identifier setting.
+       It can be one of the following values:
 
-    * ``<value>`` is an integer that indicates the DTLS connection identifier setting.
-      It can be one of the following values:
+       * ``0`` - ``TLS_DTLS_CID_DISABLED``.
+       * ``1`` - ``TLS_DTLS_CID_SUPPORTED``.
+       * ``2`` - ``TLS_DTLS_CID_ENABLED``.
 
-      * ``0`` - ``TLS_DTLS_CID_DISABLED``.
-      * ``1`` - ``TLS_DTLS_CID_SUPPORTED``.
-      * ``2`` - ``TLS_DTLS_CID_ENABLED``.
+     See `NRF_SO_SEC_DTLS_CID <nrfxlib_dtls_cid_settings_>`_ for more details regarding the allowed values.
 
-    See `NRF_SO_SEC_DTLS_CID <nrfxlib_dtls_cid_settings_>`_ for more details regarding the allowed values.
+   * ``15`` - ``AT_TLS_DTLS_CID_STATUS`` (get-only).
+     It is the DTLS connection identifier status.
+     It can be retrieved after the DTLS handshake.
+     See `NRF_SO_SEC_DTLS_CID_STATUS <nrfxlib_dtls_cid_status_>`_ for more details regarding the returned values.
 
-  * ``15`` - ``AT_TLS_DTLS_CID_STATUS`` (get-only).
-    It is the DTLS connection identifier status.
-    It can be retrieved after the DTLS handshake.
-    See `NRF_SO_SEC_DTLS_CID_STATUS <nrfxlib_dtls_cid_status_>`_ for more details regarding the returned values.
+   * ``18`` - ``AT_TLS_DTLS_HANDSHAKE_TIMEO``.
 
-  * ``18`` - ``AT_TLS_DTLS_HANDSHAKE_TIMEO``.
+     * ``<value>`` is an integer that indicates the DTLS handshake timeout in seconds.
+       It can be one of the following values: ``1``, ``3``, ``7``, ``15``, ``31``, ``63``, ``123``.
 
-    * ``<value>`` is an integer that indicates the DTLS handshake timeout in seconds.
-      It can be one of the following values: ``1``, ``3``, ``7``, ``15``, ``31``, ``63``, ``123``.
+   * ``19`` - ``AT_TLS_DTLS_CONN_SAVE`` (set-only).
+     Write-only socket option to save DTLS connection.
 
-  * ``19`` - ``AT_TLS_DTLS_CONN_SAVE`` (set-only).
-    Write-only socket option to save DTLS connection.
+     * ``<value>`` can be any integer value, which will be ignored.
 
-    * ``<value>`` can be any integer value, which will be ignored.
+     After this option is successfully called, you must call ``AT_TLS_DTLS_CONN_LOAD`` before continuing to communicate on the socket.
 
-    After this option is successfully called, you must call ``AT_TLS_DTLS_CONN_LOAD`` before continuing to communicate on the socket.
+   * ``20`` - ``AT_TLS_DTLS_CONN_LOAD`` (set-only).
+     Write-only socket option to load DTLS connection.
 
-  * ``20`` - ``AT_TLS_DTLS_CONN_LOAD`` (set-only).
-    Write-only socket option to load DTLS connection.
+     * ``<value>`` can be any integer value, which will be ignored.
 
-    * ``<value>`` can be any integer value, which will be ignored.
+   * ``22`` - ``AT_TLS_DTLS_FRAG_EXT``.
 
-  * ``22`` - ``AT_TLS_DTLS_FRAG_EXT``.
+     * ``<value>`` is an integer that indicates the use of the DTLS fragmentation extension specified in RFC 6066.
+       It can be one of the following values:
 
-    * ``<value>`` is an integer that indicates the use of the DTLS fragmentation extension specified in RFC 6066.
-      It can be one of the following values:
-
-      * ``0`` - ``DTLS_FRAG_EXT_DISABLED``.
-      * ``1`` - ``DTLS_FRAG_EXT_512_ENABLED``.
-      * ``2`` - ``DTLS_FRAG_EXT_1024_ENABLED``.
+       * ``0`` - ``DTLS_FRAG_EXT_DISABLED``.
+       * ``1`` - ``DTLS_FRAG_EXT_512_ENABLED``.
+       * ``2`` - ``DTLS_FRAG_EXT_1024_ENABLED``.
 
 See `nRF socket options <nrfxlib_nrf_sockets_>`_ for explanation of the supported options.
 
@@ -728,11 +755,16 @@ Syntax
 
    AT#XBIND=<handle>,<port>
 
-* The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
+The parameters and their defined values are the following:
 
-* The ``<port>`` parameter is an unsigned 16-bit integer (0 - 65535).
-  It represents the specific port to use for binding the socket.
-  ``0`` is a special value that indicates that the modem should choose the port automatically.
+<handle>
+   Integer.
+   Specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
+
+<port>
+   Integer.
+   An unsigned 16-bit integer (0 - 65535) representing the specific port to use for binding the socket.
+   ``0`` is a special value that indicates that the modem should choose the port automatically.
 
 Example
 ~~~~~~~
@@ -771,15 +803,21 @@ Syntax
 
    AT#XCONNECT=<handle>,<url>,<port>
 
-* The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
+The parameters and their defined values are the following:
 
-* The ``<url>`` parameter is a string.
-  It indicates the hostname or the IP address of the server.
-  The maximum supported size of the hostname is 128 bytes.
-  When using IP addresses, it supports both IPv4 and IPv6.
+<handle>
+   Integer.
+   Specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
 
-* The ``<port>`` parameter is an unsigned 16-bit integer (0 - 65535).
-  It represents the port of the TCP or UDP service on the remote server.
+<url>
+   String.
+   The hostname or the IP address of the server.
+   The maximum supported size of the hostname is 128 bytes.
+   When using IP addresses, it supports both IPv4 and IPv6.
+
+<port>
+   Integer.
+   An unsigned 16-bit integer (0 - 65535) representing the port of the TCP or UDP service on the remote server.
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -788,13 +826,15 @@ Response syntax
 
    #XCONNECT: <handle>,<status>
 
-* The ``<handle>`` parameter is an integer indicating the socket handle.
+The parameters and their defined values are the following:
 
-* The ``<status>`` parameter is an integer.
-  It can return one of the following values:
+<handle>
+   Integer.
+   The socket handle.
 
-  * ``1`` - Connected.
-  * ``0`` - Disconnected.
+<status>
+   * ``0`` - Disconnected.
+   * ``1`` - Connected.
 
 Examples
 ~~~~~~~~
@@ -846,44 +886,51 @@ Syntax
 
    AT#XSEND=<handle>,<mode>,<flags>[,<data_len>] when ``<mode>`` is ``2``
 
-* The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
+The parameters and their defined values are the following:
 
-* The ``<mode>`` parameter specifies the data sending mode:
+<handle>
+   Integer.
+   Specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
 
-  * ``0`` - String mode.
-    Data is provided directly in the command as the ``<data>`` parameter.
-  * ``1`` - Hex string mode.
-    Data is provided as a hexadecimal string in the ``<data>`` parameter.
-  * ``2`` - Data mode.
-    |SM| enters :ref:`sm_data_mode` for data input.
+<mode>
+   * ``0`` - String mode.
+     Data is provided directly in the command as the ``<data>`` parameter.
+   * ``1`` - Hex string mode.
+     Data is provided as a hexadecimal string in the ``<data>`` parameter.
+   * ``2`` - Data mode.
+     |SM| enters :ref:`sm_data_mode` for data input.
 
-* The ``<flags>`` parameter sets the sending behavior.
-  You can set it to one of the following values:
+<flags>
+   Sending behavior based on the BSD socket definition.
 
-  * ``0`` - No flags set.
-    The request is complete when the data is pushed to the modem buffer.
-  * ``512`` - Blocks send operation until the request is acknowledged by the network.
-    The request will not return until the data is pushed to the network, or acknowledged by the network (for TCP), or the timeout given by the ``AT_SO_SNDTIMEO`` socket option is reached.
-    Valid timeout values are 1 to 600 seconds.
-  * ``8192`` - Send unsolicited ``#XSENDNTF`` notification when the request is acknowledged by the network.
-    Unsolicited notification will be sent when the data is pushed to the network, or acknowledged by the network (for TCP), or the timeout given by the ``AT_SO_SNDTIMEO`` socket option is reached.
-    Valid timeout values are 1 to 600 seconds.
-    Further sends for the socket are blocked until the unsolicited notification is received.
+   * ``0`` - No flags set.
+     The request is complete when the data is pushed to the modem buffer.
+   * ``512`` - Blocks send operation until the request is acknowledged by the network.
+     The request will not return until the data is pushed to the network, or acknowledged by the network (for TCP), or the timeout given by the ``AT_SO_SNDTIMEO`` socket option is reached.
+     Valid timeout values are 1 to 600 seconds.
+   * ``8192`` - Send unsolicited ``#XSENDNTF`` notification when the request is acknowledged by the network.
+     Unsolicited notification will be sent when the data is pushed to the network, or acknowledged by the network (for TCP), or the timeout given by the ``AT_SO_SNDTIMEO`` socket option is reached.
+     Valid timeout values are 1 to 600 seconds.
+     Further sends for the socket are blocked until the unsolicited notification is received.
 
-    This is only supported by the following modem firmware:
+     This is only supported by the following modem firmware:
 
-      * mfw_nrf9151-ntn
+       * mfw_nrf9151-ntn
 
-* The ``<data>`` parameter is required when ``<mode>`` is ``0`` (string mode) or ``1`` (hex string mode).
-  For string mode (``0``), it is a string that contains the data to be sent.
-  For hex string mode (``1``), it is a hexadecimal string representation of the data to be sent.
-  The maximum payload size in hexadecimal string mode is up to 2800 characters (1400 bytes).
-  This parameter is not used when ``<mode>`` is ``2`` (data mode).
+<data>
+   String.
+   Required when ``<mode>`` is ``0`` (string mode) or ``1`` (hex string mode).
+   For string mode (``0``), it is a string that contains the data to be sent.
+   For hex string mode (``1``), it is a hexadecimal string representation of the data to be sent.
+   The maximum payload size in hexadecimal string mode is up to 2800 characters (1400 bytes).
+   Not used when ``<mode>`` is ``2`` (data mode).
 
-* The ``<data_len>`` parameter is optional and only used when ``<mode>`` is ``2`` (data mode).
-  It sets the number of bytes to send in data mode.
-  When the required number of bytes are sent, the data mode is exited.
-  The termination command :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` is not used in this case.
+<data_len>
+   Integer.
+   Optional, only used when ``<mode>`` is ``2`` (data mode).
+   Sets the number of bytes to send in data mode.
+   When the required number of bytes are sent, the data mode is exited.
+   The termination command :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` is not used in this case.
 
 .. note::
 
@@ -904,15 +951,19 @@ Response syntax
 
    #XSEND: <handle>,<result_type>,<size>
 
-* The ``<handle>`` parameter is an integer indicating the socket handle.
+The parameters and their defined values are the following:
 
-* The ``<result_type>`` parameter is an integer indicating the type of result:
+<handle>
+   Integer.
+   The socket handle.
 
-  * ``0`` - Indicates that there are no further notifications.
-  * ``1`` - Indicates that an unsolicited notification will be sent when the network acknowledged send is completed.
+<result_type>
+   * ``0`` - Indicates that there are no further notifications.
+   * ``1`` - Indicates that an unsolicited notification will be sent when the network acknowledged send is completed.
 
-* The ``<size>`` parameter is an integer.
-  It represents the actual number of bytes that has been sent.
+<size>
+   Integer.
+   The actual number of bytes that has been sent.
 
 
 Unsolicited notification
@@ -928,15 +979,21 @@ This is only supported by the following modem firmware:
 
    #XSENDNTF: <handle>,<status>,<size>
 
-* The ``<handle>`` parameter is an integer indicating the socket handle.
+The parameters and their defined values are the following:
 
-* The ``<status>`` parameter is an integer indicating the status of the send acknowledged by the network.
-  It can have one of the following values:
+<handle>
+   Integer.
+   The socket handle.
 
-  * ``0`` - Success
-  * ``-1`` - Failure
+<status>
+   The status of the send acknowledged by the network.
 
-* The ``<size>`` parameter is an integer indicating the size of the data sent.
+   * ``0`` - Success.
+   * ``-1`` - Failure.
+
+<size>
+   Integer.
+   The size of the data sent.
 
 
 Example
@@ -990,26 +1047,36 @@ Syntax
 
    AT#XRECV=<handle>,<mode>,<flags>,<timeout>[,<data_len>]
 
-* The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
+The parameters and their defined values are the following:
 
-* The ``<mode>`` parameter specifies the receive mode:
+<handle>
+   Integer.
+   Specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
 
-  * ``0`` - Binary mode. Data is received as binary data.
-  * ``1`` - Hex string mode. Data is received as a hexadecimal string representation.
+<mode>
+   * ``0`` - Binary mode.
+     Data is received as binary data.
+   * ``1`` - Hex string mode.
+     Data is received as a hexadecimal string representation.
 
-* The ``<flags>`` parameter sets the receiving behavior based on the BSD socket definition.
-  You can set it to one of the following values:
+<flags>
+   Receiving behavior based on the BSD socket definition.
 
-  * ``0`` - No flags set.
-  * ``2`` - Read data without removing it from the socket input queue.
-  * ``64`` - Override the operation to non-blocking.
-  * ``256`` (TCP only) - Block until the full amount of data can be returned.
+   * ``0`` - No flags set.
+   * ``2`` - Read data without removing it from the socket input queue.
+   * ``64`` - Override the operation to non-blocking.
+   * ``256`` (TCP only) - Block until the full amount of data can be returned.
 
-* The ``<timeout>`` parameter sets the timeout value in seconds.
-  When ``0``, it means no timeout, and it makes this request block indefinitely.
+<timeout>
+   Integer.
+   The timeout value in seconds.
+   When ``0``, it means no timeout, and it makes this request block indefinitely.
 
-* The ``<data_len>`` parameter is optional and sets the maximum number of bytes to receive.
-  The maximum value is 2048 bytes, which is also the default value when the parameter is omitted.
+<data_len>
+   Integer.
+   Optional.
+   The maximum number of bytes to receive.
+   The maximum value is 2048 bytes, which is also the default value when the parameter is omitted.
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -1021,14 +1088,24 @@ Response syntax
    #XRECV: <handle>,<mode>,<size>
    <data>
 
-* The ``<handle>`` parameter is an integer indicating the socket handle.
+The parameters and their defined values are the following:
 
-* The ``<mode>`` parameter is an integer indicating the receive mode used.
+<handle>
+   Integer.
+   The socket handle.
 
-* The ``<size>`` parameter is an integer that represents the actual number of bytes received.
-  In case of hex string mode, it represents the number of bytes before conversion to hexadecimal format.
+<mode>
+   Integer.
+   The receive mode used.
 
-* The ``<data>`` parameter is a string that contains the data being received.
+<size>
+   Integer.
+   The actual number of bytes received.
+   In case of hex string mode, it represents the number of bytes before conversion to hexadecimal format.
+
+<data>
+   String.
+   The data being received.
 
 .. sm_recv_response_end
 
@@ -1076,49 +1153,62 @@ Syntax
 
    AT#XSENDTO=<handle>,<mode>,<flags>,<url>,<port>[,<data_len>] when ``<mode>`` is ``2``
 
-* The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
+The parameters and their defined values are the following:
 
-* The ``<mode>`` parameter specifies the data sending mode:
+<handle>
+   Integer.
+   Specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
 
-  * ``0`` - String mode. Data is provided directly in the command as the ``<data>`` parameter.
-  * ``1`` - Hex string mode. Data is provided as a hexadecimal string in the ``<data>`` parameter.
-  * ``2`` - Data mode. |SM| enters :ref:`sm_data_mode` for data input.
+<mode>
+   * ``0`` - String mode.
+     Data is provided directly in the command as the ``<data>`` parameter.
+   * ``1`` - Hex string mode.
+     Data is provided as a hexadecimal string in the ``<data>`` parameter.
+   * ``2`` - Data mode.
+     |SM| enters :ref:`sm_data_mode` for data input.
 
-* The ``<flags>`` parameter sets the sending behavior.
-  You can set it to one of the following values:
+<flags>
+   Sending behavior based on the BSD socket definition.
 
-  * ``0`` - No flags set. The request is complete when the data is pushed to the modem buffer.
-  * ``512`` - Blocks send operation until the request is acknowledged by network.
-    The request will not return until the data is pushed to the network, or acknowledged by network (for TCP), or the timeout given by the AT_SO_SNDTIMEO socket option, is reached.
-    Valid timeout values are 1 to 600 seconds.
-  * ``8192`` - Send unsolicited ``#XSENDNTF`` notification when the request is acknowledged by network.
-    Unsolicited notification will be sent when the data is pushed to the network, or acknowledged by network (for TCP), or the timeout given by the AT_SO_SNDTIMEO socket option, is reached.
-    Valid timeout values are 1 to 600 seconds.
-    Further sends for the socket are blocked until the unsolicited notification is received.
+   * ``0`` - No flags set.
+     The request is complete when the data is pushed to the modem buffer.
+   * ``512`` - Blocks send operation until the request is acknowledged by network.
+     The request will not return until the data is pushed to the network, or acknowledged by network (for TCP), or the timeout given by the AT_SO_SNDTIMEO socket option, is reached.
+     Valid timeout values are 1 to 600 seconds.
+   * ``8192`` - Send unsolicited ``#XSENDNTF`` notification when the request is acknowledged by network.
+     Unsolicited notification will be sent when the data is pushed to the network, or acknowledged by network (for TCP), or the timeout given by the AT_SO_SNDTIMEO socket option, is reached.
+     Valid timeout values are 1 to 600 seconds.
+     Further sends for the socket are blocked until the unsolicited notification is received.
 
-    This is only supported by the following modem firmware:
+     This is only supported by the following modem firmware:
 
-      * mfw_nrf9151-ntn
+       * mfw_nrf9151-ntn
 
-* The ``<url>`` parameter is a string.
-  It indicates the hostname or the IP address of the remote peer.
-  The maximum size of the hostname is 128 bytes.
-  When using IP addresses, it supports both IPv4 and IPv6.
+<url>
+   String.
+   The hostname or the IP address of the remote peer.
+   The maximum size of the hostname is 128 bytes.
+   When using IP addresses, it supports both IPv4 and IPv6.
 
-* The ``<port>`` parameter is an unsigned 16-bit integer (0 - 65535).
-  It represents the port of the UDP service on remote peer.
+<port>
+   Integer.
+   An unsigned 16-bit integer (0 - 65535) representing the port of the UDP service on the remote peer.
 
-* The ``<data>`` parameter is required when ``<mode>`` is ``0`` (string mode) or ``1`` (hex string mode).
-  For string mode (``0``), it is a string that contains the data to be sent.
-  For hex string mode (``1``), it is a hexadecimal string representation of the data to be sent.
-  The maximum payload size in hexadecimal string mode is up to 2800 characters (1400 bytes).
-  For large packets, it is recommended to use data mode (``2``) since AT parser's memory limits the maximum size of data that can be sent in string or hex string modes.
-  This parameter is not used when ``<mode>`` is ``2`` (data mode).
+<data>
+   String.
+   Required when ``<mode>`` is ``0`` (string mode) or ``1`` (hex string mode).
+   For string mode (``0``), it is a string that contains the data to be sent.
+   For hex string mode (``1``), it is a hexadecimal string representation of the data to be sent.
+   The maximum payload size in hexadecimal string mode is up to 2800 characters (1400 bytes).
+   For large packets, it is recommended to use data mode (``2``) since AT parser's memory limits the maximum size of data that can be sent in string or hex string modes.
+   Not used when ``<mode>`` is ``2`` (data mode).
 
-* The ``<data_len>`` parameter is optional and only used when ``<mode>`` is ``2`` (data mode).
-  It sets the number of bytes to send in data mode.
-  When required number of bytes are sent, the data mode is exited.
-  The termination command :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` is not used in this case.
+<data_len>
+   Integer.
+   Optional, only used when ``<mode>`` is ``2`` (data mode).
+   Sets the number of bytes to send in data mode.
+   When the required number of bytes are sent, the data mode is exited.
+   The termination command :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` is not used in this case.
 
 .. note::
 
@@ -1145,15 +1235,19 @@ Response syntax
 
    #XSENDTO: <handle>,<result_type>,<size>
 
-* The ``<handle>`` parameter is an integer indicating the socket handle.
+The parameters and their defined values are the following:
 
-* The ``<result_type>`` parameter is an integer indicating the type of result:
+<handle>
+   Integer.
+   The socket handle.
 
-  * ``0`` - Indicates that there are no further notifications.
-  * ``1`` - Indicates that an unsolicited notification will be sent when the network acknowledged send is completed.
+<result_type>
+   * ``0`` - Indicates that there are no further notifications.
+   * ``1`` - Indicates that an unsolicited notification will be sent when the network acknowledged send is completed.
 
-* The ``<size>`` parameter is an integer.
-  It represents the actual number of bytes that have been sent.
+<size>
+   Integer.
+   The actual number of bytes that have been sent.
 
 Unsolicited notification
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1168,15 +1262,21 @@ This is only supported by the following modem firmware:
 
    #XSENDNTF: <handle>,<status>,<size>
 
-* The ``<handle>`` parameter is an integer indicating the socket handle.
+The parameters and their defined values are the following:
 
-* The ``<status>`` parameter is an integer indicating the status of the send acknowledged by the network.
-  It can have one of the following values:
+<handle>
+   Integer.
+   The socket handle.
 
-  * ``0`` - Success
-  * ``-1`` - Failure
+<status>
+   The status of the send acknowledged by the network.
 
-* The ``<size>`` parameter is an integer indicating the size of the data sent.
+   * ``0`` - Success.
+   * ``-1`` - Failure.
+
+<size>
+   Integer.
+   The size of the data sent.
 
 Example
 ~~~~~~~
@@ -1224,27 +1324,35 @@ Syntax
 
    AT#XRECVFROM=<handle>,<mode>,<flags>,<timeout>[,<data_len>]
 
-* The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
+The parameters and their defined values are the following:
 
-* The ``<mode>`` parameter specifies the receive mode:
+<handle>
+   Integer.
+   Specifies the socket handle returned from ``#XSOCKET`` or ``#XSSOCKET`` commands.
 
-  * ``0`` - Binary mode.
-    Data is received as binary data.
-  * ``1`` - Hex string mode.
-    Data is received as a hexadecimal string representation.
+<mode>
+   * ``0`` - Binary mode.
+     Data is received as binary data.
+   * ``1`` - Hex string mode.
+     Data is received as a hexadecimal string representation.
 
-* The ``<flags>`` parameter sets the receiving behavior based on the BSD socket definition.
-  You can set it to one of the following values:
+<flags>
+   Receiving behavior based on the BSD socket definition.
 
-  * ``0`` - No flags set.
-  * ``2`` - Read data without removing it from the socket input queue.
-  * ``64`` - Override the operation to non-blocking.
+   * ``0`` - No flags set.
+   * ``2`` - Read data without removing it from the socket input queue.
+   * ``64`` - Override the operation to non-blocking.
 
-* The ``<timeout>`` parameter sets the timeout value in seconds.
-  When ``0``, it means no timeout, and it makes this request block indefinitely.
+<timeout>
+   Integer.
+   The timeout value in seconds.
+   When ``0``, it means no timeout, and it makes this request block indefinitely.
 
-* The ``<data_len>`` parameter is optional and sets the maximum number of bytes to receive.
-  The maximum value is 2048 bytes, which is also the default value when the parameter is omitted.
+<data_len>
+   Integer.
+   Optional.
+   The maximum number of bytes to receive.
+   The maximum value is 2048 bytes, which is also the default value when the parameter is omitted.
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -1256,18 +1364,32 @@ Response syntax
    #XRECVFROM: <handle>,<mode>,<size>,"<ip_addr>",<port>
    <data>
 
-* The ``<handle>`` parameter is an integer indicating the socket handle.
+The parameters and their defined values are the following:
 
-* The ``<mode>`` parameter is an integer indicating the receive mode used.
+<handle>
+   Integer.
+   The socket handle.
 
-* The ``<size>`` parameter is an integer that represents the actual number of bytes received.
-  In the case of hex string mode, it represents the number of bytes before conversion to hexadecimal format.
+<mode>
+   Integer.
+   The receive mode used.
 
-* The ``<ip_addr>`` parameter is a string that represents the IPv4 or IPv6 address of the remote peer.
+<size>
+   Integer.
+   The actual number of bytes received.
+   In the case of hex string mode, it represents the number of bytes before conversion to hexadecimal format.
 
-* The ``<port>`` parameter is an integer that represents the UDP port of the remote peer.
+<ip_addr>
+   String.
+   The IPv4 or IPv6 address of the remote peer.
 
-* The ``<data>`` parameter is a string that contains the data being received.
+<port>
+   Integer.
+   The UDP port of the remote peer.
+
+<data>
+   String.
+   The data being received.
 
 .. sm_recvfrom_response_end
 
@@ -1313,24 +1435,30 @@ Syntax
 
    AT#XAPOLL=[<handle>],<op>,[<events>]
 
-* The ``<handle>`` parameter is an integer that sets the socket handle to poll (optional).
-  Handles are sent in the ``AT#XSOCKET`` or ``AT#XSSOCKET`` responses.
-  Handles can also be obtained using the ``AT#XSOCKET?`` or ``AT#XSSOCKET?`` command.
-  If the handle is omitted, the operation applies to all open sockets and to any new sockets that are created.
+The parameters and their defined values are the following:
 
-* The ``<op>`` parameter can accept one of the following values:
+<handle>
+   Integer.
+   Optional.
+   Sets the socket handle to poll.
+   Handles are sent in the ``AT#XSOCKET`` or ``AT#XSSOCKET`` responses.
+   Handles can also be obtained using the ``AT#XSOCKET?`` or ``AT#XSSOCKET?`` command.
+   If the handle is omitted, the operation applies to all open sockets and to any new sockets that are created.
 
-  * ``0`` - Stop asynchronous polling.
-  * ``1`` - Start asynchronous polling.
+<op>
+   * ``0`` - Stop asynchronous polling.
+   * ``1`` - Start asynchronous polling.
 
-* The ``<events>`` parameter is an optional integer, which is interpreted as a bit field.
-  It represents the events to poll for, which can be a combination of ``POLLIN`` and ``POLLOUT``.
-  Permanent error and closure events (``POLLERR``, ``POLLHUP``, and ``POLLNVAL``) are always polled.
-  The value can be any combination of the following values summed up:
+<events>
+   Integer.
+   Optional.
+   Interpreted as a bit field representing the events to poll for.
+   Permanent error and closure events (``POLLERR``, ``POLLHUP``, and ``POLLNVAL``) are always polled.
+   The value can be any combination of the following values summed up:
 
-  * ``0`` - Poll the default events.
-  * ``1`` - Read events (``POLLIN``) are polled, in addition to the default events.
-  * ``4`` - Write events (``POLLOUT``) are polled, in addition to the default events.
+   * ``0`` - Poll the default events.
+   * ``1`` - Read events (``POLLIN``) are polled, in addition to the default events.
+   * ``4`` - Write events (``POLLOUT``) are polled, in addition to the default events.
 
 
 Response syntax
@@ -1354,12 +1482,16 @@ When the asynchronous socket events are enabled, |SM| sends events as URC notifi
 
    #XAPOLL: <handle>,<revents>
 
-* The ``<handle>`` parameter is an integer.
-  It is the handle of the socket that has events.
+The parameters and their defined values are the following:
 
-* The ``<revents>`` parameter is an integer, which must be interpreted as a bit field.
-  It represents the returned events as a combination of ``POLLIN`` (1), ``POLLOUT`` (4), ``POLLERR`` (8), ``POLLHUP`` (16), and ``POLLNVAL`` (32) summed up.
-  Hexadecimal representation is avoided to support AT command parsers that do not support hexadecimal values.
+<handle>
+   Integer.
+   The handle of the socket that has events.
+
+<revents>
+   Integer.
+   Interpreted as a bit field representing the returned events as a combination of ``POLLIN`` (1), ``POLLOUT`` (4), ``POLLERR`` (8), ``POLLHUP`` (16), and ``POLLNVAL`` (32) summed up.
+   Hexadecimal representation is avoided to support AT command parsers that do not support hexadecimal values.
 
 Example
 ~~~~~~~
@@ -1469,17 +1601,21 @@ Response syntax
 
    #XAPOLL: <handle>,<events>
 
-* The ``<handle>`` parameter is an integer.
-  It is the handle of the socket that is being polled.
+The parameters and their defined values are the following:
 
-* The ``<events>`` parameter is an integer, which must be interpreted as a bit field.
-  It represents the events that are being polled, which can be any combination of ``POLLIN`` and ``POLLOUT``.
-  Permanent error and closure events (``POLLERR``, ``POLLHUP``, and ``POLLNVAL``) are always polled.
-  The value can be any combination of the following values:
+<handle>
+   Integer.
+   The handle of the socket that is being polled.
 
-  * ``0`` - Poll the default events.
-  * ``1`` - Poll read events (``POLLIN``) in addition to the default events.
-  * ``4`` - Poll write events (``POLLOUT``) in addition to the default events.
+<events>
+   Integer.
+   Interpreted as a bit field representing the events that are being polled.
+   Permanent error and closure events (``POLLERR``, ``POLLHUP``, and ``POLLNVAL``) are always polled.
+   The value can be any combination of the following values:
+
+   * ``0`` - Poll the default events.
+   * ``1`` - Poll read events (``POLLIN``) in addition to the default events.
+   * ``4`` - Poll write events (``POLLOUT``) in addition to the default events.
 
 
 Example
@@ -1595,21 +1731,29 @@ Syntax
 
    AT#XRECVCFG=[<handle>],<auto_reception_flags>[,<hex_format>]
 
-* The ``<handle>`` parameter is an integer that identifies the socket handle.
-  If omitted, the command applies to all opened sockets, whether already open or opened in the future.
-* The ``<auto_reception_flags>`` parameter is an integer that specifies the automatic reception flags.
-  It can be a combination of the following values summed up:
+The parameters and their defined values are the following:
 
-  * ``0`` - No automatic data reception.
-  * ``1`` - Automatic data reception in AT-command mode.
-  * ``2`` - Automatic data reception in data mode.
+<handle>
+   Integer.
+   Identifies the socket handle.
+   If omitted, the command applies to all opened sockets, whether already open or opened in the future.
 
-* The ``<hex_format>`` parameter is an integer that specifies the hex format for automatically received data.
-  It applies only when automatic data reception is enabled.
-  It can be one of the following values:
+<auto_reception_flags>
+   Integer.
+   Specifies the automatic reception flags.
+   Can be a combination of the following values summed up:
 
-  * ``0`` - Data is received in binary format (default).
-  * ``1`` - Data is received in hex string format (supported only in AT-command mode).
+   * ``0`` - No automatic data reception.
+   * ``1`` - Automatic data reception in AT-command mode.
+   * ``2`` - Automatic data reception in data mode.
+
+<hex_format>
+   Integer.
+   Specifies the hex format for automatically received data.
+   Applies only when automatic data reception is enabled.
+
+   * ``0`` - Data is received in binary format (default).
+   * ``1`` - Data is received in hex string format (supported only in AT-command mode).
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -1755,19 +1899,27 @@ Response syntax
 
    #XRECVCFG: <handle>,<auto_reception_flags>,<hex_format>
 
-* The ``<handle>`` parameter is an integer that identifies the socket handle.
-* The ``<auto_reception_flags>`` parameter is an integer that specifies the automatic reception flags.
-  It is a combination of the following values summed up:
+The parameters and their defined values are the following:
 
-  * ``0`` - No automatic data reception.
-  * ``1`` - Automatic data reception in AT-command mode.
-  * ``2`` - Automatic data reception in data mode.
+<handle>
+   Integer.
+   Identifies the socket handle.
 
-* The ``<hex_format>`` parameter is an integer that specifies the hex format for automatically received data.
-  It can be one of the following values:
+<auto_reception_flags>
+   Integer.
+   Specifies the automatic reception flags.
+   A combination of the following values summed up:
 
-  * ``0`` - Data is received in binary format.
-  * ``1`` - Data is received in hex string format (supported only in AT-command mode).
+   * ``0`` - No automatic data reception.
+   * ``1`` - Automatic data reception in AT-command mode.
+   * ``2`` - Automatic data reception in data mode.
+
+<hex_format>
+   Integer.
+   Specifies the hex format for automatically received data.
+
+   * ``0`` - Data is received in binary format.
+   * ``1`` - Data is received in hex string format (supported only in AT-command mode).
 
 Example
 ~~~~~~~
@@ -1853,14 +2005,22 @@ Syntax
 
    AT#XGETADDRINFO=<hostname>[,<address_family>]
 
-* The ``<hostname>`` parameter is a string.
-* The ``<address_family>`` parameter is an optional integer that gives a hint for DNS query on address family.
+The parameters and their defined values are the following:
 
-  * ``0`` means unspecified address family.
-  * ``1`` means IPv4 address family.
-  * ``2`` means IPv6 address family.
+<hostname>
+   String.
+   The hostname to resolve.
 
-  If ``<address_family>`` is not specified, there will be no hint given for the DNS query.
+<address_family>
+   Integer.
+   Optional.
+   Gives a hint for DNS query on address family.
+
+   * ``0`` - Unspecified address family.
+   * ``1`` - IPv4 address family.
+   * ``2`` - IPv6 address family.
+
+   If not specified, there will be no hint given for the DNS query.
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -1869,8 +2029,11 @@ Response syntax
 
    #XGETADDRINFO: "<ip_addresses>"
 
-* The ``<ip_addresses>`` parameter is a string.
-  It indicates the IPv4 or IPv6 address of the resolved hostname.
+The parameters and their defined values are the following:
+
+<ip_addresses>
+   String.
+   The IPv4 or IPv6 address of the resolved hostname.
 
 Example
 ~~~~~~~
@@ -1923,8 +2086,12 @@ Syntax
 
    AT#XLISTEN=<handle>
 
-* The ``<handle>`` parameter is an integer that specifies the socket handle returned from ``#XSOCKET`` command.
-  The socket must be a stream socket (TCP) that has been bound to a non-zero local port with ``#XBIND``.
+The parameters and their defined values are the following:
+
+<handle>
+   Integer.
+   Specifies the socket handle returned from ``#XSOCKET`` command.
+   The socket must be a stream socket (TCP) that has been bound to a non-zero local port with ``#XBIND``.
 
 Example
 ~~~~~~~
@@ -1953,12 +2120,19 @@ Response syntax
 
    #XLISTEN: <handle>,<cid>,<local_port>
 
-* The ``<handle>`` parameter is an integer indicating the socket handle.
+The parameters and their defined values are the following:
 
-* The ``<cid>`` parameter is an integer indicating the PDN connection ID.
+<handle>
+   Integer.
+   The socket handle.
 
-* The ``<local_port>`` parameter is an unsigned 16-bit integer (0 - 65535).
-  It represents the local port the socket is bound to and listening on.
+<cid>
+   Integer.
+   The PDN connection ID.
+
+<local_port>
+   Integer.
+   An unsigned 16-bit integer (0 - 65535) representing the local port the socket is bound to and listening on.
 
 Example
 ~~~~~~~
@@ -2025,7 +2199,11 @@ Syntax
 
    AT#XACCEPT=<handle>
 
-* The ``<handle>`` parameter is an integer that specifies the socket handle that was used for the ``AT#XLISTEN`` command.
+The parameters and their defined values are the following:
+
+<handle>
+   Integer.
+   Specifies the socket handle that was used for the ``AT#XLISTEN`` command.
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -2034,16 +2212,25 @@ Response syntax
 
    #XACCEPT: <handle>,<cid>,"<peer_addr>",<peer_port>
 
-* The ``<handle>`` parameter is an integer indicating the new socket handle created for the accepted connection.
-  You can use this new socket to send and receive data with the connected client.
+The parameters and their defined values are the following:
 
-* The ``<cid>`` parameter is an integer indicating the PDN connection ID.
+<handle>
+   Integer.
+   The new socket handle created for the accepted connection.
+   You can use this new socket to send and receive data with the connected client.
 
-* The ``<peer_addr>`` parameter is a string containing the IP address of the remote peer that connected.
-  It supports both IPv4 and IPv6 addresses.
+<cid>
+   Integer.
+   The PDN connection ID.
 
-* The ``<peer_port>`` parameter is an unsigned 16-bit integer (0 - 65535).
-  It represents the port number of the remote peer.
+<peer_addr>
+   String.
+   The IP address of the remote peer that connected.
+   Supports both IPv4 and IPv6 addresses.
+
+<peer_port>
+   Integer.
+   An unsigned 16-bit integer (0 - 65535) representing the port number of the remote peer.
 
 Example
 ~~~~~~~

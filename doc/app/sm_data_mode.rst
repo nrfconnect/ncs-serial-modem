@@ -158,9 +158,13 @@ Syntax
 
    AT#XDATACTRL=<time_limit>
 
-* The ``<time_limit>`` parameter sets the timeout value in milliseconds.
-  The default value is the minimum required value, based on the configured UART baud rate.
-  This value must be long enough to allow for a DMA transmission of an UART receive (RX) buffer (:ref:`CONFIG_SM_UART_RX_BUF_SIZE <CONFIG_SM_UART_RX_BUF_SIZE>`).
+The parameters and their defined values are the following:
+
+<time_limit>
+   Integer.
+   The timeout value in milliseconds.
+   The default value is the minimum required value, based on the configured UART baud rate.
+   This value must be long enough to allow for a DMA transmission of an UART receive (RX) buffer (:ref:`CONFIG_SM_UART_RX_BUF_SIZE <CONFIG_SM_UART_RX_BUF_SIZE>`).
 
 Read command
 ------------
@@ -212,11 +216,11 @@ Unsolicited notification
 
    #XDATAMODE: <status>
 
-* The ``<status>`` parameter is an integer that indicates the status of the data mode operation.
-  It can have one of the following values:
+The parameters and their defined values are the following:
 
-  * ``0`` - Success
-  * ``-1`` - Failure
+<status>
+   * ``0`` - Success.
+   * ``-1`` - Failure.
 
 Example
 ~~~~~~~

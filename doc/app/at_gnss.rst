@@ -38,32 +38,36 @@ Syntax
 
    AT#XGNSS=<op>,<cloud_assistance>,<interval>[,<timeout>]
 
-* The ``<op>`` parameter can have the following integer values:
+The parameters and their defined values are the following:
 
-  * ``0`` - Stop the GNSS module.
-    In this case, no other parameter is allowed.
-  * ``1`` - Start the GNSS module.
+<op>
+   * ``0`` - Stop the GNSS module.
+     In this case, no other parameter is allowed.
+   * ``1`` - Start the GNSS module.
 
-* ``<cloud_assistance>`` parameter is an integer that indicates whether to use the nRF Cloud assistive services that were enabled during compilation.
-  It is ``0`` for disabled or ``1`` for enabled.
+<cloud_assistance>
+   * ``0`` - Disabled.
+   * ``1`` - Enabled.
 
-* ``<interval>`` parameter is an integer that indicates the GNSS fix interval in seconds.
-  It can have one of the following values:
+<interval>
+   Integer.
+   The GNSS fix interval in seconds.
+   It can have one of the following values:
 
-  * ``0`` - Single-fix navigation mode.
-  * ``1`` - Continuous navigation mode.
-    The fix interval is set to 1 second.
-  * Ranging from ``10`` to ``65535`` - Periodic navigation mode.
-    The fix interval is set to the specified value.
+   * ``0`` - Single-fix navigation mode.
+   * ``1`` - Continuous navigation mode.
+     The fix interval is set to 1 second.
+   * Ranging from ``10`` to ``65535`` - Periodic navigation mode.
+     The fix interval is set to the specified value.
 
-* ``timeout`` is an integer that indicates the maximum time in seconds that the GNSS receiver is allowed to run while trying to produce a valid Position, Velocity, and Time (PVT) estimate.
-  It can only be specified in single-fix and periodic navigation modes, and must be omitted in continuous navigation mode.
-  If omitted in single-fix or periodic navigation modes, the default value is 60 seconds.
+<timeout>
+   Integer.
+   The maximum time in seconds that the GNSS receiver is allowed to run while trying to produce a valid Position, Velocity, and Time (PVT) estimate.
+   Can only be specified in single-fix and periodic navigation modes, and must be omitted in continuous navigation mode.
+   If omitted in single-fix or periodic navigation modes, the default value is 60 seconds.
 
-  It can be one of the following:
-
-  * ``0`` - The GNSS receiver runs indefinitely until a valid PVT estimate is produced.
-  * Any positive integer - The GNSS receiver is turned off after the specified time is up, even if a valid PVT estimate was not produced.
+   * ``0`` - The GNSS receiver runs indefinitely until a valid PVT estimate is produced.
+   * Any positive integer - The GNSS receiver is turned off after the specified time is up, even if a valid PVT estimate was not produced.
 
 In periodic navigation mode, the ``<interval>`` and ``<timeout>`` parameters are temporarily ignored during the first fix.
 
@@ -114,13 +118,35 @@ Unsolicited notification
 
    #XGNSSPOS: <latitude>,<longitude>,<altitude>,<accuracy>,<speed>,<heading>,<datetime>
 
-* The ``<latitude>`` parameter represents the latitude in degrees.
-* The ``<longitude>`` parameter represents the longitude in degrees.
-* The ``<altitude>`` parameter represents the altitude above the WGS-84 ellipsoid in meters.
-* The ``<accuracy>`` parameter represents the accuracy (2D 1-sigma) in meters.
-* The ``<speed>`` parameter represents the horizontal speed in meters per second.
-* The ``<heading>`` parameter represents the heading of the movement of the user in degrees.
-* The ``<datetime>`` parameter represents the UTC date-time.
+The parameters and their defined values are the following:
+
+<latitude>
+   Float.
+   The latitude in degrees.
+
+<longitude>
+   Float.
+   The longitude in degrees.
+
+<altitude>
+   Float.
+   The altitude above the WGS-84 ellipsoid in meters.
+
+<accuracy>
+   Float.
+   The accuracy (2D 1-sigma) in meters.
+
+<speed>
+   Float.
+   The horizontal speed in meters per second.
+
+<heading>
+   Float.
+   The heading of the movement of the user in degrees.
+
+<datetime>
+   String.
+   The UTC date-time.
 
 ``#XGNSS`` notification indicates GNSS status.
 
@@ -130,17 +156,18 @@ Unsolicited notification
 
    #XGNSS: <gnss_service>,<gnss_status>
 
-* The ``<gnss_service>`` parameter is an integer.
-  When it has the value ``1``, it means that GNSS is supported in ``%XSYSTEMMODE`` and activated in ``+CFUN``.
+The parameters and their defined values are the following:
 
-* The ``<gnss_status>`` parameter is an integer.
-  It can have the following values:
+<gnss_service>
+   Integer.
+   When it has the value ``1``, it means that GNSS is supported in ``%XSYSTEMMODE`` and activated in ``+CFUN``.
 
-  * ``0`` - GNSS is stopped.
-  * ``1`` - GNSS is started.
-  * ``2`` - GNSS wakes up in periodic mode.
-  * ``3`` - GNSS enters sleep because of timeout.
-  * ``4`` - GNSS enters sleep because a fix is acquired.
+<gnss_status>
+   * ``0`` - GNSS is stopped.
+   * ``1`` - GNSS is started.
+   * ``2`` - GNSS wakes up in periodic mode.
+   * ``3`` - GNSS enters sleep because of timeout.
+   * ``4`` - GNSS enters sleep because a fix is acquired.
 
 .. sm_gps_status_notif_end
 
@@ -339,17 +366,21 @@ Syntax
 
    AT#XGNSSDEL=<mask>
 
-The ``<mask>`` parameter accepts an integer that is a bitwise ``OR`` of the following bitmasks:
+The parameters and their defined values are the following:
 
-* ``0x001`` - Ephemerides
-* ``0x002`` - Almanacs (excluding leap second and ionospheric correction)
-* ``0x004`` - Ionospheric correction parameters
-* ``0x008`` - Last good fix (the last position)
-* ``0x010`` - GPS time-of-week (TOW)
-* ``0x020`` - GPS week number
-* ``0x040`` - Leap second (UTC parameters)
-* ``0x100`` - Precision estimate of GPS time-of-week (TOW)
-* ``0x400`` - Extended Kalman Filter (EKF) state (last position/velocity/time solution)
+<mask>
+   Integer.
+   A bitwise ``OR`` of the following bitmasks:
+
+   * ``0x001`` - Ephemerides.
+   * ``0x002`` - Almanacs (excluding leap second and ionospheric correction).
+   * ``0x004`` - Ionospheric correction parameters.
+   * ``0x008`` - Last good fix (the last position).
+   * ``0x010`` - GPS time-of-week (TOW).
+   * ``0x020`` - GPS week number.
+   * ``0x040`` - Leap second (UTC parameters).
+   * ``0x100`` - Precision estimate of GPS time-of-week (TOW).
+   * ``0x400`` - Extended Kalman Filter (EKF) state (last position/velocity/time solution).
 
 For example, the integer value with all of the above bits enabled will be ``1407`` (``0x57f``).
 

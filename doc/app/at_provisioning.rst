@@ -62,28 +62,28 @@ One of the following ``#XNRFPROV`` notifications is emitted when the provisionin
 
    #XNRFPROV: <status>
 
-* The ``<status>`` parameter is an integer.
-  It can have the following values:
+The parameters and their defined values are the following:
 
-  * ``0`` - Provisioning successful, or no pending commands on the server.
-  * ``1`` - Host action required: deactivate LTE.
-    The host must take the modem offline (for example ``AT+CFUN=4``) so that credentials can be written safely.
-    The provisioning client waits until the modem reports offline functional mode before continuing or times out after ``CONFIG_NRF_PROVISIONING_MODEM_STATE_WAIT_TIMEOUT_SECONDS`` seconds.
-  * ``2`` - Host action required: activate LTE.
-    The host must bring the modem back online (for example ``AT+CFUN=1``) to reconnect to the provisioning server.
-    The provisioning client waits until the modem reports LTE registration before continuing or times out after ``CONFIG_NRF_PROVISIONING_MODEM_STATE_WAIT_TIMEOUT_SECONDS`` seconds.
-  * ``-1`` - Provisioning failed.
-    The host can retry provisioning by triggering the ``#XNRFPROV`` command again.
-  * ``-2`` - Device not claimed on nRF Cloud.
-    The device must be claimed using its attestation token.
-    Refer to the `nRF Cloud claiming Devices`_ documentation for more information.
-  * ``-3`` - Wrong root CA certificate.
-    Provision the correct nRF Cloud root CA certificate.
-  * ``-4`` - No valid datetime reference.
-    The modem must have a valid time before provisioning can proceed.
-  * ``-5`` - Too many commands received from the server.
-    Increase ``CONFIG_NRF_PROVISIONING_CBOR_RECORDS``.
-  * ``-6`` - Fatal error; the provisioning client encountered an irrecoverable error.
+<status>
+   * ``0`` - Provisioning successful, or no pending commands on the server.
+   * ``1`` - Host action required: deactivate LTE.
+     The host must take the modem offline (for example ``AT+CFUN=4``) so that credentials can be written safely.
+     The provisioning client waits until the modem reports offline functional mode before continuing or times out after ``CONFIG_NRF_PROVISIONING_MODEM_STATE_WAIT_TIMEOUT_SECONDS`` seconds.
+   * ``2`` - Host action required: activate LTE.
+     The host must bring the modem back online (for example ``AT+CFUN=1``) to reconnect to the provisioning server.
+     The provisioning client waits until the modem reports LTE registration before continuing or times out after ``CONFIG_NRF_PROVISIONING_MODEM_STATE_WAIT_TIMEOUT_SECONDS`` seconds.
+   * ``-1`` - Provisioning failed.
+     The host can retry provisioning by triggering the ``#XNRFPROV`` command again.
+   * ``-2`` - Device not claimed on nRF Cloud.
+     The device must be claimed using its attestation token.
+     Refer to the `nRF Cloud claiming Devices`_ documentation for more information.
+   * ``-3`` - Wrong root CA certificate.
+     Provision the correct nRF Cloud root CA certificate.
+   * ``-4`` - No valid datetime reference.
+     The modem must have a valid time before provisioning can proceed.
+   * ``-5`` - Too many commands received from the server.
+     Increase ``CONFIG_NRF_PROVISIONING_CBOR_RECORDS``.
+   * ``-6`` - Fatal error; the provisioning client encountered an irrecoverable error.
 
 Example
 ~~~~~~~

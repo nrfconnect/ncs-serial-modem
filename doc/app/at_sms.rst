@@ -33,16 +33,20 @@ Syntax
 
    AT#XSMS=<op>[,<number>,<text>]
 
-* The ``<op>`` parameter can accept one of the following values:
+The parameters and their defined values are the following:
 
-  * ``0`` - Stop SMS.
-  * ``1`` - Start SMS, ready to receive.
-  * ``2`` - Send SMS.
+<op>
+   * ``0`` - Stop SMS.
+   * ``1`` - Start SMS, ready to receive.
+   * ``2`` - Send SMS.
 
-* The ``<number>`` parameter is a string.
-  It represents the SMS recipient's phone number, including the country code (for example ``+81xxxxxxx``).
-* The ``<text>`` parameter is  a string.
-  It is the SMS text to be sent.
+<number>
+   String.
+   The SMS recipient's phone number, including the country code (for example ``+81xxxxxxx``).
+
+<text>
+   String.
+   The SMS text to be sent.
 
 Unsolicited notification
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -53,15 +57,22 @@ This is the notification syntax when an SMS message is received:
 
       #XSMS: <datetime>,<number>,<text>
 
-  * The ``<datetime>`` parameter is a string.
-    It represents the time when the SMS is received.
-    It has a format of ``YY-MM-DD HH:MM:SS UTC[+|-]HH:MM``.
-  * The ``<number>`` parameter is a string.
-    It represents the SMS sender's phone number.
-  * The ``<text>`` parameter is a string.
-    It represents the SMS text that has been received.
+The parameters and their defined values are the following:
 
-  When receiving concatenated SMS messages, there will be only one notification.
+<datetime>
+   String.
+   The time when the SMS is received.
+   It has a format of ``YY-MM-DD HH:MM:SS UTC[+|-]HH:MM``.
+
+<number>
+  String.
+  The SMS sender's phone number.
+
+<text>
+   String.
+   The SMS text that has been received.
+
+When receiving concatenated SMS messages, there will be only one notification.
 
 Example
 ~~~~~~~
