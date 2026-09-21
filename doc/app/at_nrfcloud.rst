@@ -40,25 +40,26 @@ Syntax
 
    AT#XNRFCLOUD=<op>[,<send_location>]
 
-* The ``<op>`` parameter can have the following integer values:
+The parameters and their defined values are the following:
 
-  * ``0`` - Disconnect from the nRF Cloud service.
-  * ``1`` - Connect to the nRF Cloud service.
-  * ``2`` - Send a message in the JSON format to the nRF Cloud service.
+<op>
+   * ``0`` - Disconnect from the nRF Cloud service.
+   * ``1`` - Connect to the nRF Cloud service.
+   * ``2`` - Send a message in the JSON format to the nRF Cloud service.
 
-  When ``<op>`` is ``2``, |SM| enters :ref:`sm_data_mode`.
+   When ``<op>`` is ``2``, |SM| enters :ref:`sm_data_mode`.
 
-* The ``<send_location>`` parameter is used only when the value of ``<op>`` is ``1``.
-  It can have the following integer values:
+<send_location>
+   Used only when the value of ``<op>`` is ``1``.
 
-  * ``0`` - The device location is not sent to nRF Cloud.
-    This is the default behavior if the parameter is omitted.
-  * ``1`` - The device location is sent to nRF Cloud.
+   * ``0`` - The device location is not sent to nRF Cloud.
+     This is the default behavior if the parameter is omitted.
+   * ``1`` - The device location is sent to nRF Cloud.
 
-  .. note::
-     The location is sent to the nRF Cloud whenever a fix is produced by the GNSS module.
-     You must use the :ref:`#XGNSS <SM_AT_GNSS>` AT command to start GNSS either in single-fix or periodic navigation mode.
-     The interval between fixes must be at least 5 seconds.
+   .. note::
+      The location is sent to the nRF Cloud whenever a fix is produced by the GNSS module.
+      You must use the :ref:`#XGNSS <SM_AT_GNSS>` AT command to start GNSS either in single-fix or periodic navigation mode.
+      The interval between fixes must be at least 5 seconds.
 
 Unsolicited notification
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -67,8 +68,15 @@ Unsolicited notification
 
    #XNRFCLOUD: <ready>,<send_location>
 
-* The ``<ready>`` parameter indicates whether the connection to nRF Cloud is established or not.
-* The ``<send_location>`` parameter indicates whether the device location will be sent to nRF Cloud or not.
+The parameters and their defined values are the following:
+
+<ready>
+   Integer.
+   Indicates whether the connection to nRF Cloud is established or not.
+
+<send_location>
+   Integer.
+   Indicates whether the device location will be sent to nRF Cloud or not.
 
 Example
 ~~~~~~~
@@ -125,10 +133,23 @@ Response syntax
 
    #XNRFCLOUD: <ready>,<send_location>,<sec_tag>,<device_id>
 
-* The ``<ready>`` parameter indicates whether the connection to nRF Cloud is established or not.
-* The ``<send_location>`` parameter indicates whether the device location will be sent to nRF Cloud or not.
-* The ``<sec_tag>`` parameter indicates the ``sec_tag`` used for accessing nRF Cloud.
-* The ``<device_id>`` parameter indicates the device ID used for accessing nRF Cloud.
+The parameters and their defined values are the following:
+
+<ready>
+   Integer.
+   Indicates whether the connection to nRF Cloud is established or not.
+
+<send_location>
+   Integer.
+   Indicates whether the device location will be sent to nRF Cloud or not.
+
+<sec_tag>
+   Integer.
+   The ``sec_tag`` used for accessing nRF Cloud.
+
+<device_id>
+   String.
+   The device ID used for accessing nRF Cloud.
 
 Example
 ~~~~~~~
@@ -190,32 +211,39 @@ Syntax
 
    AT#XNRFCLOUDPOS=<cell_count>,<wifi_pos>[,<MAC 1>[,<RSSI 1>],<MAC 2>[,<RSSI 2>][,<MAC 3>[...]]]
 
-* The ``<cell_count>`` parameter indicates the number of cells to include in the location request.
-  The value range is ``0`` to ``15``.
-  For cellular positioning, a recommended value is ``4``.
-  ``0`` means that no cellular network information will be included in the location request.
-  The |SM| uses the ``AT%NCELLMEAS`` command to retrieve the cellular network information, and depending on the value of ``<cell_count>``, the command might be executed multiple times.
+The parameters and their defined values are the following:
 
-  .. note::
+<cell_count>
+   Integer.
+   The number of cells to include in the location request.
+   The value range is ``0`` to ``15``.
+   For cellular positioning, a recommended value is ``4``.
+   ``0`` means that no cellular network information will be included in the location request.
+   The |SM| uses the ``AT%NCELLMEAS`` command to retrieve the cellular network information, and depending on the value of ``<cell_count>``, the command might be executed multiple times.
 
-     Since the |SM| uses the ``AT%NCELLMEAS`` command internally, the host must not use the ``AT%NCELLMEAS`` command during ``#XNRFCLOUDPOS`` command execution.
-     You may still use ``AT%NCELLMEAS`` command before or after ``#XNRFCLOUDPOS`` command execution for your own purposes.
-     You will also see ``%NCELLMEAS`` notifications, which you can ignore, during the ``#XNRFCLOUDPOS`` command execution.
+   .. note::
 
-* The ``<wifi_pos>`` parameter can have the following integer values:
+      Since the |SM| uses the ``AT%NCELLMEAS`` command internally, the host must not use the ``AT%NCELLMEAS`` command during ``#XNRFCLOUDPOS`` command execution.
+      You may still use ``AT%NCELLMEAS`` command before or after ``#XNRFCLOUDPOS`` command execution for your own purposes.
+      You will also see ``%NCELLMEAS`` notifications, which you can ignore, during the ``#XNRFCLOUDPOS`` command execution.
 
-  * ``0`` - Do not include Wi-Fi access point information in the location request.
-  * ``1`` - Use Wi-Fi access point information.
-    The access points must be given as additional parameters to the command.
-    The minimum number of access points to provide is two (``NRF_CLOUD_LOCATION_WIFI_AP_CNT_MIN``), and the maximum is limited by the maximum size of the AT command, which is 8190 bytes, including the terminator character.
+<wifi_pos>
+   * ``0`` - Do not include Wi-Fi access point information in the location request.
+   * ``1`` - Use Wi-Fi access point information.
+     The access points must be given as additional parameters to the command.
+     The minimum number of access points to provide is two (``NRF_CLOUD_LOCATION_WIFI_AP_CNT_MIN``), and the maximum is limited by the maximum size of the AT command, which is 8190 bytes, including the terminator character.
 
-* The ``<MAC x>`` parameter is a string.
-  It indicates the MAC address of a Wi-Fi access point and must be formatted as ``%02x:%02x:%02x:%02x:%02x:%02x`` (``WIFI_MAC_ADDR_TEMPLATE``).
+<MAC x>
+   String.
+   The MAC address of a Wi-Fi access point.
+   Must be formatted as ``%02x:%02x:%02x:%02x:%02x:%02x`` (``WIFI_MAC_ADDR_TEMPLATE``).
 
-* The ``<RSSI x>`` parameter is an optional integer.
-  It indicates the signal strength of a Wi-Fi access point in dBm, between ``-128`` and ``0``.
-  If provided, it must follow the MAC address parameter of the access point.
-  Providing the RSSI parameters helps improve the accuracy of the Wi-Fi location.
+<RSSI x>
+   Integer.
+   Optional.
+   The signal strength of a Wi-Fi access point in dBm, between ``-128`` and ``0``.
+   If provided, it must follow the MAC address parameter of the access point.
+   Providing the RSSI parameters helps improve the accuracy of the Wi-Fi location.
 
 Unsolicited notification
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -224,23 +252,34 @@ Unsolicited notification
 
    #XNRFCLOUDPOS: <status>[,<type>,<latitude>,<longitude>,<uncertainty>]
 
-* The ``<status>`` parameter indicates the status of the location request.
+The parameters and their defined values are the following:
 
-  * ``0`` - Successful request. Other parameters are also present.
-  * ``-1`` - Location request failed.
-  * ``<positive integer>`` - Requesting location from the cloud failed with cloud error as defined in :c:enum:`nrf_cloud_error` values.
+<status>
+   * ``0`` - Successful request.
+     Other parameters are also present.
+   * ``-1`` - Location request failed.
+   * ``<positive integer>`` - Requesting location from the cloud failed with cloud error as defined in :c:enum:`nrf_cloud_error` values.
 
 This is emitted when a successful response to a sent location request is received.
 
-* The ``<type>`` parameter indicates the service used to fulfill the location request.
+<type>
+   The service used to fulfill the location request.
 
-  * ``0`` (:c:enumerator:`LOCATION_TYPE_SINGLE_CELL`) - Single-cell cellular location.
-  * ``1`` (:c:enumerator:`LOCATION_TYPE_MULTI_CELL`) - Multi-cell cellular location.
-  * ``2`` (:c:enumerator:`LOCATION_TYPE_WIFI`) - Wi-Fi location.
+   * ``0`` (:c:enumerator:`LOCATION_TYPE_SINGLE_CELL`) - Single-cell cellular location.
+   * ``1`` (:c:enumerator:`LOCATION_TYPE_MULTI_CELL`) - Multi-cell cellular location.
+   * ``2`` (:c:enumerator:`LOCATION_TYPE_WIFI`) - Wi-Fi location.
 
-* The ``<latitude>`` parameter represents the latitude in degrees.
-* The ``<longitude>`` parameter represents the longitude in degrees.
-* The ``<uncertainty>`` parameter represents the radius of the uncertainty circle around the location in meters, also known as Horizontal Positioning Error (HPE).
+<latitude>
+   Float.
+   The latitude in degrees.
+
+<longitude>
+   Float.
+   The longitude in degrees.
+
+<uncertainty>
+   Float.
+   The radius of the uncertainty circle around the location in meters, also known as Horizontal Positioning Error (HPE).
 
 Example
 ~~~~~~~
@@ -341,18 +380,21 @@ Syntax
 
    AT#XNRFCLOUDOBSAUTO=<enable>[,<interval_seconds>][,<project_key>]
 
-* The ``<enable>`` parameter can have the following integer values:
+The parameters and their defined values are the following:
 
-  * ``0`` - Disable the automatic upload.
-  * ``1`` - Enable the automatic upload.
+<enable>
+   * ``0`` - Disable the automatic upload.
+   * ``1`` - Enable the automatic upload.
 
-* The ``<interval_seconds>`` parameter is an integer from ``60`` to ``86400``.
-  It is the interval between two uploads.
-  When it is omitted, the stored interval is kept.
-  Its initial value is set by the :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_AUTO_INTERVAL_SECONDS <CONFIG_SM_NRF_CLOUD_OBSERVABILITY_AUTO_INTERVAL_SECONDS>` Kconfig option.
+<interval_seconds>
+   Integer.
+   The interval between two uploads, from ``60`` to ``86400`` seconds.
+   When omitted, the stored interval is kept.
+   Its initial value is set by the :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_AUTO_INTERVAL_SECONDS <CONFIG_SM_NRF_CLOUD_OBSERVABILITY_AUTO_INTERVAL_SECONDS>` Kconfig option.
 
-* The ``<project_key>`` parameter is a string.
-  When it is omitted, the stored project key is kept, and an empty string clears it.
+<project_key>
+   String.
+   When omitted, the stored project key is kept, and an empty string clears it.
 
 The first upload runs when the interval expires, not when the automatic upload is enabled.
 An upload that falls while there is no connection to nRF Cloud is skipped, and the next one is scheduled as usual.
@@ -447,12 +489,13 @@ Unsolicited notification
 
    #XNRFCLOUDOBSUPLOAD: <result>[,<bytes>]
 
-* The ``<result>`` parameter is an integer.
+The parameters and their defined values are the following:
 
-  * ``0`` - Success.
-    The ``<bytes>`` parameter follows and indicates the number of bytes uploaded, which is ``0`` when there was nothing buffered.
-  * ``-1`` - Failure.
-    The error code is shown in the log.
+<result>
+   * ``0`` - Success.
+     The ``<bytes>`` parameter follows and indicates the number of bytes uploaded, which is ``0`` when there was nothing buffered.
+   * ``-1`` - Failure.
+     The error code is shown in the log.
 
 Example
 ~~~~~~~
@@ -517,10 +560,11 @@ Syntax
 
    AT#XNRFCLOUDOBSCOREDUMP=<enable>
 
-* The ``<enable>`` parameter is an integer.
+The parameters and their defined values are the following:
 
-  * ``0`` - Exclude the stored core dump from uploads.
-  * ``1`` - Include the stored core dump in uploads.
+<enable>
+   * ``0`` - Exclude the stored core dump from uploads.
+   * ``1`` - Include the stored core dump in uploads.
 
 Read command
 ------------
@@ -629,8 +673,11 @@ Syntax
 
    AT#XNRFCLOUDOBSFORWARD=<base64_chunk>[,<project_key>]
 
-* The ``<base64_chunk>`` parameter is a string.
-  It is the base64-encoded Memfault chunk to forward.
+The parameters and their defined values are the following:
+
+<base64_chunk>
+   String.
+   The base64-encoded Memfault chunk to forward.
 
 The command returns ``OK`` immediately and the chunk is posted asynchronously.
 When the post completes, an unsolicited notification is sent.
@@ -642,11 +689,12 @@ Unsolicited notification
 
    #XNRFCLOUDOBSFORWARD: <result>
 
-* The ``<result>`` parameter is an integer.
+The parameters and their defined values are the following:
 
-  * ``0`` - Success.
-  * ``-1`` - Failure.
-    The chunk is not buffered, so the host must send it again to retry.
+<result>
+   * ``0`` - Success.
+   * ``-1`` - Failure.
+     The chunk is not buffered, so the host must send it again to retry.
 
 Example
 ~~~~~~~
@@ -711,7 +759,23 @@ Response
 
    #XNRFCLOUDOBSDEVINFO: <device_serial>,<software_type>,<software_version>,<hardware_version>
 
-All four parameters are strings.
+The parameters and their defined values are the following:
+
+<device_serial>
+   String.
+   The device serial.
+
+<software_type>
+   String.
+   The software type.
+
+<software_version>
+   String.
+   The software version.
+
+<hardware_version>
+   String.
+   The hardware version.
 
 Example
 ~~~~~~~
@@ -755,8 +819,12 @@ Syntax
 
    AT#XNRFCLOUDOBSCRASH[=<type>]
 
-* The ``<type>`` parameter is an integer from ``0`` to ``4``.
-  It defaults to ``0``, an assertion failure.
+The parameters and their defined values are the following:
+
+<type>
+   Integer.
+   An integer from ``0`` to ``4``.
+   It defaults to ``0``, an assertion failure.
 
 The device crashes and no response is returned, unless the crash type is invalid.
 
@@ -875,16 +943,18 @@ Syntax
 
    AT#XNRFCLOUDFOTA=<op>[,<project_key>]
 
-* The ``<op>`` parameter is an integer.
+The parameters and their defined values are the following:
 
-  * ``0`` - Cancel an ongoing download.
-    This is effective only after a download has started, that is, after the first ``#XFOTA`` progress notification.
-  * ``1`` - Check for and download an application update.
-    The optional ``<project_key>`` overrides the application project key (``CONFIG_MEMFAULT_PROJECT_KEY``) for this check.
-  * ``2`` - Check for and download a modem firmware update.
+<op>
+   * ``0`` - Cancel an ongoing download.
+     This is effective only after a download has started, that is, after the first ``#XFOTA`` progress notification.
+   * ``1`` - Check for and download an application update.
+     The optional ``<project_key>`` overrides the application project key (``CONFIG_MEMFAULT_PROJECT_KEY``) for this check.
+   * ``2`` - Check for and download a modem firmware update.
 
-* The ``<project_key>`` parameter is a string.
-  For ``<op>=1`` it overrides the application project key (``CONFIG_MEMFAULT_PROJECT_KEY``), and for ``<op>=2`` it overrides :ref:`CONFIG_SM_NRF_CLOUD_FOTA_MODEM_PROJECT_KEY <CONFIG_SM_NRF_CLOUD_FOTA_MODEM_PROJECT_KEY>`, for this check.
+<project_key>
+   String.
+   For ``<op>=1`` it overrides the application project key (``CONFIG_MEMFAULT_PROJECT_KEY``), and for ``<op>=2`` it overrides :ref:`CONFIG_SM_NRF_CLOUD_FOTA_MODEM_PROJECT_KEY <CONFIG_SM_NRF_CLOUD_FOTA_MODEM_PROJECT_KEY>`, for this check.
 
 The command returns ``OK`` immediately and the check runs asynchronously.
 When it completes, an unsolicited notification is sent.
@@ -896,11 +966,12 @@ Unsolicited notification
 
    #XNRFCLOUDFOTA: <result>[,<error>]
 
-* The ``<result>`` parameter is an integer.
+The parameters and their defined values are the following:
 
-  * ``0`` - No update is available.
-  * ``-1`` - The check failed.
-    The ``<error>`` parameter follows with the error code.
+<result>
+   * ``0`` - No update is available.
+   * ``-1`` - The check failed.
+     The ``<error>`` parameter follows with the error code.
 
 This notification is sent only when no download was started.
 When a download starts, progress and completion are reported over the ``#XFOTA`` notification instead, as described in :ref:`SM_AT_FOTA`.

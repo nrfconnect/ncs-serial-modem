@@ -51,8 +51,18 @@ Syntax
 
    AT+CMUX=<mode>[,<subset>]
 
-* The ``<mode>`` parameter selects the operation mode. Only ``0`` (basic mode) is supported.
-* The ``<subset>`` parameter selects the subset of mode 0. Only ``0`` is supported. Default value is ``0``.
+The parameters and their defined values are the following:
+
+<mode>
+   Integer.
+   Selects the operation mode.
+   Only ``0`` (basic mode) is supported.
+
+<subset>
+   Integer.
+   Selects the subset of mode 0.
+   Only ``0`` is supported.
+   Default value is ``0``.
 
 Read command
 ------------
@@ -73,8 +83,15 @@ Response syntax
 
    +CMUX: <mode>,<subset>
 
-* The ``<mode>`` parameter is always ``0`` (basic mode).
-* The ``<subset>`` parameter is always ``0``.
+The parameters and their defined values are the following:
+
+<mode>
+   Integer.
+   Always ``0`` (basic mode).
+
+<subset>
+   Integer.
+   Always ``0``.
 
 Test command
 ------------
@@ -144,12 +161,16 @@ Syntax
 
    AT#XCMUX[=<AT_channel>]
 
-The ``<AT_channel>`` parameter is an integer used to indicate the address of the AT channel.
-The AT channel denotes the CMUX channel where AT data (commands, responses, notifications) is exchanged.
-If specified, it must be ``1``, unless :ref:`PPP <CONFIG_SM_PPP>` is enabled.
-If PPP is enabled, it can also be ``2`` (to allocate the first CMUX channel to PPP).
-If not specified, the previously used address is used.
-If no address has been previously specified, the default address is ``1``.
+The parameters and their defined values are the following:
+
+<AT_channel>
+   Integer.
+   The address of the AT channel.
+   The AT channel denotes the CMUX channel where AT data (commands, responses, notifications) is exchanged.
+   If specified, it must be ``1``, unless :ref:`PPP <CONFIG_SM_PPP>` is enabled.
+   If PPP is enabled, it can also be ``2`` (to allocate the first CMUX channel to PPP).
+   If not specified, the previously used address is used.
+   If no address has been previously specified, the default address is ``1``.
 
 .. note::
 
@@ -185,10 +206,17 @@ Response syntax
 
    #XCMUX: <AT_channel>,<channel_count>
 
-* The ``<AT_channel>`` parameter indicates the address of the AT channel.
-  It is between ``1`` and ``<channel_count>``.
-* The ``<channel_count>`` parameter is the total number of CMUX channels.
-  It depends on what features are enabled (for example, :ref:`PPP <CONFIG_SM_PPP>`).
+The parameters and their defined values are the following:
+
+<AT_channel>
+   Integer.
+   The address of the AT channel.
+   It is between ``1`` and ``<channel_count>``.
+
+<channel_count>
+   Integer.
+   The total number of CMUX channels.
+   It depends on what features are enabled (for example, :ref:`PPP <CONFIG_SM_PPP>`).
 
 Example
 -------
@@ -277,11 +305,12 @@ Syntax
 
    AT#XCMUXURC=<channel>
 
-* The ``<channel>`` parameter is an integer from ``0`` to the total number of CMUX channels:
+The parameters and their defined values are the following:
 
-  * ``0`` means auto-select - URCs are sent to the first open AT channel not in data mode.
-  * ``99`` means all channels - URCs are sent to all open AT channels not in data mode.
-  * Any other value routes URCs to the specified DLC channel.
+<channel>
+   * ``0`` - Auto-select: URCs are sent to the first open AT channel not in data mode.
+   * ``99`` - All channels: URCs are sent to all open AT channels not in data mode.
+   * Any other value routes URCs to the specified DLC channel.
 
 Read command
 ------------
@@ -302,7 +331,11 @@ Response syntax
 
    #XCMUXURC: <channel>
 
-* The ``<channel>`` parameter is the currently configured URC channel (see the set command).
+The parameters and their defined values are the following:
+
+<channel>
+   Integer.
+   The currently configured URC channel (see the set command).
 
 Test command
 ------------

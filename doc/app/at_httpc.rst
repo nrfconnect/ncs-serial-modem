@@ -33,59 +33,67 @@ Syntax
 
    AT#XHTTPCREQ=<handle>,<url>,<method>[,<auto_reception>[,<format>[,<body_len>[,<header 1>[,<header 2>[...]]]]]]
 
-* The ``<handle>`` parameter is an integer.
-  It identifies the connected socket handle returned by ``AT#XSOCKET`` or ``AT#XSSOCKET``, and connected by ``AT#XCONNECT``.
+The parameters and their defined values are the following:
 
-* The ``<url>`` parameter is a string.
-  It specifies the full URL of the request, for example, ``http://host/path`` or ``https://host/path``.
+<handle>
+   Integer.
+   Identifies the connected socket handle returned by ``AT#XSOCKET`` or ``AT#XSSOCKET``, and connected by ``AT#XCONNECT``.
 
-* The ``<method>`` parameter must be one of the following values:
+<url>
+   String.
+   The full URL of the request, for example, ``http://host/path`` or ``https://host/path``.
 
-  * ``0`` - GET.
-  * ``1`` - POST.
-  * ``2`` - PUT.
-  * ``3`` - DELETE.
-  * ``4`` - HEAD.
+<method>
+   * ``0`` - GET.
+   * ``1`` - POST.
+   * ``2`` - PUT.
+   * ``3`` - DELETE.
+   * ``4`` - HEAD.
 
-* The ``<auto_reception>`` parameter is an optional integer.
-  When omitted, automatic reception is used.
-  It can accept the following values:
+<auto_reception>
+   Integer.
+   Optional.
+   When omitted, automatic reception is used.
 
-  * ``1`` - Automatic mode (default).
-    Response body bytes are received and forwarded to the host automatically.
-  * ``0`` - Manual mode.
-    Response body reception is paused after the headers are parsed and ``#XHTTPCHEAD`` is emitted.
-    The host must then retrieve body data in chunks using ``AT#XHTTPCDATA`` commands.
+   * ``1`` - Automatic mode (default).
+     Response body bytes are received and forwarded to the host automatically.
+   * ``0`` - Manual mode.
+     Response body reception is paused after the headers are parsed and ``#XHTTPCHEAD`` is emitted.
+     The host must then retrieve body data in chunks using ``AT#XHTTPCDATA`` commands.
 
-* The ``<format>`` parameter is an optional integer.
-  It controls the encoding used to deliver response body bytes to the host.
-  It can accept the following values:
+<format>
+   Integer.
+   Optional.
+   Controls the encoding used to deliver response body bytes to the host.
 
-  * ``0`` - Binary (default).
-    Response body bytes are forwarded to the host as raw binary.
-  * ``1`` - Hex string.
-    Response body bytes are encoded as a lower-case ASCII hex string before delivery.
-    Each raw byte becomes two hex characters.
-    The ``<length>`` field in ``#XHTTPCDATA`` always reports the raw byte count.
-    The actual data delivered is ``2×<length>`` ASCII hex characters.
-    Applies to both automatic and manual reception modes.
+   * ``0`` - Binary (default).
+     Response body bytes are forwarded to the host as raw binary.
+   * ``1`` - Hex string.
+     Response body bytes are encoded as a lower-case ASCII hex string before delivery.
+     Each raw byte becomes two hex characters.
+     The ``<length>`` field in ``#XHTTPCDATA`` always reports the raw byte count.
+     The actual data delivered is ``2×<length>`` ASCII hex characters.
+     Applies to both automatic and manual reception modes.
 
-* The ``<body_len>`` parameter is an optional integer.
-  It is required as a placeholder when ``<header>`` parameters follow.
-  It can accept the following values:
+<body_len>
+   Integer.
+   Optional.
+   Required as a placeholder when ``<header>`` parameters follow.
 
-  * ``0`` - No request body.
-  * Positive integer - Length of the request body in bytes.
-    Valid for POST and PUT only.
-    When set, the HTTP request headers are sent to the server immediately when the AT command is processed.
-    The command then responds with ``OK`` and enters data mode.
-    Body bytes are forwarded to the server as they are received from the host in data mode.
-    The host must send exactly this many bytes as the request body.
-    Data mode exits and ``#XDATAMODE: 0`` is reported when all bytes have been processed.
+   * ``0`` - No request body.
+   * Positive integer - Length of the request body in bytes.
+     Valid for POST and PUT only.
+     When set, the HTTP request headers are sent to the server immediately when the AT command is processed.
+     The command then responds with ``OK`` and enters data mode.
+     Body bytes are forwarded to the server as they are received from the host in data mode.
+     The host must send exactly this many bytes as the request body.
+     Data mode exits and ``#XDATAMODE: 0`` is reported when all bytes have been processed.
 
-* The ``<header X>`` parameter is an optional string.
-  It specifies an additional HTTP request header.
-  Empty parameters between headers (``<header 1>``, ``<header 2>``,, ``<header 3>``, ...) are ignored.
+<header X>
+   String.
+   Optional.
+   An additional HTTP request header.
+   Empty parameters between headers (``<header 1>``, ``<header 2>``,, ``<header 3>``, ...) are ignored.
 
 .. note::
 
@@ -103,8 +111,11 @@ Response syntax
    #XHTTPCREQ: <handle>
    OK
 
-* The ``<handle>`` parameter is an integer.
-  It identifies the socket.
+The parameters and their defined values are the following:
+
+<handle>
+   Integer.
+   Identifies the socket.
 
 Unsolicited notification
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -113,12 +124,19 @@ Unsolicited notification
 
    #XHTTPCHEAD: <handle>,<status_code>,<content_length>
 
-* The ``<handle>`` parameter is an integer.
-  It identifies the socket.
-* The ``<status_code>`` parameter is an integer.
-  It contains the HTTP status code returned by the server.
-* The ``<content_length>`` parameter is an integer.
-  It contains the value of the ``Content-Length`` response header, or ``-1`` when the server uses chunked transfer encoding or does not provide a content length.
+The parameters and their defined values are the following:
+
+<handle>
+   Integer.
+   Identifies the socket.
+
+<status_code>
+   Integer.
+   The HTTP status code returned by the server.
+
+<content_length>
+   Integer.
+   The value of the ``Content-Length`` response header, or ``-1`` when the server uses chunked transfer encoding or does not provide a content length.
 
 ``#XHTTPCDATA`` is emitted in automatic mode for each received body chunk::
 
@@ -129,12 +147,19 @@ The notification line is terminated with ``\r\n``, the response data follows imm
 In binary mode (``<format>=0``, default),  the data is ``<length>`` raw bytes.
 In hex mode (``<format>=1``), the data is ``2×<length>`` lower-case ASCII hex characters.
 
-* The ``<handle>`` parameter is an integer.
-  It identifies the socket.
-* The ``<offset>`` parameter is an integer.
-  It contains the number of body bytes already delivered before this chunk.
-* The ``<length>`` parameter is an integer.
-  It contains the number of body bytes in this chunk.
+The parameters and their defined values are the following:
+
+<handle>
+   Integer.
+   Identifies the socket.
+
+<offset>
+   Integer.
+   The number of body bytes already delivered before this chunk.
+
+<length>
+   Integer.
+   The number of body bytes in this chunk.
 
 .. note::
 
@@ -148,18 +173,26 @@ In hex mode (``<format>=1``), the data is ``2×<length>`` lower-case ASCII hex c
 
    #XHTTPCSTAT: <handle>,<status_code>,<total_bytes>,<connection_close>
 
-* The ``<handle>`` parameter is an integer.
-  It identifies the socket.
-* The ``<status_code>`` parameter is an integer.
-  It contains the HTTP status code on success, or ``-1`` on failure, cancel, or timeout.
-* The ``<total_bytes>`` parameter is an integer.
+The parameters and their defined values are the following:
+
+<handle>
+   Integer.
+   Identifies the socket.
+
+<status_code>
+   Integer.
+   The HTTP status code on success, or ``-1`` on failure, cancel, or timeout.
+
+<total_bytes>
+   Integer.
    On successful completion, failure, or timeout, it contains the total number of response body bytes received by the HTTP client.
    For chunked transfer encoding this includes the raw framing bytes (chunk-size lines, ``\r\n`` separators, and the final ``0\r\n\r\n`` terminator).
    On cancel (``status_code=-1`` from ``AT#XHTTPCCANCEL`` or ``AT#XCLOSE``), it contains the number of response body bytes already delivered to the host.
-* The ``<connection_close>`` parameter is an integer.
-  It is ``1`` when the server includes a ``Connection: close`` header in its response, indicating that the TCP connection will be closed after this response.
-  It is ``0`` otherwise (keep-alive connection).
-  When ``<connection_close>`` is ``1``, the host must close the socket with ``AT#XCLOSE`` and open a new connection before issuing the next request.
+
+<connection_close>
+   * ``0`` - Keep-alive connection.
+   * ``1`` - The server includes a ``Connection: close`` header, indicating that the TCP connection will be closed after this response.
+     The host must close the socket with ``AT#XCLOSE`` and open a new connection before issuing the next request.
 
 .. note::
 
@@ -353,12 +386,17 @@ Syntax
 
    AT#XHTTPCDATA=<handle>[,<length>]
 
-* The ``<handle>`` parameter is an integer.
-  It identifies the socket used when starting the manual-mode request.
+The parameters and their defined values are the following:
 
-* The ``<length>`` parameter is an optional integer.
-  It specifies the maximum number of bytes to receive in this pull.
-  When omitted, the full internal receive buffer size is used.
+<handle>
+   Integer.
+   Identifies the socket used when starting the manual-mode request.
+
+<length>
+   Integer.
+   Optional.
+   The maximum number of bytes to receive in this pull.
+   When omitted, the full internal receive buffer size is used.
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -378,13 +416,20 @@ When the socket buffer is temporarily empty (EAGAIN)::
    #XHTTPCDATA: <handle>,<offset>,0
    OK
 
-* The ``<handle>`` parameter is an integer.
-  It identifies the socket.
-* The ``<offset>`` parameter is an integer.
-  It contains the number of body bytes already delivered before this pull.
-* The ``<length>`` parameter is an integer.
-  It contains the number of body bytes delivered in this pull.
-  A value of ``0`` means the socket buffer is currently empty.
+The parameters and their defined values are the following:
+
+<handle>
+   Integer.
+   Identifies the socket.
+
+<offset>
+   Integer.
+   The number of body bytes already delivered before this pull.
+
+<length>
+   Integer.
+   The number of body bytes delivered in this pull.
+   A value of ``0`` means the socket buffer is currently empty.
 
 When all body bytes have been delivered, ``#XHTTPCSTAT`` is sent as a URC after the final ``OK``.
 This happens either when the server closes the connection, when the ``Content-Length`` bytes have all been forwarded, or when the chunked transfer ``0\r\n\r\n`` terminator is received.
@@ -474,8 +519,11 @@ Syntax
 
    AT#XHTTPCCANCEL=<handle>
 
-* The ``<handle>`` parameter is an integer.
-  It identifies the socket of the request to cancel.
+The parameters and their defined values are the following:
+
+<handle>
+   Integer.
+   Identifies the socket of the request to cancel.
 
 An unsolicited ``#XHTTPCSTAT: <handle>,-1,<total_bytes>,<connection_close>`` notification is emitted after cancellation, where ``<total_bytes>`` is the number of response body bytes already delivered to the host.
 

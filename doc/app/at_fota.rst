@@ -26,46 +26,52 @@ Syntax
 
    AT#XFOTA=<op>[,<file_url>[,<sec_tag>[,<pdn_id>]]]
 
-* The ``<op>`` parameter must be one of the following values:
+The parameters and their defined values are the following:
 
-  * ``0`` - Stop FOTA (during download only).
-    Can be used as a way to pause and resume the download, by issuing the same FOTA start command to resume.
-  * ``1`` - Start FOTA for application update.
-  * ``2`` - Start FOTA for modem delta update.
+<op>
+   * ``0`` - Stop FOTA (during download only).
+     Can be used as a way to pause and resume the download, by issuing the same FOTA start command to resume.
+   * ``1`` - Start FOTA for application update.
+   * ``2`` - Start FOTA for modem delta update.
 
-  .. only:: not nrf91m1
+   .. only:: not nrf91m1
 
-    * ``3`` - Start FOTA for full modem update.
-      Can only be used when the :file:`full-fota.conf` configuration file and :file:`full-fota.overlay` devicetree overlay are used.
+     * ``3`` - Start FOTA for full modem update.
+       Can only be used when the :file:`full-fota.conf` configuration file and :file:`full-fota.overlay` devicetree overlay are used.
 
-  * ``5`` - Start FOTA for MCUboot second-stage bootloader update.
+   * ``5`` - Start FOTA for MCUboot second-stage bootloader update.
 
-  .. only:: not nrf91m1
+   .. only:: not nrf91m1
 
-      Only available when the device uses the NSIB (B0) and MCUboot as a second-stage bootloader.
+       Only available when the device uses the NSIB (B0) and MCUboot as a second-stage bootloader.
 
-      Not supported on the Thingy:91 X.
+       Not supported on the Thingy:91 X.
 
-  * ``7`` - Read modem DFU area size and firmware image offset (for modem delta update).
-  * ``9`` - Erase modem DFU area (for modem delta update).
+   * ``7`` - Read modem DFU area size and firmware image offset (for modem delta update).
+   * ``9`` - Erase modem DFU area (for modem delta update).
 
-* The ``<file url>`` parameter is a string.
-  It represents the full HTTP or HTTPS path of the target image to download.
-  It must be provided to the start operations.
-  For the MCUboot bootloader update, the target image must be the signed image for the **inactive** ``s0``/``s1`` slot.
-  You can use the ``AT#XBOOTINFO=1`` command to query which slot is active.
-* The ``<sec_tag>`` parameter is an integer.
-  It indicates to the modem the credential of the security tag used for establishing a secure connection for downloading the image.
-  It is associated with the certificate or PSK.
-  It must be provided to the start operations when using HTTPS.
-* The ``<pdn_id>`` parameter is an integer.
-  It represents the Packet Data Network (PDN) ID that can be used instead of the default PDN for downloading.
-  It can be provided to the start operations.
+<file_url>
+   String.
+   The full HTTP or HTTPS path of the target image to download.
+   Must be provided to the start operations.
+   For the MCUboot bootloader update, the target image must be the signed image for the **inactive** ``s0``/``s1`` slot.
+   You can use the ``AT#XBOOTINFO=1`` command to query which slot is active.
 
-  .. note::
+<sec_tag>
+   Integer.
+   Indicates to the modem the credential of the security tag used for establishing a secure connection for downloading the image.
+   It is associated with the certificate or PSK.
+   Must be provided to the start operations when using HTTPS.
 
-     Raw sockets must not use the PDN connection at the same time.
-     See :ref:`SM_AT_SOCKET_RAW_SOCKET_LIMITATION` for more information.
+<pdn_id>
+   Integer.
+   The Packet Data Network (PDN) ID that can be used instead of the default PDN for downloading.
+   Can be provided to the start operations.
+
+   .. note::
+
+      Raw sockets must not use the PDN connection at the same time.
+      See :ref:`SM_AT_SOCKET_RAW_SOCKET_LIMITATION` for more information.
 
 After the ``#XFOTA: 4,0`` notification indicating that the FOTA update is downloaded, it must be activated by resetting either the whole device with the ``AT#XRESET`` command, or in case of modem update only the modem with the ``AT#XMODEMRESET`` command.
 
@@ -96,9 +102,16 @@ Response syntax
   AT#XFOTA=7
   #XFOTA: <size>,<offset>
 
-* The ``<size>`` integer gives the size of the modem DFU area in bytes.
-* The ``<offset>`` integer gives the offset of the firmware image in the modem DFU area.
-  It is ``0`` if no image is in the modem DFU area, and ``2621440`` (``NRF_MODEM_DELTA_DFU_OFFSET_DIRTY``) if the modem DFU area needs to be erased before a new firmware update can be received.
+The parameters and their defined values are the following:
+
+<size>
+   Integer.
+   The size of the modem DFU area in bytes.
+
+<offset>
+   Integer.
+   The offset of the firmware image in the modem DFU area.
+   It is ``0`` if no image is in the modem DFU area, and ``2621440`` (``NRF_MODEM_DELTA_DFU_OFFSET_DIRTY``) if the modem DFU area needs to be erased before a new firmware update can be received.
 
 Example
 ~~~~~~~
@@ -162,24 +175,25 @@ Unsolicited notification
 
    #XFOTA: <fota_stage>,<fota_status>[,<fota_info>]
 
-* The ``<fota_stage>`` parameter is an integer and can return one of the following values:
+The parameters and their defined values are the following:
 
-  * ``0`` - Init
-  * ``1`` - Download
-  * ``2`` - Download, erase pending (modem delta update only)
-  * ``3`` - Download, erase complete (modem delta update only)
-  * ``4`` - Downloaded, to be activated
-  * ``5`` - Complete
+<fota_stage>
+   * ``0`` - Init.
+   * ``1`` - Download.
+   * ``2`` - Download, erase pending (modem delta update only).
+   * ``3`` - Download, erase complete (modem delta update only).
+   * ``4`` - Downloaded, to be activated.
+   * ``5`` - Complete.
 
-* The ``<fota_status>`` parameter is an integer and can return one of the following values:
+<fota_status>
+   * ``0`` - OK.
+   * ``1`` - Error.
+   * ``2`` - Cancelled.
+   * ``3`` - Reverted (application FOTA only).
 
-  * ``0`` - OK
-  * ``1`` - Error
-  * ``2`` - Cancelled
-  * ``3`` - Reverted (application FOTA only)
-
-* The ``<fota_info>`` parameter is an integer.
-  Its value can have different meanings based on the values returned by ``<fota_stage>`` and ``<fota_status>``.
+<fota_info>
+   Integer.
+   Its value can have different meanings based on the values returned by ``<fota_stage>`` and ``<fota_status>``.
   See the following table:
 
   +-------------------------+----------------------------+----------------------------------------------------+
