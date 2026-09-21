@@ -51,9 +51,16 @@ Syntax
 
    AT#XDFUINIT=<type>[,<size>]
 
-* The ``<type>`` parameter is an integer indicating the DFU image type as specified in the :ref:`dfu_types` section.
-* The ``<size>`` parameter is an integer indicating the total firmware image size in bytes.
-  It is required for application (type ``0``), delta modem firmware (type ``1``), and MCUboot bootloader (type ``3``) updates.
+The parameters and their defined values are the following:
+
+<type>
+   Integer.
+   The DFU image type as specified in the :ref:`dfu_types` section.
+
+<size>
+   Integer.
+   The total firmware image size in bytes.
+   Required for application (type ``0``), delta modem firmware (type ``1``), and MCUboot bootloader (type ``3``) updates.
 
 For full modem firmware (type ``2``), the command triggers an immediate reboot into bootloader mode.
 
@@ -122,9 +129,19 @@ Syntax
 
    AT#XDFUWRITE=<type>,<addr>,<len>
 
-* The ``<type>`` parameter is an integer indicating the DFU image type as specified in the :ref:`dfu_types` section.
-* The ``<addr>`` parameter is an integer indicating the address offset for the data.
-* The ``<len>`` parameter is an integer indicating the length of the data chunk to write.
+The parameters and their defined values are the following:
+
+<type>
+   Integer.
+   The DFU image type as specified in the :ref:`dfu_types` section.
+
+<addr>
+   Integer.
+   The address offset for the data.
+
+<len>
+   Integer.
+   The length of the data chunk to write.
 
 After the command returns ``OK``, the |SM| application enters data mode to receive exactly ``<len>`` bytes of firmware data.
 When the data has been received and written, the |SM| application sends a ``#XDFU`` unsolicited notification with the status.
@@ -192,7 +209,11 @@ Syntax
 
    AT#XDFUAPPLY=<type>
 
-* The ``<type>`` parameter is an integer indicating the DFU image type as specified in the :ref:`dfu_types` section.
+The parameters and their defined values are the following:
+
+<type>
+   Integer.
+   The DFU image type as specified in the :ref:`dfu_types` section.
 
 For application (type ``0``), delta modem firmware (type ``1``), and MCUboot bootloader (type ``3``), the update is scheduled and will be activated on the next reset, which can be done with the ``AT#XRESET`` command.
 For full modem firmware (type ``2``), the command applies the current segment (bootloader or firmware) and triggers a reboot if needed.
@@ -257,17 +278,19 @@ Unsolicited notification
 
    #XDFU: <type>,<operation>,<status>
 
-* The ``<type>`` parameter is an integer indicating the DFU image type as specified in the :ref:`dfu_types` section.
-* The ``<operation>`` parameter is an integer indicating the operation:
+The parameters and their defined values are the following:
 
-  * ``1`` - Data write completed
-  * ``2`` - Apply update completed
+<type>
+   Integer.
+   The DFU image type as specified in the :ref:`dfu_types` section.
 
-* The ``<status>`` parameter is an integer indicating the status of the DFU operation.
-  It can have one of the following values:
+<operation>
+   * ``1`` - Data write completed.
+   * ``2`` - Apply update completed.
 
-  * ``0`` - Success
-  * ``-1`` - Failure
+<status>
+   * ``0`` - Success.
+   * ``-1`` - Failure.
 
 Complete DFU examples
 =====================

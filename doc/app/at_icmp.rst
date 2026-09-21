@@ -26,30 +26,43 @@ Syntax
 
    AT#XPING=<url>,<length>,<timeout>[,<count>[,<interval>[,<pdn>]]]
 
-* The ``<url>`` parameter is a string.
-  It represents the hostname, the IPv4, or the IPv6 address of the target host.
-* The ``<length>`` parameter is an integer.
-  It represents the length of the buffer size.
-  The value range is ``0`` to ``65535``.
-* The ``<timeout>`` parameter is an integer.
-  It represents the time to wait for each reply, in milliseconds.
-  The value range is ``0`` to ``4294967295``.
-* The ``<count>`` parameter is an integer.
-  It represents the number of echo requests to send.
-  The default value is ``1``.
-  The value range is ``1`` to ``65535``.
-* The ``<interval>`` parameter is an integer.
-  It represents the time to wait for sending the next echo request, in milliseconds.
-  The default value is ``1000``.
-  The value range is ``0`` to ``4294967295``.
-* The ``<pdn>`` parameter is an integer.
-  It represents ``cid`` in the ``+CGDCONT`` command.
-  The default value is ``0``.
+The parameters and their defined values are the following:
 
-  .. note::
+<url>
+   String.
+   The hostname, the IPv4, or the IPv6 address of the target host.
 
-     Other sockets cannot use the same PDN connection.
-     See :ref:`SM_AT_SOCKET_RAW_SOCKET_LIMITATION` for more information.
+<length>
+   Integer.
+   The length of the buffer size.
+   The value range is ``0`` to ``65535``.
+
+<timeout>
+   Integer.
+   The time to wait for each reply, in milliseconds.
+   The value range is ``0`` to ``4294967295``.
+
+<count>
+   Integer.
+   The number of echo requests to send.
+   The default value is ``1``.
+   The value range is ``1`` to ``65535``.
+
+<interval>
+   Integer.
+   The time to wait for sending the next echo request, in milliseconds.
+   The default value is ``1000``.
+   The value range is ``0`` to ``4294967295``.
+
+<pdn>
+   Integer.
+   Represents ``cid`` in the ``+CGDCONT`` command.
+   The default value is ``0``.
+
+   .. note::
+
+      Other sockets cannot use the same PDN connection.
+      See :ref:`SM_AT_SOCKET_RAW_SOCKET_LIMITATION` for more information.
 
 Unsolicited notification
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -58,8 +71,11 @@ Unsolicited notification
 
    #XPING: <response time> seconds
 
-The ``<response time>`` parameter is a *float*.
-It represents the elapsed time, in seconds, between the echo requests and the echo replies.
+The parameters and their defined values are the following:
+
+<response time>
+   Float.
+   The elapsed time, in seconds, between the echo requests and the echo replies.
 
 Example
 ~~~~~~~

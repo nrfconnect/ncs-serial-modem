@@ -39,10 +39,11 @@ Syntax
 
    AT#XLOG=<mode>
 
-* The ``<mode>`` parameter is an integer:
+The parameters and their defined values are the following:
 
-  * ``0`` - Disable the application log backend and suspend the UART.
-  * ``1`` - Resume the UART and enable the application log backend.
+<mode>
+   * ``0`` - Disable the application log backend and suspend the UART.
+   * ``1`` - Resume the UART and enable the application log backend.
 
 
 .. note::
@@ -67,7 +68,13 @@ Response syntax
 
    #XLOG: <mode>
 
-* The ``<mode>`` parameter reflects the current state (``0`` = disabled, ``1`` = enabled).
+The parameters and their defined values are the following:
+
+<mode>
+   The current state.
+
+   * ``0`` - Disabled.
+   * ``1`` - Enabled.
 
 Test command
 ------------
@@ -124,10 +131,11 @@ Syntax
 
    AT#XTRACE=<mode>
 
-* The ``<mode>`` parameter is an integer:
+The parameters and their defined values are the following:
 
-  * ``0`` - Disable modem traces and suspend the UART.
-  * ``1`` - Resume the UART and enable the modem trace backend.
+<mode>
+   * ``0`` - Disable modem traces and suspend the UART.
+   * ``1`` - Resume the UART and enable the modem trace backend.
 
 .. note::
    Returns ``ERROR`` if ``AT#XLOG=1`` has been issued.
@@ -152,7 +160,13 @@ Response syntax
 
    #XTRACE: <mode>
 
-* The ``<mode>`` parameter reflects the current state (``0`` = disabled, ``1`` = enabled).
+The parameters and their defined values are the following:
+
+<mode>
+   The current state.
+
+   * ``0`` - Disabled.
+   * ``1`` - Enabled.
 
 Test command
 ------------
