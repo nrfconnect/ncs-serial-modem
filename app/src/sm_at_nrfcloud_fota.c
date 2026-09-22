@@ -12,6 +12,7 @@
 #include <nrf_cloud_download.h>
 #include <memfault/ports/zephyr/fota.h>
 #include <memfault/http/http_client.h>
+#include <memfault/nrfconnect_port/coap.h>
 #include "sm_util.h"
 #include "sm_at_host.h"
 #include "sm_at_fota.h"
@@ -32,9 +33,13 @@ LOG_MODULE_REGISTER(sm_nrfcloud_fota, CONFIG_SM_LOG_LEVEL);
 #define FOTA_PARAM_KEY		2
 
 /* <op> values for AT#XNRFCLOUDFOTA. */
-#define FOTA_STOP	0
-#define FOTA_APP	1
-#define FOTA_MODEM	2
+enum {
+	FOTA_STOP	 = 0,
+	FOTA_APP	 = 1,
+	FOTA_MODEM	 = 2,
+	FOTA_APP_CHECK	 = 4,
+	FOTA_MODEM_CHECK = 6,
+};
 
 /* Pipe that a #XFOTA or #XNRFCLOUDFOTA URC is sent to: the pipe of the command that started
  * the ongoing check/download.
@@ -47,9 +52,28 @@ static struct modem_pipe *fota_pipe;
  */
 static char fota_project_key[FOTA_KEY_MAX_LEN + 1];
 
-/*************************************************/
-/* Memfault FOTA check                           */
-/*************************************************/
+/* Selects app or modem for the ongoing check-only (FOTA_APP_CHECK/FOTA_MODEM_CHECK) request. */
+static bool fota_check_only_modem;
+
+/* Swaps in the <project_key> override (if any) as the application's Memfault project key.
+ * Returns the previous key, to be restored by the caller after its Memfault call.
+ */
+static const char *nrfcloud_fota_app_key_swap(void)
+{
+	const char *saved_key = g_mflt_http_client_config.api_key;
+
+	if (fota_project_key[0] != '\0') {
+		g_mflt_http_client_config.api_key = fota_project_key;
+	}
+	return saved_key;
+}
+
+/* Reports a failed check/download attempt: logs it and sends the #XNRFCLOUDFOTA error URC. */
+static void nrfcloud_fota_check_failed(int rv)
+{
+	LOG_ERR("FOTA check failed: %d", rv);
+	urc_send_to(fota_pipe, "\r\n#XNRFCLOUDFOTA: -1,%d\r\n", rv);
+}
 
 /* Query Memfault release management and, if an update is available, start the download.
  * sm_fota_type selects app or modem; sm_fota_stage is already FOTA_STAGE_DOWNLOAD and
@@ -60,14 +84,8 @@ static void nrfcloud_fota_check(void)
 	int rv;
 
 	if (sm_fota_type == SM_FOTA_TYPE_APP) {
-		/* memfault_zephyr_fota_app_start() uses g_mflt_http_client_config.api_key as the
-		 * project key; swap in the override for the check, like the modem path does.
-		 */
-		const char *saved_key = g_mflt_http_client_config.api_key;
+		const char *saved_key = nrfcloud_fota_app_key_swap();
 
-		if (fota_project_key[0] != '\0') {
-			g_mflt_http_client_config.api_key = fota_project_key;
-		}
 		rv = memfault_zephyr_fota_app_start();
 		g_mflt_http_client_config.api_key = saved_key;
 	} else {
@@ -78,9 +96,8 @@ static void nrfcloud_fota_check(void)
 	}
 
 	if (rv < 0) {
-		LOG_ERR("FOTA check failed: %d", rv);
+		nrfcloud_fota_check_failed(rv);
 		sm_fota_init_state();
-		urc_send_to(fota_pipe, "\r\n#XNRFCLOUDFOTA: -1,%d\r\n", rv);
 	} else if (rv == 0) {
 		sm_fota_init_state();
 		urc_send_to(fota_pipe, "\r\n#XNRFCLOUDFOTA: 0\r\n");
@@ -97,6 +114,45 @@ static void nrfcloud_fota_check_work_fn(struct k_work *work)
 	nrfcloud_fota_check();
 }
 K_WORK_DEFINE(nrfcloud_fota_check_work, nrfcloud_fota_check_work_fn);
+
+/* Query Memfault release management for an app or modem update, without starting the
+ * download. fota_check_only_modem selects app or modem; fota_pipe already set by the caller.
+ */
+static void nrfcloud_fota_check_only(void)
+{
+	char *url = NULL;
+	int rv;
+
+	if (fota_check_only_modem) {
+		memfault_zephyr_fota_modem_project_key_set(
+			fota_project_key[0] != '\0' ? fota_project_key : NULL);
+		rv = memfault_zephyr_fota_modem_get_download_url(&url);
+		memfault_zephyr_fota_modem_project_key_set(NULL);
+	} else {
+		const char *saved_key = nrfcloud_fota_app_key_swap();
+
+		rv = memfault_zephyr_port_coap_get_download_url(&url);
+		g_mflt_http_client_config.api_key = saved_key;
+	}
+	memfault_zephyr_port_coap_release_download_url(&url);
+
+	if (rv < 0) {
+		nrfcloud_fota_check_failed(rv);
+	} else {
+		urc_send_to(fota_pipe, "\r\n#XNRFCLOUDFOTA: %d\r\n", rv);
+	}
+
+	/* Release the busy gate held by the handler for the duration of the check. */
+	sm_fota_init_state();
+}
+
+static void nrfcloud_fota_check_only_work_fn(struct k_work *work)
+{
+	ARG_UNUSED(work);
+
+	nrfcloud_fota_check_only();
+}
+K_WORK_DEFINE(nrfcloud_fota_check_only_work, nrfcloud_fota_check_only_work_fn);
 
 /* Releases the nRF Cloud download layer at the end of an AT#XNRFCLOUDFOTA session and restores
  * AT#XFOTA's fota_download callback, which nrf_cloud_download_start() overwrote for the
@@ -187,10 +243,6 @@ void memfault_fota_download_callback(const struct fota_download_evt *evt)
 	}
 }
 
-/*************************************************/
-
-/*************************************************/
-
 SM_AT_CMD_CUSTOM(xnrfcloudfota, "AT#XNRFCLOUDFOTA", handle_at_nrf_cloud_fota);
 STATIC int handle_at_nrf_cloud_fota(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 				    uint32_t param_count)
@@ -211,17 +263,14 @@ STATIC int handle_at_nrf_cloud_fota(enum at_parser_cmd_type cmd_type, struct at_
 			return fota_download_cancel();
 		}
 
+		if (op != FOTA_APP && op != FOTA_MODEM && op != FOTA_APP_CHECK &&
+		    op != FOTA_MODEM_CHECK) {
+			return -EINVAL;
+		}
+
 		/* One FOTA session at a time, shared with AT#XFOTA. */
 		if (sm_fota_stage != FOTA_STAGE_INIT) {
 			return -EBUSY;
-		}
-
-		if (op == FOTA_APP) {
-			sm_fota_type = SM_FOTA_TYPE_APP;
-		} else if (op == FOTA_MODEM) {
-			sm_fota_type = SM_FOTA_TYPE_MFW;
-		} else {
-			return -EINVAL;
 		}
 
 		/* Optional <project_key> override, applied to the app or modem check. */
@@ -236,6 +285,17 @@ STATIC int handle_at_nrf_cloud_fota(enum at_parser_cmd_type cmd_type, struct at_
 		}
 		strcpy(fota_project_key, key);
 
+		if (op == FOTA_APP_CHECK || op == FOTA_MODEM_CHECK) {
+			fota_check_only_modem = (op == FOTA_MODEM_CHECK);
+			fota_pipe = sm_at_host_get_current_pipe();
+			/* Hold the shared busy gate until the check work completes. */
+			sm_fota_stage = FOTA_STAGE_DOWNLOAD;
+			sm_k_work_submit_blocking(&nrfcloud_fota_check_only_work);
+			return 0;
+		}
+
+		sm_fota_type = (op == FOTA_MODEM) ? SM_FOTA_TYPE_MFW : SM_FOTA_TYPE_APP;
+
 		sm_fota_stage = FOTA_STAGE_DOWNLOAD;
 		sm_fota_nrfcloud = true;
 		fota_pipe = sm_at_host_get_current_pipe();
@@ -246,8 +306,8 @@ STATIC int handle_at_nrf_cloud_fota(enum at_parser_cmd_type cmd_type, struct at_
 		return 0;
 
 	case AT_PARSER_CMD_TYPE_TEST:
-		rsp_send("\r\n#XNRFCLOUDFOTA: (%d,%d,%d)[,<project_key>]\r\n",
-			FOTA_STOP, FOTA_APP, FOTA_MODEM);
+		rsp_send("\r\n#XNRFCLOUDFOTA: (%d,%d,%d,%d,%d)[,<project_key>]\r\n",
+			FOTA_STOP, FOTA_APP, FOTA_MODEM, FOTA_APP_CHECK, FOTA_MODEM_CHECK);
 		return 0;
 
 	default:
