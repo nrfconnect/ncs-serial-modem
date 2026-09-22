@@ -49,6 +49,12 @@ static int settings_set(const char *name, size_t len, settings_read_cb read_cb, 
 		if (read_cb(cb_arg, &sm_modem_init_eio_retry_count, len) > 0)
 			return 0;
 	}
+	if (!strcmp(name, "fota_nrfcloud")) {
+		if (len != sizeof(sm_fota_nrfcloud))
+			return -EINVAL;
+		if (read_cb(cb_arg, &sm_fota_nrfcloud, len) > 0)
+			return 0;
+	}
 	/* Simply ignore obsolete settings that are not in use anymore.
 	 * settings_delete() does not completely remove settings.
 	 */
@@ -98,7 +104,12 @@ int sm_settings_fota_save(void)
 	if (err) {
 		return err;
 	}
-	return settings_save_one("sm/fota_type", &sm_fota_type, sizeof(sm_fota_type));
+	err = settings_save_one("sm/fota_type", &sm_fota_type, sizeof(sm_fota_type));
+	if (err) {
+		return err;
+	}
+	return settings_save_one("sm/fota_nrfcloud", &sm_fota_nrfcloud,
+				 sizeof(sm_fota_nrfcloud));
 }
 
 int sm_settings_bootloader_mode_save(void)

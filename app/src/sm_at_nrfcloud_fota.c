@@ -19,11 +19,12 @@
 
 LOG_MODULE_REGISTER(sm_nrfcloud_fota, CONFIG_SM_LOG_LEVEL);
 
-/* AT#XNRFCLOUDFOTA shares the FOTA session state (sm_fota_type, sm_fota_stage, ...) and the
- * #XFOTA progress/activation URC with AT#XFOTA: an application update is staged the same way as
- * AT#XFOTA=1 and activated by the host with AT#XRESET, and a modem update is staged the same way
- * as AT#XFOTA=2 and activated with AT#XMODEMRESET. Only the source of the download URL differs:
- * Memfault release management instead of a host-supplied URL.
+/* AT#XNRFCLOUDFOTA shares the FOTA session state (sm_fota_type, sm_fota_stage, ...) with
+ * AT#XFOTA: an application update is staged the same way as AT#XFOTA=1 and activated by the
+ * host with AT#XRESET, and a modem update is staged the same way as AT#XFOTA=2 and activated
+ * with AT#XMODEMRESET. Only the source of the download URL differs: Memfault release
+ * management instead of a host-supplied URL. Progress and completion are reported over the
+ * #XNRFCLOUDFOTA URC (same <stage>,<status>[,<info>] format as #XFOTA's).
  */
 
 #define FOTA_KEY_MAX_LEN	32
@@ -85,7 +86,7 @@ static void nrfcloud_fota_check(void)
 		urc_send_to(fota_pipe, "\r\n#XNRFCLOUDFOTA: 0\r\n");
 	}
 	/* rv == 1: a download started. memfault_fota_download_callback() reports the rest
-	 * through the shared #XFOTA URC.
+	 * through the #XNRFCLOUDFOTA URC.
 	 */
 }
 
@@ -117,9 +118,9 @@ static void nrfcloud_fota_session_end(void)
 
 /* Custom implementation of the Memfault NCS FOTA backend's download callback (selected via
  * CONFIG_MEMFAULT_FOTA_DOWNLOAD_CALLBACK_CUSTOM), so that progress and completion are reported
- * over the #XFOTA URC instead of the SDK's default of rebooting immediately. This mirrors
- * sm_at_fota.c's fota_dl_handler(); the two are never active at the same time because they
- * share the sm_fota_stage busy gate.
+ * over the #XNRFCLOUDFOTA URC instead of the SDK's default of rebooting immediately. This
+ * mirrors sm_at_fota.c's fota_dl_handler(); the two are never active at the same time because
+ * they share the sm_fota_stage busy gate.
  *
  * memfault_fota.c forward-declares this itself; there is no public header to include it from.
  */
@@ -133,15 +134,16 @@ void memfault_fota_download_callback(const struct fota_download_evt *evt)
 		sm_fota_stage = FOTA_STAGE_DOWNLOAD;
 		sm_fota_status = FOTA_STATUS_OK;
 		sm_fota_info = evt->progress;
-		urc_send_to(fota_pipe, "\r\n#XFOTA: %d,%d,%d\r\n", sm_fota_stage, sm_fota_status,
-			   sm_fota_info);
+		urc_send_to(fota_pipe, "\r\n#XNRFCLOUDFOTA: %d,%d,%d\r\n", sm_fota_stage,
+			   sm_fota_status, sm_fota_info);
 		break;
 	case FOTA_DOWNLOAD_EVT_FINISHED:
 		sm_fota_stage = FOTA_STAGE_ACTIVATE;
 		sm_fota_info = 0;
 		/* Save, in case activation happens by reset. */
 		sm_settings_fota_save();
-		urc_send_to(fota_pipe, "\r\n#XFOTA: %d,%d\r\n", sm_fota_stage, sm_fota_status);
+		urc_send_to(fota_pipe, "\r\n#XNRFCLOUDFOTA: %d,%d\r\n", sm_fota_stage,
+			   sm_fota_status);
 		/* The app is staged but not yet rebooted; end the session now instead of
 		 * waiting for AT#XRESET.
 		 */
@@ -152,10 +154,11 @@ void memfault_fota_download_callback(const struct fota_download_evt *evt)
 		break;
 	case FOTA_DOWNLOAD_EVT_ERASE_PENDING:
 		sm_fota_stage = FOTA_STAGE_DOWNLOAD_ERASE_PENDING;
-		urc_send_to(fota_pipe, "\r\n#XFOTA: %d,%d\r\n", sm_fota_stage, sm_fota_status);
+		urc_send_to(fota_pipe, "\r\n#XNRFCLOUDFOTA: %d,%d\r\n", sm_fota_stage,
+			   sm_fota_status);
 		break;
 	case FOTA_DOWNLOAD_EVT_ERASE_DONE:
-		urc_send_to(fota_pipe, "\r\n#XFOTA: %d,%d\r\n", FOTA_STAGE_DOWNLOAD_ERASED,
+		urc_send_to(fota_pipe, "\r\n#XNRFCLOUDFOTA: %d,%d\r\n", FOTA_STAGE_DOWNLOAD_ERASED,
 			   sm_fota_status);
 		/* Back to init now that the erasure is complete so that potential pre-start
 		 * error codes are printed with the same stage than if there had been no
@@ -166,15 +169,16 @@ void memfault_fota_download_callback(const struct fota_download_evt *evt)
 	case FOTA_DOWNLOAD_EVT_ERROR:
 		sm_fota_status = FOTA_STATUS_ERROR;
 		sm_fota_info = evt->cause;
-		urc_send_to(fota_pipe, "\r\n#XFOTA: %d,%d,%d\r\n", sm_fota_stage, sm_fota_status,
-			   sm_fota_info);
+		urc_send_to(fota_pipe, "\r\n#XNRFCLOUDFOTA: %d,%d,%d\r\n", sm_fota_stage,
+			   sm_fota_status, sm_fota_info);
 		nrfcloud_fota_session_end();
 		sm_fota_init_state();
 		break;
 	case FOTA_DOWNLOAD_EVT_CANCELLED:
 		sm_fota_status = FOTA_STATUS_CANCELLED;
 		sm_fota_info = 0;
-		urc_send_to(fota_pipe, "\r\n#XFOTA: %d,%d\r\n", sm_fota_stage, sm_fota_status);
+		urc_send_to(fota_pipe, "\r\n#XNRFCLOUDFOTA: %d,%d\r\n", sm_fota_stage,
+			   sm_fota_status);
 		nrfcloud_fota_session_end();
 		sm_fota_init_state();
 		break;
@@ -233,6 +237,7 @@ STATIC int handle_at_nrf_cloud_fota(enum at_parser_cmd_type cmd_type, struct at_
 		strcpy(fota_project_key, key);
 
 		sm_fota_stage = FOTA_STAGE_DOWNLOAD;
+		sm_fota_nrfcloud = true;
 		fota_pipe = sm_at_host_get_current_pipe();
 
 		/* Run on the blocking work queue */
