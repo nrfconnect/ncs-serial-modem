@@ -161,6 +161,7 @@ tests:
       - mcuboot_EXTRA_DTC_OVERLAY_FILE="${APP_DIR}/pgps.overlay"
     extra_configs:
       - CONFIG_NRF_CLOUD_PGPS=y
+      - CONFIG_NRF_CLOUD_GPS_LOG_LEVEL_INF=y
     platform_allow:
       - nrf9151dk/nrf9151/ns
   serial_modem.pgps_no_agnss:
@@ -172,6 +173,7 @@ tests:
     extra_configs:
       - CONFIG_NRF_CLOUD_PGPS=y
       - CONFIG_NRF_CLOUD_AGNSS=n
+      - CONFIG_NRF_CLOUD_GPS_LOG_LEVEL_INF=y
     platform_allow:
       - nrf9151dk/nrf9151/ns
     tags: exclude_integration
