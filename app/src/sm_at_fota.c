@@ -53,6 +53,7 @@ enum sm_fota_image_type sm_fota_type = SM_FOTA_TYPE_NONE;
 enum fota_stage sm_fota_stage = FOTA_STAGE_INIT;
 enum fota_status sm_fota_status;
 int32_t sm_fota_info;
+bool sm_fota_nrfcloud;
 
 static struct modem_pipe *fota_pipe;
 
@@ -440,6 +441,7 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 			if (err == 0) {
 				sm_fota_init_state();
 				sm_fota_stage = FOTA_STAGE_DOWNLOAD;
+				sm_fota_nrfcloud = false;
 				if (op == SM_FOTA_START_MFW) {
 					sm_fota_type = SM_FOTA_TYPE_MFW;
 				}
@@ -534,6 +536,7 @@ void sm_fota_init_state(void)
 	sm_fota_stage = FOTA_STAGE_INIT;
 	sm_fota_status = FOTA_STATUS_OK;
 	sm_fota_info = 0;
+	sm_fota_nrfcloud = false;
 }
 
 void sm_fota_mcuboot_bl_boot_check(void)
@@ -599,11 +602,12 @@ void sm_fota_post_process(void)
 	LOG_INF("FOTA result %d,%d,%d", sm_fota_stage, sm_fota_status, sm_fota_info);
 
 	struct modem_pipe *pipe = fota_pipe ? fota_pipe : sm_at_host_get_urc_pipe();
+	const char *urc_name = sm_fota_nrfcloud ? "XNRFCLOUDFOTA" : "XFOTA";
 
 	if (sm_fota_status == FOTA_STATUS_OK) {
-		urc_send_to(pipe, "\r\n#XFOTA: %d,%d\r\n", sm_fota_stage, sm_fota_status);
+		urc_send_to(pipe, "\r\n#%s: %d,%d\r\n", urc_name, sm_fota_stage, sm_fota_status);
 	} else {
-		urc_send_to(pipe, "\r\n#XFOTA: %d,%d,%d\r\n", sm_fota_stage, sm_fota_status,
+		urc_send_to(pipe, "\r\n#%s: %d,%d,%d\r\n", urc_name, sm_fota_stage, sm_fota_status,
 			sm_fota_info);
 	}
 

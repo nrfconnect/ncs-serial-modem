@@ -46,6 +46,7 @@ extern enum sm_fota_image_type sm_fota_type; /* FOTA image type. */
 extern enum fota_stage sm_fota_stage; /* Current stage of FOTA process. */
 extern enum fota_status sm_fota_status; /* FOTA process status. */
 extern int32_t sm_fota_info; /* FOTA download percentage or failure cause in case of error. */
+extern bool sm_fota_nrfcloud; /* FOTA was started via AT#XNRFCLOUDFOTA. */
 
 /** @brief Sets the FOTA state variables to their default values. */
 void sm_fota_init_state(void);

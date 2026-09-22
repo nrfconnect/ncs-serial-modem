@@ -919,7 +919,7 @@ Requires the :ref:`CONFIG_SM_NRF_CLOUD_FOTA <CONFIG_SM_NRF_CLOUD_FOTA>` Kconfig 
 
 An application update is staged the same way as ``AT#XFOTA=1``; the host activates it with ``AT#XRESET``.
 A modem update is staged the same way as ``AT#XFOTA=2``; the host activates it with ``AT#XMODEMRESET``.
-Both share their FOTA session and progress/completion notifications with ``#XFOTA``: see :ref:`SM_AT_FOTA` for the ``#XFOTA`` unsolicited notification and the activation commands.
+Both share their FOTA session with ``#XFOTA``, but progress and completion are reported over the ``#XNRFCLOUDFOTA`` notification instead, using the same ``<fota_stage>``, ``<fota_status>`` and ``<fota_info>`` values as ``#XFOTA``: see :ref:`SM_AT_FOTA` for their meaning and the activation commands.
 Only one FOTA session, from either command, can be ongoing at a time.
 
 .. note::
@@ -947,7 +947,7 @@ The parameters and their defined values are the following:
 
 <op>
    * ``0`` - Cancel an ongoing download.
-     This is effective only after a download has started, that is, after the first ``#XFOTA`` progress notification.
+     This is effective only after a download has started, that is, after the first ``#XNRFCLOUDFOTA`` progress notification.
    * ``1`` - Check for and download an application update.
      The optional ``<project_key>`` overrides the application project key (``CONFIG_MEMFAULT_PROJECT_KEY``) for this check.
    * ``2`` - Check for and download a modem firmware update.
@@ -965,6 +965,9 @@ Unsolicited notification
 ::
 
    #XNRFCLOUDFOTA: <result>[,<error>]
+   #XNRFCLOUDFOTA: <fota_stage>,<fota_status>[,<fota_info>]
+
+When the check completes without starting a download, the first form is sent:
 
 The parameters and their defined values are the following:
 
@@ -973,8 +976,7 @@ The parameters and their defined values are the following:
    * ``-1`` - The check failed.
      The ``<error>`` parameter follows with the error code.
 
-This notification is sent only when no download was started.
-When a download starts, progress and completion are reported over the ``#XFOTA`` notification instead, as described in :ref:`SM_AT_FOTA`.
+When a download starts, progress and completion are reported with the second form instead, using the same ``<fota_stage>``, ``<fota_status>`` and ``<fota_info>`` values as the ``#XFOTA`` notification described in :ref:`SM_AT_FOTA`.
 
 Example
 ~~~~~~~
@@ -985,11 +987,11 @@ Example
 
   OK
 
-  #XFOTA: 1,0,45
+  #XNRFCLOUDFOTA: 1,0,45
 
-  #XFOTA: 1,0,100
+  #XNRFCLOUDFOTA: 1,0,100
 
-  #XFOTA: 4,0
+  #XNRFCLOUDFOTA: 4,0
   AT#XRESET
 
 Read command
