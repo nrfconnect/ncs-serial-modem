@@ -949,12 +949,13 @@ The parameters and their defined values are the following:
    * ``0`` - Cancel an ongoing download.
      This is effective only after a download has started, that is, after the first ``#XNRFCLOUDFOTA`` progress notification.
    * ``1`` - Check for and download an application update.
-     The optional ``<project_key>`` overrides the application project key (``CONFIG_MEMFAULT_PROJECT_KEY``) for this check.
    * ``2`` - Check for and download a modem firmware update.
+   * ``4`` - Check for an application update, without downloading it.
+   * ``6`` - Check for a modem firmware update, without downloading it.
 
 <project_key>
    String.
-   For ``<op>=1`` it overrides the application project key (``CONFIG_MEMFAULT_PROJECT_KEY``), and for ``<op>=2`` it overrides :ref:`CONFIG_SM_NRF_CLOUD_FOTA_MODEM_PROJECT_KEY <CONFIG_SM_NRF_CLOUD_FOTA_MODEM_PROJECT_KEY>`, for this check.
+   For ``<op>=1`` and ``<op>=4`` it overrides the application project key (``CONFIG_MEMFAULT_PROJECT_KEY``), and for ``<op>=2`` and ``<op>=6`` it overrides :ref:`CONFIG_SM_NRF_CLOUD_FOTA_MODEM_PROJECT_KEY <CONFIG_SM_NRF_CLOUD_FOTA_MODEM_PROJECT_KEY>`, for this check.
 
 The command returns ``OK`` immediately and the check runs asynchronously.
 When it completes, an unsolicited notification is sent.
@@ -973,13 +974,14 @@ The parameters and their defined values are the following:
 
 <result>
    * ``0`` - No update is available.
+   * ``1`` - An update is available (``<op>=4`` and ``<op>=6`` only; ``<op>=1`` and ``<op>=2`` start the download instead).
    * ``-1`` - The check failed.
      The ``<error>`` parameter follows with the error code.
 
 When a download starts, progress and completion are reported with the second form instead, using the same ``<fota_stage>``, ``<fota_status>`` and ``<fota_info>`` values as the ``#XFOTA`` notification described in :ref:`SM_AT_FOTA`.
 
-Example
-~~~~~~~
+Examples
+~~~~~~~~
 
 ::
 
@@ -993,6 +995,16 @@ Example
 
   #XNRFCLOUDFOTA: 4,0
   AT#XRESET
+
+The following example checks whether an application update is available, without downloading it:
+
+::
+
+  AT#XNRFCLOUDFOTA=4
+
+  OK
+
+  #XNRFCLOUDFOTA: 1
 
 Read command
 ------------
@@ -1016,4 +1028,4 @@ Response
 
 ::
 
-   #XNRFCLOUDFOTA: (0,1,2)[,<project_key>]
+   #XNRFCLOUDFOTA: (0,1,2,4,6)[,<project_key>]
