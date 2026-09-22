@@ -331,15 +331,15 @@ config SM_NRF_CLOUD_FOTA
 	select MEMFAULT_FOTA_MODEM_UPDATE
 	select NRF_CLOUD_FOTA_POLL
 	help
-	  Enable the AT#XNRFCLOUDFOTA* commands, which check for and download
-	  application and modem firmware updates via Memfault release
-	  management (https://mflt.io/release-mgmt), delivered over the same
-	  nRF Cloud CoAP transport as AT#XNRFCLOUDOBS*.
+	  Enable the AT#XNRFCLOUDFOTA command, which checks for and downloads an
+	  application or modem firmware update via Memfault release management
+	  (https://mflt.io/release-mgmt). It uses the same nRF Cloud CoAP transport
+	  as the AT#XNRFCLOUDOBS* commands.
 
-	  An application update is staged the same way as AT#XFOTA=1; the
-	  host activates it with AT#XRESET. A modem update is staged the
-	  same way as AT#XFOTA=2; the host activates it with AT#XMODEMRESET.
-	  Both report progress and completion via the #XFOTA URC.
+	  An application update (<op>=1) is staged the same way as AT#XFOTA=1 and
+	  activated with AT#XRESET. A modem update (<op>=2) is staged the same way
+	  as AT#XFOTA=2 and activated with AT#XMODEMRESET. Progress and completion,
+	  for either op, are reported via the #XNRFCLOUDFOTA URC.
 
 	  AT#XNRFCLOUDFOTA=<op>[,<project_key>] takes an optional Memfault
 	  project key, overriding CONFIG_MEMFAULT_PROJECT_KEY for an
