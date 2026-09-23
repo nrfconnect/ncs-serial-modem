@@ -41,6 +41,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/settings/settings.h>
 #include <modem/at_monitor.h>
+#include <modem/at_parser.h>
 
 #include "sm_at_host.h"
 #include "sm_at_nrfcloud.h"
@@ -55,6 +56,12 @@ static const char *resp;
 static char *result;
 extern char test_at_nrfcloud_ncellmeas_resp[];
 extern int test_at_nrfcloud_ncellmeas_resp_ret;
+
+extern int handle_at_nrf_cloud(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+			       uint32_t param_count);
+
+static K_SEM_DEFINE(conn_work_entered, 0, 1);
+static K_SEM_DEFINE(conn_work_release, 0, 1);
 
 /* ---------------------------------------------------------------------------
  * Externals provided by the stub / helper files
@@ -257,6 +264,13 @@ void test_xnrfcloud_connect_invalid_send_location(void)
 	TEST_ASSERT_NOT_NULL(strstr(resp, "ERROR"));
 }
 
+void test_xnrfcloud_connect_rejects_extra_parameter(void)
+{
+	send_at_command("AT#XNRFCLOUD=1,0,1\r\n");
+	resp = get_captured_response();
+	TEST_ASSERT_NOT_NULL(strstr(resp, "ERROR"));
+}
+
 /*
  * Tests connect when there is nRF Cloud connection already.
  */
@@ -267,10 +281,125 @@ void test_xnrfcloud_connect_already_connected(void)
 
 	send_at_command("AT#XNRFCLOUD=1\r\n");
 	resp = get_captured_response();
+	TEST_ASSERT_NOT_NULL(strstr(resp, "OK"));
+	result = strstr(resp, "#XNRFCLOUD");
+	TEST_ASSERT_EQUAL_STRING("#XNRFCLOUD: 1,0\r\n", result);
+
+	clear_captured_response();
+	helper_xnrfcloud_disconnect_ok();
+}
+
+void test_xnrfcloud_connect_invalid_send_location_when_connected(void)
+{
+	helper_xnrfcloud_connect_ok();
+	clear_captured_response();
+
+	send_at_command("AT#XNRFCLOUD=1,2\r\n");
+	resp = get_captured_response();
 	TEST_ASSERT_NOT_NULL(strstr(resp, "ERROR"));
 
 	clear_captured_response();
 	helper_xnrfcloud_disconnect_ok();
+}
+
+/*
+ * Tests changing <send_location> while connected.
+ */
+void test_xnrfcloud_send_location_change_when_connected(void)
+{
+	helper_xnrfcloud_connect_ok();
+	clear_captured_response();
+
+	send_at_command("AT#XNRFCLOUD=1,1\r\n");
+	resp = get_captured_response();
+	TEST_ASSERT_NOT_NULL(strstr(resp, "OK"));
+	result = strstr(resp, "#XNRFCLOUD");
+	TEST_ASSERT_EQUAL_STRING("#XNRFCLOUD: 1,1\r\n", result);
+
+	clear_captured_response();
+	send_at_command("AT#XNRFCLOUD=1\r\n");
+	resp = get_captured_response();
+	TEST_ASSERT_NOT_NULL(strstr(resp, "OK"));
+	result = strstr(resp, "#XNRFCLOUD");
+	TEST_ASSERT_EQUAL_STRING("#XNRFCLOUD: 1,0\r\n", result);
+
+	clear_captured_response();
+	helper_xnrfcloud_disconnect_ok();
+}
+
+/* Keeps nrfcloud_conn_work running until the test gives conn_work_release. */
+static int blocking_coap_connect(const char *const app_ver, int num_calls)
+{
+	k_sem_give(&conn_work_entered);
+	/* Bounded so that a failed assertion cannot wedge sm_work_q for later tests. */
+	k_sem_take(&conn_work_release, K_SECONDS(2));
+	return 0;
+}
+
+static int blocking_coap_disconnect(int num_calls)
+{
+	k_sem_give(&conn_work_entered);
+	k_sem_take(&conn_work_release, K_SECONDS(2));
+	return 0;
+}
+
+/* AT commands run on the same work queue as nrfcloud_conn_work, so call the handler directly. */
+static int call_xnrfcloud_set(const char *cmd)
+{
+	struct at_parser parser;
+	size_t count = 0;
+
+	TEST_ASSERT_EQUAL_INT(0, at_parser_init(&parser, cmd));
+	TEST_ASSERT_EQUAL_INT(0, at_parser_cmd_count_get(&parser, &count));
+
+	return handle_at_nrf_cloud(AT_PARSER_CMD_TYPE_SET, &parser, count);
+}
+
+/*
+ * Tests that connect and disconnect return -EBUSY while the connection work is running,
+ * and that the rejected commands do not replace the pending request.
+ */
+void test_xnrfcloud_busy_rejects_and_keeps_pending_request(void)
+{
+	sm_nrf_cloud_ready = false;
+	k_sem_reset(&conn_work_entered);
+	k_sem_reset(&conn_work_release);
+
+	/* Hold a connect request with <send_location> = 1 in the worker. */
+	__cmock_nrf_cloud_coap_connect_Stub(blocking_coap_connect);
+	send_at_command("AT#XNRFCLOUD=1,1\r\n");
+	TEST_ASSERT_EQUAL_INT(0, k_sem_take(&conn_work_entered, K_SECONDS(1)));
+
+	TEST_ASSERT_EQUAL_INT(-EBUSY, call_xnrfcloud_set("AT#XNRFCLOUD=1,0"));
+	/* Not ready yet, so without the busy check this would be an idempotent OK. */
+	TEST_ASSERT_EQUAL_INT(-EBUSY, call_xnrfcloud_set("AT#XNRFCLOUD=0"));
+
+	k_sem_give(&conn_work_release);
+	/* The URC has no send_at_command() waiting for its tx_done. */
+	uart_stub_tx_done_drain();
+
+	resp = get_captured_response();
+	TEST_ASSERT_NOT_NULL(strstr(resp, "#XNRFCLOUD: 1,1\r\n"));
+	TEST_ASSERT_TRUE(sm_nrf_cloud_ready);
+	TEST_ASSERT_TRUE(sm_nrf_cloud_send_location);
+
+	/* Hold a disconnect request in the worker. */
+	clear_captured_response();
+	__cmock_nrf_cloud_coap_disconnect_Stub(blocking_coap_disconnect);
+	send_at_command("AT#XNRFCLOUD=0\r\n");
+	TEST_ASSERT_EQUAL_INT(0, k_sem_take(&conn_work_entered, K_SECONDS(1)));
+
+	/* Still ready, so without the busy check these would be idempotent OKs. */
+	TEST_ASSERT_EQUAL_INT(-EBUSY, call_xnrfcloud_set("AT#XNRFCLOUD=1"));
+	TEST_ASSERT_EQUAL_INT(-EBUSY, call_xnrfcloud_set("AT#XNRFCLOUD=1,0"));
+	TEST_ASSERT_TRUE(sm_nrf_cloud_send_location);
+
+	k_sem_give(&conn_work_release);
+	uart_stub_tx_done_drain();
+
+	resp = get_captured_response();
+	TEST_ASSERT_NOT_NULL(strstr(resp, "#XNRFCLOUD: 0,1\r\n"));
+	TEST_ASSERT_FALSE(sm_nrf_cloud_ready);
 }
 
 /*
@@ -290,6 +419,22 @@ void test_xnrfcloud_disconnect_ok(void)
 void test_xnrfcloud_disconnect_not_connected(void)
 {
 	send_at_command("AT#XNRFCLOUD=0\r\n");
+	resp = get_captured_response();
+	TEST_ASSERT_NOT_NULL(strstr(resp, "OK"));
+	result = strstr(resp, "#XNRFCLOUD");
+	TEST_ASSERT_EQUAL_STRING("#XNRFCLOUD: 0,0\r\n", result);
+}
+
+void test_xnrfcloud_disconnect_rejects_extra_parameter(void)
+{
+	send_at_command("AT#XNRFCLOUD=0,1\r\n");
+	resp = get_captured_response();
+	TEST_ASSERT_NOT_NULL(strstr(resp, "ERROR"));
+}
+
+void test_xnrfcloud_send_rejects_extra_parameter(void)
+{
+	send_at_command("AT#XNRFCLOUD=2,1\r\n");
 	resp = get_captured_response();
 	TEST_ASSERT_NOT_NULL(strstr(resp, "ERROR"));
 }
