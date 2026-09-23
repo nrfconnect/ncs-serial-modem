@@ -23,15 +23,21 @@ jobs:
           run_id: ${{ github.event.workflow_run.id }}
 
       - name: Unzip html archive
+        id: unzip
         working-directory: docs
         run: |
           OUTDIR=$(awk 'NR==1 { if ($3 ~ /^(latest|PR-[0-9]+|[0-9]+\.[0-9a-zA-Z\.\-]+)$/) print $3 }' monitor_*.txt)
+          if [ -z "$OUTDIR" ]; then
+            echo "::warning::Monitor file holds no publishable version. Nothing to publish."
+            exit 0
+          fi
           echo "OUTDIR=$OUTDIR" >> "$GITHUB_ENV"
+          echo "outdir=$OUTDIR" >> "$GITHUB_OUTPUT"
           unzip legacy-addon-serial_modem*.zip -d $OUTDIR
           find "$OUTDIR" -type l -delete
 
       - name: Obtain PR number
-        if: ${{ github.event.workflow_run.event == 'pull_request' }}
+        if: ${{ steps.unzip.outputs.outdir && github.event.workflow_run.event == 'pull_request' }}
         working-directory: docs
         run: |
           if [ -f pr.txt ]; then
@@ -40,6 +46,7 @@ jobs:
           printf 'PR=%s\n' "$PR" >> "$GITHUB_ENV"
 
       - name: Upload to Azure storage
+        if: ${{ steps.unzip.outputs.outdir }}
         working-directory: docs
         env:
           AZCOPY_CONCURRENCY_VALUE: 1024
@@ -53,7 +60,7 @@ jobs:
           fi
 
       - name: Find Comment
-        if: ${{ github.event.workflow_run.event == 'pull_request' }}
+        if: ${{ steps.unzip.outputs.outdir && github.event.workflow_run.event == 'pull_request' }}
         uses: peter-evans/find-comment@3eae4d37986fb5a8592848f6a574fdf654e61f9e # v3
         id: fc
         with:
@@ -62,7 +69,7 @@ jobs:
           body-includes: documentation preview
 
       - name: Create or update comment
-        if: ${{ github.event.workflow_run.event == 'pull_request' }}
+        if: ${{ steps.unzip.outputs.outdir && github.event.workflow_run.event == 'pull_request' }}
         uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # v4
         with:
           comment-id: ${{ steps.fc.outputs.comment-id }}
