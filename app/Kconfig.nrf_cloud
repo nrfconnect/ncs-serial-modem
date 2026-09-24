@@ -33,14 +33,6 @@ configdefault NRF_CLOUD
 configdefault NRF_CLOUD_COAP
 	default y
 
-# Disable file downloads over CoAP: prefer HTTPS when downloads are active
-# (FOTA and P-GPS are both disabled, so NRF_CLOUD_DOWNLOADS is inactive and
-# the NRF_CLOUD_DOWNLOADS_PROTOCOL choice is invisible. This default only takes
-# effect if either is ever enabled.)
-choice NRF_CLOUD_DOWNLOADS_PROTOCOL
-	default NRF_CLOUD_HTTPS_DOWNLOADS
-endchoice
-
 # Disable nRF Cloud FOTA: FOTA is handled by the SM FOTA subsystem (AT#XFOTA) and
 # Memfault FOTA (AT#XNRFCLOUDFOTA). Memfault FOTA is different to old CONFIG_NRF_CLOUD_FOTA.
 configdefault NRF_CLOUD_FOTA
@@ -81,10 +73,6 @@ endchoice
 
 choice NRF_CLOUD_FOTA_POLL_LOG_LEVEL_CHOICE
 	default NRF_CLOUD_FOTA_POLL_LOG_LEVEL_WRN
-endchoice
-
-choice DOWNLOADER_LOG_LEVEL_CHOICE
-	default DOWNLOADER_LOG_LEVEL_WRN
 endchoice
 
 # Use the modem device UUID as the nRF Cloud client ID.
