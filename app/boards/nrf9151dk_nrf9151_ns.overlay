@@ -194,8 +194,8 @@
  * 0x2000_0000  Secure RAM                   (  16 kB)
  * 0x2000_4000  Non-secure RAM area          ( 240 kB)
  *   0x2000_4000  Modem shared area          (  34 kB)
- *     0x2000_4000  control                  (1832 B)
- *     0x2000_4728  app -> cell              (8408 B)
+ *     0x2000_4000  control                  (1256 B)
+ *     0x2000_44e8  app -> cell              (8984 B)
  *     0x2000_6800  cell -> app              (   8 kB)
  *   0x2000_8800  Application RAM            ( 222 kB)
  */
@@ -225,12 +225,12 @@
 
 			cpuapp_cpucell_ipc_shm_ctrl: sram0_ns_modem@0 {
 				/* Modem IPC control */
-				reg = <0x0 0x728>;
+				reg = <0x0 0x4e8>;
 			};
 
-			cpuapp_cpucell_ipc_shm_heap: sram0_ns_modem@728 {
+			cpuapp_cpucell_ipc_shm_heap: sram0_ns_modem@4e8 {
 				/* Modem IPC transmit */
-				reg = <0x728 0x20d8>;
+				reg = <0x4e8 0x2318>;
 			};
 
 			cpucell_cpuapp_ipc_shm_heap: sram0_ns_modem@2800 {
