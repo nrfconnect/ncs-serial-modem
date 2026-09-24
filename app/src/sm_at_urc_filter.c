@@ -15,6 +15,7 @@
 #include <modem/at_cmd_custom.h>
 #include <modem/at_monitor.h>
 #include <modem/lte_lc.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
@@ -33,6 +34,9 @@ STATIC bool sm_urcf_fwd_cereg;
 STATIC bool sm_urcf_fwd_cgev;
 STATIC bool sm_urcf_fwd_xtime;
 
+/* Host-requested +CEREG notification mode, cleared by CFUN=0 like the modem does. */
+STATIC uint8_t sm_urcf_host_cereg_mode;
+
 AT_CMD_CUSTOM(sm_urcf_cereg_interceptor, "AT+CEREG", sm_urcf_cereg_callback);
 AT_CMD_CUSTOM(sm_urcf_cgerep_interceptor, "AT+CGEREP", sm_urcf_cgerep_callback);
 AT_CMD_CUSTOM(sm_urcf_xtime_interceptor, "AT%XTIME", sm_urcf_xtime_callback);
@@ -41,10 +45,13 @@ AT_CMD_CUSTOM(sm_urcf_cfun_interceptor, "AT+CFUN=", sm_urcf_cfun_callback);
 static void sm_urcf_cereg_subscribe(void)
 {
 	char buf[sizeof("\r\nOK")];
-	char cmd[16];
+	char cmd[sizeof("AT+CEREG=255")];
+	uint8_t mode = sm_urcf_host_cereg_mode > SM_AT_CEREG_INTERNAL_MODE
+			       ? sm_urcf_host_cereg_mode
+			       : SM_AT_CEREG_INTERNAL_MODE;
 	int ret;
 
-	snprintf(cmd, sizeof(cmd), "AT+CEREG=%d", SM_AT_CEREG_INTERNAL_MODE);
+	snprintf(cmd, sizeof(cmd), "AT+CEREG=%hhu", mode);
 	ret = sm_util_at_cmd_no_intercept(buf, sizeof(buf), cmd);
 	if (ret) {
 		LOG_ERR("Failed to subscribe to +CEREG notifications (%d).", ret);
@@ -83,6 +90,7 @@ static void sm_urcf_on_cfun(unsigned int mode)
 		sm_urcf_fwd_cgev = false;
 		sm_urcf_fwd_cereg = false;
 		sm_urcf_fwd_xtime = false;
+		sm_urcf_host_cereg_mode = 0;
 	}
 
 #if IS_ENABLED(CONFIG_SM_NRF_CLOUD_OBSERVABILITY_LTE_METRICS)
@@ -119,6 +127,7 @@ STATIC int sm_urcf_cereg_callback(char *buf, size_t len, char *at_cmd)
 	}
 
 	if (set_cmd) {
+		sm_urcf_host_cereg_mode = mode;
 		sm_urcf_fwd_cereg = (mode != 0);
 	}
 
