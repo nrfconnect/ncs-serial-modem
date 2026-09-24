@@ -22,22 +22,32 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).absolute().parents[1]))
 
 from conf_common import *  # noqa: F401,F403
+from conf_common import docsets, docset_exclude_patterns, html_theme_options
 
 DOCSET = "nrf91m1"
 
-project, root_doc = docsets.ALL_DOCSETS[DOCSET]  # noqa: F405
+project, root_doc = docsets.ALL_DOCSETS[DOCSET]
 
-exclude_patterns = docset_exclude_patterns(DOCSET) + [  # noqa: F405
+exclude_patterns = docset_exclude_patterns(DOCSET) + [
     # Pages that do not apply to the nRF91M1 go here.
+    "app/at_carrier.rst",
+    "app/at_commands.rst",
+    "app/README.rst",
+    "app/sm_*.rst",
+    "gsg_guide.rst",
+    "lib/*.rst",
+    "releases/*.rst",
+    "samples/*.rst",
+    "uart_configuration.rst",
 ]
 
-html_theme_options["docset"] = DOCSET  # noqa: F405
+html_theme_options["docset"] = DOCSET
 
 # Lets this docset link into the main docset with :external+main:. The mapping
 # is only available once the main docset has been built, which is why
 # _scripts/build_docsets.py builds the docsets in order.
 intersphinx_mapping = {}
 
-_main_mapping = docsets.get_intersphinx_mapping("main")  # noqa: F405
+_main_mapping = docsets.get_intersphinx_mapping("main")
 if _main_mapping:
     intersphinx_mapping["main"] = _main_mapping

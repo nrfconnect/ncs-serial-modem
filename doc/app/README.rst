@@ -81,7 +81,6 @@ See the subpages for how to use the application, how to extend it, and informati
    sm_logging
    sm_configuration
    sm_cellular_modem
-   sm_data_mode
    sm_releasing
    sm_extending
    sm_testing

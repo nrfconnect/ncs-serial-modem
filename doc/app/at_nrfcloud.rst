@@ -9,8 +9,8 @@ The page describes nRF Cloud-related AT commands.
 
 .. _SM_AT_NRFCLOUD:
 
-nRF Cloud access
-================
+nRF Cloud access #XNRFCLOUD
+===========================
 
 The ``#XNRFCLOUD`` command controls the access to the nRF Cloud service.
 
@@ -187,8 +187,8 @@ Example
 
 .. _SM_AT_NRFCLOUDPOS:
 
-nRF Cloud location
-==================
+nRF Cloud location #XNRFCLOUDPOS
+================================
 
 The ``#XNRFCLOUDPOS`` command sends a request to nRF Cloud to determine the device's location.
 The request uses information from the cellular network, Wi-Fi® access points, or both.
@@ -731,182 +731,184 @@ Response
 
    #XNRFCLOUDOBSFORWARD: <base64_chunk>,<project_key>
 
-.. _SM_AT_NRFCLOUDOBSDEVINFO:
+.. only:: not nrf91m1
 
-Memfault device information #XNRFCLOUDOBSDEVINFO
-================================================
+   .. _SM_AT_NRFCLOUDOBSDEVINFO:
 
-The ``#XNRFCLOUDOBSDEVINFO`` command returns the Memfault device information, which identifies the device and the firmware in the Memfault project.
+   Memfault device information #XNRFCLOUDOBSDEVINFO
+   ================================================
 
-This command requires the :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG <CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG>` Kconfig option.
+   The ``#XNRFCLOUDOBSDEVINFO`` command returns the Memfault device information, which identifies the device and the firmware in the Memfault project.
 
-Set command
------------
+   This command requires the :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG <CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG>` Kconfig option.
 
-The set command returns the device information.
+   Set command
+   -----------
 
-Syntax
-~~~~~~
+   The set command returns the device information.
 
-::
+   Syntax
+   ~~~~~~
 
-   AT#XNRFCLOUDOBSDEVINFO
+   ::
 
-Response
-~~~~~~~~
+      AT#XNRFCLOUDOBSDEVINFO
 
-::
+   Response
+   ~~~~~~~~
 
-   #XNRFCLOUDOBSDEVINFO: <device_serial>,<software_type>,<software_version>,<hardware_version>
+   ::
 
-The parameters and their defined values are the following:
+      #XNRFCLOUDOBSDEVINFO: <device_serial>,<software_type>,<software_version>,<hardware_version>
 
-<device_serial>
-   String.
-   The device serial.
+   The parameters and their defined values are the following:
 
-<software_type>
-   String.
-   The software type.
+   <device_serial>
+      String.
+      The device serial.
 
-<software_version>
-   String.
-   The software version.
+   <software_type>
+      String.
+      The software type.
 
-<hardware_version>
-   String.
-   The hardware version.
+   <software_version>
+      String.
+      The software version.
 
-Example
-~~~~~~~
+   <hardware_version>
+      String.
+      The hardware version.
 
-::
+   Example
+   ~~~~~~~
 
-  AT#XNRFCLOUDOBSDEVINFO
+   ::
 
-  #XNRFCLOUDOBSDEVINFO: "50344654-3037-409f-802d-2206917f23d2","serial_modem","3.4.0","nrf9151dk"
+     AT#XNRFCLOUDOBSDEVINFO
 
-  OK
+     #XNRFCLOUDOBSDEVINFO: "50344654-3037-409f-802d-2206917f23d2","serial_modem","3.4.0","nrf9151dk"
 
-Read command
-------------
+     OK
 
-The read command is not supported.
+   Read command
+   ------------
 
-Test command
-------------
+   The read command is not supported.
 
-The test command is not supported.
+   Test command
+   ------------
 
-.. _SM_AT_NRFCLOUDOBSCRASH:
+   The test command is not supported.
 
-Forced crash #XNRFCLOUDOBSCRASH
-===============================
+   .. _SM_AT_NRFCLOUDOBSCRASH:
 
-The ``#XNRFCLOUDOBSCRASH`` command forces a crash, so that the coredump capture and upload can be tested.
+   Forced crash #XNRFCLOUDOBSCRASH
+   ===============================
 
-This command requires the :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG <CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG>` Kconfig option.
+   The ``#XNRFCLOUDOBSCRASH`` command forces a crash, so that the coredump capture and upload can be tested.
 
-Set command
------------
+   This command requires the :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG <CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG>` Kconfig option.
 
-The set command crashes the application.
+   Set command
+   -----------
 
-Syntax
-~~~~~~
+   The set command crashes the application.
 
-::
+   Syntax
+   ~~~~~~
 
-   AT#XNRFCLOUDOBSCRASH[=<type>]
+   ::
 
-The parameters and their defined values are the following:
+      AT#XNRFCLOUDOBSCRASH[=<type>]
 
-<type>
-   Integer.
-   An integer from ``0`` to ``4``.
-   It defaults to ``0``, an assertion failure.
+   The parameters and their defined values are the following:
 
-The device crashes and no response is returned, unless the crash type is invalid.
+   <type>
+      Integer.
+      An integer from ``0`` to ``4``.
+      It defaults to ``0``, an assertion failure.
 
-Read command
-------------
+   The device crashes and no response is returned, unless the crash type is invalid.
 
-The read command is not supported.
+   Read command
+   ------------
 
-Test command
-------------
+   The read command is not supported.
 
-The test command returns the supported syntax.
+   Test command
+   ------------
 
-Syntax
-~~~~~~
+   The test command returns the supported syntax.
 
-::
+   Syntax
+   ~~~~~~
 
-   AT#XNRFCLOUDOBSCRASH=?
+   ::
 
-Response
-~~~~~~~~
+      AT#XNRFCLOUDOBSCRASH=?
 
-::
+   Response
+   ~~~~~~~~
 
-   #XNRFCLOUDOBSCRASH: <type>
+   ::
 
-.. _SM_AT_NRFCLOUDOBSEXPORT:
+      #XNRFCLOUDOBSCRASH: <type>
 
-Chunk export #XNRFCLOUDOBSEXPORT
-================================
+   .. _SM_AT_NRFCLOUDOBSEXPORT:
 
-The ``#XNRFCLOUDOBSEXPORT`` command prints the buffered Memfault chunks to the AT interface instead of uploading them in the Memfault chunk export format, which the Memfault tooling can parse.
+   Chunk export #XNRFCLOUDOBSEXPORT
+   ================================
 
-This command requires the :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG <CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG>` Kconfig option.
+   The ``#XNRFCLOUDOBSEXPORT`` command prints the buffered Memfault chunks to the AT interface instead of uploading them in the Memfault chunk export format, which the Memfault tooling can parse.
 
-.. note::
-   The command consumes the chunks.
-   They are no longer available for ``#XNRFCLOUDOBSUPLOAD`` and the automatic upload.
+   This command requires the :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG <CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG>` Kconfig option.
 
-Set command
------------
+   .. note::
+      The command consumes the chunks.
+      They are no longer available for ``#XNRFCLOUDOBSUPLOAD`` and the automatic upload.
 
-The set command prints the buffered chunks.
+   Set command
+   -----------
 
-Syntax
-~~~~~~
+   The set command prints the buffered chunks.
 
-::
+   Syntax
+   ~~~~~~
 
-   AT#XNRFCLOUDOBSEXPORT
+   ::
 
-Response
-~~~~~~~~
+      AT#XNRFCLOUDOBSEXPORT
 
-The buffered chunks are returned, one per line::
+   Response
+   ~~~~~~~~
 
-   MC:<base64_chunk>:
+   The buffered chunks are returned, one per line::
 
-Example
-~~~~~~~
+      MC:<base64_chunk>:
 
-::
+   Example
+   ~~~~~~~
 
-  AT#XNRFCLOUDOBSHEARTBEAT
+   ::
 
-  OK
-  AT#XNRFCLOUDOBSEXPORT
+     AT#XNRFCLOUDOBSHEARTBEAT
 
-  MC:CAKnAgIDAQpqdGVzdHNlcmlhbA==:
+     OK
+     AT#XNRFCLOUDOBSEXPORT
 
-  OK
+     MC:CAKnAgIDAQpqdGVzdHNlcmlhbA==:
 
-Read command
-------------
+     OK
 
-The read command is not supported.
+   Read command
+   ------------
 
-Test command
-------------
+   The read command is not supported.
 
-The test command is not supported.
+   Test command
+   ------------
+
+   The test command is not supported.
 
 .. _SM_AT_NRFCLOUDFOTA:
 
