@@ -219,11 +219,12 @@ typedef int sm_at_callback(enum at_parser_cmd_type cmd_type, struct at_parser *p
  * @param buf Response buffer.
  * @param len Response buffer size.
  * @param at_cmd AT command.
+ * @param filter_len Length of the AT_CMD_CUSTOM filter string (excluding null terminator).
  * @param cb AT command callback.
-
+ *
  * @retval 0 on success.
  */
-int sm_at_cb_wrapper(char *buf, size_t len, char *at_cmd, sm_at_callback cb);
+int sm_at_cb_wrapper(char *buf, size_t len, char *at_cmd, size_t filter_len, sm_at_callback cb);
 
 /**
  * @brief Enable or disable echo of received characters.
@@ -398,7 +399,7 @@ void sm_at_host_queue_idle_work(struct modem_pipe *pipe, struct k_work *work);
 			     uint32_t param_count);                                                \
 	STATIC int _callback##_wrapper_##entry(char *buf, size_t len, char *at_cmd)                \
 	{                                                                                          \
-		return sm_at_cb_wrapper(buf, len, at_cmd, _callback);                              \
+		return sm_at_cb_wrapper(buf, len, at_cmd, sizeof(_filter) - 1, _callback);         \
 	}                                                                                          \
 	AT_CMD_CUSTOM(entry, _filter, _callback##_wrapper_##entry);
 
