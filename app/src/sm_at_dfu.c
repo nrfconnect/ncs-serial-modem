@@ -679,15 +679,15 @@ static int handle_at_xdfu_apply(enum at_parser_cmd_type cmd_type, struct at_pars
 
 int sm_at_handle_xdfu_init(char *buf, size_t len, char *at_cmd)
 {
-	return sm_at_cb_wrapper(buf, len, at_cmd, handle_at_xdfu_init);
+	return sm_at_cb_wrapper(buf, len, at_cmd, sizeof("AT#XDFUINIT") - 1, handle_at_xdfu_init);
 }
 
 int sm_at_handle_xdfu_write(char *buf, size_t len, char *at_cmd)
 {
-	return sm_at_cb_wrapper(buf, len, at_cmd, handle_at_xdfu_write);
+	return sm_at_cb_wrapper(buf, len, at_cmd, sizeof("AT#XDFUWRITE") - 1, handle_at_xdfu_write);
 }
 
 int sm_at_handle_xdfu_apply(char *buf, size_t len, char *at_cmd)
 {
-	return sm_at_cb_wrapper(buf, len, at_cmd, handle_at_xdfu_apply);
+	return sm_at_cb_wrapper(buf, len, at_cmd, sizeof("AT#XDFUAPPLY") - 1, handle_at_xdfu_apply);
 }
