@@ -214,7 +214,7 @@ configdefault COAP_CLIENT_MAX_EXTRA_OPTIONS
 	default 4 if MEMFAULT
 
 configdefault COAP_CLIENT_MAX_PATH_LENGTH
-	default 160 if MEMFAULT
+	default 160 if MEMFAULT_USE_NRF_CLOUD_COAP
 
 # The larger CoAP options above (COAP_EXTENDED_OPTIONS_LEN_VALUE and
 # COAP_CLIENT_MAX_EXTRA_OPTIONS) enlarge struct coap_client_request, which the
