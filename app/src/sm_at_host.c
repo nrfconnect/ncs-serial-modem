@@ -1721,7 +1721,7 @@ void exit_datamode_handler(struct sm_at_host_ctx *ctx, int result)
 	}
 }
 
-int sm_at_cb_wrapper(char *buf, size_t len, char *at_cmd, sm_at_callback *cb)
+int sm_at_cb_wrapper(char *buf, size_t len, char *at_cmd, size_t filter_len, sm_at_callback *cb)
 {
 	int err;
 	struct at_parser parser;
@@ -1729,6 +1729,16 @@ int sm_at_cb_wrapper(char *buf, size_t len, char *at_cmd, sm_at_callback *cb)
 	enum at_parser_cmd_type type;
 
 	assert(cb);
+
+	/* Reject partial-prefix false positives: the character immediately after the
+	 * filter must be a valid continuation: '=' or '?' (separator for plain-name filters),
+	 * ',' (additional arguments after a quoted sub-command, e.g. AT#XCARRIER="time",<val>),
+	 * or '\0' (exact match — strchr searches up to and including the terminator).
+	 * Any other character means the command name extends beyond the filter.
+	 */
+	if (!strchr("=?,", at_cmd[filter_len])) {
+		return -EINVAL;
+	}
 
 	err = at_parser_init(&parser, at_cmd);
 	if (err) {

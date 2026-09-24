@@ -401,12 +401,16 @@ int nrf_modem_at_notif_handler_set(nrf_modem_at_notif_handler_t callback)
 
 /* --- AT command dispatch ------------------------------------------------ */
 
-int sm_at_cb_wrapper(char *buf, size_t len, char *at_cmd, sm_at_callback *cb)
+int sm_at_cb_wrapper(char *buf, size_t len, char *at_cmd, size_t filter_len, sm_at_callback *cb)
 {
 	struct at_parser parser;
 	size_t valid_count = 0;
 	enum at_parser_cmd_type type;
 	int err;
+
+	if (!strchr("=?,", at_cmd[filter_len])) {
+		return -EINVAL;
+	}
 
 	err = at_parser_init(&parser, at_cmd);
 	if (err) {
