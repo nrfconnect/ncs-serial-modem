@@ -136,7 +136,6 @@ Data mode AT commands
 The following command list describes data mode-related AT commands.
 
 .. _sm_data_mode_ctrl:
-.. _sm_data_mode_at_cmd_start:
 
 Data mode control #XDATACTRL
 ============================
@@ -233,5 +232,3 @@ Example
    Test datamode
    +++
    #XDATAMODE: 0
-
-.. _sm_data_mode_at_cmd_end:

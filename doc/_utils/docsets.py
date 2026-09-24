@@ -22,7 +22,7 @@ from sphinx.cmd.build import get_parser
 # published root page redirects to.
 ALL_DOCSETS = {
     "main": ("Serial Modem", "index"),
-    "nrf91m1": ("Serial Modem for nRF91M1", "index_nrf91m1"),
+    "nrf91m1": ("nRF91M1 AT Commands", "index_nrf91m1"),
 }
 
 
