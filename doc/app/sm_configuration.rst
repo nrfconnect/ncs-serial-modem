@@ -211,6 +211,21 @@ CONFIG_SM_NRF_CLOUD_OBSERVABILITY_LTE_METRICS - Additional LTE metrics for Memfa
    It is enabled by default.
    This requires :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY <CONFIG_SM_NRF_CLOUD_OBSERVABILITY>` and ``CONFIG_MEMFAULT_NCS_LTE_METRICS`` to be enabled.
 
+.. _CONFIG_SM_NRF_CLOUD_FOTA:
+
+CONFIG_SM_NRF_CLOUD_FOTA - nRF Cloud FOTA AT commands
+   This option enables the ``#XNRFCLOUDFOTA*`` commands, which check for and download application and modem firmware updates via `Memfault release management`_, delivered over the same nRF Cloud CoAP transport as ``#XNRFCLOUDOBS*``.
+   This requires :ref:`CONFIG_SM_NRF_CLOUD <CONFIG_SM_NRF_CLOUD>` and ``CONFIG_MEMFAULT_USE_NRF_CLOUD_COAP`` to be enabled.
+   See :ref:`SM_AT_NRFCLOUDFOTA` for more information.
+
+.. _CONFIG_SM_NRF_CLOUD_FOTA_MODEM_PROJECT_KEY:
+
+CONFIG_SM_NRF_CLOUD_FOTA_MODEM_PROJECT_KEY - Default Memfault project key for modem firmware updates
+   This option sets the dedicated Memfault project key used for modem firmware updates.
+   Obtain it from **Settings > General** in the Memfault project that holds the modem firmware (a different project than the application's).
+   It can be overridden at runtime with the ``<project_key>`` parameter of ``AT#XNRFCLOUDFOTA``.
+   This requires :ref:`CONFIG_SM_NRF_CLOUD_FOTA <CONFIG_SM_NRF_CLOUD_FOTA>` to be enabled.
+
 .. _CONFIG_SM_COAPC:
 
 CONFIG_SM_COAPC - CoAP client support in |SM|
