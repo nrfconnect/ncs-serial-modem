@@ -1132,7 +1132,8 @@ static void handle_bootloader_at_cmd(uint8_t *buf, size_t buf_size, char *at_cmd
 		rsp_send_ok();
 		final_call(sm_reset);
 	} else {
-		LOG_ERR("AT command not supported in bootloader mode: %s", at_cmd);
+		LOG_ERR("AT command not supported in bootloader mode: %.*s",
+			(int)strcspn(at_cmd, "=?,\r\n"), at_cmd);
 		rsp_send_error();
 	}
 }
