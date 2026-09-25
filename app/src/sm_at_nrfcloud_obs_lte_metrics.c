@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <memfault/metrics/metrics.h>
+#include <memfault/metrics/connectivity.h>
 #include <memfault_ncs.h>
 #include <modem/lte_lc.h>
 #include <zephyr/kernel.h>
@@ -404,6 +405,14 @@ void sm_memfault_lte_metrics_on_cfun_request(unsigned int mode)
 	}
 }
 
+static void connectivity_state_set(eMemfaultMetricsConnectivityState state)
+{
+	/* The Memfault port waits for a +CFUN notification, which the modem never sends. */
+	if (IS_ENABLED(CONFIG_MEMFAULT_METRICS_CONNECTIVITY_CONNECTED_TIME)) {
+		memfault_metrics_connectivity_connected_state_change(state);
+	}
+}
+
 void sm_memfault_lte_metrics_on_cfun(unsigned int mode)
 {
 	/* Called after the modem has accepted AT+CFUN, to start the metrics timers on
@@ -414,6 +423,7 @@ void sm_memfault_lte_metrics_on_cfun(unsigned int mode)
 	case LTE_LC_FUNC_MODE_ACTIVATE_LTE:
 		cfun_deactivation_pending = false;
 		MEMFAULT_METRIC_TIMER_START(ncs_lte_on_time_ms);
+		connectivity_state_set(kMemfaultMetricsConnectivityState_Started);
 		/* Only time a fresh connection attempt; a repeated activation or a
 		 * registration that already completed must not restart the timer.
 		 */
@@ -429,6 +439,7 @@ void sm_memfault_lte_metrics_on_cfun(unsigned int mode)
 		cfun_deactivation_pending = false;
 		MEMFAULT_METRIC_TIMER_STOP(ncs_lte_on_time_ms);
 		MEMFAULT_METRIC_TIMER_STOP(ncs_lte_time_to_connect_ms);
+		connectivity_state_set(kMemfaultMetricsConnectivityState_Stopped);
 		break;
 	default:
 		break;
