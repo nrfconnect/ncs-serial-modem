@@ -119,18 +119,21 @@ static int do_cloud_send_msg(const char *message, int len)
 	return err;
 }
 
+static void nrfcloud_send_state_urc(struct modem_pipe *pipe, bool ready, bool send_location)
+{
+	urc_send_to(pipe, "\r\n#XNRFCLOUD: %d,%d\r\n", ready, send_location);
+}
+
 static void on_cloud_ready(void)
 {
 	sm_nrf_cloud_ready = true;
-	urc_send_to(nrfcloud_pipe, "\r\n#XNRFCLOUD: %d,%d\r\n", sm_nrf_cloud_ready,
-		    sm_nrf_cloud_send_location);
+	nrfcloud_send_state_urc(nrfcloud_pipe, sm_nrf_cloud_ready, sm_nrf_cloud_send_location);
 }
 
 static void on_cloud_disconnected(void)
 {
 	sm_nrf_cloud_ready = false;
-	urc_send_to(nrfcloud_pipe, "\r\n#XNRFCLOUD: %d,%d\r\n", sm_nrf_cloud_ready,
-		    sm_nrf_cloud_send_location);
+	nrfcloud_send_state_urc(nrfcloud_pipe, sm_nrf_cloud_ready, sm_nrf_cloud_send_location);
 }
 
 static void date_time_event_handler(const struct date_time_evt *evt)
@@ -184,8 +187,7 @@ static void nrfcloud_conn_work_fn(struct k_work *work)
 		err = nrf_cloud_coap_connect(NULL);
 		if (err) {
 			LOG_ERR("Cloud connection failed, error: %d", err);
-			urc_send_to(nrfcloud_pipe, "\r\n#XNRFCLOUD: %d,%d\r\n", 0,
-				    nrfcloud_conn_send_location);
+			nrfcloud_send_state_urc(nrfcloud_pipe, false, nrfcloud_conn_send_location);
 			return;
 		}
 		sm_nrf_cloud_send_location = nrfcloud_conn_send_location;
@@ -223,41 +225,74 @@ STATIC int handle_at_nrf_cloud(enum at_parser_cmd_type cmd_type, struct at_parse
 
 	switch (cmd_type) {
 	case AT_PARSER_CMD_TYPE_SET:
-		nrfcloud_pipe = sm_at_host_get_current_pipe();
 		err = at_parser_num_get(parser, 1, &op);
 		if (err < 0) {
 			return err;
 		}
-		if (op == SM_NRF_CLOUD_CONNECT && !sm_nrf_cloud_ready) {
-			if (k_work_busy_get(&nrfcloud_conn_work)) {
-				return -EBUSY;
+		if (op == SM_NRF_CLOUD_CONNECT) {
+			if (param_count > 3) {
+				return -EINVAL;
 			}
 			if (param_count > 2) {
 				err = at_parser_num_get(parser, 2, &send_location);
-				if (send_location != 0 && send_location != 1) {
-					err = -EINVAL;
-				}
 				if (err < 0) {
 					return err;
 				}
+				if (send_location > 1) {
+					return -EINVAL;
+				}
+			}
+			if (k_work_busy_get(&nrfcloud_conn_work)) {
+				return -EBUSY;
+			}
+			nrfcloud_pipe = sm_at_host_get_current_pipe();
+			if (sm_nrf_cloud_ready) {
+				sm_nrf_cloud_send_location = send_location;
+				nrfcloud_send_state_urc(nrfcloud_pipe, sm_nrf_cloud_ready,
+						       sm_nrf_cloud_send_location);
+				return 0;
 			}
 
 			nrfcloud_connect = true;
 			nrfcloud_conn_send_location = send_location;
 			sm_k_work_submit_blocking(&nrfcloud_conn_work);
 			err = 0;
-		} else if (op == SM_NRF_CLOUD_SEND && sm_nrf_cloud_ready) {
-			/* enter data mode */
-			err = enter_datamode(nrf_cloud_datamode_callback, 0);
-		} else if (op == SM_NRF_CLOUD_DISCONNECT && sm_nrf_cloud_ready) {
+		} else if (op == SM_NRF_CLOUD_SEND) {
+			if (param_count > 2) {
+				return -EINVAL;
+			}
 			if (k_work_busy_get(&nrfcloud_conn_work)) {
 				return -EBUSY;
+			}
+			if (!sm_nrf_cloud_ready) {
+				return -ENOTCONN;
+			}
+			nrfcloud_pipe = sm_at_host_get_current_pipe();
+			/* enter data mode */
+			err = enter_datamode(nrf_cloud_datamode_callback, 0);
+		} else if (op == SM_NRF_CLOUD_DISCONNECT) {
+			if (param_count > 2) {
+				return -EINVAL;
+			}
+			if (k_work_busy_get(&nrfcloud_conn_work)) {
+				return -EBUSY;
+			}
+#if defined(CONFIG_SM_NRF_CLOUD_LOCATION)
+			if (nrfcloud_sending_loc_req) {
+				return -EBUSY;
+			}
+#endif
+			nrfcloud_pipe = sm_at_host_get_current_pipe();
+			if (!sm_nrf_cloud_ready) {
+				nrfcloud_send_state_urc(nrfcloud_pipe, sm_nrf_cloud_ready,
+						       sm_nrf_cloud_send_location);
+				return 0;
 			}
 			nrfcloud_connect = false;
 			sm_k_work_submit_blocking(&nrfcloud_conn_work);
 			err = 0;
 		} else {
-			err = -EBUSY;
+			err = -EINVAL;
 		} break;
 
 	case AT_PARSER_CMD_TYPE_READ: {
@@ -328,6 +363,10 @@ STATIC int handle_at_nrf_cloud_pos(enum at_parser_cmd_type cmd_type,
 
 	if (cmd_type != AT_PARSER_CMD_TYPE_SET) {
 		return -ENOTSUP;
+	}
+
+	if (k_work_busy_get(&nrfcloud_conn_work)) {
+		return -EBUSY;
 	}
 
 	if (!sm_nrf_cloud_ready) {
