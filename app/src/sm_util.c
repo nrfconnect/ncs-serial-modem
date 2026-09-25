@@ -28,7 +28,8 @@ static bool cmd_name_has_lower(const char *cmd)
 		if (c == '=' || c == '?') {
 			break;
 		} else if (islower(c)) {
-			LOG_ERR("FIX ME: AT command \"%s\" must be all-uppercase.", cmd);
+			LOG_ERR("FIX ME: AT command \"%.*s\" must be all-uppercase.",
+				(int)strcspn(cmd, "=?,\r\n"), cmd);
 			return true;
 		}
 	}
@@ -45,8 +46,9 @@ int sm_util_at_printf(const char *fmt, ...)
 	ret = vsnprintf(buf, sizeof(buf), fmt, args);
 	va_end(args);
 	if (ret >= sizeof(buf)) {
-		LOG_ERR("AT command \"%.16s...\" would get truncated from %u to %u bytes. "
-			"The buffer needs to be made bigger.", buf, ret, sizeof(buf) - 1);
+		LOG_ERR("AT command \"%.*s...\" would get truncated from %u to %u bytes. "
+			"The buffer needs to be made bigger.",
+			(int)MIN(strcspn(buf, "=?,\r\n"), 16U), buf, ret, sizeof(buf) - 1);
 		return -E2BIG;
 	}
 
@@ -63,8 +65,9 @@ int sm_util_at_printf(const char *fmt, ...)
 		/* Unlikely, but in that case the response code most likely didn't
 		 * make it into the buffer, so searching for it would be fruitless.
 		 */
-		LOG_ERR("AT response to \"%s\" didn't fit into %u bytes. "
-			"The buffer needs to be made bigger.", fmt, sizeof(buf) - 1);
+		LOG_ERR("AT response to \"%.*s\" didn't fit into %u bytes. "
+			"The buffer needs to be made bigger.",
+			(int)strcspn(fmt, "=?,\r\n"), fmt, sizeof(buf) - 1);
 	}
 	return ret;
 }
@@ -82,8 +85,9 @@ int sm_util_at_scanf(const char *cmd, const char *fmt, ...)
 
 	ret = nrf_modem_at_cmd(buf, sizeof(buf), "%s", cmd);
 	if (ret == -NRF_E2BIG) {
-		LOG_ERR("AT response to \"%s\" truncated to %u bytes. "
-			"The buffer needs to be made bigger.", cmd, sizeof(buf) - 1);
+		LOG_ERR("AT response to \"%.*s\" truncated to %u bytes. "
+			"The buffer needs to be made bigger.",
+			(int)strcspn(cmd, "=?,\r\n"), cmd, sizeof(buf) - 1);
 		buf[sizeof(buf) - 1] = '\0';
 	} else if (ret < 0) {
 		return ret;
@@ -143,7 +147,8 @@ int sm_util_at_cmd_no_intercept(char *buf, size_t len, const char *at_cmd)
 #define nrf_modem_at_scanf nrf_modem_at_printf
 
 	if (line_count < 1) {
-		LOG_ERR("Forwarding of \"%s\" failed (%d).", at_cmd, line_count);
+		LOG_ERR("Forwarding of \"%.*s\" failed (%d).",
+			(int)strcspn(at_cmd, "=?,\r\n"), at_cmd, line_count);
 		return line_count;
 	}
 

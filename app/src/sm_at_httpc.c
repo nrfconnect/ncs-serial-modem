@@ -358,8 +358,9 @@ static int http_start_request(struct http_request *req)
 	int ret;
 	struct sm_socket *sock;
 
-	LOG_INF("HTTP %d %s: %s:%d%s", req->method, http_method_str[req->method],
-		req->hostname, req->port, req->path);
+	LOG_INF("HTTP %d %s: %s:%d", req->method, http_method_str[req->method],
+		req->hostname, req->port);
+	LOG_DBG("HTTP %d path: %s", req->fd, req->path);
 
 	ret = http_alloc_build_headers(req);
 	if (ret < 0) {
@@ -991,8 +992,9 @@ static int http_send_request_headers(struct http_request *req)
 	int sent;
 	int n;
 
-	LOG_INF("HTTP %d %s (streaming): %s:%d%s", req->method,
-		http_method_str[req->method], req->hostname, req->port, req->path);
+	LOG_INF("HTTP %d %s (streaming): %s:%d", req->method,
+		http_method_str[req->method], req->hostname, req->port);
+	LOG_DBG("HTTP %d path: %s", req->fd, req->path);
 
 	ret = http_alloc_build_headers(req);
 	if (ret < 0) {

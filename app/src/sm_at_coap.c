@@ -369,10 +369,11 @@ static int coap_start_request(struct coap_request *req)
 
 	req->coap_started = true;
 
-	LOG_INF("Starting CoAP request: method=%d, path=%s, confirmable=%d, content_format=%d, "
+	LOG_INF("Starting CoAP request: method=%d, confirmable=%d, content_format=%d, "
 		"payload_len=%d, num_options=%d",
-		req->method, req->path, req->confirmable, req->content_format,
+		req->method, req->confirmable, req->content_format,
 		(int)req->payload_len, (int)req->num_extra_options);
+	LOG_DBG("CoAP path: %s", req->path);
 
 	coap_req.method = req->method;
 	coap_req.confirmable = req->confirmable;
