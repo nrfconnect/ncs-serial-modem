@@ -388,29 +388,41 @@ static void sm_memfault_lte_metrics_on_connection_lost(void)
 	lte_connected = false;
 }
 
+static bool cfun_mode_deactivates_lte(unsigned int mode)
+{
+	switch (mode) {
+	case LTE_LC_FUNC_MODE_POWER_OFF:
+	case LTE_LC_FUNC_MODE_RX_ONLY:
+	case LTE_LC_FUNC_MODE_OFFLINE:
+	case LTE_LC_FUNC_MODE_DEACTIVATE_LTE:
+	case LTE_LC_FUNC_MODE_DEACTIVATE_UICC:
+	case LTE_LC_FUNC_MODE_OFFLINE_UICC_ON:
+	case LTE_LC_FUNC_MODE_OFFLINE_KEEP_REG:
+	case LTE_LC_FUNC_MODE_OFFLINE_KEEP_REG_UICC_ON:
+		return true;
+	default:
+		return false;
+	}
+}
+
 void sm_memfault_lte_metrics_on_cfun_request(unsigned int mode)
 {
 	/* Called before AT+CFUN is forwarded to the modem, so the flag is set in time for
 	 * a +CEREG: 0 URC that the modem emits while processing the deactivation.
 	 */
-	switch (mode) {
-	case LTE_LC_FUNC_MODE_POWER_OFF:
-	case LTE_LC_FUNC_MODE_OFFLINE:
-	case LTE_LC_FUNC_MODE_DEACTIVATE_LTE:
-		cfun_deactivation_pending = true;
-		break;
-	default:
-		cfun_deactivation_pending = false;
-		break;
-	}
+	cfun_deactivation_pending = cfun_mode_deactivates_lte(mode);
 }
 
-static void connectivity_state_set(eMemfaultMetricsConnectivityState state)
+static void connectivity_started_set(bool started)
 {
+#if defined(CONFIG_MEMFAULT_METRICS_CONNECTIVITY_CONNECTED_TIME)
 	/* The Memfault port waits for a +CFUN notification, which the modem never sends. */
-	if (IS_ENABLED(CONFIG_MEMFAULT_METRICS_CONNECTIVITY_CONNECTED_TIME)) {
-		memfault_metrics_connectivity_connected_state_change(state);
-	}
+	memfault_metrics_connectivity_connected_state_change(
+		started ? kMemfaultMetricsConnectivityState_Started
+			: kMemfaultMetricsConnectivityState_Stopped);
+#else
+	ARG_UNUSED(started);
+#endif
 }
 
 void sm_memfault_lte_metrics_on_cfun(unsigned int mode)
@@ -418,31 +430,23 @@ void sm_memfault_lte_metrics_on_cfun(unsigned int mode)
 	/* Called after the modem has accepted AT+CFUN, to start the metrics timers on
 	 * activation and stop them on an intentional deactivation.
 	 */
-	switch (mode) {
-	case LTE_LC_FUNC_MODE_NORMAL:
-	case LTE_LC_FUNC_MODE_ACTIVATE_LTE:
+	if (mode == LTE_LC_FUNC_MODE_NORMAL || mode == LTE_LC_FUNC_MODE_ACTIVATE_LTE) {
 		cfun_deactivation_pending = false;
 		MEMFAULT_METRIC_TIMER_START(ncs_lte_on_time_ms);
-		connectivity_state_set(kMemfaultMetricsConnectivityState_Started);
+		connectivity_started_set(true);
 		/* Only time a fresh connection attempt; a repeated activation or a
 		 * registration that already completed must not restart the timer.
 		 */
 		if (!lte_connected) {
 			MEMFAULT_METRIC_TIMER_START(ncs_lte_time_to_connect_ms);
 		}
-		break;
-	case LTE_LC_FUNC_MODE_POWER_OFF:
-	case LTE_LC_FUNC_MODE_OFFLINE:
-	case LTE_LC_FUNC_MODE_DEACTIVATE_LTE:
+	} else if (cfun_mode_deactivates_lte(mode)) {
 		/* Intentional deactivation is not a connection loss. */
 		lte_connected = false;
 		cfun_deactivation_pending = false;
 		MEMFAULT_METRIC_TIMER_STOP(ncs_lte_on_time_ms);
 		MEMFAULT_METRIC_TIMER_STOP(ncs_lte_time_to_connect_ms);
-		connectivity_state_set(kMemfaultMetricsConnectivityState_Stopped);
-		break;
-	default:
-		break;
+		connectivity_started_set(false);
 	}
 }
 
