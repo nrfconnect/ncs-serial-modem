@@ -68,8 +68,9 @@ static void nrf_provisioning_callback(const struct nrf_provisioning_callback_dat
 		LOG_WRN("Claim the device using the device's attestation token on "
 			"nrfcloud.com");
 
+		/* Note: We explicitly allow attestation token to be printed to log */
 		if (IS_ENABLED(CONFIG_NRF_PROVISIONING_PROVIDE_ATTESTATION_TOKEN)) {
-			LOG_WRN("Attestation token:\r\n\n%.*s.%.*s\r\n", event->token->attest_sz,
+			LOG_DBG("Attestation token:\r\n\n%.*s.%.*s\r\n", event->token->attest_sz,
 				event->token->attest, event->token->cose_sz, event->token->cose);
 		}
 
