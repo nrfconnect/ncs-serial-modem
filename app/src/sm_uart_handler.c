@@ -219,7 +219,7 @@ static int tx_disable(k_timeout_t timeout)
 	if (!err) {
 		LOG_INF("TX aborted");
 	} else if (err != -EFAULT) {
-		LOG_ERR("uart_tx_abort failed (%d).", err);
+		LOG_ERR("UART TX abort failed: %d", err);
 		return err;
 	}
 
@@ -284,7 +284,7 @@ static void uart_callback(const struct device *dev, struct uart_event *evt, void
 	case UART_TX_ABORTED:
 		err = ring_buf_get_finish(&tx_buf, evt->data.tx.len);
 		if (err) {
-			LOG_ERR("UART_TX_%s failure: %d",
+			LOG_ERR("UART_TX_%s failed: %d",
 				(evt->type == UART_TX_DONE) ? "DONE" : "ABORTED", err);
 		}
 		if (ring_buf_is_empty(&tx_buf) ||
@@ -317,12 +317,12 @@ static void uart_callback(const struct device *dev, struct uart_event *evt, void
 		break;
 	case UART_RX_BUF_REQUEST:
 		if (k_msgq_num_free_get(&rx_event_queue) < UART_RX_EVENT_COUNT_FOR_BUF) {
-			LOG_WRN("Disabling UART RX: No event space.");
+			LOG_WRN("Disabling UART RX: %s", "no event space");
 			break;
 		}
 		buf = rx_buf_alloc();
 		if (!buf) {
-			LOG_WRN("Disabling UART RX: No free buffers.");
+			LOG_WRN("Disabling UART RX: %s", "no buffers");
 			break;
 		}
 		err = uart_rx_buf_rsp(sm_uart_dev, buf->buf, sizeof(buf->buf));
@@ -356,7 +356,7 @@ static void notify_transmit_idle_fn(struct k_work *work)
 static void notify_closed_fn(struct k_work *work)
 {
 	ARG_UNUSED(work);
-	LOG_DBG("UART pipe closed!!!");
+	LOG_DBG("UART pipe closed");
 	modem_pipe_notify_closed(&sm_pipe.pipe);
 }
 
@@ -390,7 +390,7 @@ static int sm_uart_handler_enable(void)
 
 	err = uart_config_get(sm_uart_dev, &cfg);
 	if (err) {
-		LOG_ERR("uart_config_get: %d", err);
+		LOG_ERR("UART config get failed: %d", err);
 		return err;
 	}
 
@@ -417,14 +417,14 @@ static int sm_uart_handler_enable(void)
 	} while (err);
 	err = uart_callback_set(sm_uart_dev, uart_callback, NULL);
 	if (err) {
-		LOG_ERR("Cannot set callback: %d", err);
+		LOG_ERR("UART callback set failed: %d", err);
 		return -EFAULT;
 	}
 
 	/* Initialize UART pipe for unified interface */
 	err = sm_uart_pipe_init_internal();
 	if (err && err != -EALREADY) {
-		LOG_ERR("Failed to initialize UART pipe: %d", err);
+		LOG_ERR("UART pipe init failed: %d", err);
 		return err;
 	}
 
@@ -438,13 +438,13 @@ int sm_uart_handler_disable(void)
 
 	err = tx_disable(K_MSEC(50));
 	if (err) {
-		LOG_ERR("TX disable failed (%d).", err);
+		LOG_ERR("TX disable failed: %d", err);
 		return err;
 	}
 
 	err = rx_disable();
 	if (err) {
-		LOG_ERR("RX disable failed (%d).", err);
+		LOG_ERR("RX disable failed: %d", err);
 		return err;
 	}
 
@@ -512,7 +512,7 @@ static int pipe_transmit(void *data, const uint8_t *buf, size_t size)
 			k_sem_give(&tx_done_sem);
 			return (int)sent;
 		} else if (err) {
-			LOG_ERR("TX %s failed (%d).", "start", err);
+			LOG_ERR("TX %s failed: %d", "start", err);
 			k_sem_give(&tx_done_sem);
 			return err;
 		}
@@ -618,7 +618,7 @@ static int handle_at_ipr(enum at_parser_cmd_type cmd_type, struct at_parser *par
 
 	err = uart_config_get(sm_uart_dev, &cfg);
 	if (err) {
-		LOG_ERR("uart_config_get: %d", err);
+		LOG_ERR("UART config get failed: %d", err);
 		return err;
 	}
 
@@ -638,7 +638,7 @@ static int handle_at_ipr(enum at_parser_cmd_type cmd_type, struct at_parser *par
 	}
 
 	if (sm_cmux_is_started()) {
-		LOG_ERR("Cannot change baudrate while CMUX is active.");
+		LOG_ERR("Baudrate change not supported while CMUX active");
 		return -EBUSY;
 	}
 
@@ -660,17 +660,17 @@ static int handle_at_ipr(enum at_parser_cmd_type cmd_type, struct at_parser *par
 
 	err = modem_pipe_close(&sm_pipe.pipe, K_SECONDS(1));
 	if (err) {
-		LOG_ERR("modem_pipe_close: %d", err);
+		LOG_ERR("Pipe close failed: %d", err);
 		return err;
 	}
 	err = uart_configure(sm_uart_dev, &cfg);
 	if (err) {
-		LOG_ERR("uart_configure: %d", err);
+		LOG_ERR("UART configure failed: %d", err);
 		return err;
 	}
 	err = modem_pipe_open(&sm_pipe.pipe, K_SECONDS(1));
 	if (err) {
-		LOG_ERR("modem_pipe_open: %d", err);
+		LOG_ERR("Pipe open failed: %d", err);
 		return err;
 	}
 

@@ -106,13 +106,13 @@ static int setup_full_modem_fota_config(void)
 
 	err = dfu_target_full_modem_cfg(&full_modem_fota_params);
 	if (err != 0 && err != -EALREADY) {
-		LOG_ERR("dfu_target_full_modem_cfg failed: %d", err);
+		LOG_ERR("Full modem FOTA config failed: %d", err);
 		return err;
 	}
 
 	err = dfu_target_full_modem_fdev_get(&fdev);
 	if (err != 0) {
-		LOG_ERR("dfu_target_full_modem_fdev_get failed: %d", err);
+		LOG_ERR("Full modem FOTA fdev get failed: %d", err);
 		return err;
 	}
 
@@ -128,13 +128,13 @@ static int do_fota_mfw_read(void)
 
 	err = nrf_modem_delta_dfu_area(&area);
 	if (err) {
-		LOG_ERR("failed in delta dfu area: %d", err);
+		LOG_ERR("Delta DFU area read failed: %d", err);
 		return err;
 	}
 
 	err = nrf_modem_delta_dfu_offset(&offset);
 	if (err) {
-		LOG_ERR("failed in delta dfu offset: %d", err);
+		LOG_ERR("Delta DFU offset read failed: %d", err);
 		return err;
 	}
 
@@ -154,7 +154,7 @@ static int do_fota_erase_mfw(void)
 		if (err == NRF_MODEM_DELTA_DFU_ERASE_PENDING) {
 			in_progress = true;
 		} else {
-			LOG_ERR("failed in delta dfu offset: %d", err);
+			LOG_ERR("Delta DFU offset read failed: %d", err);
 			return err;
 		}
 	}
@@ -167,7 +167,7 @@ static int do_fota_erase_mfw(void)
 	if (!in_progress) {
 		err = nrf_modem_delta_dfu_erase();
 		if (err) {
-			LOG_ERR("failed in delta dfu erase: %d", err);
+			LOG_ERR("Delta DFU erase failed: %d", err);
 			return err;
 		}
 	}
@@ -178,11 +178,11 @@ static int do_fota_erase_mfw(void)
 		k_sleep(K_SECONDS(ERASE_POLL_TIME));
 		err = nrf_modem_delta_dfu_offset(&offset);
 		if (err != 0 && err != NRF_MODEM_DELTA_DFU_ERASE_PENDING) {
-			LOG_ERR("failed in delta dfu offset: %d", err);
+			LOG_ERR("Delta DFU offset read failed: %d", err);
 			return err;
 		}
 		if (err == 0 && offset == 0) {
-			LOG_INF("Erase completed");
+			LOG_INF("Erase done");
 			break;
 		}
 		time_elapsed += ERASE_POLL_TIME;
@@ -214,17 +214,17 @@ static int do_fota_start(const char *file_uri, size_t file_uri_len, int sec_tag,
 	http_parser_url_init(&parser);
 	ret = http_parser_parse_url(file_uri, file_uri_len, 0, &parser);
 	if (ret) {
-		LOG_ERR("Parse URL error");
+		LOG_ERR("URL parse failed: %d", ret);
 		return -EINVAL;
 	}
 
 	if (!(parser.field_set & (1 << UF_PATH))) {
-		LOG_ERR("Parse path error");
+		LOG_ERR("URL path missing");
 		return -EINVAL;
 	}
 
 	if (!(parser.field_set & (1 << UF_HOST))) {
-		LOG_ERR("Parse host error");
+		LOG_ERR("URL host missing");
 		return -EINVAL;
 	}
 
@@ -238,7 +238,7 @@ static int do_fota_start(const char *file_uri, size_t file_uri_len, int sec_tag,
 	 * at least the leading '/').
 	 */
 	if (file_uri_len > SM_MAX_URL || path_off == 0 || path_off >= file_uri_len) {
-		LOG_ERR("Invalid URL layout: uri_len=%zu path_off=%zu", file_uri_len, path_off);
+		LOG_ERR("Invalid URL layout uri_len=%zu path_off=%zu", file_uri_len, path_off);
 		return -EINVAL;
 	}
 
@@ -316,7 +316,7 @@ static void fota_dl_handler(const struct fota_download_evt *evt)
 		urc_send_to(fota_pipe, "\r\n#XFOTA: %d,%d\r\n", sm_fota_stage, sm_fota_status);
 		break;
 	case FOTA_DOWNLOAD_EVT_ERASE_TIMEOUT:
-		LOG_INF("Erasure timeout reached. Erasure continues.");
+		LOG_INF("Erase timeout, continuing");
 		break;
 	case FOTA_DOWNLOAD_EVT_ERASE_PENDING:
 		sm_fota_stage = FOTA_STAGE_DOWNLOAD_ERASE_PENDING;
@@ -412,7 +412,7 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 			 * used to size any buffer (CERT STR31-C).
 			 */
 			if (uri_len == 0 || uri_len > SM_MAX_URL) {
-				LOG_ERR("Invalid URI length: %zu (max %d)", uri_len, SM_MAX_URL);
+				LOG_ERR("URI length invalid len=%zu max=%d", uri_len, SM_MAX_URL);
 				err = -EINVAL;
 				break;
 			}
@@ -521,7 +521,7 @@ static int sm_at_fota_init(void)
 	int ret = sm_at_fota_register_callback();
 
 	if (ret) {
-		LOG_ERR("fota_download_init failed: %d", ret);
+		LOG_ERR("FOTA download init failed: %d", ret);
 		sm_init_failed = true;
 		return ret;
 	}
@@ -552,11 +552,11 @@ void sm_fota_mcuboot_bl_boot_check(void)
 	if (err != 0) {
 		sm_fota_status = FOTA_STATUS_ERROR;
 		sm_fota_info = err;
-		LOG_ERR("MCUboot validate: FAIL (fw_info read err %d)", err);
+		LOG_ERR("MCUboot BL version read failed: %d", err);
 	} else if (current_version <= sm_fota_bl_version_before) {
 		sm_fota_status = FOTA_STATUS_ERROR;
 		sm_fota_info = 1;
-		LOG_WRN("MCUboot validate: FAIL (version unchanged: %u -> %u)",
+		LOG_WRN("MCUboot BL version unchanged was=%u now=%u",
 			sm_fota_bl_version_before, current_version);
 	} else {
 		sm_fota_status = FOTA_STATUS_OK;
@@ -599,7 +599,8 @@ void sm_fota_post_process(void)
 	if (sm_fota_stage != FOTA_STAGE_COMPLETE && sm_fota_stage != FOTA_STAGE_ACTIVATE) {
 		return;
 	}
-	LOG_INF("FOTA result %d,%d,%d", sm_fota_stage, sm_fota_status, sm_fota_info);
+	LOG_INF("FOTA result stage=%d status=%d info=%d", sm_fota_stage, sm_fota_status,
+		sm_fota_info);
 
 	struct modem_pipe *pipe = fota_pipe ? fota_pipe : sm_at_host_get_urc_pipe();
 	const char *urc_name = sm_fota_nrfcloud ? "XNRFCLOUDFOTA" : "XFOTA";
@@ -626,16 +627,16 @@ FUNC_NORETURN static void handle_full_fota_activation_fail(int ret)
 	sm_fota_info = ret;
 	sm_fota_post_process();
 
-	LOG_ERR("Modem firmware activation failed, error: %d", ret);
+	LOG_ERR("Modem firmware activation failed: %d", ret);
 
 	/* Extenal flash needs to be erased and internal counters cleared */
 	err = dfu_target_reset();
 	if (err != 0)
-		LOG_ERR("dfu_target_reset() failed: %d", err);
+		LOG_ERR("DFU target reset failed: %d", err);
 	else
-		LOG_INF("External flash erase succeeded");
+		LOG_INF("External flash erase done");
 
-	LOG_WRN("Rebooting...");
+	LOG_INF("Rebooting");
 	sm_uart_tx_flush();
 	sm_log_flush();
 	sys_reboot(SYS_REBOOT_COLD);
@@ -653,7 +654,7 @@ void sm_finish_modem_full_fota(void)
 
 	err = nrf_modem_lib_bootloader_init();
 	if (err != 0) {
-		LOG_ERR("nrf_modem_lib_bootloader_init() failed: %d", err);
+		LOG_ERR("Modem bootloader init failed: %d", err);
 		handle_full_fota_activation_fail(err);
 	}
 
@@ -665,20 +666,20 @@ void sm_finish_modem_full_fota(void)
 
 	err = fmfu_fdev_load(fmfu_buf, sizeof(fmfu_buf), fdev.dev, fdev.offset);
 	if (err != 0) {
-		LOG_ERR("fmfu_fdev_load failed: %d", err);
+		LOG_ERR("FMFU fdev load failed: %d", err);
 		handle_full_fota_activation_fail(err);
 	}
 
 	err = nrf_modem_lib_shutdown();
 	if (err != 0) {
-		LOG_ERR("nrf_modem_lib_shutdown() failed: %d", err);
+		LOG_ERR("Modem shutdown failed: %d", err);
 		handle_full_fota_activation_fail(err);
 	}
 
 	sm_fota_status = FOTA_STATUS_OK;
 	sm_fota_info = 0;
 
-	LOG_INF("Full modem firmware update complete.");
+	LOG_INF("Full modem firmware update complete");
 }
 
 #endif /* CONFIG_SM_FULL_FOTA */

@@ -87,22 +87,21 @@ static void on_modem_dfu_res(int dfu_res, void *ctx)
 {
 	switch (dfu_res) {
 	case NRF_MODEM_DFU_RESULT_OK:
-		LOG_INF("Modem update OK. Running new firmware.");
+		LOG_INF("Modem update OK, running new firmware");
 		break;
 	case NRF_MODEM_DFU_RESULT_UUID_ERROR:
 	case NRF_MODEM_DFU_RESULT_AUTH_ERROR:
-		LOG_ERR("Modem update failed (0x%x). Running old firmware.", dfu_res);
+		LOG_ERR("Modem update failed: 0x%x, running old firmware", dfu_res);
 		break;
 	case NRF_MODEM_DFU_RESULT_HARDWARE_ERROR:
 	case NRF_MODEM_DFU_RESULT_INTERNAL_ERROR:
-		LOG_ERR("Fatal error (0x%x) encountered during modem update.", dfu_res);
+		LOG_ERR("Fatal modem update error: 0x%x", dfu_res);
 		break;
 	case NRF_MODEM_DFU_RESULT_VOLTAGE_LOW:
-		LOG_ERR("Modem update postponed due to low voltage. "
-			"Reset the modem once you have sufficient power.");
+		LOG_ERR("Modem update postponed, low voltage");
 		break;
 	default:
-		LOG_ERR("Unhandled nrf_modem DFU result code 0x%x.", dfu_res);
+		LOG_ERR("Unhandled DFU result: 0x%x", dfu_res);
 		break;
 	}
 
@@ -150,7 +149,7 @@ static void check_app_fota_status(void)
 		 * slot_0_partition. It writes image_ok where MCUboot expects it.
 		 */
 		ret = boot_write_img_confirmed_multi(0);
-		LOG_INF("boot_write_img_confirmed_multi: %d", ret);
+		LOG_INF("Image confirmed: %d", ret);
 		break;
 	}
 	/* Only report FOTA completion if an app FOTA was in progress.
@@ -174,7 +173,7 @@ static int bootloader_mode_init(void)
 		LOG_ERR("Failed to initialize bootloader mode: %d", ret);
 		return ret;
 	}
-	LOG_INF("Bootloader mode initiated successfully");
+	LOG_INF("Bootloader mode active");
 
 	urc_send("Bootloader mode ready\r\n");
 
@@ -196,11 +195,9 @@ void lte_auto_connect(void)
 	}
 
 	LOG_INF("LTE auto connect");
-	LOG_DBG("Configuring system mode: %s", CONFIG_SM_AUTO_CONNECT_SYSTEM_MODE);
 	err = sm_util_at_printf("AT%%XSYSTEMMODE=%s", CONFIG_SM_AUTO_CONNECT_SYSTEM_MODE);
 	if (err) {
-		LOG_ERR("Failed to configure system mode \"%s\": %d",
-			CONFIG_SM_AUTO_CONNECT_SYSTEM_MODE, err);
+		LOG_ERR("System mode %s: %d", CONFIG_SM_AUTO_CONNECT_SYSTEM_MODE, err);
 		return;
 	}
 
@@ -208,22 +205,18 @@ void lte_auto_connect(void)
 	err = sm_util_at_printf("AT+CGDCONT=0,%s,%s", CONFIG_SM_AUTO_CONNECT_PDN_FAMILY_STRING,
 				CONFIG_SM_AUTO_CONNECT_PDN_APN);
 	if (err) {
-		LOG_ERR("Failed to configure PDN: %d", err);
+		LOG_ERR("PDN APN config failed: %d", err);
 		return;
 	}
-	LOG_DBG("PDN configured: APN=\"%s\", PDN type=\"%s\"", CONFIG_SM_AUTO_CONNECT_PDN_APN,
-		CONFIG_SM_AUTO_CONNECT_PDN_FAMILY_STRING);
 
 	if (CONFIG_SM_AUTO_CONNECT_PDN_AUTH != 0) {
 		err = sm_util_at_printf("AT+CGAUTH=0,%d,%s,%s", CONFIG_SM_AUTO_CONNECT_PDN_AUTH,
 					CONFIG_SM_AUTO_CONNECT_PDN_USERNAME,
 					CONFIG_SM_AUTO_CONNECT_PDN_PASSWORD);
 		if (err) {
-			LOG_ERR("Failed to configure AUTH: %d", err);
+			LOG_ERR("PDN auth config failed: %d", err);
 			return;
 		}
-		LOG_DBG("PDN AUTH configured: protocol=%d, username=\"%s\"",
-			CONFIG_SM_AUTO_CONNECT_PDN_AUTH, CONFIG_SM_AUTO_CONNECT_PDN_USERNAME);
 	}
 #endif /* CONFIG_SM_AUTO_CONNECT_PDN_CONFIG */
 
@@ -274,13 +267,13 @@ static int sm_main(void)
 	const uint32_t rr = nrf_power_resetreas_get(NRF_POWER_NS);
 
 	nrf_power_resetreas_clear(NRF_POWER_NS, 0x70017);
-	LOG_INF("RR: 0x%08x", rr);
+	LOG_INF("Reset reason: 0x%08x", rr);
 
 	if (sm_bootloader_mode_requested) {
 		/* Clear bootloader mode flag */
 		ret = bootloader_mode_request(false);
 		if (ret) {
-			LOG_ERR("Failed to clear bootloader mode flag, starting SM in normal mode");
+			LOG_ERR("Bootloader mode flag clear failed, starting in normal mode");
 		} else {
 			ret = bootloader_mode_init();
 			if (ret) {
@@ -300,7 +293,7 @@ static int sm_main(void)
 	ret = nrf_modem_lib_init();
 
 	if (ret) {
-		LOG_ERR("Modem library init failed, err: %d", ret);
+		LOG_ERR("Modem library init failed: %d", ret);
 		if (ret != -EAGAIN && ret != -EIO) {
 			return ret;
 		} else if (ret == -EIO) {
@@ -309,7 +302,7 @@ static int sm_main(void)
 				 * during a flash operation.
 				 */
 				sm_modem_init_eio_retry_count++;
-				LOG_WRN("Rebooting (%u/%u) before requesting bootloader mode",
+				LOG_WRN("Rebooting %u/%u, requesting bootloader mode",
 					sm_modem_init_eio_retry_count,
 					SM_MODEM_INIT_EIO_MAX_RETRIES);
 				(void)sm_settings_modem_eio_retried_save();
@@ -319,8 +312,7 @@ static int sm_main(void)
 			sm_modem_init_eio_retry_count = 0;
 			(void)sm_settings_modem_eio_retried_save();
 
-			LOG_ERR("Please program full modem firmware with the bootloader or "
-				"external tools");
+			LOG_ERR("Full modem firmware update required");
 			(void)bootloader_mode_request(true);
 			goto exit_reboot;
 		}

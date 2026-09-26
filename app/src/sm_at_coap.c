@@ -226,7 +226,7 @@ static void coap_callback(const struct coap_client_response_data *data, void *us
 		return;
 	}
 
-	LOG_DBG("CoAP response callback: result_code=%d, payload_len=%d, last_block=%d",
+	LOG_DBG("CoAP response callback: result_code=%d, len=%d, last_block=%d",
 		data->result_code, (int)data->payload_len, data->last_block);
 
 	req->status_code = data->result_code;
@@ -265,8 +265,7 @@ static void coap_callback(const struct coap_client_response_data *data, void *us
 				 * A concurrent cancel gives rx_consumed to release us early.
 				 */
 				if (k_sem_take(&req->rx_consumed, COAP_HOST_PULL_TIMEOUT) != 0) {
-					LOG_ERR("Timed out waiting for AT#XCOAPCDATA (handle=%d)",
-						req->fd);
+					LOG_ERR("AT#XCOAPCDATA timeout, handle %d", req->fd);
 					/* Cancel first: it clears request_ongoing and NULLs the
 					 * library's cb/user_data, so coap_client never
 					 * dereferences req again after we free it below.
@@ -357,8 +356,6 @@ static int coap_payload_cb(size_t offset, const uint8_t **payload, size_t *len,
 		k_sem_give(&req->staging_consumed);
 	}
 
-	LOG_DBG("CoAP payload_cb: offset=%zu, len=%zu, last=%d",
-		offset, *len, (int)*last_block);
 	return 0;
 }
 
@@ -373,7 +370,7 @@ static int coap_start_request(struct coap_request *req)
 		"payload_len=%d, num_options=%d",
 		req->method, req->confirmable, req->content_format,
 		(int)req->payload_len, (int)req->num_extra_options);
-	LOG_DBG("CoAP path: %s", req->path);
+	LOG_DBG("CoAP request: path=%s", req->path);
 
 	coap_req.method = req->method;
 	coap_req.confirmable = req->confirmable;
@@ -406,7 +403,7 @@ static int coap_start_request(struct coap_request *req)
 
 	ret = coap_client_req(&sm_coap_client, req->fd, NULL, &coap_req, NULL);
 	if (ret) {
-		LOG_ERR("coap_client_req failed: %d", ret);
+		LOG_ERR("CoAP start failed: %d", ret);
 		coap_fail_request(req);
 	}
 
@@ -495,8 +492,7 @@ static int coap_datamode_send_block(struct coap_request *req, const uint8_t *dat
 			if (!is_last_block) {
 				if (k_sem_take(&req->staging_consumed, COAP_BLOCK_SEND_TIMEOUT) !=
 				    0) {
-					LOG_ERR("Timed out waiting for coap_client to consume "
-						"block");
+					LOG_ERR("CoAP block send timeout");
 					req->payload_aborted = true;
 					return -ETIMEDOUT;
 				}
@@ -510,8 +506,6 @@ static int coap_datamode_send_block(struct coap_request *req, const uint8_t *dat
 
 static int coap_datamode_callback(uint8_t op, const uint8_t *data, int len, uint8_t flags)
 {
-	LOG_DBG("CoAP data mode callback: op=%d, len=%d, flags=0x%02x", op, len, flags);
-
 	if (op == DATAMODE_SEND) {
 		struct coap_request *req = coap_pending_req;
 
@@ -547,8 +541,6 @@ static int coap_datamode_callback(uint8_t op, const uint8_t *data, int len, uint
 			}
 		}
 
-		LOG_DBG("CoAP payload: %zu / %zu bytes buffered",
-			req->payload_sent + req->staging_filled, req->payload_len);
 		return len;
 
 	} else if (op == DATAMODE_EXIT) {
@@ -638,7 +630,7 @@ STATIC int handle_at_coap_req(enum at_parser_cmd_type cmd_type, struct at_parser
 		}
 
 		if (!find_socket(handle)) {
-			LOG_ERR("Invalid socket handle: %d", handle);
+			LOG_ERR("Invalid handle %d", handle);
 			return -EINVAL;
 		}
 
@@ -784,7 +776,7 @@ STATIC int handle_at_coap_req(enum at_parser_cmd_type cmd_type, struct at_parser
 			ret = parse_option_value(val_str, val_len, opt->value,
 						 sizeof(opt->value), &decoded_len);
 			if (ret) {
-				LOG_ERR("CoAP option %d value too long (%zu bytes, max %zu)",
+				LOG_ERR("CoAP option %d value too long: %zu > %zu",
 					opt_num, val_len, sizeof(opt->value));
 				goto cleanup_req;
 			}
@@ -897,7 +889,7 @@ STATIC int handle_at_coap_cancel(enum at_parser_cmd_type cmd_type, struct at_par
 			return -EINVAL;
 		}
 
-		LOG_INF("Cancelling CoAP request (handle=%d)", handle);
+		LOG_INF("Cancelling CoAP request, handle %d", handle);
 		coap_client_cancel_requests(&sm_coap_client);
 		ret = 0;
 		break;

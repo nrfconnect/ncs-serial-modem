@@ -38,17 +38,17 @@ static void nrf_provisioning_callback(const struct nrf_provisioning_callback_dat
 {
 	switch (event->type) {
 	case NRF_PROVISIONING_EVENT_START:
-		LOG_INF("Provisioning: started");
+		LOG_INF("Provisioning started");
 		break;
 	case NRF_PROVISIONING_EVENT_STOP:
-		LOG_INF("Provisioning: stopped");
+		LOG_INF("Provisioning stopped");
 		break;
 	case NRF_PROVISIONING_EVENT_NEED_LTE_DEACTIVATED:
-		LOG_INF("Provisioning requires device to deactivate network");
+		LOG_INF("Provisioning needs LTE deactivated");
 		xnrfprov_send_status(XNRFPROV_NEED_LTE_DEACTIVATED);
 		break;
 	case NRF_PROVISIONING_EVENT_NEED_LTE_ACTIVATED:
-		LOG_INF("Provisioning requires device to activate network");
+		LOG_INF("Provisioning needs LTE activated");
 		xnrfprov_send_status(XNRFPROV_NEED_LTE_ACTIVATED);
 		break;
 	case NRF_PROVISIONING_EVENT_FAILED_TOO_MANY_COMMANDS:
@@ -56,7 +56,7 @@ static void nrf_provisioning_callback(const struct nrf_provisioning_callback_dat
 		xnrfprov_send_status(XNRFPROV_FAILED_TOO_MANY_CMDS);
 		break;
 	case NRF_PROVISIONING_EVENT_NO_COMMANDS:
-		LOG_INF("Provisioning done, no commands received from the server");
+		LOG_INF("Provisioning done, no commands received");
 		xnrfprov_send_status(XNRFPROV_DONE);
 		break;
 	case NRF_PROVISIONING_EVENT_FAILED:
@@ -94,7 +94,7 @@ static void nrf_provisioning_callback(const struct nrf_provisioning_callback_dat
 		urc_send("\r\n#XNRFPROV: %lld\r\n", event->next_attempt_time_seconds);
 		break;
 	case NRF_PROVISIONING_EVENT_DONE:
-		LOG_INF("Provisioning: done");
+		LOG_INF("Provisioning done");
 		xnrfprov_send_status(XNRFPROV_DONE);
 		break;
 	default:
@@ -116,7 +116,7 @@ STATIC int handle_at_provision(enum at_parser_cmd_type cmd_type, struct at_parse
 		int ret = nrf_provisioning_trigger_manually();
 
 		if (ret) {
-			LOG_ERR("Failed to trigger provisioning: %d", ret);
+			LOG_ERR("Provisioning trigger failed: %d", ret);
 			return ret;
 		}
 		return 0;
@@ -135,7 +135,7 @@ static void sm_provisioning_init(int ret, void *ctx)
 
 	err = nrf_provisioning_init(nrf_provisioning_callback);
 	if (err) {
-		LOG_ERR("Failed to initialize provisioning client");
+		LOG_ERR("Provisioning init failed: %d", err);
 		sm_init_failed = true;
 	}
 }

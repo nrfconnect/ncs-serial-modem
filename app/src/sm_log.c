@@ -57,7 +57,7 @@ static int uart_suspend(void)
 	int ret = pm_device_action_run(uart_dev, PM_DEVICE_ACTION_SUSPEND);
 
 	if (ret && ret != -EALREADY) {
-		LOG_ERR("Failed to %s UART device: %d", "suspend", ret);
+		LOG_ERR("UART device %s failed: %d", "suspend", ret);
 		return ret;
 	}
 
@@ -69,7 +69,7 @@ static int uart_resume(void)
 	int ret = pm_device_action_run(uart_dev, PM_DEVICE_ACTION_RESUME);
 
 	if (ret && ret != -EALREADY) {
-		LOG_ERR("Failed to %s UART device: %d", "resume", ret);
+		LOG_ERR("UART device %s failed: %d", "resume", ret);
 		return ret;
 	}
 	return 0;
@@ -81,7 +81,7 @@ static bool uart_is_active(void)
 	int err = pm_device_state_get(uart_dev, &state);
 
 	if (err) {
-		LOG_ERR("Failed to get UART device state (%d).", err);
+		LOG_ERR("UART device state get failed: %d", err);
 		return false;
 	}
 	return state == PM_DEVICE_STATE_ACTIVE;
