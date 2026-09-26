@@ -64,7 +64,7 @@ static int ext_xtal_control(bool xtal_on)
 #if SM_DTR_GPIOS
 static void dtr_enable_fn(struct k_work *)
 {
-	LOG_INF("DTR pin callback work function.");
+	LOG_INF("DTR asserted, powering on");
 	sm_at_host_power_on();
 }
 
@@ -74,7 +74,7 @@ static void dtr_pin_callback(const struct device *dev, struct gpio_callback *gpi
 	static K_WORK_DEFINE(work, dtr_enable_fn);
 	bool asserted = gpio_pin_get_dt(&dtr_gpio);
 
-	LOG_DBG("DTR pin %s.", asserted ? "asserted" : "de-asserted");
+	LOG_DBG("DTR pin %s", asserted ? "asserted" : "de-asserted");
 
 	if (asserted) {
 		gpio_remove_callback(dev, gpio_callback);
@@ -101,7 +101,7 @@ void sm_ctrl_pin_enter_sleep_no_uninit(bool at_host_power_off)
 		sm_at_host_power_off();
 	}
 
-	LOG_INF("Entering sleep. No uninit.");
+	LOG_INF("Entering sleep, no uninit");
 	sm_log_flush();
 
 	k_sleep(K_MSEC(100));
@@ -128,7 +128,7 @@ void sm_ctrl_pin_enter_sleep(void)
 void sm_ctrl_pin_enter_idle(void)
 {
 #if SM_DTR_GPIOS
-	LOG_INF("Entering idle.");
+	LOG_INF("Entering idle");
 	int err;
 
 	err = sm_ctrl_pin_ready();
@@ -145,14 +145,14 @@ void sm_ctrl_pin_enter_idle(void)
 
 	err = ext_xtal_control(false);
 	if (err < 0) {
-		LOG_WRN("Failed to disable ext XTAL: %d", err);
+		LOG_WRN("Ext XTAL %s failed: %d", "disable", err);
 	}
 #endif
 }
 
 void sm_ctrl_pin_enter_shutdown(void)
 {
-	LOG_INF("Entering shutdown.");
+	LOG_INF("Entering shutdown");
 	sm_log_flush();
 	k_sleep(K_MSEC(100));
 
@@ -176,7 +176,7 @@ int sm_ctrl_pin_init(void)
 
 	err = ext_xtal_control(true);
 	if (err) {
-		LOG_ERR("Failed to enable ext XTAL: %d", err);
+		LOG_ERR("Ext XTAL %s failed: %d", "enable", err);
 		sm_init_failed = true;
 		return err;
 	}

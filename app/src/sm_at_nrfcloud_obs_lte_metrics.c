@@ -223,7 +223,7 @@ static int collect_xmonitor(void)
 		tau_legacy_str);
 
 	if (ret < 0) {
-		LOG_DBG("AT%%XMONITOR failed (%d)", ret);
+		LOG_DBG("AT%%XMONITOR failed: %d", ret);
 		return ret;
 	}
 
@@ -238,19 +238,19 @@ static int collect_xmonitor(void)
 
 	if (lte_mode >= 0) {
 		if (MEMFAULT_METRIC_SET_UNSIGNED(ncs_lte_mode, (uint32_t)lte_mode)) {
-			LOG_ERR("Failed to set ncs_lte_mode");
+			LOG_ERR("Metric update failed: %s", "ncs_lte_mode");
 		}
 	}
 
 	if (cell_id != LTE_LC_CELL_EUTRAN_ID_INVALID) {
 		if (MEMFAULT_METRIC_SET_SIGNED(ncs_lte_cell_id, (int32_t)cell_id)) {
-			LOG_ERR("Failed to set ncs_lte_cell_id");
+			LOG_ERR("Metric update failed: %s", "ncs_lte_cell_id");
 		}
 	}
 
 	if (tac != LTE_LC_CELL_TAC_INVALID) {
 		if (MEMFAULT_METRIC_SET_SIGNED(ncs_lte_tracking_area_code, (int32_t)tac)) {
-			LOG_ERR("Failed to set ncs_lte_tracking_area_code");
+			LOG_ERR("Metric update failed: %s", "ncs_lte_tracking_area_code");
 		}
 	}
 
@@ -263,11 +263,11 @@ static int collect_xmonitor(void)
 
 	if (psm_parse(active_time_str, tau_ext_str, tau_legacy_str, &tau, &active_time) == 0) {
 		if (MEMFAULT_METRIC_SET_SIGNED(ncs_lte_psm_tau_seconds, tau)) {
-			LOG_ERR("Failed to set ncs_lte_psm_tau_seconds");
+			LOG_ERR("Metric update failed: %s", "ncs_lte_psm_tau_seconds");
 		}
 
 		if (MEMFAULT_METRIC_SET_SIGNED(ncs_lte_psm_active_time_seconds, active_time)) {
-			LOG_ERR("Failed to set ncs_lte_psm_active_time_seconds");
+			LOG_ERR("Metric update failed: %s", "ncs_lte_psm_active_time_seconds");
 		}
 	}
 
@@ -317,7 +317,7 @@ static int collect_edrx(void)
 		&act_type, edrx_str, ptw_str);
 
 	if (ret < 0) {
-		LOG_DBG("AT+CEDRXRDP failed (%d)", ret);
+		LOG_DBG("AT+CEDRXRDP failed: %d", ret);
 		return ret;
 	}
 
@@ -355,12 +355,12 @@ static int collect_edrx(void)
 
 	if (MEMFAULT_METRIC_SET_UNSIGNED(ncs_lte_edrx_interval_ms,
 					 (uint32_t)(edrx_seconds * MSEC_PER_SEC))) {
-		LOG_ERR("Failed to set ncs_lte_edrx_interval_ms");
+		LOG_ERR("Metric update failed: %s", "ncs_lte_edrx_interval_ms");
 	}
 
 	if (MEMFAULT_METRIC_SET_UNSIGNED(ncs_lte_edrx_ptw_ms,
 					 (uint32_t)(ptw_seconds * MSEC_PER_SEC))) {
-		LOG_ERR("Failed to set ncs_lte_edrx_ptw_ms");
+		LOG_ERR("Metric update failed: %s", "ncs_lte_edrx_ptw_ms");
 	}
 
 	return 0;
@@ -379,7 +379,7 @@ static void sm_memfault_lte_metrics_on_connection_lost(void)
 	}
 
 	if (MEMFAULT_METRIC_ADD(ncs_lte_connection_loss_count, 1)) {
-		LOG_ERR("Failed to increment ncs_lte_connection_loss_count");
+		LOG_ERR("Metric update failed: %s", "ncs_lte_connection_loss_count");
 	}
 
 	MEMFAULT_METRIC_TIMER_START(ncs_lte_time_to_connect_ms);

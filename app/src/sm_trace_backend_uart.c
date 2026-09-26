@@ -59,7 +59,7 @@ static void uart_callback(const struct device *dev, struct uart_event *evt, void
 
 	switch (evt->type) {
 	case UART_TX_ABORTED:
-		LOG_WRN_RATELIMIT("UART_TX_ABORTED: %zu bytes", evt->data.tx.len);
+		LOG_WRN_RATELIMIT("TX aborted: %zu B", evt->data.tx.len);
 		/* fallthrough */
 	case UART_TX_DONE:
 		tx_bytes = evt->data.tx.len;
@@ -97,7 +97,7 @@ static int trace_backend_write(const void *data, size_t len)
 	size_t chunk = MIN(len, CHUNK_SZ);
 
 	if (!trace_active) {
-		LOG_DBG_RATELIMIT("Inactive, dropped %u bytes.", len);
+		LOG_DBG_RATELIMIT("Trace inactive, dropped %u B", len);
 		trace_processed_callback(len);
 		return len;
 	}
@@ -107,7 +107,7 @@ static int trace_backend_write(const void *data, size_t len)
 	ret = uart_tx(uart_dev, (const uint8_t *)data, chunk,
 		      UART_TX_WAIT_TIME_MS * USEC_PER_MSEC);
 	if (ret) {
-		LOG_ERR("uart_tx failed: %d", ret);
+		LOG_ERR("UART TX failed: %d", ret);
 		goto out;
 	}
 
@@ -146,7 +146,7 @@ static int trace_backend_activate(void)
 	 */
 	ret = uart_callback_set(uart_dev, uart_callback, NULL);
 	if (ret) {
-		LOG_ERR("Failed to set UART callback: %d", ret);
+		LOG_ERR("UART callback set failed: %d", ret);
 		return ret;
 	}
 
@@ -156,7 +156,7 @@ static int trace_backend_activate(void)
 	/* Tell the modem to begin generating traces. */
 	ret = nrf_modem_lib_trace_level_set(NRF_MODEM_LIB_TRACE_LEVEL_FULL);
 	if (ret) {
-		LOG_ERR("Failed to set modem trace level: %d", ret);
+		LOG_ERR("Modem trace level set failed: %d", ret);
 	}
 
 	return ret;
@@ -169,7 +169,7 @@ static int trace_backend_deactivate(void)
 	/* Stop the modem from generating new trace data. */
 	ret = nrf_modem_lib_trace_level_set(NRF_MODEM_LIB_TRACE_LEVEL_OFF);
 	if (ret) {
-		LOG_ERR("Failed to set modem trace level: %d", ret);
+		LOG_ERR("Modem trace level set failed: %d", ret);
 	}
 
 	/* Wait for any in-flight write to release tx_sem. */
@@ -190,7 +190,7 @@ static int uart_suspend(void)
 	int ret = pm_device_action_run(uart_dev, PM_DEVICE_ACTION_SUSPEND);
 
 	if (ret && ret != -EALREADY) {
-		LOG_ERR("Failed to %s UART device: %d", "suspend", ret);
+		LOG_ERR("UART device %s failed: %d", "suspend", ret);
 		return ret;
 	}
 
@@ -202,7 +202,7 @@ static int uart_resume(void)
 	int ret = pm_device_action_run(uart_dev, PM_DEVICE_ACTION_RESUME);
 
 	if (ret && ret != -EALREADY) {
-		LOG_ERR("Failed to %s UART device: %d", "resume", ret);
+		LOG_ERR("UART device %s failed: %d", "resume", ret);
 		return ret;
 	}
 	return 0;
@@ -214,7 +214,7 @@ static bool uart_is_active(void)
 	int err = pm_device_state_get(uart_dev, &state);
 
 	if (err) {
-		LOG_ERR("Failed to get UART device state (%d).", err);
+		LOG_ERR("UART device state get failed: %d", err);
 		return false;
 	}
 	return state == PM_DEVICE_STATE_ACTIVE;

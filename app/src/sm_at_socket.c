@@ -19,6 +19,7 @@
 #include "sm_at_host.h"
 #include "sm_sockopt.h"
 #include "sm_at_httpc.h"
+#include "sm_log.h"
 
 LOG_MODULE_REGISTER(sm_sock, CONFIG_SM_LOG_LEVEL);
 
@@ -175,7 +176,8 @@ static int bind_to_pdn(struct sm_socket *sock)
 		ret = zsock_setsockopt(sock->fd, SOL_SOCKET, SO_BINDTOPDN, &pdn_id,
 				     sizeof(int));
 		if (ret < 0) {
-			LOG_ERR("zsock_setsockopt(%d) error: %d", SO_BINDTOPDN, -errno);
+			LOG_ERR("zsock_setsockopt(%d,%d,%d) error: %d",
+				sock->fd, SOL_SOCKET, SO_BINDTOPDN, -errno);
 			ret = -errno;
 		}
 	}
@@ -186,17 +188,15 @@ static int bind_to_pdn(struct sm_socket *sock)
 /* Called in IRQ context */
 static void poll_cb(const struct socket_ncs_pollcb_params *pollfd)
 {
-	LOG_DBG("Poll event fd %d, revents 0x%x", pollfd->fd, pollfd->revents);
-
 	struct sm_socket *sock = find_socket(pollfd->fd);
 	struct async_poll_ctx *poll_ctx = poll_ctx_from_sock(sock);
 
 	if (sock == NULL) {
-		LOG_DBG("Poll callback for unknown socket fd %d", pollfd->fd);
+		LOG_WRN("Poll cb unknown, socket handle %d", pollfd->fd);
 		return;
 	}
 	if (!poll_ctx) {
-		LOG_ERR("No poll context found for socket fd %d", sock->fd);
+		LOG_ERR("No poll ctx for socket handle %d", sock->fd);
 		/* TODO: Should we re-bind to a valid context here to recover from this error? */
 		return;
 	}
@@ -214,8 +214,6 @@ static int set_so_poll_cb(struct sm_socket *socket, uint8_t events)
 	if (socket == NULL) {
 		return -EINVAL;
 	}
-
-	LOG_DBG("Set poll cb for socket %d, events %d", socket->fd, events);
 
 	struct socket_ncs_pollcb pcb = {
 		.callback = poll_cb,
@@ -286,19 +284,18 @@ static int update_poll_events(struct sm_socket *sock, uint8_t events, bool updat
 	}
 
 	if (poll_ctx_from_sock(sock) == NULL) {
-		LOG_DBG("Poll ctx lost for socket %p, re-assigning", sock);
+		LOG_DBG("Poll ctx lost, socket handle %d, reassigning", sock->fd);
 		sock->pipe = sm_at_host_get_current_pipe();
 	}
 
 	sock->async_poll.events |= events;
 	ret = set_so_poll_cb(sock, sock->async_poll.events);
 	if (ret) {
-		LOG_ERR("Failed to update poll events %d for socket %d: %d",
-			sock->async_poll.events, sock->fd, ret);
+		LOG_ERR("Poll update failed, socket handle %d events 0x%x: %d",
+			sock->fd, sock->async_poll.events, ret);
 		return ret;
 	}
 
-	LOG_DBG("Updated poll events %d for socket %d", sock->async_poll.events, sock->fd);
 	return 0;
 }
 
@@ -308,7 +305,7 @@ void sm_at_socket_poll_idle_handler(struct k_work *work)
 	struct modem_pipe *pipe = sm_at_host_get_current_pipe();
 
 	if (!is_idle(pipe)) {
-		LOG_DBG("Defer poll processing until channel idle");
+		LOG_DBG("Poll deferred: channel busy");
 		sm_at_host_queue_idle_work(pipe, &poll_ctx->idle_work);
 		return;
 	}
@@ -322,7 +319,7 @@ void sm_at_socket_poll_work_handler(struct k_work *work)
 	struct modem_pipe *pipe = sm_at_host_get_pipe_from_poll_ctx(poll_ctx);
 
 	if (!pipe || !poll_ctx) {
-		LOG_ERR("No pipe or poll context found for poll work handler");
+		LOG_ERR("No pipe or poll ctx for work handler");
 		return;
 	}
 
@@ -337,14 +334,20 @@ void sm_at_socket_poll_work_handler(struct k_work *work)
 		}
 
 		uint8_t revents = atomic_clear(&sock->async_poll.revents);
+		bool poll_active =
+			sock->async_poll.xapoll_events_requested || sock->async_poll.adr_flags;
 
-		LOG_DBG("Socket %d poll revents 0x%x", sock->fd, revents);
+		if (revents && poll_active) {
+			LOG_DBG("Poll socket handle=%d revents=0x%x", sock->fd, revents);
+		}
 
 		/* Store events for later processing when not in AT mode. */
 		if (!at_and_idle) {
 			sock->async_poll.delayed_revents |= revents;
-			LOG_DBG("Socket %d delayed revents 0x%x", sock->fd,
-				sock->async_poll.delayed_revents);
+			if (poll_active) {
+				LOG_DBG("Poll socket handle=%d delayed_revents=0x%x", sock->fd,
+					sock->async_poll.delayed_revents);
+			}
 			sm_at_host_queue_idle_work(pipe, &poll_ctx->idle_work);
 		}
 
@@ -417,9 +420,11 @@ void sm_at_socket_poll_work_handler(struct k_work *work)
 			}
 		}
 
-		LOG_DBG("Socket %d, revents %d, disable %d, events %d, xapoll_events %d",
-			sock->fd, revents, sock->async_poll.disable,
-			sock->async_poll.events, sock->async_poll.xapoll_events);
+		if (poll_active) {
+			LOG_DBG("Poll socket handle=%d revents=0x%x disable=%d events=0x%x "
+				"xapoll=0x%x", sock->fd, revents, sock->async_poll.disable,
+				sock->async_poll.events, sock->async_poll.xapoll_events);
+		}
 
 		/* Re-register for remaining events */
 		update_poll_events(sock, 0, false);
@@ -454,8 +459,8 @@ static void send_cb_fn(struct k_work *work)
 
 			atomic_clear(&socks[i].send_ntf.ready);
 			if (status) {
-				LOG_ERR("Send cb failed for socket %d: %d, %d", socks[i].fd,
-					-status, bytes_sent);
+				LOG_ERR("Send cb failed, socket handle %d status=%d bytes=%d",
+					socks[i].fd, -status, bytes_sent);
 				status = -1;
 			}
 			urc_send_to(socks[i].pipe, "\r\n#XSENDNTF: %d,%d,%d\r\n", socks[i].fd,
@@ -470,17 +475,17 @@ static void send_cb(const struct socket_ncs_sendcb_params *params)
 {
 	static K_WORK_DEFINE(work, send_cb_fn);
 
-	LOG_DBG("Send cb fd %d, status %d, bytes_sent %d",
+	LOG_DBG("Send cb socket handle %d status %d bytes %d",
 		params->fd, params->status, params->bytes_sent);
 
 	struct sm_socket *sock = find_socket(params->fd);
 
 	if (sock == NULL) {
-		LOG_DBG("Send callback for unknown socket fd %d", params->fd);
+		LOG_WRN("Send cb unknown, socket handle %d", params->fd);
 		return;
 	}
 	if (atomic_get(&sock->send_ntf.ready)) {
-		LOG_ERR("Send notification pending for socket fd %d", params->fd);
+		LOG_ERR("Send ntf pending, socket handle %d", params->fd);
 		return;
 	}
 	sock->send_ntf.status = params->status;
@@ -501,8 +506,6 @@ static int set_so_send_cb(struct sm_socket *socket)
 	if (socket->send_cb_set) {
 		return 0;
 	}
-
-	LOG_DBG("Set send cb for socket %d", socket->fd);
 
 	struct socket_ncs_sendcb pcb = {
 		.callback = send_cb,
@@ -532,8 +535,6 @@ static int clear_so_send_cb(struct sm_socket *socket)
 		return 0;
 	}
 
-	LOG_DBG("Clear send cb for socket %d", socket->fd);
-
 	err = zsock_setsockopt(socket->fd, SOL_SOCKET, SO_SENDCB, NULL, 0);
 	if (err < 0) {
 		LOG_ERR("zsock_setsockopt(%d,%d,%d) error: %d", socket->fd, SOL_SOCKET,
@@ -559,7 +560,7 @@ static int do_socket_open(struct sm_socket *sock)
 
 	if (sock->type == SOCK_RAW || sock->family == AF_PACKET) {
 		if (sock->type != SOCK_RAW || sock->family != AF_PACKET)  {
-			LOG_ERR("Raw socket: Family and type must match");
+			LOG_ERR("Raw socket family and type must match");
 			return -EINVAL;
 		}
 	}
@@ -586,7 +587,8 @@ static int do_socket_open(struct sm_socket *sock)
 
 	ret = zsock_setsockopt(sock->fd, SOL_SOCKET, SO_SNDTIMEO, &tmo, sizeof(tmo));
 	if (ret) {
-		LOG_ERR("zsock_setsockopt(%d) error: %d", SO_SNDTIMEO, -errno);
+		LOG_ERR("zsock_setsockopt(%d,%d,%d) error: %d",
+			 sock->fd, SOL_SOCKET, SO_SNDTIMEO, -errno);
 		ret = -errno;
 		goto error;
 	}
@@ -603,7 +605,7 @@ static int do_socket_open(struct sm_socket *sock)
 	struct async_poll_ctx *poll_ctx = poll_ctx_from_sock(sock);
 
 	if (!poll_ctx) {
-		LOG_ERR("No poll context found for socket fd %d", sock->fd);
+		LOG_ERR("No poll ctx for socket handle %d", sock->fd);
 		return -EINVAL;
 	}
 	sock->async_poll.adr_flags = poll_ctx->adr_flags;
@@ -647,7 +649,8 @@ static int do_secure_socket_open(struct sm_socket *sock, int peer_verify)
 
 	ret = zsock_setsockopt(sock->fd, SOL_SOCKET, SO_SNDTIMEO, &tmo, sizeof(tmo));
 	if (ret) {
-		LOG_ERR("zsock_setsockopt(%d) error: %d", SO_SNDTIMEO, -errno);
+		LOG_ERR("zsock_setsockopt(%d,%d,%d) error: %d",
+			sock->fd, SOL_SOCKET, SO_SNDTIMEO, -errno);
 		ret = -errno;
 		goto error;
 	}
@@ -662,7 +665,8 @@ static int do_secure_socket_open(struct sm_socket *sock, int peer_verify)
 	ret = zsock_setsockopt(sock->fd, SOL_TLS, TLS_SEC_TAG_LIST, sec_tag_list,
 			       sizeof(sec_tag_t));
 	if (ret) {
-		LOG_ERR("zsock_setsockopt(%d) error: %d", TLS_SEC_TAG_LIST, -errno);
+		LOG_ERR("zsock_setsockopt(%d,%d,%d) error: %d",
+			sock->fd, SOL_TLS, TLS_SEC_TAG_LIST, -errno);
 		ret = -errno;
 		goto error;
 	}
@@ -671,7 +675,8 @@ static int do_secure_socket_open(struct sm_socket *sock, int peer_verify)
 	ret = zsock_setsockopt(sock->fd, SOL_TLS, TLS_PEER_VERIFY, &peer_verify,
 			       sizeof(peer_verify));
 	if (ret) {
-		LOG_ERR("zsock_setsockopt(%d) error: %d", TLS_PEER_VERIFY, -errno);
+		LOG_ERR("zsock_setsockopt(%d,%d,%d) error: %d",
+			sock->fd, SOL_TLS, TLS_PEER_VERIFY, -errno);
 		ret = -errno;
 		goto error;
 	}
@@ -682,7 +687,7 @@ static int do_secure_socket_open(struct sm_socket *sock, int peer_verify)
 	struct async_poll_ctx *poll_ctx = poll_ctx_from_sock(sock);
 
 	if (!poll_ctx) {
-		LOG_ERR("No poll context found for socket fd %d", sock->fd);
+		LOG_ERR("No poll ctx for socket handle %d", sock->fd);
 		return -EINVAL;
 	}
 	sock->async_poll.adr_flags = poll_ctx->adr_flags;
@@ -963,7 +968,7 @@ static int bind_to_local_addr(struct sm_socket *sock, uint16_t port)
 
 		util_get_ip_addr(sock->cid, ipv4_addr, NULL);
 		if (!*ipv4_addr) {
-			LOG_ERR("Get local IPv4 address failed");
+			LOG_ERR("No local IPv4 address");
 			return -ENETDOWN;
 		}
 
@@ -973,23 +978,23 @@ static int bind_to_local_addr(struct sm_socket *sock, uint16_t port)
 		};
 
 		if (zsock_inet_pton(AF_INET, ipv4_addr, &local.sin_addr) != 1) {
-			LOG_ERR("Parse local IPv4 address failed: %d", -errno);
+			LOG_ERR("Local IPv4 address parse error: %d", -errno);
 			return -EINVAL;
 		}
 
 		ret = zsock_bind(sock->fd, (struct sockaddr *)&local,
 			       sizeof(struct sockaddr_in));
 		if (ret) {
-			LOG_ERR("zsock_bind() sock %d failed: %d", sock->fd, -errno);
+			LOG_ERR("zsock_bind() socket handle %d error: %d", sock->fd, -errno);
 			return -errno;
 		}
-		LOG_DBG("bind sock %d to %s", sock->fd, ipv4_addr);
+		LOG_DBG("Bind socket handle %d to %s", sock->fd, ipv4_addr);
 	} else if (sock->family == AF_INET6) {
 		char ipv6_addr[INET6_ADDRSTRLEN];
 
 		util_get_ip_addr(sock->cid, NULL, ipv6_addr);
 		if (!*ipv6_addr) {
-			LOG_ERR("Get local IPv6 address failed");
+			LOG_ERR("No local IPv6 address");
 			return -ENETDOWN;
 		}
 
@@ -999,16 +1004,16 @@ static int bind_to_local_addr(struct sm_socket *sock, uint16_t port)
 		};
 
 		if (zsock_inet_pton(AF_INET6, ipv6_addr, &local.sin6_addr) != 1) {
-			LOG_ERR("Parse local IPv6 address failed: %d", -errno);
+			LOG_ERR("Local IPv6 address parse error: %d", -errno);
 			return -EINVAL;
 		}
 		ret = zsock_bind(sock->fd, (struct sockaddr *)&local,
 			       sizeof(struct sockaddr_in6));
 		if (ret) {
-			LOG_ERR("zsock_bind() sock %d failed: %d", sock->fd, -errno);
+			LOG_ERR("zsock_bind() socket handle %d error: %d", sock->fd, -errno);
 			return -errno;
 		}
-		LOG_DBG("bind sock %d to %s", sock->fd, ipv6_addr);
+		LOG_DBG("Bind socket handle %d to %s", sock->fd, ipv6_addr);
 	} else {
 		return -EINVAL;
 	}
@@ -1022,7 +1027,6 @@ static int do_connect(struct sm_socket *sock, const char *url, uint16_t port)
 	int ret = 0;
 	struct net_sockaddr sa = {.sa_family = NET_AF_UNSPEC};
 
-	LOG_DBG("connect %s:%d", url, port);
 	ret = util_resolve_host(sock->cid, url, port, sock->family, &sa);
 	if (ret) {
 		return -EAGAIN;
@@ -1051,8 +1055,6 @@ static int do_send(struct sm_socket *sock, const uint8_t *data, int len, int fla
 	int sockfd = sock->fd;
 	bool send_ntf = (flags & SM_MSG_SEND_ACK) != 0;
 
-	LOG_DBG("send flags=%d", flags);
-
 	if (send_ntf) {
 		/* Set send callback. */
 		flags &= ~SM_MSG_SEND_ACK;
@@ -1073,7 +1075,7 @@ static int do_send(struct sm_socket *sock, const uint8_t *data, int len, int fla
 	while (sent < len) {
 		ret = zsock_send(sockfd, data + sent, len - sent, flags);
 		if (ret < 0) {
-			LOG_ERR("Sent %u out of %u bytes. (%d)", sent, len, -errno);
+			LOG_ERR("Sent %u of %u bytes: %d", sent, len, -errno);
 			ret = -errno;
 			break;
 		}
@@ -1105,7 +1107,7 @@ static int data_send_hex(struct sm_socket *sock, const uint8_t *buf, int recv_le
 		size_t size = bin2hex(buf + consumed, data_len, hex_buf, sizeof(hex_buf));
 
 		if (size == 0) {
-			LOG_ERR("Failed to convert binary data to hex string");
+			LOG_ERR("Binary to hex conversion failed");
 			return -EINVAL;
 		}
 		data_send(sock->pipe, hex_buf, size);
@@ -1126,7 +1128,8 @@ static int do_recv(struct sm_socket *sock, int timeout, int flags,
 
 	ret = zsock_setsockopt(sock->fd, SOL_SOCKET, SO_RCVTIMEO, &tmo, sizeof(tmo));
 	if (ret) {
-		LOG_ERR("zsock_setsockopt(%d) error: %d", SO_RCVTIMEO, -errno);
+		LOG_ERR("zsock_setsockopt(%d,%d,%d) error: %d",
+			sock->fd, SOL_SOCKET, SO_RCVTIMEO, -errno);
 		return -errno;
 	}
 	ret = zsock_recv(sockfd, (void *)recv_buf, data_len, flags);
@@ -1175,7 +1178,6 @@ static int do_sendto(struct sm_socket *sock, const char *url, uint16_t port, con
 	struct net_sockaddr sa = {.sa_family = NET_AF_UNSPEC};
 	bool send_ntf = (flags & SM_MSG_SEND_ACK) != 0;
 
-	LOG_DBG("sendto %s:%d, flags=%d", url, port, flags);
 	ret = util_resolve_host(sock->cid, url, port, sock->family, &sa);
 	if (ret) {
 		return -EAGAIN;
@@ -1215,7 +1217,7 @@ static int do_sendto(struct sm_socket *sock, const char *url, uint16_t port, con
 	}
 
 	if (ret < 0) {
-		LOG_ERR("Sent %u out of %u bytes. (%d)", sent, len, ret);
+		LOG_ERR("Sent %u of %u bytes: %d", sent, len, ret);
 	}
 
 	if (!in_datamode(sock->pipe)) {
@@ -1241,7 +1243,8 @@ static int do_recvfrom(struct sm_socket *sock, int timeout, int flags,
 
 	ret = zsock_setsockopt(sock->fd, SOL_SOCKET, SO_RCVTIMEO, &tmo, sizeof(tmo));
 	if (ret) {
-		LOG_ERR("zsock_setsockopt(%d) error: %d", SO_RCVTIMEO, -errno);
+		LOG_ERR("zsock_setsockopt(%d,%d,%d) error: %d",
+			sock->fd, SOL_SOCKET, SO_RCVTIMEO, -errno);
 		return -errno;
 	}
 	ret = zsock_recvfrom(sock->fd, (void *)recv_buf, data_len, flags,
@@ -1302,7 +1305,7 @@ static int socket_datamode_callback(uint8_t op, const uint8_t *data, int len, ui
 	}
 
 	if (poll_ctx == NULL || poll_ctx->datamode_sock == NULL) {
-		LOG_ERR("Data mode callback with no valid socket context");
+		LOG_ERR("Data mode callback with no socket context");
 		return -ENODEV;
 	}
 
@@ -1788,7 +1791,7 @@ STATIC int handle_at_send(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 			if (mode == AT_SOCKET_MODE_HEX) {
 				size = hex2bin(str_ptr, size, bin_data, sizeof(bin_data));
 				if (size == 0) {
-					LOG_ERR("Failed to convert hex string to binary data");
+					LOG_ERR("Hex to binary conversion failed");
 					return -EINVAL;
 				}
 				str_ptr = (const char *)bin_data;
@@ -1872,7 +1875,7 @@ STATIC int handle_at_recv(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 				return err;
 			}
 			if (data_len > sizeof(recv_buf)) {
-				LOG_ERR("data_len is too large for receive buffer");
+				LOG_ERR("Recv data too long");
 				return -ENOBUFS;
 			}
 		}
@@ -1942,7 +1945,7 @@ STATIC int handle_at_sendto(enum at_parser_cmd_type cmd_type, struct at_parser *
 			if (mode == AT_SOCKET_MODE_HEX) {
 				size = hex2bin(str_ptr, size, bin_data, sizeof(bin_data));
 				if (size == 0) {
-					LOG_ERR("Failed to convert hex string to binary data");
+					LOG_ERR("Hex to binary conversion failed");
 					return -EINVAL;
 				}
 				str_ptr = (const char *)bin_data;
@@ -2030,7 +2033,7 @@ STATIC int handle_at_recvfrom(enum at_parser_cmd_type cmd_type, struct at_parser
 				return err;
 			}
 			if (data_len > sizeof(recv_buf)) {
-				LOG_ERR("data_len is too large for receive buffer");
+				LOG_ERR("Recv data too long");
 				return -ENOBUFS;
 			}
 		}
@@ -2057,14 +2060,14 @@ static int do_listen(struct sm_socket *sock)
 	/* Set the socket to non-blocking mode, so accept() won't block. */
 	ret = zsock_fcntl(sock->fd, ZVFS_F_SETFL, ZVFS_O_NONBLOCK);
 	if (ret) {
-		LOG_ERR("zsock_fcntl() failed: %d", -errno);
+		LOG_ERR("zsock_fcntl() error: %d", -errno);
 		return -errno;
 	}
 
 	/* nRF modem ignores the backlog parameter. Backlog in modem is fixed to 2. */
 	ret = zsock_listen(sock->fd, 2);
 	if (ret) {
-		LOG_ERR("zsock_listen() failed: %d", -errno);
+		LOG_ERR("zsock_listen() error: %d", -errno);
 		return -errno;
 	}
 
@@ -2131,7 +2134,7 @@ static int do_accept(struct sm_socket *sock)
 
 	ret = zsock_accept(sock->fd, (struct sockaddr *)&remote, (socklen_t *)&addrlen);
 	if (ret < 0) {
-		LOG_ERR("zsock_accept() failed: %d", -errno);
+		LOG_ERR("zsock_accept() error: %d", -errno);
 		return -errno;
 	}
 
@@ -2159,7 +2162,7 @@ static int do_accept(struct sm_socket *sock)
 		new_sock->async_poll.adr_hex = poll_ctx->adr_hex;
 		new_sock->async_poll.xapoll_events_requested = poll_ctx->xapoll_events_requested;
 	} else {
-		LOG_WRN("No poll context for accepting socket; using default poll flags");
+		LOG_WRN("No poll ctx for accepting socket, using default flags");
 	}
 	update_poll_events(new_sock,
 			   ZSOCK_POLLIN | ZSOCK_POLLOUT | ZSOCK_POLLERR | ZSOCK_POLLHUP |
@@ -2318,7 +2321,7 @@ void xapoll_stop(struct sm_socket *sock)
 		sm_at_host_get_async_poll_ctx(pipe);
 
 	if (poll_ctx == NULL) {
-		LOG_ERR("No poll context for the current pipe");
+		LOG_ERR("No poll ctx for current pipe");
 		return;
 	}
 
@@ -2361,7 +2364,7 @@ int set_xapoll_events(struct sm_socket *sock, uint8_t events)
 	}
 
 	if (poll_ctx == NULL) {
-		LOG_ERR("No poll context for the current pipe");
+		LOG_ERR("No poll ctx for current pipe");
 		return -ENODEV;
 	}
 
@@ -2486,7 +2489,7 @@ STATIC int handle_at_recvcfg(enum at_parser_cmd_type cmd_type, struct at_parser 
 			}
 		}
 		if ((flags & SM_ADR_DATA_MODE) && hex_mode) {
-			LOG_ERR("Hex mode with data mode is not supported.");
+			LOG_ERR("Hex mode not supported in data mode");
 			return -EINVAL;
 		}
 		if (sock) {
@@ -2496,7 +2499,7 @@ STATIC int handle_at_recvcfg(enum at_parser_cmd_type cmd_type, struct at_parser 
 			err = update_poll_events(sock, ZSOCK_POLLIN, false);
 		} else {
 			if (poll_ctx == NULL) {
-				LOG_ERR("No poll context for the current pipe");
+				LOG_ERR("No poll ctx for current pipe");
 				return -ENODEV;
 			}
 			/* Apply to all sockets in this context */

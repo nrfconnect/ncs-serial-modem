@@ -157,7 +157,7 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 
 	case MQTT_EVT_PUBACK:
 		if (evt->result == 0) {
-			LOG_DBG("PUBACK packet id: %u", evt->param.puback.message_id);
+			LOG_DBG("PUBACK id=%u", evt->param.puback.message_id);
 		}
 		break;
 
@@ -165,16 +165,14 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 		if (evt->result != 0) {
 			break;
 		}
-		LOG_DBG("PUBREC packet id: %u", evt->param.pubrec.message_id);
+		LOG_DBG("PUBREC id=%u", evt->param.pubrec.message_id);
 		{
 			struct mqtt_pubrel_param param = {
 				.message_id = evt->param.pubrel.message_id
 			};
 			ret = mqtt_publish_qos2_release(&client, &param);
 			if (ret) {
-				LOG_ERR("mqtt_publish_qos2_release: Fail! %d", ret);
-			} else {
-				LOG_DBG("Release, id %u", evt->param.pubrec.message_id);
+				LOG_ERR("QoS2 release failed: %d", ret);
 			}
 		}
 		break;
@@ -183,46 +181,37 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 		if (evt->result != 0) {
 			break;
 		}
-		LOG_DBG("PUBREL packet id %u", evt->param.pubrel.message_id);
+		LOG_DBG("PUBREL id=%u", evt->param.pubrel.message_id);
 		{
 			struct mqtt_pubcomp_param param = {
 				.message_id = evt->param.pubrel.message_id
 			};
 			ret = mqtt_publish_qos2_complete(&client, &param);
 			if (ret) {
-				LOG_ERR("mqtt_publish_qos2_complete Failed:%d", ret);
-			} else {
-				LOG_DBG("Complete, id %u", evt->param.pubrel.message_id);
+				LOG_ERR("QoS2 complete failed: %d", ret);
 			}
 		}
 		break;
 
 	case MQTT_EVT_PUBCOMP:
 		if (evt->result == 0) {
-			LOG_DBG("PUBCOMP packet id %u", evt->param.pubcomp.message_id);
+			LOG_DBG("PUBCOMP id=%u", evt->param.pubcomp.message_id);
 		}
 		break;
 
 	case MQTT_EVT_SUBACK:
 		if (evt->result == 0) {
-			LOG_DBG("SUBACK packet id: %u", evt->param.suback.message_id);
+			LOG_DBG("SUBACK id=%u", evt->param.suback.message_id);
 		}
 		break;
 
 	case MQTT_EVT_UNSUBACK:
 		if (evt->result == 0) {
-			LOG_DBG("UNSUBACK packet id: %u", evt->param.unsuback.message_id);
-		}
-		break;
-
-	case MQTT_EVT_PINGRESP:
-		if (evt->result == 0) {
-			LOG_DBG("PINGRESP packet");
+			LOG_DBG("UNSUBACK id=%u", evt->param.unsuback.message_id);
 		}
 		break;
 
 	default:
-		LOG_DBG("default: %d", evt->type);
 		break;
 	}
 
@@ -262,7 +251,7 @@ static K_WORK_DELAYABLE_DEFINE(mqtt_keepalive_work, mqtt_keepalive_work_handler)
 
 static void mqtt_connection_abort(int err)
 {
-	LOG_ERR("Abort MQTT connection (error %d)", err);
+	LOG_ERR("MQTT connection aborted: %d", err);
 	(void)mqtt_abort(&client);
 	ctx.connected = false;
 	if (ctx.rx_topic_len == 0 && ctx.publish_payload_remaining > 0) {
@@ -327,7 +316,7 @@ static void mqtt_poll_work_handler(struct k_work *work)
 		if (ctx.rx_topic_len == 0 && ctx.publish_payload_remaining == 0) {
 			err = mqtt_input(&client);
 			if (err != 0) {
-				LOG_ERR("ERROR: mqtt_input %d", err);
+				LOG_ERR("MQTT input failed: %d", err);
 				goto abort;
 			}
 		}
@@ -403,7 +392,7 @@ static void mqtt_keepalive_work_handler(struct k_work *work)
 	 * the Network Connection to the Server.
 	 */
 	if (client.unacked_ping > 1) {
-		LOG_ERR("ERROR: mqtt_ping nack %d", client.unacked_ping);
+		LOG_ERR("MQTT ping nack: %d", client.unacked_ping);
 		mqtt_connection_abort(-ENETRESET);
 		return;
 	}
@@ -411,7 +400,7 @@ static void mqtt_keepalive_work_handler(struct k_work *work)
 	int err = mqtt_live(&client);
 
 	if (err != 0 && err != -EAGAIN) {
-		LOG_ERR("ERROR: mqtt_live %d", err);
+		LOG_ERR("MQTT keepalive failed: %d", err);
 		mqtt_connection_abort(err);
 		return;
 	}
@@ -528,7 +517,7 @@ static int do_mqtt_connect(void)
 	/* Connect to MQTT broker */
 	err = mqtt_connect(&client);
 	if (err != 0) {
-		LOG_ERR("ERROR: mqtt_connect %d", err);
+		LOG_ERR("MQTT connect failed: %d", err);
 		goto fail;
 	}
 
@@ -569,7 +558,7 @@ static int do_mqtt_disconnect(void)
 		 * the connection anyway: mqtt_abort() has no such check, and leaving
 		 * ctx.connected set would strand the client with no way out.
 		 */
-		LOG_WRN("mqtt_disconnect: %d, aborting instead", err);
+		LOG_WRN("MQTT disconnect failed: %d, aborting", err);
 		mqtt_connection_abort(err);
 		return 0;
 	}

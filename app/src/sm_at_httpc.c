@@ -163,7 +163,7 @@ static void http_timeout_work_fn(struct k_work *work)
 		}
 
 		if (k_uptime_get() > req->timeout_timestamp) {
-			LOG_ERR("HTTP request %d idle timeout state %d", req->fd, req->state);
+			LOG_ERR("HTTP handle %d idle timeout state=%d", req->fd, req->state);
 			http_fail_request(req);
 		}
 	}
@@ -232,7 +232,7 @@ static int http_parse_url_components(const char *url, size_t url_len, struct htt
 		unsigned int host_len = parser.field_data[UF_HOST].len;
 
 		if (host_len >= HTTP_HOST_MAX_LEN) {
-			LOG_ERR("Hostname too long");
+			LOG_ERR("Hostname too long: %u", host_len);
 			return -EINVAL;
 		}
 		req->hostname = strndup(url + parser.field_data[UF_HOST].off, host_len);
@@ -276,7 +276,7 @@ static int http_parse_url_components(const char *url, size_t url_len, struct htt
 		size_t total_len = path_len + query_len;
 
 		if (total_len >= HTTP_PATH_MAX_LEN) {
-			LOG_ERR("Path+query too long");
+			LOG_ERR("Path+query too long: %zu", total_len);
 			return -EINVAL;
 		}
 		req->path = strndup(url + parser.field_data[UF_PATH].off, total_len);
@@ -345,7 +345,7 @@ static int http_alloc_build_headers(struct http_request *req)
 
 	req->send_buf = malloc(send_buf_size);
 	if (!req->send_buf) {
-		LOG_ERR("Failed to allocate send buffer (%zu bytes)", send_buf_size);
+		LOG_ERR("Send buffer alloc failed: %zu B", send_buf_size);
 		return -ENOMEM;
 	}
 
@@ -358,9 +358,9 @@ static int http_start_request(struct http_request *req)
 	int ret;
 	struct sm_socket *sock;
 
-	LOG_INF("HTTP %d %s: %s:%d", req->method, http_method_str[req->method],
+	LOG_INF("HTTP handle %d %s: %s:%d", req->fd, http_method_str[req->method],
 		req->hostname, req->port);
-	LOG_DBG("HTTP %d path: %s", req->fd, req->path);
+	LOG_DBG("HTTP handle %d path: %s", req->fd, req->path);
 
 	ret = http_alloc_build_headers(req);
 	if (ret < 0) {
@@ -619,19 +619,19 @@ static bool http_headers_complete(struct http_request *req, char *header_end,
 
 	ret = parse_http_status_code((char *)req->recv_buf, &req->status_code);
 	if (ret < 0) {
-		LOG_WRN("HTTP %d: Failed to parse status code: %d", req->fd, ret);
+		LOG_WRN("HTTP handle %d: Failed to parse status code: %d", req->fd, ret);
 	}
 
 	ret = parse_content_length((char *)req->recv_buf, header_end, &req->content_length);
 	if (ret == 0) {
-		LOG_INF("HTTP %d: Content-Length=%d", req->fd, req->content_length);
+		LOG_INF("HTTP handle %d: Content-Length=%d", req->fd, req->content_length);
 	} else {
-		LOG_DBG("HTTP %d: No Content-Length header", req->fd);
+		LOG_DBG("HTTP handle %d: No Content-Length header", req->fd);
 	}
 
 	req->connection_close = parse_connection_close((char *)req->recv_buf, header_end);
 	if (req->connection_close) {
-		LOG_INF("HTTP %d: Server sent Connection: close", req->fd);
+		LOG_INF("HTTP handle %d: Server sent Connection: close", req->fd);
 	}
 
 	req->headers_complete = true;
@@ -668,7 +668,7 @@ static bool http_headers_complete(struct http_request *req, char *header_end,
 		if (body_len > 0)
 			memmove(req->recv_buf, req->recv_buf + body_offset, body_len);
 		req->recv_buf_len = body_len;
-		LOG_DBG("HTTP %d: Headers complete (manual), status %d, piggybacked=%d",
+		LOG_DBG("HTTP handle %d: Headers complete (manual) status=%d piggybacked=%d",
 			req->fd, req->status_code, req->recv_buf_len);
 		xapoll_stop(sock);
 		/* need_rearm_pollin stays false */
@@ -681,7 +681,7 @@ static bool http_headers_complete(struct http_request *req, char *header_end,
 
 	/* Clear buffer for next recv */
 	req->recv_buf_len = 0;
-	LOG_DBG("HTTP %d: Headers complete, status %d", req->fd, req->status_code);
+	LOG_DBG("HTTP handle %d: Headers complete status=%d", req->fd, req->status_code);
 
 	/*
 	 * If POLLHUP arrived together with POLLIN, the connection is already
@@ -690,7 +690,7 @@ static bool http_headers_complete(struct http_request *req, char *header_end,
 	 */
 	if (hup) {
 		if (req->content_length > 0 && req->bytes_sent < req->content_length)
-			LOG_WRN("HTTP %d: Incomplete transfer - received %d/%d bytes",
+			LOG_WRN("HTTP handle %d: Transfer incomplete, received %d/%d B",
 				req->fd, req->bytes_sent, req->content_length);
 		http_finish_request(req);
 		return true;
@@ -717,7 +717,7 @@ static void http_warn_incomplete_transfer(const struct http_request *req)
 	if (req->content_length > 0 &&
 	    req->total_received < req->content_length &&
 	    !req->connection_close) {
-		LOG_WRN("HTTP %d: Incomplete transfer - received %d/%d bytes",
+		LOG_WRN("HTTP handle %d: Transfer incomplete, received %d/%d B",
 			req->fd, req->total_received, req->content_length);
 	}
 }
@@ -744,10 +744,10 @@ static int http_recv_read(struct http_request *req, struct sm_socket *sock)
 			return -1;
 		}
 		if (errno == ETIMEDOUT) {
-			LOG_ERR("Recv timed out");
+			LOG_ERR("HTTP handle %d: Recv timed out", req->fd);
 			return -ETIMEDOUT;
 		}
-		LOG_ERR("Recv failed: %d", errno);
+		LOG_ERR("HTTP handle %d: Recv failed: %d", req->fd, -errno);
 		return -errno;
 	}
 
@@ -777,7 +777,7 @@ static void http_process_recv_headers(struct http_request *req, struct sm_socket
 	}
 
 	if (req->recv_buf_len >= HTTP_RECV_BUF_SIZE - 1) {
-		LOG_ERR("HTTP headers too large");
+		LOG_ERR("HTTP handle %d: Headers too large", req->fd);
 		http_fail_request(req);
 		return;
 	}
@@ -825,24 +825,24 @@ static void http_process_request(struct http_request *req, uint8_t events)
 	struct sm_socket *sock = find_socket(req->fd);
 
 	if (!sock) {
-		LOG_ERR("HTTP %d: Socket not found", req->fd);
+		LOG_ERR("HTTP handle %d: not found", req->fd);
 		http_fail_request(req);
 		return;
 	}
 
-	LOG_DBG("HTTP %d: process_request state=%d events=0x%x time=%lld timeout=%lld", req->fd,
+	LOG_DBG("HTTP handle %d: state=%d events=0x%x time=%lld timeout=%lld", req->fd,
 		req->state, events, k_uptime_get(), req->timeout_timestamp);
 
 	/* POLLERR/POLLNVAL are always fatal; POLLHUP is handled per-state below. */
 	if (events & (ZSOCK_POLLERR | ZSOCK_POLLNVAL)) {
-		LOG_ERR("HTTP %d: Socket error (events=0x%x)", req->fd, events);
+		LOG_ERR("HTTP handle %d: Socket error events=0x%x", req->fd, events);
 		http_fail_request(req);
 		return;
 	}
 
 	/* POLLHUP during sending means the server closed the connection unexpectedly. */
 	if ((events & ZSOCK_POLLHUP) && req->state == HTTP_STATE_SENDING_REQUEST) {
-		LOG_ERR("HTTP %d: Connection closed during send (events=0x%x)", req->fd,
+		LOG_ERR("HTTP handle %d: Connection closed during send events=0x%x", req->fd,
 			events);
 		http_fail_request(req);
 		return;
@@ -861,7 +861,7 @@ static void http_process_request(struct http_request *req, uint8_t events)
 					set_xapoll_events(sock, ZSOCK_POLLOUT | ZSOCK_POLLIN);
 					return;
 				}
-				LOG_ERR("Send failed: %d", errno);
+				LOG_ERR("HTTP handle %d: Send failed: %d", req->fd, errno);
 				http_fail_request(req);
 				return;
 			}
@@ -887,8 +887,7 @@ static void http_process_request(struct http_request *req, uint8_t events)
 		 * arrives at the same time, drain the socket buffer (e.g. Connection: close).
 		 */
 		if ((events & ZSOCK_POLLHUP) && !(events & ZSOCK_POLLIN)) {
-			LOG_ERR("HTTP %d: Connection closed before headers (POLLHUP)",
-				req->fd);
+			LOG_ERR("HTTP handle %d: POLLHUP before headers", req->fd);
 			http_fail_request(req);
 			return;
 		}
@@ -945,7 +944,7 @@ static void http_process_request(struct http_request *req, uint8_t events)
 		break;
 
 	default:
-		LOG_ERR("Invalid state: %d", req->state);
+		LOG_ERR("HTTP handle %d: Invalid state=%d", req->fd, req->state);
 		break;
 	}
 }
@@ -977,7 +976,7 @@ void sm_at_httpc_socket_closed(int fd)
 	struct http_request *req = find_request(fd);
 
 	if (req) {
-		LOG_WRN("HTTP %d: socket closed with active request (state=%d); cleaning up",
+		LOG_WRN("HTTP handle %d: Socket closed with active request state=%d",
 			fd, req->state);
 		http_send_cancel_status(req);
 		http_close_request(req);
@@ -992,9 +991,9 @@ static int http_send_request_headers(struct http_request *req)
 	int sent;
 	int n;
 
-	LOG_INF("HTTP %d %s (streaming): %s:%d", req->method,
+	LOG_INF("HTTP handle %d %s (streaming): %s:%d", req->fd,
 		http_method_str[req->method], req->hostname, req->port);
-	LOG_DBG("HTTP %d path: %s", req->fd, req->path);
+	LOG_DBG("HTTP handle %d path: %s", req->fd, req->path);
 
 	ret = http_alloc_build_headers(req);
 	if (ret < 0) {
@@ -1071,7 +1070,7 @@ static int http_datamode_callback(uint8_t op, const uint8_t *data, int len, uint
 		if (datamode_req) {
 			if (flags & SM_DATAMODE_FLAGS_EXIT_HANDLER) {
 				/* Data mode exited unexpectedly - body not fully sent */
-				LOG_WRN("HTTP %d: Data mode exited unexpectedly",
+				LOG_WRN("HTTP handle %d: Data mode exited unexpectedly",
 					datamode_req->fd);
 				http_fail_request(datamode_req);
 			} else {
@@ -1089,7 +1088,7 @@ static int http_datamode_callback(uint8_t op, const uint8_t *data, int len, uint
 						http_fail_request(datamode_req);
 					}
 				} else {
-					LOG_ERR("HTTP %d: Socket not found after body send",
+					LOG_ERR("HTTP handle %d: not found after body send",
 						datamode_req->fd);
 					http_fail_request(datamode_req);
 				}
@@ -1132,7 +1131,7 @@ STATIC int handle_at_httpcreq(enum at_parser_cmd_type cmd_type, struct at_parser
 		/* Validate socket exists */
 		sock = find_socket(socket_fd);
 		if (!sock) {
-			LOG_ERR("Invalid socket fd: %d", socket_fd);
+			LOG_ERR("Handle %d not found", socket_fd);
 			return -EINVAL;
 		}
 
@@ -1145,7 +1144,7 @@ STATIC int handle_at_httpcreq(enum at_parser_cmd_type cmd_type, struct at_parser
 		k_mutex_lock(&http_mutex, K_FOREVER);
 		if (find_request(socket_fd)) {
 			k_mutex_unlock(&http_mutex);
-			LOG_ERR("Request already active on socket %d", socket_fd);
+			LOG_ERR("Request already active handle=%d", socket_fd);
 			return -EBUSY;
 		}
 		req = alloc_request();
@@ -1218,12 +1217,12 @@ STATIC int handle_at_httpcreq(enum at_parser_cmd_type cmd_type, struct at_parser
 			if (at_parser_num_get(parser, next_param_idx, &body_len) == 0) {
 				if (method == HTTP_POST || method == HTTP_PUT) {
 					if (body_len < 0) {
-						LOG_ERR("Invalid body_len: %d", body_len);
+						LOG_ERR("Invalid body len: %d", body_len);
 						http_close_request(req);
 						return -EINVAL;
 					}
 				} else if (body_len != 0) {
-					LOG_ERR("body_len must be 0 for method %d", method);
+					LOG_ERR("Body not allowed for method %d", method);
 					http_close_request(req);
 					return -EINVAL;
 				}
@@ -1249,8 +1248,8 @@ STATIC int handle_at_httpcreq(enum at_parser_cmd_type cmd_type, struct at_parser
 
 			headers_total_len += header_len + 2;
 			if (headers_total_len + 1 > HTTP_EXTRA_HEADERS_SIZE) {
-				LOG_ERR("Extra headers too large (%zu > %d)", headers_total_len + 1,
-					HTTP_EXTRA_HEADERS_SIZE);
+				LOG_ERR("Extra headers too large len=%zu max=%d",
+					headers_total_len + 1, HTTP_EXTRA_HEADERS_SIZE);
 				http_close_request(req);
 				return -ENOMEM;
 			}
@@ -1262,7 +1261,7 @@ STATIC int handle_at_httpcreq(enum at_parser_cmd_type cmd_type, struct at_parser
 
 			hdr = malloc(headers_total_len + 1);
 			if (!hdr) {
-				LOG_ERR("Failed to allocate extra headers (%zu bytes)",
+				LOG_ERR("Extra headers alloc failed: %zu B",
 					headers_total_len + 1);
 				http_close_request(req);
 				return -ENOMEM;
@@ -1290,7 +1289,7 @@ STATIC int handle_at_httpcreq(enum at_parser_cmd_type cmd_type, struct at_parser
 		/* Enable manual mode when auto reception is disabled */
 		if (!auto_reception) {
 			req->manual_mode = true;
-			LOG_INF("HTTP %d: Manual mode enabled", req->fd);
+			LOG_INF("HTTP handle %d: Manual mode enabled", req->fd);
 		}
 
 		req->hex_rx = (bool)format;
@@ -1304,7 +1303,7 @@ STATIC int handle_at_httpcreq(enum at_parser_cmd_type cmd_type, struct at_parser
 
 		/* For POST/PUT with body, send headers now then stream body via data mode */
 		if ((method == HTTP_POST || method == HTTP_PUT) && body_len > 0) {
-			LOG_INF("Streaming %d bytes body", body_len);
+			LOG_INF("Streaming body %d B", body_len);
 			req->request_body_len = body_len;
 			err = http_send_request_headers(req);
 			if (err) {
@@ -1368,19 +1367,19 @@ static int pull_data(int socket_fd, int pull_len)
 	req = find_request(socket_fd);
 	if (!req) {
 		k_mutex_unlock(&http_mutex);
-		LOG_ERR("Socket fd %d not found", socket_fd);
+		LOG_ERR("Handle %d not found", socket_fd);
 		return -EINVAL;
 	}
 
 	if (!req->manual_mode) {
 		k_mutex_unlock(&http_mutex);
-		LOG_ERR("Socket fd %d not in manual mode", socket_fd);
+		LOG_ERR("Handle %d not in manual mode", socket_fd);
 		return -EINVAL;
 	}
 
 	if (!req->headers_complete) {
 		k_mutex_unlock(&http_mutex);
-		LOG_ERR("Headers not yet received on socket %d", socket_fd);
+		LOG_ERR("Headers not yet received handle=%d", socket_fd);
 		return -EAGAIN;
 	}
 
@@ -1535,13 +1534,13 @@ STATIC int handle_at_httpccancel(enum at_parser_cmd_type cmd_type, struct at_par
 		k_mutex_lock(&http_mutex, K_FOREVER);
 		req = find_request(socket_fd);
 		if (req) {
-			LOG_INF("Cancelling HTTP request fd=%d", socket_fd);
+			LOG_INF("Cancelling HTTP request handle=%d", socket_fd);
 			http_send_cancel_status(req);
 			http_close_request(req);
 			k_mutex_unlock(&http_mutex);
 		} else {
 			k_mutex_unlock(&http_mutex);
-			LOG_ERR("Failed to find request for fd: %d", socket_fd);
+			LOG_ERR("No request handle=%d", socket_fd);
 			return -EINVAL;
 		}
 		break;

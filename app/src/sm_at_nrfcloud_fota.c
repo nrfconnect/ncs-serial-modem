@@ -168,7 +168,7 @@ static void nrfcloud_fota_session_end(void)
 
 	err = sm_at_fota_register_callback();
 	if (err) {
-		LOG_ERR("Failed to restore AT#XFOTA's fota_download callback: %d", err);
+		LOG_ERR("FOTA callback restore failed: %d", err);
 	}
 }
 
@@ -206,7 +206,7 @@ void memfault_fota_download_callback(const struct fota_download_evt *evt)
 		nrfcloud_fota_session_end();
 		break;
 	case FOTA_DOWNLOAD_EVT_ERASE_TIMEOUT:
-		LOG_INF("Erasure timeout reached. Erasure continues.");
+		LOG_INF("Erase timeout, continuing");
 		break;
 	case FOTA_DOWNLOAD_EVT_ERASE_PENDING:
 		sm_fota_stage = FOTA_STAGE_DOWNLOAD_ERASE_PENDING;
