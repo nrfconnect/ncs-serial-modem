@@ -230,7 +230,7 @@ static void send_msg(struct sm_at_host_msg msg)
 	int ret;
 
 	while (k_msgq_put(&sm_at_host_msgq, &msg, K_NO_WAIT) != 0) {
-		LOG_ERR("AT host message queue full, purging old data");
+		LOG_ERR("AT host msgq full, purging");
 		k_msgq_purge(&sm_at_host_msgq);
 	}
 
@@ -444,7 +444,7 @@ static void at_pipe_rx_work_fn(struct k_work *work)
 	struct modem_pipe *pipe = atomic_ptr_get(&ctx->pipe);
 
 	if (!pipe) {
-		LOG_WRN("AT pipe RX work: no pipe assigned (ctx: %p)", (void *)ctx);
+		LOG_WRN("AT pipe RX work: no pipe ctx=%p", (void *)ctx);
 		return;
 	}
 
@@ -460,7 +460,7 @@ static void at_pipe_rx_work_fn(struct k_work *work)
 	do {
 		ret = modem_pipe_receive(pipe, &rx_buf, sizeof(rx_buf));
 		if (ret < 0) {
-			LOG_ERR("Pipe receive failed: %d (ctx %p, pipe %p)", ret, (void *)ctx,
+			LOG_ERR("Pipe receive failed: %d ctx=%p pipe=%p", ret, (void *)ctx,
 				(void *)pipe);
 			break;
 		}
@@ -483,7 +483,7 @@ static void at_pipe_event_handler(struct modem_pipe *pipe, enum modem_pipe_event
 	struct sm_at_host_ctx *ctx = (struct sm_at_host_ctx *)user_data;
 
 	if (!ctx || !sm_at_ctx_check(ctx)) {
-		LOG_ERR("Invalid context in pipe event handler");
+		LOG_ERR("Pipe event: invalid context");
 		return;
 	}
 
@@ -493,7 +493,7 @@ static void at_pipe_event_handler(struct modem_pipe *pipe, enum modem_pipe_event
 	case MODEM_PIPE_EVENT_RECEIVE_READY:
 		/* Ensure pipe have not changed */
 		if (atomic_ptr_get(&ctx->pipe) != pipe) {
-			LOG_ERR("Received data on pipe %p not assigned to ctx %p", (void *)pipe,
+			LOG_ERR("Data on unassigned pipe=%p ctx=%p", (void *)pipe,
 				(void *)ctx);
 			break;
 		}
@@ -522,14 +522,14 @@ static int sm_at_host_pipe_tx_blocking(struct sm_at_host_ctx *ctx, const uint8_t
 	int retries = 5;
 
 	if (!pipe) {
-		LOG_WRN("No pipe assigned for transmission (ctx: %p)", (void *)ctx);
+		LOG_WRN("No TX pipe, ctx=%p", (void *)ctx);
 		return -EINVAL;
 	}
 
 	for (size_t len = size; len > 0;) {
 		ret = modem_pipe_transmit(pipe, buf, len);
 		if (ret < 0) {
-			LOG_ERR("Pipe transmit failed: %d (ctx %p, pipe %p)", ret, (void *)ctx,
+			LOG_ERR("Pipe TX failed: %d ctx=%p pipe=%p", ret, (void *)ctx,
 				(void *)pipe);
 			return ret;
 		} else if (ret == 0) {
@@ -553,7 +553,7 @@ static void null_pipe_handler(struct modem_pipe *pipe, enum modem_pipe_event eve
 {
 	switch (event) {
 	case MODEM_PIPE_EVENT_OPENED:
-		LOG_DBG("Null pipe(%p) handler event: %d", (void *)pipe, event);
+		LOG_DBG("Null pipe opened pipe=%p", (void *)pipe);
 		sm_at_pipe_opened(NULL, pipe);
 		break;
 	default:
@@ -564,18 +564,18 @@ static void null_pipe_handler(struct modem_pipe *pipe, enum modem_pipe_event eve
 int sm_at_host_set_pipe(struct sm_at_host_ctx *ctx, struct modem_pipe *pipe)
 {
 	if (!ctx || !pipe) {
-		LOG_ERR("sm_at_host_set_pipe(%p, %p) invalid", (void *)ctx, (void *)pipe);
+		LOG_ERR("Invalid pipe ctx=%p pipe=%p", (void *)ctx, (void *)pipe);
 		return -EINVAL;
 	}
 
 	if (!sm_at_ctx_check(ctx)) {
-		LOG_ERR("sm_at_host_set_pipe: context destroyed");
+		LOG_ERR("Pipe: context destroyed");
 		return -EINVAL;
 	}
 
 	struct modem_pipe *old_pipe = atomic_ptr_set(&ctx->pipe, pipe);
 
-	LOG_DBG("Setting AT host pipe: %p (old: %p, ctx: %p)", (void *)pipe, (void *)old_pipe,
+	LOG_DBG("Setting pipe=%p old=%p ctx=%p", (void *)pipe, (void *)old_pipe,
 		(void *)ctx);
 
 	/* Release old pipe if attached */
@@ -587,7 +587,7 @@ int sm_at_host_set_pipe(struct sm_at_host_ctx *ctx, struct modem_pipe *pipe)
 	struct sm_at_host_ctx *old_ctx = sm_at_host_get_ctx_from(pipe);
 
 	if (old_ctx && old_ctx != ctx && atomic_ptr_cas(&old_ctx->pipe, pipe, (void *)0xdeadbeef)) {
-		LOG_DBG("Pipe %p already attached to another context %p, destroying old context",
+		LOG_DBG("Pipe %p already in ctx %p, destroying old ctx",
 			(void *)pipe, (void *)old_ctx);
 		sm_at_host_destroy(old_ctx);
 	}
@@ -609,7 +609,7 @@ void sm_at_host_release(struct sm_at_host_ctx *ctx)
 	modem_pipe_release(pipe);
 	sm_at_pipe_closed(ctx, pipe);
 
-	LOG_DBG("Releasing AT host pipe: %p (ctx: %p)", (void *)pipe, (void *)ctx);
+	LOG_DBG("Releasing pipe=%p ctx=%p", (void *)pipe, (void *)ctx);
 }
 
 void sm_at_host_attach(struct modem_pipe *pipe)
@@ -637,14 +637,14 @@ static bool set_sm_mode(struct sm_at_host_ctx *ctx, enum sm_operation_mode mode)
 	bool ret = false;
 
 	if (!ctx || !sm_at_ctx_check(ctx)) {
-		LOG_ERR("set_sm_mode: invalid context");
+		LOG_ERR("SM mode: invalid context");
 		return false;
 	}
 
 	if (ctx->at_mode == SM_AT_COMMAND_MODE) {
 		if (mode == SM_DATA_MODE) {
 			if (ctx->data_rb_buf == NULL) {
-				LOG_DBG("Allocating data mode buffer of size %d",
+				LOG_DBG("Allocating data mode buffer %d B",
 					CONFIG_SM_DATAMODE_BUF_SIZE);
 				ctx->data_rb_buf = malloc(CONFIG_SM_DATAMODE_BUF_SIZE);
 				if (ctx->data_rb_buf == NULL) {
@@ -667,10 +667,10 @@ static bool set_sm_mode(struct sm_at_host_ctx *ctx, enum sm_operation_mode mode)
 	}
 
 	if (ret) {
-		LOG_DBG("SM mode changed: %d -> %d", ctx->at_mode, mode);
+		LOG_DBG("SM mode %d -> %d", ctx->at_mode, mode);
 		ctx->at_mode = mode;
 	} else {
-		LOG_ERR("Failed to change SM mode: %d -> %d", ctx->at_mode, mode);
+		LOG_ERR("SM mode change failed: %d -> %d", ctx->at_mode, mode);
 	}
 
 	return ret;
@@ -753,19 +753,18 @@ static void raw_send(uint8_t flags)
 			ret = ctx->data_mode.handler(DATAMODE_SEND, data, claim, send_flags);
 			if (ret < 0 || (ret == 0 && !retry)) {
 				/* Exit data mode on send failure. Further data is dropped. */
-				LOG_ERR("Send failed: %d, Dropped: %d bytes", ret, claim);
+				LOG_ERR("Send failed: %d, dropped %d bytes", ret, claim);
 				exit_datamode_handler(ctx, ret ? ret : -EAGAIN);
 				ret = claim;
 			} else if (ret == 0 && retry) {
 				retry = false;
 				LOG_WRN("Send returned 0, retrying once");
 			} else {
-				LOG_DBG("Sent %d bytes", ret);
 				retry = true;
 			}
 			ring_buf_get_finish(&ctx->data_rb, ret);
 		} else {
-			LOG_ERR("No handler. Dropped %d bytes", claim);
+			LOG_ERR("No handler, dropped %d bytes", claim);
 			ring_buf_get_finish(&ctx->data_rb, claim);
 		}
 
@@ -827,8 +826,6 @@ static void inactivity_timer_handler(struct k_timer *timer)
 	LOG_DBG("Time limit reached");
 	if (!ring_buf_is_empty(&ctx->data_rb)) {
 		k_work_submit_to_queue(&sm_work_q, &ctx->raw_send_scheduled_work);
-	} else {
-		LOG_DBG("data buffer empty");
 	}
 }
 
@@ -1041,7 +1038,7 @@ static int sm_at_send_internal(struct sm_at_host_ctx *ctx, const uint8_t *data, 
 	int ret;
 
 	if (k_is_in_isr()) {
-		LOG_ERR("FIXME: Attempt to send AT response (of size %u) in ISR.", len);
+		LOG_ERR("FIXME: AT response in ISR, size=%u", len);
 		return -EINTR;
 	}
 
@@ -1063,7 +1060,7 @@ static int sm_at_send_internal(struct sm_at_host_ctx *ctx, const uint8_t *data, 
 				return -EIO;
 			}
 		} else {
-			LOG_DBG("URC to pipe=%p", ctx->pipe);
+			LOG_DBG("URC pipe=%p", ctx->pipe);
 			/* Pipe specific URC */
 			struct urc_msg *msg = calloc(1, sizeof(struct urc_msg) + len + 1);
 
@@ -1079,7 +1076,7 @@ static int sm_at_send_internal(struct sm_at_host_ctx *ctx, const uint8_t *data, 
 		}
 		if (ctx) {
 			if (!is_idle(ctx)) {
-				LOG_DBG("AT command in progress, delaying URC processing");
+				LOG_DBG("AT command active, delaying URC");
 				check_idle_timer(ctx, false);
 			} else {
 				sm_at_host_event_notify(ctx, SM_EVENT_URC);
@@ -1128,11 +1125,11 @@ static void handle_bootloader_at_cmd(uint8_t *buf, size_t buf_size, char *at_cmd
 			rsp_send_ok();
 		}
 	} else if (strncasecmp(at_cmd, AT_XRESET_CMD, sizeof(AT_XRESET_CMD) - 1) == 0) {
-		LOG_INF("Rebooting device via %s command", AT_XRESET_CMD);
+		LOG_INF("Rebooting via %s", AT_XRESET_CMD);
 		rsp_send_ok();
 		final_call(sm_reset);
 	} else {
-		LOG_ERR("AT command not supported in bootloader mode: %.*s",
+		LOG_ERR("Not supported in bootloader mode: %.*s",
 			(int)strcspn(at_cmd, "=?,\r\n"), at_cmd);
 		rsp_send_error();
 	}
@@ -1197,7 +1194,7 @@ static void cmd_send(struct sm_at_host_ctx *ctx, uint8_t *buf, size_t cmd_length
 		atomic_dec(&ctx->executing_lock);
 		return;
 	} else if (err > 0) {
-		LOG_ERR("AT command error (%d), type: %d: value: %d", err,
+		LOG_ERR("AT command error=%d type=%d value=%d", err,
 			nrf_modem_at_err_type(err), nrf_modem_at_err(err));
 	}
 
@@ -1234,7 +1231,7 @@ void sm_at_host_cmd_done(struct sm_at_host_ctx *ctx)
 void sm_at_host_lock_ctx(struct sm_at_host_ctx *ctx)
 {
 	if (!sm_at_ctx_check(ctx)) {
-		LOG_ERR("invalid context");
+		LOG_ERR("Invalid context");
 		return;
 	}
 
@@ -1263,7 +1260,7 @@ static size_t cmd_rx_handler(struct sm_at_host_ctx *ctx, uint8_t c)
 		size_t new_size = ctx->at_buf_size * 2;
 
 		if (new_size > AT_BUF_MAX_SIZE) {
-			LOG_ERR("AT command buffer overflow, max size reached");
+			LOG_ERR("AT command buffer overflow");
 			rsp_send_error();
 			goto cmd_finnish_or_fail;
 		}
@@ -1276,7 +1273,7 @@ static size_t cmd_rx_handler(struct sm_at_host_ctx *ctx, uint8_t c)
 		}
 		ctx->at_buf = new_buf;
 		ctx->at_buf_size = new_size;
-		LOG_DBG("Expanded AT command buffer to size %zu", new_size);
+		LOG_DBG("AT cmd buf expanded: %zu B", new_size);
 	}
 
 	/* Handle control characters */
@@ -1374,14 +1371,14 @@ cmd_finnish_or_fail:
 		ctx->inside_quotes = false;
 		ctx->at_cmd_len = 0;
 		ctx->echo_len = 0;
-		/* Release extra AT buffer */
+		/* Shrink AT buffer back to minimum */
 		if (ctx->at_buf_size > AT_BUF_MIN_SIZE) {
 			uint8_t *new_buf = realloc(ctx->at_buf, AT_BUF_MIN_SIZE);
 
 			if (new_buf) {
 				ctx->at_buf = new_buf;
 				ctx->at_buf_size = AT_BUF_MIN_SIZE;
-				LOG_DBG("Released AT command buffer to size %zu", AT_BUF_MIN_SIZE);
+				LOG_DBG("AT cmd buf shrunk: %zu B", AT_BUF_MIN_SIZE);
 			}
 		}
 		k_timer_stop(&ctx->idle_timer);
@@ -1401,7 +1398,7 @@ static size_t null_handler(struct sm_at_host_ctx *ctx, uint8_t c)
 	bool match = false;
 
 	if (ctx->null_dropped_count == 0) {
-		LOG_WRN("Data pipe broken. Dropping data until data mode is terminated.");
+		LOG_WRN("Data pipe broken, dropping until data mode exit");
 	}
 
 	if (counted) {
@@ -1427,7 +1424,7 @@ static size_t null_handler(struct sm_at_host_ctx *ctx, uint8_t c)
 			ctx->null_dropped_count -= strlen(quit_str);
 		}
 		ctx->null_dropped_count += ring_buf_size_get(&ctx->data_rb);
-		LOG_WRN("Terminating data mode. Dropped %zu bytes", ctx->null_dropped_count);
+		LOG_WRN("Data mode terminated, dropped %zu bytes", ctx->null_dropped_count);
 		(void)exit_datamode(ctx);
 
 		ctx->null_match_count = 0;
@@ -1487,12 +1484,11 @@ static void rsp_send_internal(struct sm_at_host_ctx *ctx, bool urc, const char *
 
 	rsp_len = vsnprintf(rsp_buf, sizeof(rsp_buf), fmt, arg_ptr);
 	if (rsp_len < 0) {
-		LOG_ERR("rsp_send format error: %d", rsp_len);
+		LOG_ERR("Response format error: %d", rsp_len);
 		k_mutex_unlock(&mutex_rsp_buf);
 		return;
 	} else if (rsp_len >= (int)sizeof(rsp_buf)) {
-		LOG_ERR("FIXME: rsp_send truncated: %d bytes, max %zu", rsp_len,
-			sizeof(rsp_buf) - 1);
+		LOG_ERR("FIXME: response truncated %d B, max %zu", rsp_len, sizeof(rsp_buf) - 1);
 		rsp_len = sizeof(rsp_buf) - 1;
 	}
 
@@ -1529,7 +1525,7 @@ void rsp_send(const char *fmt, ...)
 	va_list arg_ptr;
 
 	if (!sm_at_ctx_check(ctx)) {
-		LOG_ERR("invalid context");
+		LOG_ERR("Invalid context");
 		return;
 	}
 
@@ -1548,7 +1544,7 @@ void rsp_send_to(struct modem_pipe *pipe, const char *fmt, ...)
 	va_list arg_ptr;
 
 	if (!sm_at_ctx_check(ctx)) {
-		LOG_ERR("invalid context");
+		LOG_ERR("Invalid context");
 		return;
 	}
 
@@ -1798,18 +1794,18 @@ static int at_host_power_off(bool shutting_down)
 
 	if (shutting_down) {
 		if (!pipe) {
-			LOG_WRN("Failed to disable UART. (no pipe)");
+			LOG_WRN("UART disable failed, no pipe");
 		} else {
 			err = modem_pipe_close(pipe, K_FOREVER);
 		}
 		if (err) {
-			LOG_WRN("Failed to disable UART. (%d)", err);
+			LOG_WRN("UART disable failed: %d", err);
 		}
 	}
 
 	err = pm_device_action_run(sm_uart_dev, PM_DEVICE_ACTION_SUSPEND);
 	if (err) {
-		LOG_WRN("Failed to suspend UART. (%d)", err);
+		LOG_WRN("UART suspend failed: %d", err);
 	}
 
 	return err;
@@ -1830,7 +1826,7 @@ int sm_at_host_power_on(void)
 	const int err = pm_device_action_run(sm_uart_dev, PM_DEVICE_ACTION_RESUME);
 
 	if (err && err != -EALREADY) {
-		LOG_ERR("Failed to resume UART. (%d)", err);
+		LOG_ERR("UART resume failed: %d", err);
 		return err;
 	}
 
@@ -1959,7 +1955,7 @@ static struct sm_at_host_ctx *sm_at_host_create(struct modem_pipe *pipe)
 	 */
 	ctx = sm_at_host_get_urc_ctx();
 	if (ctx && atomic_ptr_cas(&ctx->pipe, NULL, pipe)) {
-		LOG_DBG("Reusing first AT host instance %p for pipe %p", (void *)ctx, (void *)pipe);
+		LOG_DBG("Reusing first AT host ctx=%p pipe=%p", (void *)ctx, (void *)pipe);
 		atomic_set(&ctx->executing_lock, 0);
 		modem_pipe_attach(pipe, at_pipe_event_handler, ctx);
 		if (urcs_queued) {
@@ -1989,7 +1985,7 @@ static struct sm_at_host_ctx *sm_at_host_create(struct modem_pipe *pipe)
 
 	modem_pipe_attach(pipe, at_pipe_event_handler, ctx);
 
-	LOG_INF("Created AT host instance %p for pipe %p", (void *)ctx, (void *)pipe);
+	LOG_INF("Created AT host ctx=%p pipe=%p", (void *)ctx, (void *)pipe);
 	return ctx;
 }
 
@@ -2006,7 +2002,7 @@ static void send_urcs(struct sm_at_host_ctx *ctx)
 		int send = sm_at_host_pipe_tx_blocking(ctx, p, len);
 
 		if (send < len) {
-			LOG_ERR("Failed to send URC: %d (ctx %p)", send, ctx);
+			LOG_ERR("URC send failed: %d ctx=%p", send, (void *)ctx);
 		}
 		ring_buf_get_finish(&urc_buf, len);
 	}
@@ -2025,14 +2021,12 @@ static void sm_at_host_work_fn(struct k_work *work)
 				struct modem_pipe *current = atomic_ptr_get(&ctx->pipe);
 
 				if (current && current != msg.pipe) {
-					LOG_ERR("Pipe mismatch on open event (ctx=%p, pipe=%p, "
-						"event_pipe=%p)",
+					LOG_ERR("Pipe mismatch on ctx=%p pipe=%p event_pipe=%p",
 						(void *)ctx, (void *)current, (void *)msg.pipe);
 					break;
 				}
 				if (!atomic_ptr_cas(&ctx->pipe, NULL, msg.pipe)) {
-					LOG_ERR("CTX already attached to another pipe (ctx=%p, "
-						"pipe=%p, event_pipe=%p)",
+					LOG_ERR("Ctx already attached ctx=%p pipe=%p event_pipe=%p",
 						(void *)ctx, (void *)current, (void *)msg.pipe);
 					break;
 				}
@@ -2051,15 +2045,14 @@ static void sm_at_host_work_fn(struct k_work *work)
 				if (atomic_ptr_cas(&ctx->pipe, NULL, (void *)0xdeadbeef)) {
 					if (msg.pipe->user_data == ctx) {
 						/* Detach, in case new user have not attached yet */
-						LOG_DBG("Detached CTX from pipe %p",
+						LOG_DBG("Detached ctx from pipe %p",
 							(void *)msg.pipe);
 						modem_pipe_attach(msg.pipe, null_pipe_handler,
 								  NULL);
 					}
 					sm_at_host_destroy(ctx);
 				} else {
-					LOG_DBG("Ignoring close event for pipe %p on ctx %p with "
-						"pipe %p",
+					LOG_DBG("Ignoring close: pipe=%p ctx=%p cur=%p",
 						(void *)msg.pipe, (void *)ctx,
 						(void *)atomic_ptr_get(&ctx->pipe));
 				}
@@ -2096,11 +2089,11 @@ void sm_at_host_queue_idle_work(struct modem_pipe *pipe, struct k_work *work)
 	struct sm_at_host_ctx *ctx = sm_at_host_get_ctx_from(pipe);
 
 	if (!ctx) {
-		LOG_ERR("No AT host context found for pipe %p", (void *)pipe);
+		LOG_ERR("No ctx for pipe %p", (void *)pipe);
 		return;
 	}
 	if (k_work_is_pending(work)) {
-		LOG_ERR("Work %p is already pending, cannot queue", (void *)work);
+		LOG_ERR("Work %p already pending", (void *)work);
 		return;
 	}
 
@@ -2133,7 +2126,7 @@ static int sm_at_host_destroy(struct sm_at_host_ctx *ctx)
 
 	/* Cannot destroy first instance */
 	if (sys_slist_len(&instance_list) == 1) {
-		LOG_DBG("Cannot destroy first AT host instance");
+		LOG_DBG("Cannot destroy first AT host");
 		/* Destroy the pipe reference so we don't send to a closed pipe */
 		atomic_ptr_set(&ctx->pipe, NULL);
 		return -EPERM;
@@ -2158,7 +2151,7 @@ static int sm_at_host_destroy(struct sm_at_host_ctx *ctx)
 		}
 	}
 
-	LOG_INF("Destroyed AT host instance %p", (void *)ctx);
+	LOG_INF("Destroyed AT host ctx=%p", (void *)ctx);
 
 	/* Free the context */
 	free(ctx->data_rb_buf);
@@ -2175,7 +2168,7 @@ static int sm_at_host_init(void)
 	int err;
 
 	if (!pipe) {
-		LOG_ERR("No UART pipe available for AT host");
+		LOG_ERR("No UART pipe");
 		return -ENODEV;
 	}
 
@@ -2194,7 +2187,7 @@ static int sm_at_host_init(void)
 		return err;
 	}
 
-	LOG_INF("at_host init done");
+	LOG_INF("AT host init done");
 	return 0;
 }
 SYS_INIT(sm_at_host_init, APPLICATION, 0);
@@ -2214,7 +2207,7 @@ STATIC int handle_at_datactrl(enum at_parser_cmd_type cmd_type, struct at_parser
 			return ret;
 		}
 		if (time_limit < min_time_limit) {
-			LOG_ERR("Invalid time_limit: %d, min: %d", time_limit, min_time_limit);
+			LOG_ERR("Invalid time_limit val=%d min=%d", time_limit, min_time_limit);
 			return -EINVAL;
 		}
 		ctx->data_mode.time_limit = time_limit;

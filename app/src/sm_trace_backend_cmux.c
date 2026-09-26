@@ -78,7 +78,7 @@ int trace_backend_write(const void *data, size_t len)
 	int ret = 0;
 
 	if (!trace_pipe || !sm_pipe_is_open(trace_pipe)) {
-		LOG_DBG_RATELIMIT("Pipe closed, dropped %u bytes.", len);
+		LOG_DBG_RATELIMIT("Trace pipe closed, dropped %u B", len);
 		trace_processed_callback(len);
 		return len;
 	}
@@ -91,13 +91,13 @@ int trace_backend_write(const void *data, size_t len)
 	 */
 
 	if (k_sem_take(&tx_idle_sem, K_MSEC(100)) != 0) {
-		LOG_WRN_RATELIMIT("TX timeout.");
+		LOG_WRN_RATELIMIT("TX timeout");
 		return -EAGAIN;
 	}
 
 	ret = modem_pipe_transmit(trace_pipe, data, len);
 	if (ret < 0) {
-		LOG_WRN("TX error (%d). Dropped %u bytes.", ret, len);
+		LOG_WRN("TX error: %d, dropped %u B", ret, len);
 		trace_processed_callback(len);
 		return ret;
 	} else if (ret == 0) {

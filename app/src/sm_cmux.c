@@ -58,7 +58,7 @@ static struct {
 static void cmux_event_handler(struct modem_cmux *, enum modem_cmux_event event, void *)
 {
 	if (event == MODEM_CMUX_EVENT_CONNECTED || event == MODEM_CMUX_EVENT_DISCONNECTED) {
-		LOG_INF("CMUX %sconnected.", (event == MODEM_CMUX_EVENT_CONNECTED) ? "" : "dis");
+		LOG_INF("CMUX %sconnected", (event == MODEM_CMUX_EVENT_CONNECTED) ? "" : "dis");
 	}
 	switch (event) {
 	case MODEM_CMUX_EVENT_CONNECTED:
@@ -141,7 +141,7 @@ static void stop_work_fn(struct k_work *work)
 			init_dlci(i, sizeof(cmux.dlcis[i].receive_buf), cmux.dlcis[i].receive_buf);
 		}
 	}
-	LOG_INF("Returned to AT command mode.");
+	LOG_INF("AT command mode restored");
 }
 
 struct modem_pipe *sm_cmux_get_dlci(uint8_t address)
@@ -167,7 +167,7 @@ static void assign_default_channels(void)
 						      ? sm_cmux_get_dlci(CMUX_PPP_CHANNEL)
 						      : cmux.dlcis[!cmux.at_channel].pipe;
 
-		LOG_DBG("Reserving CMUX PPP channel pipe %p for PPP module", (void *)ppp_pipe);
+		LOG_DBG("Reserving CMUX %s pipe %p", "PPP", (void *)ppp_pipe);
 		sm_at_host_release(sm_at_host_get_ctx_from(ppp_pipe));
 		sm_ppp_attach(ppp_pipe);
 	}
@@ -175,8 +175,7 @@ static void assign_default_channels(void)
 		/* Reserve trace channel pipe for trace backend */
 		struct modem_pipe *trace_pipe = sm_cmux_get_dlci(CMUX_MODEM_TRACE_CHANNEL);
 
-		LOG_DBG("Reserving CMUX trace channel pipe %p for trace backend",
-			(void *)trace_pipe);
+		LOG_DBG("Reserving CMUX %s pipe %p", "trace", (void *)trace_pipe);
 		sm_at_host_release(sm_at_host_get_ctx_from(trace_pipe));
 		sm_trace_backend_attach(trace_pipe);
 	}
@@ -209,7 +208,7 @@ static int do_at_and_ppp_channel_switch(int new_at_channel)
 	int ret = sm_at_host_set_pipe(ctx, cmux.dlcis[cmux.at_channel].pipe);
 
 	if (ret) {
-		LOG_ERR("Failed to switch AT host to CMUX DLCI pipe. (%d)", ret);
+		LOG_ERR("AT host to CMUX DLCI switch failed: %d", ret);
 		return ret;
 	}
 	if (IS_ENABLED(CONFIG_SM_PPP)) {
@@ -239,7 +238,7 @@ static int cmux_start(void)
 
 	ret = sm_at_host_set_pipe(ctx, cmux.dlcis[cmux.at_channel].pipe);
 	if (ret) {
-		LOG_ERR("Failed to switch AT host to CMUX DLCI pipe. (%d)", ret);
+		LOG_ERR("AT host to CMUX DLCI switch failed: %d", ret);
 		/* uart_pipe is what sm_cmux_is_started() reports on. Leaving it set
 		 * after a failed start would make every later AT#XCMUX take the
 		 * "resume" path and let AT#XCMUXCLD release a CMUX instance that was
@@ -252,7 +251,7 @@ static int cmux_start(void)
 	/* Attach CMUX to UART pipe */
 	ret = modem_cmux_attach(&cmux.instance, cmux.uart_pipe);
 	if (ret) {
-		LOG_ERR("Failed to attach CMUX to UART pipe. (%d)", ret);
+		LOG_ERR("CMUX attach to UART failed: %d", ret);
 		/* Try to switch AT host back to UART so the error is reported correctly */
 		stop_work_fn(NULL);
 		return ret;
@@ -306,7 +305,7 @@ STATIC int handle_at_xcmux(enum at_parser_cmd_type cmd_type, struct at_parser *p
 	rsp_send_ok();
 	ret = cmux_start();
 	if (ret) {
-		LOG_ERR("Failed to start CMUX. (%d)", ret);
+		LOG_ERR("CMUX start failed: %d", ret);
 	} else {
 		ret = -SILENT_AT_COMMAND_RET;
 	}
@@ -386,7 +385,7 @@ STATIC int handle_at_cmux(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 		rsp_send_ok();
 		ret = cmux_start();
 		if (ret) {
-			LOG_ERR("Failed to start CMUX. (%d)", ret);
+			LOG_ERR("CMUX start failed: %d", ret);
 		} else {
 			ret = -SILENT_AT_COMMAND_RET;
 		}

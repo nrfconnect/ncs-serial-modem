@@ -28,7 +28,7 @@ static bool cmd_name_has_lower(const char *cmd)
 		if (c == '=' || c == '?') {
 			break;
 		} else if (islower(c)) {
-			LOG_ERR("FIX ME: AT command \"%.*s\" must be all-uppercase.",
+			LOG_ERR("FIX ME: AT command \"%.*s\" must be all-uppercase",
 				(int)strcspn(cmd, "=?,\r\n"), cmd);
 			return true;
 		}
@@ -46,8 +46,7 @@ int sm_util_at_printf(const char *fmt, ...)
 	ret = vsnprintf(buf, sizeof(buf), fmt, args);
 	va_end(args);
 	if (ret >= sizeof(buf)) {
-		LOG_ERR("AT command \"%.*s...\" would get truncated from %u to %u bytes. "
-			"The buffer needs to be made bigger.",
+		LOG_ERR("AT cmd \"%.*s...\" too long len=%u max=%u",
 			(int)MIN(strcspn(buf, "=?,\r\n"), 16U), buf, ret, sizeof(buf) - 1);
 		return -E2BIG;
 	}
@@ -65,9 +64,8 @@ int sm_util_at_printf(const char *fmt, ...)
 		/* Unlikely, but in that case the response code most likely didn't
 		 * make it into the buffer, so searching for it would be fruitless.
 		 */
-		LOG_ERR("AT response to \"%.*s\" didn't fit into %u bytes. "
-			"The buffer needs to be made bigger.",
-			(int)strcspn(fmt, "=?,\r\n"), fmt, sizeof(buf) - 1);
+		LOG_ERR("AT response to \"%.*s\" truncated at %u B", (int)strcspn(fmt, "=?,\r\n"),
+			fmt, sizeof(buf) - 1);
 	}
 	return ret;
 }
@@ -85,9 +83,8 @@ int sm_util_at_scanf(const char *cmd, const char *fmt, ...)
 
 	ret = nrf_modem_at_cmd(buf, sizeof(buf), "%s", cmd);
 	if (ret == -NRF_E2BIG) {
-		LOG_ERR("AT response to \"%.*s\" truncated to %u bytes. "
-			"The buffer needs to be made bigger.",
-			(int)strcspn(cmd, "=?,\r\n"), cmd, sizeof(buf) - 1);
+		LOG_ERR("AT response to \"%.*s\" truncated at %u B", (int)strcspn(cmd, "=?,\r\n"),
+			cmd, sizeof(buf) - 1);
 		buf[sizeof(buf) - 1] = '\0';
 	} else if (ret < 0) {
 		return ret;
@@ -110,8 +107,7 @@ static int terminate_at_response(char *buf, size_t len,
 	const int printf_ret = snprintf(buf + strlen(buf), len, "%s", termination_str);
 
 	if (printf_ret >= len) {
-		LOG_ERR("%u bytes of the AT response were truncated."
-			" The buffer needs to be made bigger.", printf_ret - len + 1);
+		LOG_ERR("AT response truncated: %u B", printf_ret - len + 1);
 		return -NRF_E2BIG;
 	}
 	return success_ret;
@@ -132,7 +128,7 @@ int sm_util_at_cmd_no_intercept(char *buf, size_t len, const char *at_cmd)
 		       "%%%u[^\r]\r\n%%%u[^\r]", len - 1, sizeof(second_line) - 1);
 	assert(ret < sizeof(format_str));
 
-	LOG_DBG("Forwarding \"%s\" to the modem.", at_cmd);
+	LOG_DBG("Forwarding \"%s\" to modem", at_cmd);
 
 /* This function gets called by interception callbacks invoked by nrf_modem_at_cmd().
  * Here nrf_modem_at_cmd() must be bypassed because it would otherwise call
@@ -147,8 +143,8 @@ int sm_util_at_cmd_no_intercept(char *buf, size_t len, const char *at_cmd)
 #define nrf_modem_at_scanf nrf_modem_at_printf
 
 	if (line_count < 1) {
-		LOG_ERR("Forwarding of \"%.*s\" failed (%d).",
-			(int)strcspn(at_cmd, "=?,\r\n"), at_cmd, line_count);
+		LOG_ERR("Forwarding \"%.*s\" failed: %d", (int)strcspn(at_cmd, "=?,\r\n"),
+			at_cmd, line_count);
 		return line_count;
 	}
 
@@ -335,7 +331,7 @@ int util_resolve_host(int cid, const char *host, uint16_t port, int family, stru
 		} else {
 			errstr = zsock_gai_strerror(err);
 		}
-		LOG_ERR("zsock_getaddrinfo() error (%d): %s", err, errstr);
+		LOG_ERR("zsock_getaddrinfo() error: %d %s", err, errstr);
 	}
 	return err;
 }
@@ -356,7 +352,7 @@ int util_get_peer_addr(struct net_sockaddr *peer, char addr[static NET_INET6_ADD
 	}
 
 	if (ret == NULL) {
-		LOG_ERR("zsock_inet_ntop error (%d)", -errno);
+		LOG_ERR("zsock_inet_ntop() error: %d", -errno);
 		return -errno;
 	}
 
@@ -373,7 +369,7 @@ int sm_util_pdn_id_get(uint8_t cid)
 
 	ret = sm_util_at_scanf(cmd, "%%XGETPDNID: %d", &pdn_id);
 	if (ret < 0) {
-		LOG_ERR("Failed to read PDN ID for CID %d, err %d", cid, ret);
+		LOG_ERR("PDN ID get failed cid=%d err=%d", cid, ret);
 		return ret;
 	}
 
@@ -447,7 +443,7 @@ int sm_util_pdn_dynamic_info_get(uint8_t cid, struct sm_pdn_dynamic_info *pdn_in
 		 * an error by the caller.
 		 */
 		if (ret != -NRF_EBADMSG) {
-			LOG_ERR("nrf_modem_at_scanf failed, ret: %d", ret);
+			LOG_ERR("PDN dynamic info get failed: %d", ret);
 		}
 
 		return ret;
@@ -479,7 +475,7 @@ int sm_util_cfun_get(void)
 
 	ret = sm_util_at_scanf("AT+CFUN?", "+CFUN: %d", &cfun_mode);
 	if (ret < 0) {
-		LOG_ERR("Failed to get CFUN mode, err %d", ret);
+		LOG_ERR("CFUN mode get failed: %d", ret);
 		return ret;
 	}
 
@@ -504,7 +500,7 @@ int sm_util_cereg_get(void)
 
 	ret = sm_util_at_scanf("AT+CEREG?", "+CEREG: %*d,%d", &creg_stat);
 	if (ret < 0) {
-		LOG_ERR("Failed to get CEREG status, err %d", ret);
+		LOG_ERR("CEREG status get failed: %d", ret);
 		return ret;
 	}
 
@@ -541,7 +537,7 @@ int sm_util_mcuboot_active_slot(void)
 					 PARTITION_ADDRESS(s1_partition), &s0_active);
 
 	if (err != 0) {
-		LOG_ERR("%s active slot: %d", "Failed to read MCUboot", err);
+		LOG_ERR("MCUboot active slot read failed: %d", err);
 		return err;
 	}
 	return s0_active ? 0 : 1;

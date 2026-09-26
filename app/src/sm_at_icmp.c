@@ -130,7 +130,7 @@ static uint32_t send_ping_wait_reply(void)
 		total_length = ping_argv.len + header_len + icmp_hdr_len;
 		buf = calloc(1, alloc_size);
 		if (buf == NULL) {
-			LOG_ERR("No RAM memory available for sending ping.");
+			LOG_ERR("Ping alloc failed: %zu B", alloc_size);
 			return -1;
 		}
 
@@ -180,7 +180,7 @@ static uint32_t send_ping_wait_reply(void)
 		total_length = payload_length + header_len;
 		buf = calloc(1, alloc_size);
 		if (buf == NULL) {
-			LOG_ERR("No RAM memory available for sending ping.");
+			LOG_ERR("Ping alloc failed: %zu B", alloc_size);
 			return -1;
 		}
 
@@ -239,24 +239,24 @@ static uint32_t send_ping_wait_reply(void)
 
 	fd = zsock_socket(AF_PACKET, SOCK_RAW, 0);
 	if (fd < 0) {
-		LOG_ERR("zsock_socket() failed: (%d)", -errno);
+		LOG_ERR("zsock_socket() error: %d", -errno);
 		free(buf);
 		return (uint32_t)delta_t;
 	}
 
 	/* Use non-primary PDN if specified, fail if cannot proceed
 	 */
+	int pdn = 0;
+
 	if (ping_argv.pdn != 0) {
-		int pdn = ping_argv.pdn;
+		pdn = ping_argv.pdn;
 
 		if (zsock_setsockopt(fd, SOL_SOCKET, SO_BINDTOPDN, &pdn, sizeof(int))) {
-			LOG_WRN("Unable to set socket SO_BINDTOPDN, abort");
+			LOG_WRN("SO_BINDTOPDN error: %d", -errno);
 			goto close_end;
 		}
-		LOG_DBG("Use PDN: %d", pdn);
-	} else {
-		LOG_DBG("Use PDN: 0");
 	}
+	LOG_DBG("Use PDN: %d", pdn);
 
 	/* We have a blocking socket and we do not want to block for
 	 * a long for sending. Thus, let's set the timeout:
@@ -266,7 +266,7 @@ static uint32_t send_ping_wait_reply(void)
 
 	if (zsock_setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (struct timeval *)&tv,
 		       sizeof(struct timeval)) < 0) {
-		LOG_WRN("Unable to set socket SO_SNDTIMEO, continue");
+		LOG_WRN("SO_SNDTIMEO error: %d", -errno);
 	}
 
 	/* Just for sure, let's put the timeout for rcv as well
@@ -274,7 +274,7 @@ static uint32_t send_ping_wait_reply(void)
 	 */
 	if (zsock_setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *)&tv,
 		       sizeof(struct timeval)) < 0) {
-		LOG_WRN("Unable to set socket SO_RCVTIMEO, continue");
+		LOG_WRN("SO_RCVTIMEO error: %d", -errno);
 	}
 
 	/* Include also a sending time to measured RTT: */
@@ -283,7 +283,7 @@ static uint32_t send_ping_wait_reply(void)
 
 	ret = zsock_send(fd, buf, total_length, 0);
 	if (ret <= 0) {
-		LOG_ERR("zsock_send() failed: (%d)", -errno);
+		LOG_ERR("zsock_send() error: %d", -errno);
 		goto close_end;
 	}
 
@@ -297,18 +297,18 @@ wait_for_data:
 
 	do {
 		if (timeout <= 0) {
-			LOG_WRN("Pinging result: no ping response in given timeout msec");
+			LOG_WRN("Ping timeout");
 			delta_t = 0;
 			goto close_end;
 		}
 
 		ret = zsock_poll(fds, 1, timeout);
 		if (ret == 0) {
-			LOG_WRN("Pinging result: no ping response in given timeout msec");
+			LOG_WRN("Ping timeout");
 			delta_t = 0;
 			goto close_end;
 		} else if (ret < 0) {
-			LOG_ERR("zsock_poll() failed: (%d) (%d)", -errno, ret);
+			LOG_ERR("zsock_poll() error: %d", -errno);
 			delta_t = 0;
 			goto close_end;
 		}
@@ -321,7 +321,7 @@ wait_for_data:
 
 		if (len <= 0) {
 			if (errno != EAGAIN && errno != EWOULDBLOCK) {
-				LOG_ERR("zsock_recv() failed with errno (%d) and return value (%d)",
+				LOG_ERR("zsock_recv() error: %d ret=%d",
 					-errno, len);
 				delta_t = 0;
 				goto close_end;
@@ -334,7 +334,7 @@ wait_for_data:
 			 * iteration (or the zero-initialised allocation) and could
 			 * accept them as a valid echo reply (CERT EXP33-C).
 			 */
-			LOG_ERR("zsock_recv() wrong data (%d)", len);
+			LOG_WRN("Recv too short: %d B", len);
 			continue;
 		}
 
@@ -352,7 +352,7 @@ wait_for_data:
 		int hcs = check_ics(data, len - header_len);
 
 		if (hcs != 0) {
-			LOG_ERR("IPv4 HCS error, hcs: %d, len: %d\r\n", hcs, len);
+			LOG_ERR("IPv4 HCS error hcs=%d len=%d", hcs, len);
 			delta_t = 0;
 			goto close_end;
 		}
@@ -377,7 +377,7 @@ wait_for_data:
 		int plhcs = data[2] + (data[3] << 8);
 
 		if (plhcs != hcs) {
-			LOG_ERR("IPv6 HCS error: 0x%x 0x%x\r\n", plhcs, hcs);
+			LOG_ERR("IPv6 HCS error plhcs=0x%x hcs=0x%x", plhcs, hcs);
 			delta_t = 0;
 			goto close_end;
 		}
@@ -402,7 +402,7 @@ wait_for_data:
 		}
 	}
 	if (pllen != len) {
-		LOG_ERR("Expected length %d, got %d", len, pllen);
+		LOG_ERR("Length mismatch expected=%d got=%d", pllen, len);
 		delta_t = 0;
 		goto close_end;
 	}
@@ -442,7 +442,7 @@ static void ping_task(struct k_work *item)
 	}
 
 	lost = ping_argv.count - count;
-	LOG_INF("Packets: Sent = %d, Received = %d, Lost = %d (%d%% loss)",
+	LOG_INF("Packets sent=%d received=%d lost=%d (%d%% loss)",
 		ping_argv.count, count, lost, lost * 100 / ping_argv.count);
 
 	if (count > 1) {
@@ -453,8 +453,7 @@ static void ping_task(struct k_work *item)
 		urc_send_to(ping_pipe, "#XPING: average %d.%03d seconds\r\n",
 			avg_s, avg_f);
 
-		LOG_INF("Approximate round trip times in milli-seconds:\n"
-			"    Minimum = %dms, Maximum = %dms, Average = %dms",
+		LOG_INF("RTT min=%dms max=%dms avg=%dms",
 			rtt_min, rtt_max, sum / count);
 	}
 
@@ -481,7 +480,7 @@ static int ping_test_handler(const char *target)
 		LOG_INF("Ping target's IPv4 address");
 		util_get_ip_addr(ping_argv.pdn, ipv4_addr, NULL);
 		if (!*ipv4_addr) {
-			LOG_ERR("Unable to obtain local IPv4 address");
+			LOG_ERR("Local IPv4 address not found");
 			zsock_freeaddrinfo(res);
 			return -1;
 		}
@@ -501,7 +500,7 @@ static int ping_test_handler(const char *target)
 		LOG_INF("Ping target's IPv6 address");
 		util_get_ip_addr(ping_argv.pdn, NULL, ipv6_addr);
 		if (!*ipv6_addr) {
-			LOG_ERR("Unable to obtain local IPv6 address");
+			LOG_ERR("Local IPv6 address not found");
 			zsock_freeaddrinfo(res);
 			return -1;
 		}

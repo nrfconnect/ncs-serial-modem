@@ -263,7 +263,7 @@ static void obs_auto_work_fn(struct k_work *work)
 	k_work_reschedule_for_queue(&sm_work_q, &obs_auto_work, K_SECONDS(obs_auto_interval));
 
 	if (!sm_nrf_cloud_ready) {
-		LOG_DBG("Not connected to nRF Cloud, skipping the automatic upload.");
+		LOG_DBG("Not connected to nRF Cloud, skipping upload");
 		return;
 	}
 
@@ -272,9 +272,9 @@ static void obs_auto_work_fn(struct k_work *work)
 	g_mflt_http_client_config.api_key = previous_key;
 
 	if (result < 0) {
-		LOG_WRN("Automatic upload failed: %zd", result);
+		LOG_WRN("Auto upload failed: %zd", result);
 	} else {
-		LOG_DBG("Automatic upload sent %zd bytes", result);
+		LOG_DBG("Auto upload sent %zd B", result);
 	}
 }
 
@@ -338,7 +338,7 @@ static int obs_forward_chunk(void)
 		/* A previous post timed out and its response has still not arrived. The
 		 * CoAP client gives up after COAP_MAX_RETRANSMIT retransmissions.
 		 */
-		LOG_ERR("A previous chunk post is still outstanding");
+		LOG_ERR("Chunk post still outstanding");
 		return -EBUSY;
 	}
 
@@ -349,14 +349,14 @@ static int obs_forward_chunk(void)
 				  COAP_CONTENT_FORMAT_APP_OCTET_STREAM, true,
 				  obs_coap_response_cb, &obs_coap_ctx);
 	if (err) {
-		LOG_ERR("Failed to post chunk: %d", err);
+		LOG_ERR("Chunk post failed: %d", err);
 		/* The request was never made, so no response callback is coming. */
 		atomic_clear(&obs_coap_ctx.outstanding);
 		return err;
 	}
 
 	if (k_sem_take(&obs_coap_ctx.response_sem, K_MSEC(OBS_COAP_RESPONSE_TIMEOUT_MS)) != 0) {
-		LOG_ERR("Timeout waiting for the chunk response");
+		LOG_ERR("Chunk response timeout");
 		/* Tell the callback to leave the context alone. It clears outstanding. */
 		obs_coap_ctx.result_code = -ETIMEDOUT;
 		return -ETIMEDOUT;
@@ -449,7 +449,7 @@ static int obs_parse_chunk(struct at_parser *parser)
 	err = base64_decode(obs_chunk, MEMFAULT_BASE64_MAX_DECODE_LEN(b64_len), &bin_len,
 			    (const uint8_t *)b64, b64_len);
 	if (err || bin_len == 0) {
-		LOG_ERR("Failed to decode the chunk: %d", err);
+		LOG_ERR("Chunk decode failed: %d", err);
 		free(obs_chunk);
 		obs_chunk = NULL;
 		return -EBADMSG;
@@ -471,11 +471,11 @@ static int obs_parse_chunk(struct at_parser *parser)
 static int obs_check_ready(void)
 {
 	if (!sm_nrf_cloud_ready) {
-		LOG_ERR("Not connected to nRF Cloud.");
+		LOG_ERR("Not connected to nRF Cloud");
 		return -ENOTCONN;
 	}
 	if (obs_busy) {
-		LOG_ERR("Observability operation already ongoing.");
+		LOG_ERR("Observability operation already ongoing");
 		return -EBUSY;
 	}
 
@@ -545,7 +545,7 @@ STATIC int handle_at_nrf_cloud_obs_auto(enum at_parser_cmd_type cmd_type, struct
 		err = obs_settings_save();
 		if (err) {
 			/* Applied either way; a partial save may store new and old values mixed. */
-			LOG_WRN("Failed to store the automatic upload configuration: %d", err);
+			LOG_WRN("Auto upload config save failed: %d", err);
 		}
 
 		return 0;
@@ -595,7 +595,7 @@ STATIC int handle_at_nrf_cloud_obs_coredump(enum at_parser_cmd_type cmd_type,
 					sizeof(obs_coredump_enabled));
 		if (err) {
 			/* Applied for this session either way. */
-			LOG_WRN("Failed to store the core dump upload setting: %d", err);
+			LOG_WRN("Core dump upload save failed: %d", err);
 		}
 
 		return 0;

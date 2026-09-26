@@ -97,7 +97,7 @@ static void go_sleep_wk(struct k_work *)
 		if (sm_at_host_power_off() == 0) {
 			sm_ctrl_pin_enter_idle();
 		} else {
-			LOG_ERR("failed to power off UART");
+			LOG_ERR("Failed to power off UART");
 		}
 	} else if (sleep_control.mode == SLEEP_MODE_DEEP) {
 		sm_ctrl_pin_enter_sleep();
@@ -243,7 +243,7 @@ STATIC int handle_at_uuid(enum at_parser_cmd_type cmd_type, struct at_parser *, 
 
 	ret = modem_jwt_get_uuids(&dev, NULL);
 	if (ret) {
-		LOG_ERR("Get device UUID error: %d", ret);
+		LOG_ERR("Device UUID failed: %d", ret);
 	} else {
 		rsp_send("\r\n#XUUID: %s\r\n", dev.str);
 	}
@@ -399,7 +399,7 @@ STATIC int handle_at_memstats(enum at_parser_cmd_type cmd_type, struct at_parser
 	/* System heap stats */
 	ret = malloc_runtime_stats_get(&malloc_stats);
 	if (ret) {
-		LOG_WRN("Failed to read system heap stats, error: %d", ret);
+		LOG_WRN("Failed to read system heap stats: %d", ret);
 	} else {
 		LOG_INF("System heap stats:");
 		LOG_INF("  free:           %6d", malloc_stats.free_bytes);
@@ -410,7 +410,7 @@ STATIC int handle_at_memstats(enum at_parser_cmd_type cmd_type, struct at_parser
 	/* Kernel heap stats */
 	ret = sys_heap_runtime_stats_get(&_system_heap, &kernel_stats);
 	if (ret) {
-		LOG_WRN("Failed to read kernel heap stats, error: %d", ret);
+		LOG_WRN("Failed to read kernel heap stats: %d", ret);
 	} else {
 		LOG_INF("Kernel heap stats:");
 		LOG_INF("  free:           %6d", kernel_stats.free_bytes);
