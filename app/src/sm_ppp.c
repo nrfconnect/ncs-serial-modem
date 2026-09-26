@@ -130,7 +130,7 @@ static bool open_ppp_sockets(void)
 	ppp_fds[ZEPHYR_FD_IDX] = zsock_socket(AF_PACKET, SOCK_DGRAM | SOCK_NATIVE,
 					      htons(ETH_P_ALL));
 	if (ppp_fds[ZEPHYR_FD_IDX] < 0) {
-		LOG_ERR("Zephyr socket creation failed (%d).", -errno);
+		LOG_ERR("Zephyr socket creation failed: %d", -errno);
 		return false;
 	}
 
@@ -142,14 +142,14 @@ static bool open_ppp_sockets(void)
 	ret = zsock_bind(ppp_fds[ZEPHYR_FD_IDX],
 		   (const struct sockaddr *)&ppp_zephyr_dst_addr, sizeof(ppp_zephyr_dst_addr));
 	if (ret < 0) {
-		LOG_ERR("Failed to bind Zephyr socket (%d).", -errno);
+		LOG_ERR("Failed to bind Zephyr socket: %d", -errno);
 		close_ppp_sockets();
 		return false;
 	}
 
 	ppp_fds[MODEM_FD_IDX] = zsock_socket(AF_PACKET, SOCK_RAW, 0);
 	if (ppp_fds[MODEM_FD_IDX] < 0) {
-		LOG_ERR("Modem socket creation failed (%d).", -errno);
+		LOG_ERR("Modem socket creation failed: %d", -errno);
 		close_ppp_sockets();
 		return false;
 	}
@@ -167,9 +167,9 @@ static bool open_ppp_sockets(void)
 		SOL_SOCKET, SO_BINDTOPDN,
 		&pdn_id, sizeof(int));
 	if (ret == 0) {
-		LOG_INF("PPP socket bound to PDN ID %d", pdn_id);
+		LOG_INF("PPP bound to PDN %d", pdn_id);
 	} else {
-		LOG_ERR("Failed to bind PPP to PDN ID %d (%d)", pdn_id, -errno);
+		LOG_ERR("Failed to bind PPP to PDN %d: %d", pdn_id, -errno);
 		close_ppp_sockets();
 		return false;
 	}
@@ -185,7 +185,7 @@ static void close_ppp_sockets(void)
 			continue;
 		}
 		if (zsock_close(ppp_fds[i])) {
-			LOG_WRN("Failed to close %s socket (%d).",
+			LOG_WRN("Failed to close %s socket: %d",
 				ppp_socket_names[i], -errno);
 		}
 		ppp_fds[i] = -1;
@@ -206,7 +206,7 @@ static bool configure_ppp_link_ip_addresses(struct ppp_context *ctx)
 			return false;
 		}
 	} else if (!*addr6) {
-		LOG_ERR("No connectivity.");
+		LOG_ERR("No connectivity");
 		return false;
 	}
 
@@ -239,16 +239,14 @@ static void delegate_ppp_event(enum ppp_action action, enum ppp_reason reason)
 {
 	struct ppp_event event = {.action = action, .reason = reason};
 
-	LOG_DBG("PPP %s, reason: %d", ppp_action_str(event.action), event.reason);
-
 	if (k_msgq_put(&ppp_work.queue, &event, K_NO_WAIT)) {
-		LOG_ERR("Failed to queue PPP event.");
+		LOG_ERR("Failed to queue PPP event");
 		return;
 	}
 
 	/* Signal the PPP thread that an event is available */
 	if (eventfd_write(ppp_fds[EVENT_FD_IDX], 1) != 0) {
-		LOG_ERR("Failed to signal PPP event (%d).", errno);
+		LOG_ERR("Failed to signal PPP event: %d", -errno);
 	}
 }
 
@@ -315,15 +313,15 @@ static void ppp_retrieve_pdn_info(struct ppp_context *const ctx)
 		}
 #else
 		} else {
-			LOG_WRN("No DNS addresses available on PDN and no fallback configured.");
+			LOG_WRN("No DNS on PDN and no fallback configured");
 		}
 #endif
 	} else {
-		LOG_DBG("Could not retrieve MTU, using fallback value.");
+		LOG_INF("Failed to get MTU, using fallback");
 		BUILD_ASSERT(sizeof(ppp_data_buf) >= CONFIG_SM_PPP_FALLBACK_MTU);
 	}
 	net_if_set_mtu(ppp_iface, mtu);
-	LOG_DBG("MTU set to %u.", mtu);
+	LOG_INF("MTU set to %u", mtu);
 }
 
 static int ppp_start(void)
@@ -352,7 +350,7 @@ static int ppp_start(void)
 
 	ret = net_if_up(ppp_iface);
 	if (ret) {
-		LOG_ERR("Failed to bring PPP interface up (%d).", ret);
+		LOG_ERR("PPP interface up failed: %d", ret);
 		goto error;
 	}
 
@@ -421,7 +419,7 @@ static int ppp_stop(enum ppp_reason reason)
 		int ret = net_if_down(ppp_iface);
 
 		if (ret) {
-			LOG_WRN("Failed to bring PPP interface down (%d).", ret);
+			LOG_WRN("PPP interface down failed: %d", ret);
 			/* Retry later */
 			net_if_dormant_on(ppp_iface);
 			delegate_ppp_event(PPP_STOP, reason);
@@ -461,7 +459,7 @@ static void sm_ppp_activate_pdp_dwork_fn(struct k_work *work)
 {
 	if (!sm_util_cereg_is_registered()) {
 		if (sys_timepoint_expired(ppp_pdn_timeout)) {
-			LOG_ERR("Timeout while waiting for network registration");
+			LOG_ERR("Network registration timeout");
 			ppp_cmd_fail_return_to_at_mode();
 			return;
 		}
@@ -470,17 +468,17 @@ static void sm_ppp_activate_pdp_dwork_fn(struct k_work *work)
 	}
 
 	if (!sm_util_is_cid_active(ppp_pdn_cid)) {
-		LOG_DBG("Activating PDP context %u for PPP...", ppp_pdn_cid);
+		LOG_DBG("Activating PDP %u for PPP", ppp_pdn_cid);
 		int ret = sm_util_at_printf("AT+CGACT=1,%u", ppp_pdn_cid);
 
 		if (ret) {
-			LOG_ERR("Failed to activate PDP context %u for PPP (%d).", ppp_pdn_cid,
+			LOG_ERR("Failed to activate PDP %u for PPP: %d", ppp_pdn_cid,
 				ret);
 			ppp_cmd_fail_return_to_at_mode();
 			return;
 		}
 	}
-	LOG_DBG("PDP context %u activated for PPP.", ppp_pdn_cid);
+	LOG_DBG("PDP %u activated for PPP", ppp_pdn_cid);
 	rsp_send_to(ppp_pipe, CONNECT);
 	sm_at_host_release(sm_at_host_get_ctx_from(ppp_pipe));
 	modem_ppp_attach(&ppp_module, ppp_pipe);
@@ -517,7 +515,7 @@ static void at_notif_on_cgev(const char *notify)
 			str++;
 			cid = (uint8_t)strtoul(str, &endptr, 10);
 			if (endptr != str && cid == ppp_pdn_cid) {
-				LOG_INF("PPP PDN (%d) activated.", ppp_pdn_cid);
+				LOG_INF("PPP PDN %d activated", ppp_pdn_cid);
 				delegate_ppp_event(PPP_START, PPP_REASON_NETWORK);
 			}
 		}
@@ -531,7 +529,7 @@ static void ppp_work_fn(void)
 
 	while (k_msgq_get(&ppp_work.queue, &event, K_NO_WAIT) == 0) {
 
-		LOG_INF("PPP %s, reason: %d", ppp_action_str(event.action), event.reason);
+		LOG_INF("PPP %s reason: %d", ppp_action_str(event.action), event.reason);
 
 		switch (event.action) {
 		case PPP_START:
@@ -548,11 +546,11 @@ static void ppp_work_fn(void)
 			err = ppp_stop(event.reason);
 			break;
 		default:
-			LOG_ERR("Unknown PPP action: %d.", event.action);
+			LOG_ERR("Unknown PPP action: %d", event.action);
 			break;
 		}
 
-		LOG_INF("PPP %s %s.", ppp_action_str(event.action),
+		LOG_INF("PPP %s %s", ppp_action_str(event.action),
 			(err ? "failed" : "succeeded"));
 	}
 }
@@ -562,12 +560,12 @@ static void ppp_net_mgmt_event_handler(uint64_t mgmt_event, struct net_if *iface
 {
 	switch (mgmt_event) {
 	case NET_EVENT_PPP_PHASE_RUNNING:
-		LOG_INF("Peer connected.");
+		LOG_INF("Peer connected");
 		ppp_peer_connected = true;
 		send_status_notification();
 		break;
 	case NET_EVENT_PPP_PHASE_DEAD:
-		LOG_DBG("Peer not connected.");
+		LOG_DBG("Peer not connected");
 		/* This event can come without prior NET_EVENT_PPP_PHASE_RUNNING. */
 		if (!ppp_peer_connected) {
 			break;
@@ -579,7 +577,7 @@ static void ppp_net_mgmt_event_handler(uint64_t mgmt_event, struct net_if *iface
 		}
 		send_status_notification();
 
-		LOG_INF("Peer disconnected. %s PPP...", "Stopping");
+		LOG_INF("Peer disconnected, stopping PPP");
 		delegate_ppp_event(PPP_STOP, PPP_REASON_PEER_DISCONNECTED);
 
 		break;
@@ -600,7 +598,7 @@ static int sm_ppp_init(void)
 	/* Create event eventfd for signaling events to the PPP thread */
 	ppp_fds[EVENT_FD_IDX] = eventfd(0, EFD_NONBLOCK);
 	if (ppp_fds[EVENT_FD_IDX] < 0) {
-		LOG_ERR("Failed to create event eventfd (%d).", errno);
+		LOG_ERR("Failed to create eventfd: %d", -errno);
 		sm_init_failed = true;
 		return -errno;
 	}
@@ -616,7 +614,7 @@ static int sm_ppp_init(void)
 
 	net_if_flag_set(ppp_iface, NET_IF_POINTOPOINT);
 
-	LOG_DBG("PPP initialized.");
+	LOG_DBG("PPP initialized");
 	return 0;
 }
 SYS_INIT(sm_ppp_init, APPLICATION, 0);
@@ -669,7 +667,7 @@ STATIC int handle_at_ppp(enum at_parser_cmd_type cmd_type, struct at_parser *par
 			struct modem_pipe *pipe = ctx ? sm_at_host_get_pipe(ctx) : NULL;
 
 			if (!ctx || !pipe) {
-				LOG_ERR("No pipe available for PPP.");
+				LOG_ERR("No pipe available for PPP");
 				return -ENODEV;
 			}
 			ppp_pipe = pipe;
@@ -753,7 +751,7 @@ STATIC int handle_at_cgdata(enum at_parser_cmd_type cmd_type, struct at_parser *
 	struct modem_pipe *pipe = ctx ? sm_at_host_get_pipe(ctx) : NULL;
 
 	if (!ctx || !pipe) {
-		LOG_ERR("No pipe available for PPP.");
+		LOG_ERR("No pipe available for PPP");
 		return -ENODEV;
 	}
 	ppp_pipe = pipe;
@@ -798,7 +796,7 @@ static void ppp_data_passing_thread(void*, void*, void*)
 		const int poll_ret = zsock_poll(fds, nfds, -1);
 
 		if (poll_ret <= 0) {
-			LOG_ERR("Sockets polling failed (%d, %d).", poll_ret, -errno);
+			LOG_ERR("Sockets polling failed ret=%d err=%d", poll_ret, -errno);
 			if (ppp_is_running()) {
 				ppp_state = PPP_STATE_STARTING;
 				delegate_ppp_event(PPP_RESTART, PPP_REASON_ERROR);
@@ -821,11 +819,11 @@ static void ppp_data_passing_thread(void*, void*, void*)
 					eventfd_t value;
 					/* Read the eventfd to clear it */
 					if (eventfd_read(ppp_fds[EVENT_FD_IDX], &value) == 0) {
-						LOG_DBG("Processing PPP events.");
+						LOG_DBG("Processing PPP events");
 						/* Process all queued events */
 						ppp_work_fn();
 					} else {
-						LOG_ERR("Failed to read eventfd (%d).", errno);
+						LOG_ERR("Failed to read eventfd: %d", -errno);
 					}
 				}
 				/* Restart the polling loop as STOP/START/RESTART may
@@ -848,10 +846,10 @@ static void ppp_data_passing_thread(void*, void*, void*)
 			if (!(revents & ZSOCK_POLLIN)) {
 				/* ZSOCK_POLLERR comes when the connection goes down (AT+CFUN=0). */
 				if (revents ^ ZSOCK_POLLERR) {
-					LOG_WRN("Unexpected event 0x%x on %s socket. Stop.",
+					LOG_WRN("Unexpected event 0x%x on %s socket, stopping",
 						revents, ppp_socket_names[src]);
 				} else {
-					LOG_DBG("Connection down. Stop.");
+					LOG_DBG("Connection down, stopping");
 				}
 				ppp_state = PPP_STATE_STOPPING;
 				delegate_ppp_event(PPP_STOP, PPP_REASON_NETWORK);
@@ -864,7 +862,7 @@ static void ppp_data_passing_thread(void*, void*, void*)
 
 			if (len <= 0) {
 				if (len != -1 || (errno != EAGAIN && errno != EWOULDBLOCK)) {
-					LOG_ERR("Failed to receive data from %s socket (%d, %d).",
+					LOG_ERR("Failed to receive from %s socket: %d %d",
 						ppp_socket_names[src], len, -errno);
 				}
 				continue;
@@ -890,13 +888,13 @@ static void ppp_data_passing_thread(void*, void*, void*)
 			send_ret = zsock_sendto(ppp_fds[dst], ppp_data_buf, len, 0, dst_addr,
 						addrlen);
 			if (send_ret == -1) {
-				LOG_ERR("Failed to send %zd bytes to %s socket (%d).",
+				LOG_ERR("Failed to send %zd bytes to %s socket: %d",
 					len, ppp_socket_names[dst], -errno);
 			} else if (send_ret != len) {
-				LOG_ERR("Only sent %zd out of %zd bytes to %s socket.",
+				LOG_ERR("Sent %zd of %zd bytes to %s socket",
 					send_ret, len, ppp_socket_names[dst]);
 			} else {
-				LOG_DBG_RATELIMIT_RATE(5000, "Forwarded %zd bytes to %s socket.",
+				LOG_DBG_RATELIMIT_RATE(5000, "Forwarded %zd bytes to %s socket",
 					send_ret, ppp_socket_names[dst]);
 			}
 		}

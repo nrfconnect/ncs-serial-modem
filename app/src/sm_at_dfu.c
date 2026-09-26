@@ -104,12 +104,11 @@ int bootloader_mode_request(bool enable)
 
 	err = sm_settings_bootloader_mode_save();
 	if (err) {
-		LOG_ERR("Failed to set bootloader mode requested to: %s",
-			enable ? "enabled" : "disabled");
+		LOG_ERR("Bootloader mode request save failed: %d", err);
 		return err;
 	}
 
-	LOG_DBG("Bootloader mode request set to: %s", enable ? "enabled" : "disabled");
+	LOG_DBG("Bootloader mode request: %s", enable ? "enabled" : "disabled");
 
 	return 0;
 }
@@ -122,11 +121,11 @@ static int set_full_mfw_dfu_segment_type(enum xdfu_full_mfw_segment_type type)
 
 	err = sm_settings_full_mfw_dfu_segment_type_save();
 	if (err) {
-		LOG_ERR("Failed to set full MFW DFU segment type to: %d", type);
+		LOG_ERR("Full MFW DFU segment type save failed: %d", err);
 		return err;
 	}
 
-	LOG_DBG("Full MFW DFU segment type set to: %d", type);
+	LOG_DBG("Full MFW DFU segment type: %d", type);
 
 	return 0;
 }
@@ -140,7 +139,7 @@ static int xdfu_datamode_callback(uint8_t op, const uint8_t *data, int len, uint
 	switch (op) {
 	case DATAMODE_SEND:
 		if (data == NULL || len <= 0) {
-			LOG_ERR("Chunk data invalid (data=%p len=%d)", (void *)data, len);
+			LOG_ERR("Chunk data invalid data=%p len=%d", (void *)data, len);
 			return -EINVAL;
 		}
 
@@ -241,7 +240,7 @@ static int xdfu_datamode_callback(uint8_t op, const uint8_t *data, int len, uint
 		return 0;
 	}
 	default:
-		LOG_WRN("Unexpected data mode op: %u (flags=0x%02x)", op, flags);
+		LOG_WRN("Unexpected data mode op=%u flags=0x%02x", op, flags);
 		return 0;
 	}
 }
@@ -302,7 +301,7 @@ static int handle_at_xdfu_init(enum at_parser_cmd_type cmd_type, struct at_parse
 				return err;
 			}
 
-			LOG_INF("%s DFU initialized successfully",
+			LOG_INF("%s DFU initialized",
 				type == DFU_TYPE_APP ? "MCUboot" : "MCUboot bootloader");
 			return 0;
 		case DFU_TYPE_DELTA_MFW:
@@ -318,7 +317,7 @@ static int handle_at_xdfu_init(enum at_parser_cmd_type cmd_type, struct at_parse
 				return err;
 			}
 
-			LOG_INF("Delta modem firmware initialized successfully");
+			LOG_INF("Delta modem firmware initialized");
 			return 0;
 		case DFU_TYPE_FULL_MFW:
 			if (!IS_ENABLED(CONFIG_SM_DFU_MODEM_FULL)) {
@@ -605,7 +604,9 @@ static int handle_at_xdfu_apply(enum at_parser_cmd_type cmd_type, struct at_pars
 			urc_send("#XDFU: %u,%u,%d\r\n",
 				DFU_TYPE_DELTA_MFW, DFU_OPERATION_APPLY_UPDATE, err ? -1 : 0);
 
-			LOG_INF("Delta modem firmware update scheduled");
+			if (!err) {
+				LOG_INF("Delta modem firmware update scheduled");
+			}
 
 			return 0;
 		case DFU_TYPE_FULL_MFW:
@@ -620,7 +621,7 @@ static int handle_at_xdfu_apply(enum at_parser_cmd_type cmd_type, struct at_pars
 			} else {
 				if (full_mfw_dfu_segment_type ==
 					DFU_FULL_MFW_SEGMENT_BOOTLOADER) {
-					LOG_INF("Bootloader segment update successful");
+					LOG_INF("Bootloader segment updated");
 					LOG_WRN("After first FW write, modem will corrupt "
 						"if update is not completed");
 					(void)set_full_mfw_dfu_segment_type(
@@ -637,7 +638,7 @@ static int handle_at_xdfu_apply(enum at_parser_cmd_type cmd_type, struct at_pars
 					rsp_send("#XDFU: %u,%u,%d\r\n", DFU_TYPE_FULL_MFW,
 						 DFU_OPERATION_APPLY_UPDATE, 0);
 					sm_uart_tx_flush();
-					LOG_INF("Firmware update successful, rebooting...");
+					LOG_INF("Firmware update complete, rebooting");
 					sm_log_flush();
 					sys_reboot(SYS_REBOOT_COLD);
 				}

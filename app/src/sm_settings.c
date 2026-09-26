@@ -72,19 +72,19 @@ static int sm_settings_init(void)
 
 	ret = settings_subsys_init();
 	if (ret) {
-		LOG_ERR("Init setting failed: %d", ret);
+		LOG_ERR("Settings init failed: %d", ret);
 		sm_init_failed = true;
 		return ret;
 	}
 	ret = settings_register(&sm_settings_conf);
 	if (ret) {
-		LOG_ERR("Register setting failed: %d", ret);
+		LOG_ERR("Settings register failed: %d", ret);
 		sm_init_failed = true;
 		return ret;
 	}
 	ret = settings_load_subtree("sm");
 	if (ret) {
-		LOG_ERR("Load setting failed: %d", ret);
+		LOG_ERR("Settings load failed: %d", ret);
 		sm_init_failed = true;
 	}
 

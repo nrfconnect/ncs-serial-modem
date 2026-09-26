@@ -113,7 +113,7 @@ static int do_cloud_send_msg(const char *message, int len)
 	err = nrf_cloud_coap_post(resource, NULL, message, len, COAP_CONTENT_FORMAT_APP_JSON, true,
 				  NULL, NULL);
 	if (err) {
-		LOG_ERR("nrf_cloud_coap_post JSON message send failed, error: %d", err);
+		LOG_ERR("nRF Cloud JSON send failed: %d", err);
 	}
 
 	return err;
@@ -139,11 +139,11 @@ static void date_time_event_handler(const struct date_time_evt *evt)
 	case DATE_TIME_OBTAINED_MODEM:
 	case DATE_TIME_OBTAINED_NTP:
 	case DATE_TIME_OBTAINED_EXT:
-		LOG_DBG("DATE_TIME OBTAINED");
+		LOG_DBG("Date/time obtained");
 		k_sem_give(&sem_date_time);
 		break;
 	case DATE_TIME_NOT_OBTAINED:
-		LOG_INF("DATE_TIME_NOT_OBTAINED");
+		LOG_INF("Date/time not obtained");
 		break;
 	default:
 		break;
@@ -180,10 +180,10 @@ static void nrfcloud_conn_work_fn(struct k_work *work)
 	int err;
 
 	if (nrfcloud_connect) {
-		LOG_DBG("Connecting to nRF Cloud.");
+		LOG_DBG("Connecting to nRF Cloud");
 		err = nrf_cloud_coap_connect(NULL);
 		if (err) {
-			LOG_ERR("Cloud connection failed, error: %d", err);
+			LOG_ERR("Cloud connection failed: %d", err);
 			urc_send_to(nrfcloud_pipe, "\r\n#XNRFCLOUD: %d,%d\r\n", 0,
 				    nrfcloud_conn_send_location);
 			return;
@@ -196,13 +196,13 @@ static void nrfcloud_conn_work_fn(struct k_work *work)
 		}
 		on_cloud_ready();
 	} else {
-		LOG_DBG("Disconnecting from nRF Cloud.");
+		LOG_DBG("Disconnecting from nRF Cloud");
 		err = nrf_cloud_coap_disconnect();
 		if (err && err != -ENOTCONN) {
 			/* The socket fd is freed even when close() fails, so treat the
 			 * connection as down to keep sm_nrf_cloud_ready in sync.
 			 */
-			LOG_WRN("Cloud disconnection failed, error: %d", err);
+			LOG_WRN("Cloud disconnection failed: %d", err);
 		}
 		on_cloud_disconnected();
 	}
@@ -298,13 +298,13 @@ static void sm_at_nrfcloud_init(int ret, void *ctx)
 
 	err = nrf_cloud_coap_init();
 	if (err) {
-		LOG_ERR("Failed to initialize nRF Cloud CoAP library: %d", err);
+		LOG_ERR("nRF Cloud CoAP init failed: %d", err);
 		return;
 	}
 
 	err = nrf_cloud_client_id_get(nrfcloud_device_id, sizeof(nrfcloud_device_id));
 	if (err) {
-		LOG_ERR("Failed to get nRF Cloud client ID: %d", err);
+		LOG_ERR("nRF Cloud client ID get failed: %d", err);
 		return;
 	}
 
@@ -331,13 +331,13 @@ STATIC int handle_at_nrf_cloud_pos(enum at_parser_cmd_type cmd_type,
 	}
 
 	if (!sm_nrf_cloud_ready) {
-		LOG_ERR("Not connected to nRF Cloud.");
+		LOG_ERR("Not connected to nRF Cloud");
 		return -ENOTCONN;
 	}
 
 	if (nrfcloud_sending_loc_req) {
 		/* Avoid potential concurrency issues writing to global variables. */
-		LOG_ERR("nRF Cloud location request sending already ongoing.");
+		LOG_ERR("Location request already ongoing");
 		return -EBUSY;
 	}
 
@@ -360,7 +360,7 @@ STATIC int handle_at_nrf_cloud_pos(enum at_parser_cmd_type cmd_type,
 	}
 
 	if (!cell_count && !wifi_pos) {
-		LOG_ERR("At least one of cellular/Wi-Fi information must be included.");
+		LOG_ERR("Cellular or Wi-Fi info required");
 		return -EINVAL;
 	}
 
@@ -404,7 +404,7 @@ STATIC int handle_at_nrf_cloud_pos(enum at_parser_cmd_type cmd_type,
 				err = -EBADMSG; /* A different error code to differentiate. */
 			}
 			if (err) {
-				LOG_ERR("MAC address %u malformed (%d).",
+				LOG_ERR("MAC address %u malformed: %d",
 					nrfcloud_wifi_data.cnt, err);
 				break;
 			}
@@ -421,7 +421,7 @@ STATIC int handle_at_nrf_cloud_pos(enum at_parser_cmd_type cmd_type,
 
 				if (rssi < rssi_min || rssi > rssi_max) {
 					err = -EINVAL;
-					LOG_ERR("RSSI %u out of bounds ([%d,%d]).",
+					LOG_ERR("RSSI %u out of bounds min=%d max=%d",
 						nrfcloud_wifi_data.cnt, rssi_min, rssi_max);
 					break;
 				}
@@ -436,7 +436,7 @@ STATIC int handle_at_nrf_cloud_pos(enum at_parser_cmd_type cmd_type,
 
 		if (nrfcloud_wifi_data.cnt < NRF_CLOUD_LOCATION_WIFI_AP_CNT_MIN) {
 			err = -EINVAL;
-			LOG_ERR("Insufficient access point count (got %u, min %u).",
+			LOG_ERR("Insufficient access point count got=%u min=%u",
 				nrfcloud_wifi_data.cnt, NRF_CLOUD_LOCATION_WIFI_AP_CNT_MIN);
 		}
 		if (err) {
@@ -617,7 +617,7 @@ int sm_at_nrfcloud_ncellmeas_start(uint8_t cell_count, bool send_loc_req,
 	 */
 	cell_data = calloc(1, sizeof(struct lte_lc_cells_info));
 	if (cell_data == NULL) {
-		LOG_ERR("Failed to allocate memory for the nRF Cloud cell data");
+		LOG_ERR("Cell data alloc failed");
 		if (send_loc_req) {
 			sm_k_work_submit_blocking(&nrfcloud_loc_req_work);
 		}
@@ -649,7 +649,7 @@ int sm_at_nrfcloud_ncellmeas_start(uint8_t cell_count, bool send_loc_req,
 	 * 1st: Normal neighbor search to get current cell.
 	 *      In addition neighbor cells are received.
 	 */
-	LOG_DBG("Normal neighbor search (NCELLMEAS=1)");
+	LOG_DBG("Normal neighbor search NCELLMEAS=1");
 	ncellmeas_search_type = 1;
 	ncellmeas_sm_state = NCELLMEAS_STATE_FIRST_WAIT;
 	err = sm_util_at_printf("AT%%NCELLMEAS=1");
@@ -697,7 +697,7 @@ static void ncellmeas_state_handle_work_fn(struct k_work *work)
 		 */
 		err = sm_util_at_scanf("AT+CSCON?", "+CSCON: %*d,%d", &rrc_mode);
 		if (err == 1 && rrc_mode != 0 && ncellmeas_rrc_polls < 10) {
-			LOG_DBG("Waiting for RRC connection release (%d/10)",
+			LOG_DBG("Waiting for RRC release %d/10",
 				ncellmeas_rrc_polls + 1);
 			ncellmeas_rrc_polls++;
 			k_work_schedule_for_queue(
@@ -709,7 +709,7 @@ static void ncellmeas_state_handle_work_fn(struct k_work *work)
 
 		if (err != 1) {
 			/* If AT+CSCON fails, proceed anyway with GCI searches. */
-			LOG_ERR("+CSCON failed %d, proceeding with GCI search", err);
+			LOG_ERR("+CSCON failed: %d, proceeding with GCI search", err);
 		}
 
 		/*****
@@ -718,11 +718,11 @@ static void ncellmeas_state_handle_work_fn(struct k_work *work)
 		 *      minimum of 5 cells even if less has been requested.
 		 */
 		ncellmeas_2nd_cell_count = MAX(5, ncellmeas_req_cell_count);
-		LOG_DBG("GCI history search (NCELLMEAS=3,%d)", ncellmeas_2nd_cell_count);
+		LOG_DBG("GCI history search NCELLMEAS=3,%d", ncellmeas_2nd_cell_count);
 
 		cells = calloc(ncellmeas_2nd_cell_count, sizeof(struct lte_lc_cell));
 		if (cells == NULL) {
-			LOG_ERR("Failed to allocate memory for the GCI cells");
+			LOG_ERR("GCI cells alloc failed");
 			ncellmeas_complete();
 			return;
 		}
@@ -748,7 +748,7 @@ static void ncellmeas_state_handle_work_fn(struct k_work *work)
 		 *      This search can be time and power consuming especially in rural areas
 		 *      depending on the available bands in the region.
 		 */
-		LOG_DBG("GCI regional search (NCELLMEAS=4,%d)", ncellmeas_req_cell_count);
+		LOG_DBG("GCI regional search NCELLMEAS=4,%d", ncellmeas_req_cell_count);
 		ncellmeas_search_type = 4;
 		ncellmeas_gci_count = ncellmeas_req_cell_count;
 		ncellmeas_sm_state = NCELLMEAS_STATE_THIRD_WAIT;
@@ -815,7 +815,7 @@ static void nrfcloud_loc_req_work_fn(struct k_work *work)
 		urc_send_to(nrfcloud_pipe, "\r\n#XNRFCLOUDPOS: 0,%d,%lf,%lf,%d\r\n",
 			result.type, result.lat, result.lon, result.unc);
 	} else {
-		LOG_ERR("Failed to request nRF Cloud location (%d).", err);
+		LOG_ERR("nRF Cloud location request failed: %d", err);
 		urc_send_to(nrfcloud_pipe, "\r\n#XNRFCLOUDPOS: %d\r\n", err < 0 ? -1 : err);
 	}
 
@@ -888,7 +888,7 @@ static struct lte_lc_ncell *parse_ncellmeas_neighbors(
 		/* <n_earfcn[j]> */
 		err = at_parser_num_get(parser, *curr_index, &ncells[j].earfcn);
 		if (err) {
-			LOG_ERR("Could not parse n_earfcn, error: %d", err);
+			LOG_ERR("Could not parse %s, error: %d", "n_earfcn", err);
 			goto error_exit;
 		}
 
@@ -896,7 +896,7 @@ static struct lte_lc_ncell *parse_ncellmeas_neighbors(
 		(*curr_index)++;
 		err = at_parser_num_get(parser, *curr_index, &ncells[j].phys_cell_id);
 		if (err) {
-			LOG_ERR("Could not parse n_phys_cell_id, error: %d", err);
+			LOG_ERR("Could not parse %s, error: %d", "n_phys_cell_id", err);
 			goto error_exit;
 		}
 
@@ -904,7 +904,7 @@ static struct lte_lc_ncell *parse_ncellmeas_neighbors(
 		(*curr_index)++;
 		err = at_parser_num_get(parser, *curr_index, &tmp_int);
 		if (err) {
-			LOG_ERR("Could not parse n_rsrp, error: %d", err);
+			LOG_ERR("Could not parse %s, error: %d", "n_rsrp", err);
 			goto error_exit;
 		}
 		ncells[j].rsrp = tmp_int;
@@ -913,7 +913,7 @@ static struct lte_lc_ncell *parse_ncellmeas_neighbors(
 		(*curr_index)++;
 		err = at_parser_num_get(parser, *curr_index, &tmp_int);
 		if (err) {
-			LOG_ERR("Could not parse n_rsrq, error: %d", err);
+			LOG_ERR("Could not parse %s, error: %d", "n_rsrq", err);
 			goto error_exit;
 		}
 		ncells[j].rsrq = tmp_int;
@@ -922,7 +922,7 @@ static struct lte_lc_ncell *parse_ncellmeas_neighbors(
 		(*curr_index)++;
 		err = at_parser_num_get(parser, *curr_index, &ncells[j].time_diff);
 		if (err) {
-			LOG_ERR("Could not parse time_diff, error: %d", err);
+			LOG_ERR("Could not parse %s, error: %d", "time_diff", err);
 			goto error_exit;
 		}
 		(*curr_index)++;

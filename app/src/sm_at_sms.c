@@ -89,15 +89,15 @@ static void sms_concat_cleanup_work_fn(struct k_work *work)
 	struct k_work_delayable *dwork = CONTAINER_OF(work, struct k_work_delayable, work);
 	struct sm_sms_context *ctx = CONTAINER_OF(dwork, struct sm_sms_context, cleanup_work);
 
+	LOG_INF("Concat msg timeout ref_number=%u", ctx->ref_number);
 	sms_concat_clear(ctx);
-	LOG_INF("Concat msg timed out, ref_number %u", ctx->ref_number);
 }
 
 static void sms_concat_handle(struct sms_data *const data)
 {
 	struct sms_deliver_header *header = &data->header.deliver;
 
-	LOG_DBG("Concat msg %d, %d, %d",
+	LOG_DBG("Concat msg ref=%d total=%d seq=%d",
 		header->concatenated.ref_number,
 		header->concatenated.total_msgs,
 		header->concatenated.seq_number);
@@ -109,7 +109,7 @@ static void sms_concat_handle(struct sms_data *const data)
 	 * concatenated messages are received at the same time in mixed order.
 	 */
 	if (sms_ctx.ref_number != 0 && sms_ctx.ref_number != header->concatenated.ref_number) {
-		LOG_ERR("Concat msg ref_number error: %d, %d",
+		LOG_ERR("Concat msg ref mismatch stored=%d received=%d",
 			sms_ctx.ref_number, header->concatenated.ref_number);
 		sms_concat_clear(&sms_ctx);
 	}
@@ -128,7 +128,7 @@ static void sms_concat_handle(struct sms_data *const data)
 		sms_ctx.ref_number = header->concatenated.ref_number;
 
 		if (header->concatenated.total_msgs > MAX_CONCATENATED_MESSAGE) {
-			LOG_WRN("Ignoring concat msg with %d messages (max: %d)",
+			LOG_WRN("Ignoring concat msg parts=%d max=%d",
 				header->concatenated.total_msgs, MAX_CONCATENATED_MESSAGE);
 			goto done;
 		}
@@ -139,7 +139,7 @@ static void sms_concat_handle(struct sms_data *const data)
 		 */
 		sms_ctx.concat_rsp_buf = calloc(1, concat_msg_len);
 		if (sms_ctx.concat_rsp_buf == NULL) {
-			LOG_ERR("Concat msg no memory for %zu bytes, %d messages",
+			LOG_ERR("Concat msg alloc failed size=%zu parts=%d",
 				concat_msg_len, header->concatenated.total_msgs);
 			goto done;
 		}
@@ -148,14 +148,14 @@ static void sms_concat_handle(struct sms_data *const data)
 		sms_ctx.total_msgs = header->concatenated.total_msgs;
 	}
 	if (sms_ctx.total_msgs != header->concatenated.total_msgs) {
-		LOG_ERR("Concat msg total_msgs error: %d, %d",
+		LOG_ERR("Concat msg total mismatch stored=%d received=%d",
 			sms_ctx.total_msgs, header->concatenated.total_msgs);
 		goto done;
 	}
 	/* seq_number should start with 1 but could arrive in random order */
 	if (header->concatenated.seq_number == 0 ||
 	    header->concatenated.seq_number > sms_ctx.total_msgs) {
-		LOG_ERR("Concat msg seq_number error: %d, %d",
+		LOG_ERR("Concat msg invalid seq=%d total=%d",
 			header->concatenated.seq_number, sms_ctx.total_msgs);
 		goto done;
 	}
@@ -256,7 +256,7 @@ STATIC void sms_callback(struct sms_data *const data, void *context)
 			sms_concat_handle(data);
 		}
 	} else {
-		LOG_WRN("Unknown type: %d", data->type);
+		LOG_WRN("Unknown SMS type: %d", data->type);
 	}
 }
 
@@ -272,7 +272,7 @@ static int do_sms_start(void)
 	sms_ctx.sms_handle = sms_register_listener(sms_callback, NULL);
 	if (sms_ctx.sms_handle < 0) {
 		err = sms_ctx.sms_handle;
-		LOG_ERR("Start error: %d", err);
+		LOG_ERR("SMS register failed: %d", err);
 		sms_ctx.sms_handle = -1;
 	}
 
@@ -299,7 +299,7 @@ static int do_sms_send(const char *number, const char *message, uint16_t message
 
 	err = sms_send(number, message, message_len, SMS_DATA_TYPE_ASCII);
 	if (err) {
-		LOG_ERR("Send error: %d", err);
+		LOG_ERR("SMS send failed: %d", err);
 	}
 
 	return err;
