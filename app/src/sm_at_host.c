@@ -13,6 +13,7 @@
 #include "sm_ppp.h"
 #include "sm_at_socket.h"
 #include "sm_cmux.h"
+#include "sm_log.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -64,11 +65,6 @@ enum sm_event {
 	SM_EVENT_AT_MODE = 0x02, /**< Entered AT command mode. */
 };
 
-enum sm_debug_print {
-	SM_DEBUG_PRINT_NONE,
-	SM_DEBUG_PRINT_SHORT,
-	SM_DEBUG_PRINT_FULL
-};
 
 struct data_mode {
 	sm_datamode_handler_t handler;
@@ -747,8 +743,11 @@ static void raw_send(uint8_t flags)
 		}
 
 		/* Send received data onward. */
-		LOG_HEXDUMP_DBG(data, MIN(claim, HEXDUMP_LIMIT), "RX");
-		LOG_INF("Send: %d bytes, Data: %p", claim, (void *)data);
+		if (sm_log_mode() >= SM_LOG_MODE_FULL) {
+			LOG_HEXDUMP_DBG(data, MIN(claim, HEXDUMP_LIMIT), "RX");
+		} else {
+			LOG_INF("RX: [%zu B redacted]", claim);
+		}
 
 		if (ctx->data_mode.handler) {
 			ret = ctx->data_mode.handler(DATAMODE_SEND, data, claim, send_flags);
@@ -1037,7 +1036,7 @@ static void format_final_result(char *buf, size_t buf_len, size_t buf_max_len)
 }
 
 static int sm_at_send_internal(struct sm_at_host_ctx *ctx, const uint8_t *data, size_t len,
-			       bool urc, enum sm_debug_print print_debug)
+			       bool urc)
 {
 	int ret;
 
@@ -1055,8 +1054,7 @@ static int sm_at_send_internal(struct sm_at_host_ctx *ctx, const uint8_t *data, 
 				LOG_DBG("No context available for URC: %s", (const char *)data);
 				return -EIO;
 			}
-			LOG_DBG("URC default pipe=%p: %.*s", ctx->pipe, (int)len,
-				(const char *)data);
+			LOG_DBG("URC default pipe=%p", ctx->pipe);
 			ret = ring_buf_put(&urc_buf, data, len);
 			if (ret < len) {
 				LOG_ERR("URC buffer full, dropped %d bytes", len - ret);
@@ -1065,7 +1063,7 @@ static int sm_at_send_internal(struct sm_at_host_ctx *ctx, const uint8_t *data, 
 				return -EIO;
 			}
 		} else {
-			LOG_DBG("URC to pipe=%p: %.*s", ctx->pipe, (int)len, (const char *)data);
+			LOG_DBG("URC to pipe=%p", ctx->pipe);
 			/* Pipe specific URC */
 			struct urc_msg *msg = calloc(1, sizeof(struct urc_msg) + len + 1);
 
@@ -1093,12 +1091,6 @@ static int sm_at_send_internal(struct sm_at_host_ctx *ctx, const uint8_t *data, 
 	ret = sm_at_host_pipe_tx_blocking(ctx, data, len);
 	if (ret < 0) {
 		return ret;
-	}
-
-	if (print_debug == SM_DEBUG_PRINT_FULL) {
-		LOG_HEXDUMP_DBG(data, len, "TX");
-	} else if (print_debug == SM_DEBUG_PRINT_SHORT) {
-		LOG_HEXDUMP_DBG(data, MIN(HEXDUMP_LIMIT, len), "TX");
 	}
 
 	return (ret == len) ? 0 : -EIO;
@@ -1153,7 +1145,7 @@ static void cmd_send(struct sm_at_host_ctx *ctx, uint8_t *buf, size_t cmd_length
 	/* This is safe as long as we process AT-commands sequentially in one work queue. */
 	static uint8_t response_buf[MODEM_RSP_BUF_SIZE + 1];
 
-	LOG_HEXDUMP_DBG(buf, cmd_length, "RX");
+	sm_log_rx_command(buf, cmd_length);
 
 	/* UART can send additional characters when the device is powered on.
 	 * We ignore everything before the start of the AT-command.
@@ -1169,7 +1161,7 @@ static void cmd_send(struct sm_at_host_ctx *ctx, uint8_t *buf, size_t cmd_length
 
 	err = cmd_grammar_check(at_cmd, cmd_length);
 	if (err < 0) {
-		LOG_ERR("AT command syntax invalid: %s", at_cmd);
+		LOG_ERR("AT command syntax invalid: %.*s", (int)strcspn(at_cmd, "=?,\r\n"), at_cmd);
 		if (err == -ENOENT) {
 			/* Not an AT command, ignore silently. */
 			return;
@@ -1216,8 +1208,8 @@ static void cmd_send(struct sm_at_host_ctx *ctx, uint8_t *buf, size_t cmd_length
 	if (strlen(response_buf) > strlen(CRLF_STR)) {
 		format_final_result(response_buf, strlen(response_buf),
 				    sizeof(response_buf));
-		err = sm_at_send_internal(ctx, response_buf, strlen(response_buf), false,
-					  SM_DEBUG_PRINT_FULL);
+		sm_log_tx((uint8_t *)response_buf, strlen(response_buf));
+		err = sm_at_send_internal(ctx, response_buf, strlen(response_buf), false);
 		if (err) {
 			LOG_ERR("AT command response failed: %d", err);
 		}
@@ -1352,21 +1344,17 @@ handle_echo:
 
 		/* Check if echo should be truncated. */
 		if (!truncate) {
-			(void)sm_at_send_internal(ctx, (uint8_t *)&c, 1, false,
-						SM_DEBUG_PRINT_NONE);
+			(void)sm_at_send_internal(ctx, (uint8_t *)&c, 1, false);
 		}
 
 		/* Send truncated termination characters.*/
 		if (send && truncate) {
 			if (IS_ENABLED(CONFIG_SM_CR_TERMINATION)) {
-				(void)sm_at_send_internal(ctx, (uint8_t *)"\r", 1, false,
-							  SM_DEBUG_PRINT_NONE);
+				(void)sm_at_send_internal(ctx, (uint8_t *)"\r", 1, false);
 			} else if (IS_ENABLED(CONFIG_SM_LF_TERMINATION)) {
-				(void)sm_at_send_internal(ctx, (uint8_t *)"\n", 1, false,
-							  SM_DEBUG_PRINT_NONE);
+				(void)sm_at_send_internal(ctx, (uint8_t *)"\n", 1, false);
 			} else {
-				(void)sm_at_send_internal(ctx, (uint8_t *)"\r\n", 2, false,
-							  SM_DEBUG_PRINT_NONE);
+				(void)sm_at_send_internal(ctx, (uint8_t *)"\r\n", 2, false);
 			}
 		}
 	}
@@ -1507,16 +1495,17 @@ static void rsp_send_internal(struct sm_at_host_ctx *ctx, bool urc, const char *
 		rsp_len = sizeof(rsp_buf) - 1;
 	}
 
+	sm_log_tx((uint8_t *)rsp_buf, rsp_len);
+
 	if (IS_ENABLED(CONFIG_SM_CMUX) && !ctx && urc && urc_mode_all_channels()) {
 		for (uint8_t ch = 1; ch <= CONFIG_SM_CMUX_CHANNEL_COUNT; ++ch) {
 			ctx = sm_at_host_get_ctx_from(sm_cmux_get_dlci(ch));
 			if (in_at_mode(ctx)) {
-				sm_at_send_internal(ctx, rsp_buf, rsp_len, urc,
-						    SM_DEBUG_PRINT_FULL);
+				sm_at_send_internal(ctx, rsp_buf, rsp_len, urc);
 			}
 		}
 	} else {
-		sm_at_send_internal(ctx, rsp_buf, rsp_len, urc, SM_DEBUG_PRINT_FULL);
+		sm_at_send_internal(ctx, rsp_buf, rsp_len, urc);
 	}
 
 	k_mutex_unlock(&mutex_rsp_buf);
@@ -1591,7 +1580,14 @@ void data_send(struct modem_pipe *pipe, const uint8_t *data, size_t len)
 		flush_pipe_urcs(ctx);
 	}
 
-	sm_at_send_internal(ctx, data, len, false, SM_DEBUG_PRINT_SHORT);
+	/* Inbound app data. */
+	if (sm_log_mode() >= SM_LOG_MODE_FULL) {
+		LOG_HEXDUMP_DBG(data, MIN(HEXDUMP_LIMIT, len), "TX");
+	} else {
+		LOG_INF("TX: [%zu B redacted]", len);
+	}
+
+	sm_at_send_internal(ctx, data, len, false);
 }
 
 static uint16_t get_min_data_mode_idle_timeout_ms(void)
