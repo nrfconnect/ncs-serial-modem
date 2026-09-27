@@ -71,16 +71,6 @@ config SM_NRF_CLOUD_FOTA
 	  management (https://mflt.io/release-mgmt), delivered over the same
 	  nRF Cloud CoAP transport as AT#XNRFCLOUDOBS*.
 
-config SM_NRF_CLOUD_FOTA_MODEM_PROJECT_KEY
-	string "Default Memfault project key for modem firmware updates"
-	default ""
-	depends on SM_NRF_CLOUD_FOTA
-	help
-	  Dedicated Memfault project key for modem firmware, obtained from
-	  Settings -> General in that Memfault project (a different project
-	  than the application's). Forwarded to
-	  CONFIG_MEMFAULT_FOTA_MODEM_PROJECT_KEY.
-
 # Report a statically configured firmware version. A choice symbol cannot be given a
 # configdefault, which warns that it has no effect, so the default of the choice itself is
 # overridden instead. Assigning the symbol in prj.conf would warn with CONFIG_MEMFAULT=n.
@@ -149,12 +139,6 @@ configdefault MEMFAULT_FOTA_MODEM_UPDATE
 
 configdefault NRF_CLOUD_FOTA_POLL
 	default y if SM_NRF_CLOUD_FOTA
-
-# Forward the project key from the app-level prompt (Kconfig), so there is a single place to
-# set it. Only takes effect when SM_NRF_CLOUD_FOTA is enabled (which enables
-# MEMFAULT_FOTA_MODEM_UPDATE via configdefault above).
-configdefault MEMFAULT_FOTA_MODEM_PROJECT_KEY
-	default SM_NRF_CLOUD_FOTA_MODEM_PROJECT_KEY
 
 # Collect metrics for unused stack space.
 configdefault MEMFAULT_NCS_STACK_METRICS
