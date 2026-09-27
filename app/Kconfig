@@ -271,6 +271,9 @@ config SM_MQTTC
 	select MQTT_LIB
 	select MQTT_LIB_TLS
 
+configdefault MQTT_CLEAN_SESSION
+	default y if SM_MQTTC
+
 config SM_FULL_FOTA
 	bool "Full modem FOTA support"
 
