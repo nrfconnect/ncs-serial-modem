@@ -108,20 +108,36 @@ tests:
     integration_platforms:
       - nrf9151dk/nrf9151/ns
     tags: exclude_integration
-  serial_modem.no_memfault:
-    sysbuild: true
-    build_only: true
-    extra_configs:
-      - CONFIG_MEMFAULT=n
-    platform_allow:
-      - nrf9151dk/nrf9151/ns
-    tags: exclude_integration
   serial_modem.no_nrfcloud:
     sysbuild: true
     build_only: true
     extra_configs:
       - CONFIG_SM_NRF_CLOUD=n
-      - CONFIG_MEMFAULT=n
+    platform_allow:
+      - nrf9151dk/nrf9151/ns
+    tags: exclude_integration
+  serial_modem.no_nrfcloud_memfault:
+    sysbuild: true
+    build_only: true
+    extra_configs:
+      - CONFIG_SM_NRF_CLOUD_OBSERVABILITY=n
+      - CONFIG_SM_NRF_CLOUD_FOTA=n
+    platform_allow:
+      - nrf9151dk/nrf9151/ns
+    tags: exclude_integration
+  serial_modem.no_nrfcloud_observability:
+    sysbuild: true
+    build_only: true
+    extra_configs:
+      - CONFIG_SM_NRF_CLOUD_OBSERVABILITY=n
+    platform_allow:
+      - nrf9151dk/nrf9151/ns
+    tags: exclude_integration
+  serial_modem.no_nrfcloud_fota:
+    sysbuild: true
+    build_only: true
+    extra_configs:
+      - CONFIG_SM_NRF_CLOUD_FOTA=n
     platform_allow:
       - nrf9151dk/nrf9151/ns
     tags: exclude_integration
