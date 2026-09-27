@@ -934,7 +934,7 @@ Only one FOTA session, from either command, can be ongoing at a time.
 
 .. note::
    ``<op>=2`` uses a dedicated Memfault project key for modem firmware, obtained from Settings > General in that project (a different project than the application's).
-   Set it with the :ref:`CONFIG_SM_NRF_CLOUD_FOTA_MODEM_PROJECT_KEY <CONFIG_SM_NRF_CLOUD_FOTA_MODEM_PROJECT_KEY>` Kconfig option, or override it at runtime with the ``<project_key>`` parameter.
+   Set it with the ``CONFIG_MEMFAULT_FOTA_MODEM_PROJECT_KEY`` Kconfig option, or override it at runtime with the ``<project_key>`` parameter.
    When neither is set, the request will target the default project where the device was claimed.
 
 Set command
@@ -961,7 +961,7 @@ The parameters and their defined values are the following:
 
 <project_key>
    String.
-   For ``<op>=1`` and ``<op>=4`` it overrides the application project key (``CONFIG_MEMFAULT_PROJECT_KEY``), and for ``<op>=2`` and ``<op>=6`` it overrides :ref:`CONFIG_SM_NRF_CLOUD_FOTA_MODEM_PROJECT_KEY <CONFIG_SM_NRF_CLOUD_FOTA_MODEM_PROJECT_KEY>`, for this check.
+   For ``<op>=1`` and ``<op>=4`` it overrides the application project key (``CONFIG_MEMFAULT_PROJECT_KEY``), and for ``<op>=2`` and ``<op>=6`` it overrides ``CONFIG_MEMFAULT_FOTA_MODEM_PROJECT_KEY``, for this check.
    If this option is not provided and the corresponding Kconfig setting is unset, the request will target the default project where the device was claimed.
 
 The command returns ``OK`` immediately and the check runs asynchronously.
