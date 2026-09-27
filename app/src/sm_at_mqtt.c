@@ -23,6 +23,9 @@ LOG_MODULE_REGISTER(sm_mqtt, CONFIG_SM_LOG_LEVEL);
 
 #define SM_DEFAULT_CID		"sm_default_client_id"
 
+/* Initial value of clean session flag is done this way also in MQTT library.*/
+#define MQTT_CLEAN_SESSION_INIT (IS_ENABLED(CONFIG_MQTT_CLEAN_SESSION) ? 1U : 0U)
+
 /**@brief MQTT client operations. */
 enum sm_mqttcon_operation {
 	MQTTC_DISCONNECT,
@@ -637,7 +640,7 @@ STATIC int handle_at_mqtt_config(enum at_parser_cmd_type cmd_type, struct at_par
 {
 	int err = -EINVAL;
 	uint16_t keep_alive = CONFIG_MQTT_KEEPALIVE;
-	uint16_t clean_session = CONFIG_MQTT_CLEAN_SESSION;
+	uint16_t clean_session = MQTT_CLEAN_SESSION_INIT;
 
 	switch (cmd_type) {
 	case AT_PARSER_CMD_TYPE_SET:
@@ -992,7 +995,7 @@ static int sm_at_mqtt_init(void)
 	ctx.sec_tag = SEC_TAG_TLS_INVALID;
 
 	strcpy(mqtt_clientid, SM_DEFAULT_CID);
-	do_mqtt_config(CONFIG_MQTT_KEEPALIVE, CONFIG_MQTT_CLEAN_SESSION);
+	do_mqtt_config(CONFIG_MQTT_KEEPALIVE, MQTT_CLEAN_SESSION_INIT);
 
 	return 0;
 }
