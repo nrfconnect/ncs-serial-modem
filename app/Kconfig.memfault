@@ -4,19 +4,26 @@
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 #
 
-# Application defaults for Memfault, which is enabled in prj.conf.
+# Application defaults for nRF Cloud observability and FOTA, i.e., Memfault features.
 #
 # This file must be sourced before Kconfig.zephyr, which is what pulls in the Kconfig of
 # the Memfault module: a default is inserted at the position where it appears relative to
 # the definition of the symbol, and the first matching default wins. Sourced afterwards,
 # every default here would silently lose to the one of the module.
 
+# Enable Memfault when the observability or FOTA features are on.
+# Disable explicitly with CONFIG_MEMFAULT=n (no_memfault build), or automatically when both
+# SM_NRF_CLOUD_OBSERVABILITY and SM_NRF_CLOUD_FOTA are disabled.
+# Note: SM_NRF_CLOUD_OBSERVABILITY and SM_NRF_CLOUD_FOTA intentionally do not depend on
+# MEMFAULT or MEMFAULT_USE_NRF_CLOUD_COAP. Those dependencies would be circular here.
+# MEMFAULT_USE_NRF_CLOUD_COAP is enabled via its own configdefault below once MEMFAULT=y.
+configdefault MEMFAULT
+	default y if SM_NRF_CLOUD_OBSERVABILITY || SM_NRF_CLOUD_FOTA
+
 config SM_NRF_CLOUD_OBSERVABILITY
 	bool "nRF Cloud observability AT commands"
 	default y
 	depends on SM_NRF_CLOUD
-	depends on MEMFAULT_USE_NRF_CLOUD_COAP
-	depends on SETTINGS
 	select BASE64
 	help
 	  Enable the AT#XNRFCLOUDOBS* commands, which control Memfault
@@ -63,8 +70,6 @@ config SM_NRF_CLOUD_FOTA
 	bool "nRF Cloud FOTA AT commands"
 	default y
 	depends on SM_NRF_CLOUD
-	depends on MEMFAULT_USE_NRF_CLOUD_COAP
-	depends on SETTINGS
 	help
 	  Enable the AT#XNRFCLOUDFOTA* commands, which check for and download
 	  application and modem firmware updates via Memfault release
