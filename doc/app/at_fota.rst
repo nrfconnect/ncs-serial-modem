@@ -88,11 +88,19 @@ After the ``#XFOTA: 4,0`` notification indicating that the FOTA update is downlo
 
    Activating the new modem firmware is done identically to a modem delta update, by resetting either the whole device or only the modem.
 
-.. note::
+.. important::
 
    For the MCUboot bootloader update, NSIB (B0) uses monotonic counter values to prevent rollback.
-   This means that updates for MCUboot images are limited to the number of slots defined in the ``SB_CONFIG_SECURE_BOOT_NUM_VER_COUNTER_SLOTS`` Kconfig option.
-   In |SM|, it is set to ``40`` by default.
+   When performing an MCUboot FOTA, the host must ensure that the new MCUboot image has a strictly higher monotonic counter value than the currently running MCUboot to avoid update failure.
+
+   .. only:: not nrf91m1
+
+      This means that updates for MCUboot images are limited to the number of slots defined in the ``SB_CONFIG_SECURE_BOOT_NUM_VER_COUNTER_SLOTS`` Kconfig option.
+      In |SM|, it is set to ``40`` by default.
+
+   .. only:: nrf91m1
+
+      Updates for MCUboot images are limited to 40 slots.
 
 Response syntax
 ~~~~~~~~~~~~~~~

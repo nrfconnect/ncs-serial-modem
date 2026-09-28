@@ -930,7 +930,14 @@ The parameters and their defined values are the following:
    Optional, only used when ``<mode>`` is ``2`` (data mode).
    Sets the number of bytes to send in data mode.
    When the required number of bytes are sent, the data mode is exited.
-   The termination command :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` is not used in this case.
+
+   .. only:: not nrf91m1
+
+      The termination command :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` is not used in this case.
+
+   .. only:: nrf91m1
+
+      The termination command ``+++`` is not used in this case.
 
 .. note::
 
@@ -1208,7 +1215,14 @@ The parameters and their defined values are the following:
    Optional, only used when ``<mode>`` is ``2`` (data mode).
    Sets the number of bytes to send in data mode.
    When the required number of bytes are sent, the data mode is exited.
-   The termination command :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` is not used in this case.
+
+   .. only:: not nrf91m1
+
+      The termination command :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` is not used in this case.
+
+   .. only:: nrf91m1
+
+      The termination command ``+++`` is not used in this case.
 
 .. note::
 
