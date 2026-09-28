@@ -219,7 +219,7 @@ static int collect_xmonitor(void)
 		"%*[^,],"                                 /* <NW-provided_eDRX_value> */
 		"%" L(SM_XMONITOR_PSM_QUOTED_LEN) "[^,]," /* <Active-Time> */
 		"%" L(SM_XMONITOR_PSM_QUOTED_LEN) "[^,]," /* <Periodic-TAU-ext> */
-		"%" L(SM_XMONITOR_PSM_QUOTED_LEN) "[^,]", /* <Periodic-TAU> */
+		"%" L(SM_XMONITOR_PSM_QUOTED_LEN) "[^,\r]", /* <Periodic-TAU> */
 		&reg_status, tac_str, &lte_mode, cell_id_str, active_time_str, tau_ext_str,
 		tau_legacy_str);
 
@@ -472,6 +472,11 @@ void sm_memfault_lte_metrics_on_cereg(unsigned int reg_status)
 
 static void sm_memfault_lte_metrics_collect(void)
 {
+	/* Report 0 instead of omitting the metric when no connection was lost. */
+	if (MEMFAULT_METRIC_ADD(ncs_lte_connection_loss_count, 0)) {
+		LOG_ERR("Failed to set ncs_lte_connection_loss_count");
+	}
+
 	(void)collect_xmonitor();
 	(void)collect_edrx();
 }
