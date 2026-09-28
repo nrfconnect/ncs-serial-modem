@@ -19,17 +19,21 @@ Set command
 
 The set command allows you to start and stop the GNSS module.
 
-Both the `nRF Cloud A-GNSS`_ service and the `nRF Cloud P-GPS`_ service can be used with the module, either together or independently of each other.
-Using them reduces the time it takes the GNSS module to estimate its position.
+The `nRF Cloud A-GNSS`_ service can be used with the module to reduce the time it takes for the GNSS module to estimate device position.
 
-To use either of them, the device must be connected to nRF Cloud (using the :ref:`#XNRFCLOUD <SM_AT_NRFCLOUD>` AT command) when starting the GNSS module.
-In addition, the following Kconfig options must be enabled:
+.. only:: not nrf91m1
+
+   Both the `nRF Cloud A-GNSS`_ service and the `nRF Cloud P-GPS`_ service can be used with the module, either together or independently of each other.
+   Using them reduces the time it takes for the GNSS module to estimate device position.
+
+   To use either of them, the device must be connected to nRF Cloud (using the :ref:`#XNRFCLOUD <SM_AT_NRFCLOUD>` AT command) when starting the GNSS module.
+   In addition, the following Kconfig options must be enabled:
 
    * ``CONFIG_NRF_CLOUD_AGNSS`` to use A-GNSS.
    * ``CONFIG_NRF_CLOUD_PGPS`` to use P-GPS.
      This also requires applying the :file:`pgps-nrf9151.overlay` devicetree overlay to both the application and the ``mcuboot`` image (using the absolute path for the latter).
 
-If both assistive services were enabled during compilation, you cannot choose to use only one of them at run time.
+   If both assistive services were enabled during compilation, you cannot choose to use only one of them at run time.
 
 Syntax
 ~~~~~~
@@ -87,25 +91,27 @@ In periodic navigation mode, the ``<interval>`` and ``<timeout>`` parameters are
 
    When the LTE link is enabled, make sure to have either Power Saving Mode (PSM) or extended Discontinuous Reception (eDRX) enabled to give the GNSS receiver the time it needs to acquire fixes.
 
-.. tip::
+.. only:: not nrf91m1
 
-   The |SM| application logs NMEA and PVT data when trying to acquire fixes, which can be of help when solving the issue.
-   These logs are enabled if the ``CONFIG_SM_LOG_LEVEL_DBG`` Kconfig option is set and logs have been enabled with ``AT#XLOG``.
+   .. tip::
 
-.. note::
+      The |SM| application logs NMEA and PVT data when trying to acquire fixes, which can be of help when solving the issue.
+      These logs are enabled if the ``CONFIG_SM_LOG_LEVEL_DBG`` Kconfig option is set and logs have been enabled with ``AT#XLOG``.
 
-   See the documentation for the `nRF Cloud A-GNSS`_ and `nRF Cloud P-GPS`_ libraries for information on how to best configure and use A-GNSS and P-GPS, respectively.
+   .. note::
 
-.. note::
+      See the documentation for the `nRF Cloud A-GNSS`_ and `nRF Cloud P-GPS`_ libraries for information on how to best configure and use A-GNSS and P-GPS, respectively.
 
-   When using P-GPS, make sure that the value of the :ref:`CONFIG_SM_PGPS_INJECT_FIX_DATA <CONFIG_SM_PGPS_INJECT_FIX_DATA>` Kconfig option matches your use case.
-   It is enabled by default but should be disabled if the device is expected to move distances longer than a few dozen kilometers between fix attempts.
+   .. note::
 
-.. note::
+      When using P-GPS, make sure that the value of the :ref:`CONFIG_SM_PGPS_INJECT_FIX_DATA <CONFIG_SM_PGPS_INJECT_FIX_DATA>` Kconfig option matches your use case.
+      It is enabled by default but should be disabled if the device is expected to move distances longer than a few dozen kilometers between fix attempts.
 
-   When using P-GPS, apply the :file:`pgps-nrf9151.overlay` devicetree overlay to both the application and the ``mcuboot`` image to provide a dedicated flash partition for P-GPS prediction data storage and to ensure MCUboot operates with the same partition layout.
-   The absolute path to the overlay file must be provided when passing it to the ``mcuboot`` image using :makevar:`mcuboot_EXTRA_DTC_OVERLAY_FILE`.
-   See :ref:`sm_config_files` for more information.
+   .. note::
+
+      When using P-GPS, apply the :file:`pgps-nrf9151.overlay` devicetree overlay to both the application and the ``mcuboot`` image to provide a dedicated flash partition for P-GPS prediction data storage and to ensure MCUboot operates with the same partition layout.
+      The absolute path to the overlay file must be provided when passing it to the ``mcuboot`` image using :makevar:`mcuboot_EXTRA_DTC_OVERLAY_FILE`.
+      See :ref:`sm_config_files` for more information.
 
 As an alternative to GNSS-based positioning, see :ref:`#XNRFCLOUDPOS <SM_AT_NRFCLOUDPOS>` for cellular and Wi-Fi® positioning.
 

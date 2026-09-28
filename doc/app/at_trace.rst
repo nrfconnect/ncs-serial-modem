@@ -9,9 +9,11 @@ Trace AT commands
 
 This page describes the AT commands for controlling the shared UART trace backend.
 
-The ``AT#XLOG`` command is always available in the default build.
-The ``AT#XTRACE`` command requires building with the :file:`trace-backend-uart.conf` configuration overlay.
-See :ref:`sm_logging_uart_backend` for a full description of the feature.
+.. only:: not nrf91m1
+
+   The ``AT#XLOG`` command is always available in the default build.
+   The ``AT#XTRACE`` command requires building with the :file:`trace-backend-uart.conf` configuration overlay.
+   See :ref:`sm_logging_uart_backend` for a full description of the feature.
 
 The Zephyr application log backend (``AT#XLOG``) and the modem trace backend (``AT#XTRACE``) share a single UART.
 They are mutually exclusive: enabling one while the other is active returns an error.
@@ -54,7 +56,10 @@ The parameters and their defined values are the following:
   * ``2`` - Resume the UART and enable the application log backend.
     AT commands, responses, and URCs are logged as raw hex dumps at debug level only.
     These hex dumps are not collected by nRF Cloud Observability.
-    Requires the ``CONFIG_SM_LOG_LEVEL_DBG`` Kconfig option.
+
+    .. only:: not nrf91m1
+
+       Requires the ``CONFIG_SM_LOG_LEVEL_DBG`` Kconfig option.
 
 .. note::
    Returns ``ERROR`` if ``AT#XTRACE=1`` has been issued.
@@ -86,7 +91,10 @@ The parameters and their defined values are the following:
    * ``0`` - Disabled.
    * ``1`` - Logging with sensitive AT command payloads redacted.
    * ``2`` - Logging with sensitive AT command and response payloads logged as DBG hex dump only.
-     Only available if the ``CONFIG_SM_LOG_LEVEL_DBG`` Kconfig option is enabled.
+
+    .. only:: not nrf91m1
+
+       Only available if the ``CONFIG_SM_LOG_LEVEL_DBG`` Kconfig option is enabled.
 
 Test command
 ------------
@@ -107,10 +115,12 @@ Response syntax
 
    #XLOG: (0,1,2)
 
-The ``2`` option is only listed if the ``CONFIG_SM_LOG_LEVEL_DBG`` Kconfig option is enabled.
-Otherwise, the response is the following::
+.. only:: not nrf91m1
 
-   #XLOG: (0,1)
+   The ``2`` option is only listed if the ``CONFIG_SM_LOG_LEVEL_DBG`` Kconfig option is enabled.
+   Otherwise, the response is the following::
+
+      #XLOG: (0,1)
 
 Example
 ~~~~~~~

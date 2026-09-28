@@ -23,7 +23,11 @@ The ``#XNRFCLOUD`` command controls the access to the nRF Cloud service.
 
    * You must first onboard the device to nRF Cloud, using the device-specific UUID as the device ID.
      See `nRF Cloud Preconnect onboarding`_ for more information.
-   * The :ref:`CONFIG_SM_NRF_CLOUD <CONFIG_SM_NRF_CLOUD>` Kconfig option must be enabled.
+
+   .. only:: not nrf91m1
+
+      * The :ref:`CONFIG_SM_NRF_CLOUD <CONFIG_SM_NRF_CLOUD>` Kconfig option must be enabled.
+
    * The device must have access to nRF Cloud through the LTE network.
 
 Set command
@@ -198,10 +202,11 @@ The ``#XNRFCLOUDPOS`` command sends a request to nRF Cloud to determine the devi
 The request uses information from the cellular network, Wi-Fi® access points, or both.
 
 .. note::
-   To use ``#XNRFCLOUDPOS``, the following preconditions apply:
+   To use ``#XNRFCLOUDPOS``, the device must be connected to nRF Cloud using :ref:`#XNRFCLOUD <SM_AT_NRFCLOUD>`.
 
-   * The device must be connected to nRF Cloud using :ref:`#XNRFCLOUD <SM_AT_NRFCLOUD>`.
-   * The :ref:`CONFIG_SM_NRF_CLOUD_LOCATION <CONFIG_SM_NRF_CLOUD_LOCATION>` Kconfig option must be enabled.
+   .. only:: not nrf91m1
+
+      Also, the :ref:`CONFIG_SM_NRF_CLOUD_LOCATION <CONFIG_SM_NRF_CLOUD_LOCATION>` Kconfig option must be enabled.
 
 Set command
 -----------
@@ -346,16 +351,15 @@ nRF Cloud observability
 
 The ``#XNRFCLOUDOBS*`` commands control the Memfault data that the device collects (metrics, events, logs, and, in builds that include it, a coredump) and its upload to nRF Cloud over the CoAP transport.
 
-.. note::
-   To use the ``#XNRFCLOUDOBS*`` commands, the following preconditions apply:
+To use the ``#XNRFCLOUDOBS*`` commands that access the network (``#XNRFCLOUDOBSUPLOAD`` and ``#XNRFCLOUDOBSFORWARD``), the device must be connected to nRF Cloud. See :ref:`SM_AT_NRFCLOUD`.
 
-   * The commands that access the network (``#XNRFCLOUDOBSUPLOAD`` and ``#XNRFCLOUDOBSFORWARD``) require a connection to nRF Cloud.
-     See ``AT#XNRFCLOUD``.
-   * ``#XNRFCLOUDOBSDEVINFO``, ``#XNRFCLOUDOBSCRASH``, and ``#XNRFCLOUDOBSEXPORT`` additionally require the :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG <CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG>` Kconfig option, which is disabled by default.
+.. only:: not nrf91m1
 
-   Upload is host-driven.
-   Automatic uploads are disabled by default.
-   The host enables it with ``AT#XNRFCLOUDOBSAUTO=1`` or initiate uploads on demand with ``AT#XNRFCLOUDOBSUPLOAD``.
+   ``#XNRFCLOUDOBSDEVINFO``, ``#XNRFCLOUDOBSCRASH``, and ``#XNRFCLOUDOBSEXPORT`` additionally require the :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG <CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG>` Kconfig option, which is disabled by default.
+
+Upload is host-driven.
+Automatic uploads are disabled by default.
+The host enables them with ``AT#XNRFCLOUDOBSAUTO=1`` or initiate uploads on demand with ``AT#XNRFCLOUDOBSUPLOAD``.
 
 The ``<project_key>`` parameter, used by several commands, is a string.
 It is a 32-character Memfault project key.
@@ -394,7 +398,14 @@ The parameters and their defined values are the following:
    Integer.
    The interval between two uploads, from ``60`` to ``86400`` seconds.
    When omitted, the stored interval is kept.
-   Its initial value is set by the :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_AUTO_INTERVAL_SECONDS <CONFIG_SM_NRF_CLOUD_OBSERVABILITY_AUTO_INTERVAL_SECONDS>` Kconfig option.
+
+   .. only:: not nrf91m1
+
+      The initial value is set by the :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_AUTO_INTERVAL_SECONDS <CONFIG_SM_NRF_CLOUD_OBSERVABILITY_AUTO_INTERVAL_SECONDS>` Kconfig option.
+
+   .. only:: nrf91m1
+
+      The initial value is 3600 seconds.
 
 <project_key>
    String.
@@ -618,7 +629,15 @@ The ``#XNRFCLOUDOBSHEARTBEAT`` command collects and finalizes a metrics heartbea
 The data is buffered on the device until it is uploaded, so the command does not require a connection to nRF Cloud.
 
 The heartbeat carries the LTE metrics that the modem reports, such as the modem firmware version, the network operator, RSRP, SNR, the current band, and the transmitted and received data in kilobytes.
-When :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_LTE_METRICS <CONFIG_SM_NRF_CLOUD_OBSERVABILITY_LTE_METRICS>` is enabled, the heartbeat also carries the cell ID, the tracking area code, the LTE mode, the PSM active time and periodic TAU, and the eDRX interval and paging time window.
+
+.. only:: not nrf91m1
+
+   When :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_LTE_METRICS <CONFIG_SM_NRF_CLOUD_OBSERVABILITY_LTE_METRICS>` is enabled, the heartbeat also carries the cell ID, the tracking area code, the LTE mode, the PSM active time and periodic TAU, and the eDRX interval and paging time window.
+
+.. only:: nrf91m1
+
+   The heartbeat also carries the cell ID, the tracking area code, the LTE mode, the PSM active time and periodic TAU, and the eDRX interval and paging time window.
+
 The heartbeat additionally carries connection statistics that are tracked between heartbeats, including the time to connect to the network, the number of connection losses, and the time the LTE link has been active.
 Values not reported by the modem, such as when it is deactivated, are excluded from the heartbeat.
 
@@ -921,7 +940,9 @@ nRF Cloud FOTA #XNRFCLOUDFOTA
 
 The ``#XNRFCLOUDFOTA`` command checks for and downloads an application or modem firmware update via `Memfault release management`_, delivered over the same nRF Cloud CoAP transport as ``#XNRFCLOUDOBS*``.
 
-Requires the :ref:`CONFIG_SM_NRF_CLOUD_FOTA <CONFIG_SM_NRF_CLOUD_FOTA>` Kconfig option.
+.. only:: not nrf91m1
+
+   Requires the :ref:`CONFIG_SM_NRF_CLOUD_FOTA <CONFIG_SM_NRF_CLOUD_FOTA>` Kconfig option.
 
 An application update is staged the same way as ``AT#XFOTA=1``; the host activates it with ``AT#XRESET``.
 A modem update is staged the same way as ``AT#XFOTA=2``; the host activates it with ``AT#XMODEMRESET``.
@@ -934,7 +955,15 @@ Only one FOTA session, from either command, can be ongoing at a time.
 
 .. note::
    ``<op>=2`` uses a dedicated Memfault project key for modem firmware, obtained from Settings > General in that project (a different project than the application's).
-   Set it with the ``CONFIG_MEMFAULT_FOTA_MODEM_PROJECT_KEY`` Kconfig option, or override it at runtime with the ``<project_key>`` parameter.
+
+   .. only:: not nrf91m1
+
+      Set it with the ``CONFIG_MEMFAULT_FOTA_MODEM_PROJECT_KEY`` Kconfig option, or override it at runtime with the ``<project_key>`` parameter.
+
+   .. only:: nrf91m1
+
+      Use the ``<project_key>`` parameter to set it at runtime.
+
    When neither is set, the request will target the default project where the device was claimed.
 
 Set command
@@ -961,8 +990,17 @@ The parameters and their defined values are the following:
 
 <project_key>
    String.
-   For ``<op>=1`` and ``<op>=4`` it overrides the application project key (``CONFIG_MEMFAULT_PROJECT_KEY``), and for ``<op>=2`` and ``<op>=6`` it overrides ``CONFIG_MEMFAULT_FOTA_MODEM_PROJECT_KEY``, for this check.
-   If this option is not provided and the corresponding Kconfig setting is unset, the request will target the default project where the device was claimed.
+   Project key used for the FOTA operation.
+
+   .. only:: not nrf91m1
+
+      For ``<op>=1`` and ``<op>=4``, it overrides the application project key (``CONFIG_MEMFAULT_PROJECT_KEY``), and for ``<op>=2`` and ``<op>=6`` it overrides ``CONFIG_MEMFAULT_FOTA_MODEM_PROJECT_KEY``.
+      If this option is not provided and the corresponding Kconfig setting is unset, the request will target the default project where the device was claimed.
+
+   .. only:: nrf91m1
+
+      For ``<op>=1`` and ``<op>=4``, it is the application Memfault project key, and for ``<op>=2`` and ``<op>=6`` it is the modem Memfault project key.
+      If this option is not provided, the request will target the default project where the device was claimed.
 
 The command returns ``OK`` immediately and the check runs asynchronously.
 When it completes, an unsolicited notification is sent.

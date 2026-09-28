@@ -25,7 +25,10 @@ However, the |SM| data mode is applied automatically when any of the following A
 * MQTT publish ``AT#XMQTTPUB``
 * nRF Cloud send message ``AT#XNRFCLOUD``
 * DFU write ``AT#XDFUWRITE``
-* LwM2M carrier library app data send ``AT#XCARRIER``
+
+.. only:: not nrf91m1
+
+   * LwM2M carrier library app data send ``AT#XCARRIER``
 
 Entering data mode
 ==================
@@ -46,7 +49,10 @@ Other examples:
 * ``AT#XMQTTPUB=<topic>,"",<qos>,<retain>``
 * ``AT#XNRFCLOUD=2``
 * ``AT#XDFUWRITE=0,0,4096``
-* ``AT#XCARRIER="app_data_set"``
+
+.. only:: not nrf91m1
+
+   * ``AT#XCARRIER="app_data_set"``
 
 The |SM| application sends an *OK* response when it successfully enters data mode.
 
@@ -57,16 +63,29 @@ Any arbitrary data received from the MCU is sent to LTE network *as-is*.
 
 .. note::
    If sending fails while in data mode, the |SM| application drops any further data received from the UART until data mode is exited, as described in the :ref:`exiting_data_mode` section.
-   When the data mode was entered without ``<data_len>``, the |SM| application also sends the termination string, set by the :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` Kconfig option, to the MCU to signal the error.
    When data mode was entered with ``<data_len>``, no termination string is sent.
    The MCU receives ``#XDATAMODE`` at the expected byte boundary instead.
+
+   .. only:: not nrf91m1
+
+      When the data mode was entered without ``<data_len>``, the |SM| application also sends the termination string, set by the :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` Kconfig option, to the MCU to signal the error.
+
+   .. only:: nrf91m1
+
+      When the data mode was entered without ``<data_len>``, the |SM| application also sends the termination string ``+++`` to the MCU to signal the error.
 
 .. _exiting_data_mode:
 
 Exiting data mode
 =================
 
-To exit the data mode without the specification of ``<data_len>``, the MCU sends the termination command set by the :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` configuration option over UART.
+.. only:: not nrf91m1
+
+   To exit the data mode without the specification of ``<data_len>``, the MCU sends the termination command set by the :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` configuration option over UART.
+
+.. only:: nrf91m1
+
+   To exit the data mode without the specification of ``<data_len>``, the MCU sends the termination command ``+++`` over UART.
 
 The pattern string could be sent alone or as an affix to the data.
 The pattern string must be sent in full.
@@ -107,28 +126,36 @@ If the data mode buffer fills, the data are transmitted to the LTE network.
    There is no unsolicited notification defined for this event.
    UART hardware flow control is responsible for imposing and revoking flow control.
 
-The data mode buffer size is controlled by :ref:`CONFIG_SM_DATAMODE_BUF_SIZE <CONFIG_SM_DATAMODE_BUF_SIZE>`.
-
 .. note::
    The whole buffer is sent in a single operation.
    When transmitting UDP packets, only one complete packet must reside in the data mode buffer at any time.
 
-Configuration options
-*********************
+.. only:: not nrf91m1
 
-Check and configure the following configuration options for data mode:
+   The data mode buffer size is controlled by :ref:`CONFIG_SM_DATAMODE_BUF_SIZE <CONFIG_SM_DATAMODE_BUF_SIZE>`.
 
-.. _CONFIG_SM_DATAMODE_TERMINATOR:
+.. only:: nrf91m1
 
-CONFIG_SM_DATAMODE_TERMINATOR - Pattern string to terminate data mode
-   This option specifies a pattern string to terminate data mode.
-   The default pattern string is ``+++``.
+   The data mode buffer size is 4096 bytes.
 
-.. _CONFIG_SM_DATAMODE_BUF_SIZE:
+.. only:: not nrf91m1
 
-CONFIG_SM_DATAMODE_BUF_SIZE - Buffer size for data mode
-   This option defines the buffer size for the data mode.
-   The default value is 4096.
+   Configuration options
+   *********************
+
+   Check and configure the following configuration options for data mode:
+
+   .. _CONFIG_SM_DATAMODE_TERMINATOR:
+
+   CONFIG_SM_DATAMODE_TERMINATOR - Pattern string to terminate data mode
+      This option specifies a pattern string to terminate data mode.
+      The default pattern string is ``+++``.
+
+   .. _CONFIG_SM_DATAMODE_BUF_SIZE:
+
+   CONFIG_SM_DATAMODE_BUF_SIZE - Buffer size for data mode
+      This option defines the buffer size for the data mode.
+      The default value is 4096.
 
 Data mode AT commands
 *********************
@@ -163,7 +190,14 @@ The parameters and their defined values are the following:
    Integer.
    The timeout value in milliseconds.
    The default value is the minimum required value, based on the configured UART baud rate.
-   This value must be long enough to allow for a DMA transmission of an UART receive (RX) buffer (:ref:`CONFIG_SM_UART_RX_BUF_SIZE <CONFIG_SM_UART_RX_BUF_SIZE>`).
+
+   .. only:: not nrf91m1
+
+      This value must be long enough to allow for a DMA transmission of an UART receive (RX) buffer (:ref:`CONFIG_SM_UART_RX_BUF_SIZE <CONFIG_SM_UART_RX_BUF_SIZE>`).
+
+   .. only:: nrf91m1
+
+      This value must be long enough to allow for a DMA transmission of an UART receive (RX) buffer (532 bytes).
 
 Read command
 ------------
@@ -206,7 +240,13 @@ Response syntax
 Exit data mode #XDATAMODE
 =========================
 
-When the application receives the termination command :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` in data mode, it sends the ``#XDATAMODE`` unsolicited notification.
+.. only:: not nrf91m1
+
+   When the application receives the termination command :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` in data mode, it sends the ``#XDATAMODE`` unsolicited notification.
+
+.. only:: nrf91m1
+
+   When the application receives the termination command ``+++`` in data mode, it sends the ``#XDATAMODE`` unsolicited notification.
 
 Unsolicited notification
 ------------------------

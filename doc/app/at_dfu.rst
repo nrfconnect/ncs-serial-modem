@@ -24,14 +24,25 @@ The following DFU image types are supported:
 
 * ``0`` - Application firmware (MCUboot)
 * ``1`` - Delta modem firmware
-* ``2`` - Full modem firmware (requires :ref:`CONFIG_SM_DFU_MODEM_FULL <CONFIG_SM_DFU_MODEM_FULL>`)
+
+.. only:: not nrf91m1
+
+   * ``2`` - Full modem firmware (requires :ref:`CONFIG_SM_DFU_MODEM_FULL <CONFIG_SM_DFU_MODEM_FULL>`)
+
+.. only:: nrf91m1
+
+   * ``2`` - Full modem firmware
+
 * ``3`` - MCUboot second-stage bootloader self-update.
   Only available when the device uses the NSIB (B0) and MCUboot as a second-stage bootloader.
   The host must stream the signed image for the **inactive** ``s0``/``s1`` slot.
 
 .. caution::
 
-   Full modem firmware DFU is disabled by default.
+   .. only:: not nrf91m1
+
+      Full modem firmware DFU is disabled by default.
+
    If the full modem firmware update fails, the modem will not operate until a successful update is completed.
 
 DFU initialize #XDFUINIT
@@ -395,7 +406,10 @@ Full modem firmware update
 --------------------------
 
 The following example shows a complete full modem firmware update.
-For full modem firmware update, enable the :ref:`CONFIG_SM_DFU_MODEM_FULL <CONFIG_SM_DFU_MODEM_FULL>` Kconfig option.
+
+.. only:: not nrf91m1
+
+   For full modem firmware update, enable the :ref:`CONFIG_SM_DFU_MODEM_FULL <CONFIG_SM_DFU_MODEM_FULL>` Kconfig option.
 
 .. important::
 
@@ -462,8 +476,15 @@ MCUboot firmware update
 .. important::
    NSIB (B0) uses monotonic counter values to prevent rollback of the MCUboot bootloader.
    When performing an MCUboot DFU, the host must ensure that the new MCUboot image has a strictly higher monotonic counter value than the currently running MCUboot to avoid update failure.
-   This also means that updates for MCUboot images are limited to the number of slots defined in the ``SB_CONFIG_SECURE_BOOT_NUM_VER_COUNTER_SLOTS`` Kconfig option.
-   In |SM|, it is set to ``40`` by default.
+
+   .. only:: not nrf91m1
+
+      This means that updates for MCUboot images are limited to the number of slots defined in the ``SB_CONFIG_SECURE_BOOT_NUM_VER_COUNTER_SLOTS`` Kconfig option.
+      In |SM|, it is set to ``40`` by default.
+
+   .. only:: nrf91m1
+
+      Updates for MCUboot images are limited to 40 slots.
 
 The following example shows a complete MCUboot firmware update:
 
