@@ -111,7 +111,11 @@ configdefault MEMFAULT_COREDUMP_MAX_TRACKED_TASKS
 
 # Disable .data collection.
 configdefault MEMFAULT_COREDUMP_COLLECT_DATA_REGIONS
-	default n if $(dt_nodelabel_exists,memfault_coredump_partition)
+	default n
+
+# Collect heap statistics in coredumps.
+configdefault MEMFAULT_HEAP_STATS
+	default y
 
 # Upload Memfault data via the nRF Cloud CoAP transport.
 configdefault MEMFAULT_USE_NRF_CLOUD_COAP
