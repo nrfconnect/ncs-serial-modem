@@ -18,7 +18,9 @@ For other devices, follow the instructions in the `nRF Cloud Provisioning Servic
 
 Any steps that require nRF9151 application firmware support are handled by the |SM|.
 
-These commands are only available when the application is built with the :file:`nrf-device-provisioning.conf` overlay, which enables the provisioning client and its AT command interface.
+.. only:: not nrf91m1
+
+   These commands are only available when the application is built with the :file:`nrf-device-provisioning.conf` overlay, which enables the provisioning client and its AT command interface.
 
 .. note::
 
@@ -66,12 +68,29 @@ The parameters and their defined values are the following:
 
 <status>
    * ``0`` - Provisioning successful, or no pending commands on the server.
+
    * ``1`` - Host action required: deactivate LTE.
      The host must take the modem offline (for example ``AT+CFUN=4``) so that credentials can be written safely.
-     The provisioning client waits until the modem reports offline functional mode before continuing or times out after ``CONFIG_NRF_PROVISIONING_MODEM_STATE_WAIT_TIMEOUT_SECONDS`` seconds.
+
+     .. only:: not nrf91m1
+
+       The provisioning client waits until the modem reports offline functional mode before continuing or times out after ``CONFIG_NRF_PROVISIONING_MODEM_STATE_WAIT_TIMEOUT_SECONDS`` seconds.
+
+     .. only:: nrf91m1
+
+       The provisioning client waits until the modem reports offline functional mode before continuing or times out after 120 seconds.
+
    * ``2`` - Host action required: activate LTE.
      The host must bring the modem back online (for example ``AT+CFUN=1``) to reconnect to the provisioning server.
-     The provisioning client waits until the modem reports LTE registration before continuing or times out after ``CONFIG_NRF_PROVISIONING_MODEM_STATE_WAIT_TIMEOUT_SECONDS`` seconds.
+
+     .. only:: not nrf91m1
+
+       The provisioning client waits until the modem reports LTE registration before continuing or times out after ``CONFIG_NRF_PROVISIONING_MODEM_STATE_WAIT_TIMEOUT_SECONDS`` seconds.
+
+     .. only:: nrf91m1
+
+       The provisioning client waits until the modem reports LTE registration before continuing or times out after 120 seconds.
+
    * ``-1`` - Provisioning failed.
      The host can retry provisioning by triggering the ``#XNRFPROV`` command again.
    * ``-2`` - Device not claimed on nRF Cloud.
@@ -81,8 +100,17 @@ The parameters and their defined values are the following:
      Provision the correct nRF Cloud root CA certificate.
    * ``-4`` - No valid datetime reference.
      The modem must have a valid time before provisioning can proceed.
-   * ``-5`` - Too many commands received from the server.
-     Increase ``CONFIG_NRF_PROVISIONING_CBOR_RECORDS``.
+
+   .. only:: not nrf91m1
+
+     * ``-5`` - Too many commands received from the server.
+       Increase ``CONFIG_NRF_PROVISIONING_CBOR_RECORDS``.
+
+   .. only:: nrf91m1
+
+     * ``-5`` - Too many commands received from the server.
+       The maximum number of records is 5.
+
    * ``-6`` - Fatal error; the provisioning client encountered an irrecoverable error.
 
 Example

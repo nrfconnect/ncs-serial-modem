@@ -492,7 +492,14 @@ Example
 Idle timeout
 ============
 
-Every active HTTP request has a sliding idle timeout controlled by the :ref:`CONFIG_SM_HTTPC_RESPONSE_TIMEOUT_MS <CONFIG_SM_HTTPC_RESPONSE_TIMEOUT_MS>` Kconfig option (default 30 seconds).
+.. only:: not nrf91m1
+
+   Every active HTTP request has a sliding idle timeout controlled by the :ref:`CONFIG_SM_HTTPC_RESPONSE_TIMEOUT_MS <CONFIG_SM_HTTPC_RESPONSE_TIMEOUT_MS>` Kconfig option (default 30 seconds).
+
+.. only:: nrf91m1
+
+   Every active HTTP request has a sliding idle timeout of 30 seconds.
+
 The timer resets each time data is sent or received:
 
 * Sending request headers or body upload chunks (POST/PUT data mode).
