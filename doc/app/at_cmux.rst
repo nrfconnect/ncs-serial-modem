@@ -12,7 +12,14 @@ This page describes CMUX-related AT commands.
 The GSM 0710 multiplexer protocol (CMUX) enables multiplexing multiple data streams through a single serial link, setting up one channel per data stream.
 For example, it can be used to exchange AT data and have a :ref:`Point-to-Point Protocol (PPP) <CONFIG_SM_PPP>` link up at the same time on a single UART.
 |SM| implements the basic option of the CMUX protocol with only UIH frames as described in the `3GPP TS 27.010`_ specification.
-The maximum length of the information field in UIH frames is configurable using the ``CONFIG_MODEM_CMUX_MTU`` Kconfig option, which defaults to 127 bytes.
+
+.. only:: not nrf91m1
+
+   The maximum length of the information field in UIH frames is configurable using the ``CONFIG_MODEM_CMUX_MTU`` Kconfig option, which defaults to 127 bytes.
+
+.. only:: nrf91m1
+
+   The maximum length of the information field in UIH frames is 127 bytes.
 
 .. note::
 

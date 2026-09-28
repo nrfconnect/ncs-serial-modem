@@ -576,8 +576,17 @@ The parameters and their defined values are the following:
    Optional, only used when ``<msg>`` is empty (data mode).
    Sets the number of bytes of payload to publish in data mode.
    When the required number of bytes are received, the payload is published and the data mode is exited.
-   The termination command :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` is not used in this case.
-   The value must not exceed the value configured in the :ref:`CONFIG_SM_DATAMODE_BUF_SIZE <CONFIG_SM_DATAMODE_BUF_SIZE>` Kconfig option, as the payload must fit within the data mode buffer to be published as a single message.
+
+   .. only:: not nrf91m1
+
+      The termination command :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` is not used in this case.
+      The value must not exceed the value configured in the :ref:`CONFIG_SM_DATAMODE_BUF_SIZE <CONFIG_SM_DATAMODE_BUF_SIZE>` Kconfig option, as the payload must fit within the data mode buffer to be published as a single message.
+
+   .. only:: nrf91m1
+
+      The termination command ``+++`` is not used in this case.
+      The value must not exceed 4096 bytes, as the payload must fit within the data mode buffer to be published as a single message.
+
    The value ``0`` is equivalent to omitting the parameter.
    Specifying a non-zero ``<data_len>`` together with a non-empty ``<msg>`` results in an error.
 

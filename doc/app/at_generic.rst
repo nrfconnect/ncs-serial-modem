@@ -204,9 +204,16 @@ The parameters and their defined values are the following:
    String.
    The version of the |NCS|.
 
-<customer_version>
-   String.
-   The :ref:`CONFIG_SM_CUSTOMER_VERSION <CONFIG_SM_CUSTOMER_VERSION>` string, if defined.
+.. only:: not nrf91m1
+
+   <customer_version>
+      String.
+      The :ref:`CONFIG_SM_CUSTOMER_VERSION <CONFIG_SM_CUSTOMER_VERSION>` string, if defined.
+
+.. only:: nrf91m1
+
+   <customer_version>
+      String. This parameter is missing on official builds.
 
 Example
 ~~~~~~~
@@ -346,17 +353,19 @@ The parameters and their defined values are the following:
    * ``1`` - Enter Sleep.
      In this mode, both the |SM| service and the LTE connection are terminated.
 
-     |SM| can be woken up using the DTR pin (``dtr-gpios``).
+     |SM| can be woken up using the DTR pin.
 
    * ``2`` - Enter Idle.
      In this mode, both the |SM| service and the LTE connection are maintained, but the UART is disabled to save power.
      Received data is buffered and sent to the host after idle mode is exited.
 
-     |SM| can exit the idle mode using the DTR pin (``dtr-gpios``).
-     When the |SM| is in idle mode, and there is data to be read by the host, the RI pin (``ri-gpios``) is asserted for a short period of time to notify the host.
+     |SM| can exit the idle mode using the DTR pin.
+     When the |SM| is in idle mode, and there is data to be read by the host, the RI pin is asserted for a short period of time to notify the host.
      The host can then deassert and assert DTR to exit idle mode and read the data.
 
-The DTR pin is defined either in the :file:`boards/*_ns.overlay` overlay file matching your board or in the :file:`external-mcu.overlay` overlay file, if it is included.
+.. only:: not nrf91m1
+
+   The DTR pin is defined either in the :file:`boards/*_ns.overlay` overlay file matching your board or in the :file:`external-mcu.overlay` overlay file, if it is included.
 
 .. note::
 
@@ -443,7 +452,7 @@ Syntax
 
 .. note::
 
-   In this case the nRF91 Series SiP cannot be woken up using the DTR pin (``dtr-gpios``).
+   In this case the nRF91 Series SiP cannot be woken up using the DTR pin.
 
 Example
 ~~~~~~~~
@@ -643,7 +652,12 @@ The parameters and their defined values are the following:
 <value>
    Integer.
 
-   * When ``<op>`` is ``0``, it is an unsigned integer representing ``fw_info.version`` of the active MCUboot slot, set at build time using ``CONFIG_FW_INFO_FIRMWARE_VERSION`` and used by NSIB as a downgrade-protection counter.
+   * When ``<op>`` is ``0``, it is an unsigned integer representing the firmware version of the active MCUboot slot, used by NSIB as a downgrade-protection counter.
+
+     .. only:: not nrf91m1
+
+        The firmware version is set at build time using ``CONFIG_FW_INFO_FIRMWARE_VERSION``.
+
    * When ``<op>`` is ``1``, it is ``0`` if slot ``s0`` is active and ``1`` if slot ``s1`` is active.
 
 Examples
@@ -762,14 +776,17 @@ The following statistics are printed:
 
 * System heap (``malloc`` heap) - Free bytes, allocated bytes, and peak allocated bytes.
 * Kernel heap (``k_malloc`` heap) - Free bytes, allocated bytes, and peak allocated bytes.
-* Kernel heap block information - This is only available when the ``CONFIG_SYS_HEAP_INFO`` Kconfig option is enabled.
-* Thread stack usage statistics:
 
-  * This is only available when the :ref:`CONFIG_SM_DEBUG_STATS_THREAD_STACK <CONFIG_SM_DEBUG_STATS_THREAD_STACK>` Kconfig option is enabled.
-  * Setting the ``CONFIG_LOG_BUFFER_SIZE`` Kconfig option to 2048 or more is required to avoid dropping some of the log entries showing stack usage statistics.
+.. only:: not nrf91m1
 
-This command is available when the firmware is built with the :ref:`CONFIG_SM_DEBUG_STATS_HEAP <CONFIG_SM_DEBUG_STATS_HEAP>` Kconfig option enabled.
-In addition, the ``CONFIG_LOG`` Kconfig option and the ``CONFIG_SM_LOG_LEVEL_DBG`` or ``CONFIG_SM_LOG_LEVEL_INF`` Kconfig option must be enabled.
+   * Kernel heap block information - This is only available when the ``CONFIG_SYS_HEAP_INFO`` Kconfig option is enabled.
+   * Thread stack usage statistics:
+
+     * This is only available when the :ref:`CONFIG_SM_DEBUG_STATS_THREAD_STACK <CONFIG_SM_DEBUG_STATS_THREAD_STACK>` Kconfig option is enabled.
+     * Setting the ``CONFIG_LOG_BUFFER_SIZE`` Kconfig option to 2048 or more is required to avoid dropping some of the log entries showing stack usage statistics.
+
+   This command is available when the firmware is built with the :ref:`CONFIG_SM_DEBUG_STATS_HEAP <CONFIG_SM_DEBUG_STATS_HEAP>` Kconfig option enabled.
+   In addition, the ``CONFIG_LOG`` Kconfig option and the ``CONFIG_SM_LOG_LEVEL_DBG`` or ``CONFIG_SM_LOG_LEVEL_INF`` Kconfig option must be enabled.
 
 Set command
 -----------
@@ -814,54 +831,57 @@ These commands will print the following output in the log:
    [00:00:36.271,057] <inf> sm_at:   allocated:           0
    [00:00:36.271,057] <inf> sm_at:   max. allocated:   1280
 
-The output appears as follows when :ref:`CONFIG_SM_DEBUG_STATS_THREAD_STACK <CONFIG_SM_DEBUG_STATS_THREAD_STACK>` and ``CONFIG_SYS_HEAP_INFO`` Kconfig options are enabled.
-::
+.. only:: not nrf91m1
 
-   [00:01:16.852,478] <inf> sm_at: System heap stats:
-   [00:01:16.853,393] <inf> sm_at:   free:            48292
-   [00:01:16.854,431] <inf> sm_at:   allocated:         472
-   [00:01:16.855,438] <inf> sm_at:   max. allocated:   1344
-   [00:01:16.856,445] <inf> sm_at: Kernel heap stats:
-   [00:01:16.857,360] <inf> sm_at:   free:             1892
-   [00:01:16.858,398] <inf> sm_at:   allocated:           0
-   [00:01:16.859,405] <inf> sm_at:   max. allocated:   1280
-   [00:01:16.860,412] <inf> sm_at: Kernel heap block information:
-   Heap at 0x20028d40 contains 245 units in 8 buckets
+   The output appears as follows when :ref:`CONFIG_SM_DEBUG_STATS_THREAD_STACK <CONFIG_SM_DEBUG_STATS_THREAD_STACK>` and ``CONFIG_SYS_HEAP_INFO`` Kconfig options are enabled.
 
-     bucket#    min units        total      largest      largest
-                threshold       chunks      (units)      (bytes)
-     -----------------------------------------------------------
-           7          128            1          237         1896
+   ::
 
-   Chunk dump:
-   chunk    0: [*] size=8    left=0    right=8
-   chunk    8: [-] size=237  left=0    right=245
-   chunk  245: [*] size=0    left=8    right=245
+      [00:01:16.852,478] <inf> sm_at: System heap stats:
+      [00:01:16.853,393] <inf> sm_at:   free:            48292
+      [00:01:16.854,431] <inf> sm_at:   allocated:         472
+      [00:01:16.855,438] <inf> sm_at:   max. allocated:   1344
+      [00:01:16.856,445] <inf> sm_at: Kernel heap stats:
+      [00:01:16.857,360] <inf> sm_at:   free:             1892
+      [00:01:16.858,398] <inf> sm_at:   allocated:           0
+      [00:01:16.859,405] <inf> sm_at:   max. allocated:   1280
+      [00:01:16.860,412] <inf> sm_at: Kernel heap block information:
+      Heap at 0x20028d40 contains 245 units in 8 buckets
 
-   1892 free bytes, 0 allocated bytes, overhead = 72 bytes (3.7%)
-   [00:01:16.869,781] <inf> sm_at: Thread stack stats:
-   Thread analyze:
-    ppp_tx              : STACK: unused 796 usage 228 / 1024 (22 %); CPU: 0 %
-                        : Total CPU cycles used: 2
-    trace_thread        : STACK: unused 460 usage 308 / 768 (40 %); CPU: 0 %
-                        : Total CPU cycles used: 3
-    coap_client_recv_thread: STACK: unused 1276 usage 772 / 2048 (37 %); CPU: 0 %
-                        : Total CPU cycles used: 67
-    nrf_provisioning_work_q: STACK: unused 1812 usage 236 / 2048 (11 %); CPU: 0 %
-                        : Total CPU cycles used: 2
-    date_time_work_q    : STACK: unused 492 usage 788 / 1280 (61 %); CPU: 0 %
-                        : Total CPU cycles used: 32
-    ppp_data_passing    : STACK: unused 1564 usage 484 / 2048 (23 %); CPU: 0 %
-                        : Total CPU cycles used: 2
-    downloader          : STACK: unused 3844 usage 252 / 4096 (6 %); CPU: 0 %
-                        : Total CPU cycles used: 2
-    net_mgmt            : STACK: unused 596 usage 204 / 800 (25 %); CPU: 0 %
-                        : Total CPU cycles used: 1
-    sysworkq            : STACK: unused 3180 usage 916 / 4096 (22 %); CPU: 0 %
-                        : Total CPU cycles used: 475
-    idle                : STACK: unused 252 usage 68 / 320 (21 %); CPU: 99 %
-                        : Total CPU cycles used: 2506299
-    sm_work_q           : STACK: unused 812 usage 3284 / 4096 (80 %); CPU: 0 %
-                        : Total CPU cycles used: 4467
-    ISR0                : STACK: unused 1588 usage 460 / 2048 (22 %); CPU: 0 %
-                        : Total CPU cycles used: 0
+      bucket#    min units        total      largest      largest
+                 threshold       chunks      (units)      (bytes)
+      -----------------------------------------------------------
+            7          128            1          237         1896
+
+      Chunk dump:
+      chunk    0: [*] size=8    left=0    right=8
+      chunk    8: [-] size=237  left=0    right=245
+      chunk  245: [*] size=0    left=8    right=245
+
+      1892 free bytes, 0 allocated bytes, overhead = 72 bytes (3.7%)
+      [00:01:16.869,781] <inf> sm_at: Thread stack stats:
+      Thread analyze:
+       ppp_tx              : STACK: unused 796 usage 228 / 1024 (22 %); CPU: 0 %
+                           : Total CPU cycles used: 2
+       trace_thread        : STACK: unused 460 usage 308 / 768 (40 %); CPU: 0 %
+                           : Total CPU cycles used: 3
+       coap_client_recv_thread: STACK: unused 1276 usage 772 / 2048 (37 %); CPU: 0 %
+                           : Total CPU cycles used: 67
+       nrf_provisioning_work_q: STACK: unused 1812 usage 236 / 2048 (11 %); CPU: 0 %
+                           : Total CPU cycles used: 2
+       date_time_work_q    : STACK: unused 492 usage 788 / 1280 (61 %); CPU: 0 %
+                           : Total CPU cycles used: 32
+       ppp_data_passing    : STACK: unused 1564 usage 484 / 2048 (23 %); CPU: 0 %
+                           : Total CPU cycles used: 2
+       downloader          : STACK: unused 3844 usage 252 / 4096 (6 %); CPU: 0 %
+                           : Total CPU cycles used: 2
+       net_mgmt            : STACK: unused 596 usage 204 / 800 (25 %); CPU: 0 %
+                           : Total CPU cycles used: 1
+       sysworkq            : STACK: unused 3180 usage 916 / 4096 (22 %); CPU: 0 %
+                           : Total CPU cycles used: 475
+       idle                : STACK: unused 252 usage 68 / 320 (21 %); CPU: 99 %
+                           : Total CPU cycles used: 2506299
+       sm_work_q           : STACK: unused 812 usage 3284 / 4096 (80 %); CPU: 0 %
+                           : Total CPU cycles used: 4467
+       ISR0                : STACK: unused 1588 usage 460 / 2048 (22 %); CPU: 0 %
+                           : Total CPU cycles used: 0
