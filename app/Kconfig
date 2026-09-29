@@ -34,7 +34,6 @@ config SM_CUSTOMER_VERSION
 #
 config SM_EXTERNAL_XTAL
 	bool "Use external XTAL for UARTE"
-	default y
 
 #
 # AT command terminator
