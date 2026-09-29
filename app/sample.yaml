@@ -8,7 +8,6 @@ tests:
       - EXTRA_CONF_FILE="cmux.conf;ppp.conf;trace-backend-uart.conf;nrf-device-provisioning.conf"
       - EXTRA_DTC_OVERLAY_FILE="nrf91m1.overlay;trace-backend.overlay"
     extra_configs:
-      - CONFIG_SM_LOG_LEVEL_DBG=y
       - CONFIG_SM_DFU_MODEM_FULL=y
     platform_allow:
       - nrf9151dk/nrf9151/ns
@@ -50,7 +49,6 @@ tests:
       - EXTRA_CONF_FILE="cmux.conf;ppp.conf;trace-backend-uart.conf;nrf-device-provisioning.conf"
       - EXTRA_DTC_OVERLAY_FILE="interposer-nrf9151-mk-bg95.overlay;trace-backend.overlay"
     extra_configs:
-      - CONFIG_SM_LOG_LEVEL_DBG=y
       - CONFIG_SM_DFU_MODEM_FULL=y
     platform_allow:
       - nrf9151dk/nrf9151/ns
@@ -62,7 +60,6 @@ tests:
       - EXTRA_CONF_FILE="cmux.conf;ppp.conf;trace-backend-uart.conf;nrf-device-provisioning.conf"
       - EXTRA_DTC_OVERLAY_FILE="interposer-nrf9151-mk-gm02s.overlay;trace-backend.overlay"
     extra_configs:
-      - CONFIG_SM_LOG_LEVEL_DBG=y
       - CONFIG_SM_DFU_MODEM_FULL=y
     platform_allow:
       - nrf9151dk/nrf9151/ns

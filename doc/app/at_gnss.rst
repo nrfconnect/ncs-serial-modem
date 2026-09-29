@@ -89,8 +89,8 @@ In periodic navigation mode, the ``<interval>`` and ``<timeout>`` parameters are
 
 .. tip::
 
-   Enable the ``CONFIG_SM_LOG_LEVEL_DBG`` Kconfig option if you have trouble acquiring fixes.
-   It makes the application print NMEA and PVT data when trying to acquire fixes, which can be of help when solving the issue.
+   The |SM| application logs NMEA and PVT data when trying to acquire fixes, which can be of help when solving the issue.
+   These logs are enabled if the ``CONFIG_SM_LOG_LEVEL_DBG`` Kconfig option is set and logs have been enabled with ``AT#XLOG``.
 
 .. note::
 
