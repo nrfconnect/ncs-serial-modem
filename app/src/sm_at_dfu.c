@@ -325,8 +325,8 @@ static int handle_at_xdfu_init(enum at_parser_cmd_type cmd_type, struct at_parse
 				return -EOPNOTSUPP;
 			}
 
-			LOG_WRN("WARNING! After the first FW write, the modem will "
-				"corrupt if the update is not successfully completed.");
+			LOG_WRN("FW is programmed to modem flash in 8 kB blocks, after the first "
+				"block the modem remains unusable until the update completes");
 			err = bootloader_mode_request(true);
 			if (err) {
 				LOG_ERR("Failed to enable bootloader mode: %d", err);
@@ -469,9 +469,10 @@ static int handle_at_xdfu_write(enum at_parser_cmd_type cmd_type, struct at_pars
 			}
 
 			/*
-			 * POINT OF NO RETURN: After the first firmware segment write,
-			 * the modem will be corrupted if the update is not completed.
-			 * Bootloader segment writes can still be rolled back.
+			 * POINT OF NO RETURN: Firmware data is programmed to modem flash
+			 * in 8 kB blocks. After the first block, the modem remains unusable
+			 * until the update completes. Bootloader segment writes can
+			 * still be rolled back.
 			 */
 			if (param_count != 4) {
 				LOG_ERR("Invalid number of parameters for data write");
@@ -622,8 +623,9 @@ static int handle_at_xdfu_apply(enum at_parser_cmd_type cmd_type, struct at_pars
 				if (full_mfw_dfu_segment_type ==
 					DFU_FULL_MFW_SEGMENT_BOOTLOADER) {
 					LOG_INF("Bootloader segment updated");
-					LOG_WRN("After first FW write, modem will corrupt "
-						"if update is not completed");
+					LOG_WRN("FW is programmed to modem flash in 8 kB "
+						"blocks, after the first block the modem remains "
+						"unusable until the update completes");
 					(void)set_full_mfw_dfu_segment_type(
 						DFU_FULL_MFW_SEGMENT_FIRMWARE);
 				} else if (full_mfw_dfu_segment_type ==
