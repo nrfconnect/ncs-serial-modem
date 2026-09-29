@@ -26,8 +26,7 @@ The build fails if both nodes point to the same UART.
 .. note::
    The negative error codes that are visible in logs are *errno* codes defined in `nrf_errno.h`_.
 
-The default logging level for the |SM| is ``CONFIG_SM_LOG_LEVEL_INF``.
-You can get more verbose logs by setting the ``CONFIG_SM_LOG_LEVEL_DBG`` Kconfig option.
+The default logging level for the |SM| is ``CONFIG_SM_LOG_LEVEL_DBG``.
 
 TF-M logging must use the same UART as the application. For more details, see `shared TF-M logging`_.
 

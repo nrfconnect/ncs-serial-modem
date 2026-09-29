@@ -65,6 +65,9 @@ The following changes are mandatory to make your application work in the same wa
 * The ``CONFIG_SM_AT_BUF_SIZE`` Kconfig option has been removed.
   The maximum size of the AT command is 8190 bytes, which includes the terminator character.
 
+* ``CONFIG_SM_LOG_LEVEL_DBG`` Kconfig option has been set by default. This is required for AT#XLOG=2.
+  Set the ``CONFIG_SM_LOG_LEVEL_INF`` Kconfig option if you do not need debug logging.
+
 Partition Manager removal
 -------------------------
 
