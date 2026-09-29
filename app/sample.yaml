@@ -6,7 +6,7 @@ tests:
     build_only: true
     extra_args:
       - EXTRA_CONF_FILE="cmux.conf;ppp.conf;trace-backend-uart.conf;nrf-device-provisioning.conf"
-      - EXTRA_DTC_OVERLAY_FILE="nrf91m1.overlay;trace-backend.overlay"
+      - EXTRA_DTC_OVERLAY_FILE="nrf91m1.overlay;trace-backend-nrf9151.overlay"
     extra_configs:
       - CONFIG_SM_DFU_MODEM_FULL=y
     platform_allow:
@@ -47,7 +47,7 @@ tests:
     build_only: true
     extra_args:
       - EXTRA_CONF_FILE="cmux.conf;ppp.conf;trace-backend-uart.conf;nrf-device-provisioning.conf"
-      - EXTRA_DTC_OVERLAY_FILE="interposer-nrf9151-mk-bg95.overlay;trace-backend.overlay"
+      - EXTRA_DTC_OVERLAY_FILE="interposer-nrf9151-mk-bg95.overlay;trace-backend-nrf9151.overlay"
     extra_configs:
       - CONFIG_SM_DFU_MODEM_FULL=y
     platform_allow:
@@ -58,7 +58,7 @@ tests:
     build_only: true
     extra_args:
       - EXTRA_CONF_FILE="cmux.conf;ppp.conf;trace-backend-uart.conf;nrf-device-provisioning.conf"
-      - EXTRA_DTC_OVERLAY_FILE="interposer-nrf9151-mk-gm02s.overlay;trace-backend.overlay"
+      - EXTRA_DTC_OVERLAY_FILE="interposer-nrf9151-mk-gm02s.overlay;trace-backend-nrf9151.overlay"
     extra_configs:
       - CONFIG_SM_DFU_MODEM_FULL=y
     platform_allow:
@@ -98,7 +98,7 @@ tests:
     build_only: true
     extra_args:
       - EXTRA_CONF_FILE="cmux.conf;ppp.conf;trace-backend-cmux.conf"
-      - EXTRA_DTC_OVERLAY_FILE="trace-backend.overlay"
+      - EXTRA_DTC_OVERLAY_FILE="trace-backend-nrf9151.overlay"
     platform_allow:
       - nrf9151dk/nrf9151/ns
       - thingy91x/nrf9151/ns
@@ -143,7 +143,7 @@ tests:
     build_only: true
     extra_args:
       - EXTRA_CONF_FILE="full-fota.conf"
-      - EXTRA_DTC_OVERLAY_FILE="full-fota.overlay"
+      - EXTRA_DTC_OVERLAY_FILE="full-fota-nrf9151.overlay"
     extra_configs:
       - CONFIG_SM_DFU_MODEM_FULL=y
     platform_allow:
@@ -153,8 +153,8 @@ tests:
     sysbuild: true
     build_only: true
     extra_args:
-      - EXTRA_DTC_OVERLAY_FILE="pgps.overlay"
-      - mcuboot_EXTRA_DTC_OVERLAY_FILE="${APP_DIR}/pgps.overlay"
+      - EXTRA_DTC_OVERLAY_FILE="pgps-nrf9151.overlay"
+      - mcuboot_EXTRA_DTC_OVERLAY_FILE="${APP_DIR}/pgps-nrf9151.overlay"
     extra_configs:
       - CONFIG_NRF_CLOUD_PGPS=y
       - CONFIG_NRF_CLOUD_GPS_LOG_LEVEL_INF=y
@@ -165,8 +165,8 @@ tests:
     sysbuild: true
     build_only: true
     extra_args:
-      - EXTRA_DTC_OVERLAY_FILE="pgps.overlay"
-      - mcuboot_EXTRA_DTC_OVERLAY_FILE="${APP_DIR}/pgps.overlay"
+      - EXTRA_DTC_OVERLAY_FILE="pgps-nrf9151.overlay"
+      - mcuboot_EXTRA_DTC_OVERLAY_FILE="${APP_DIR}/pgps-nrf9151.overlay"
     extra_configs:
       - CONFIG_NRF_CLOUD_PGPS=y
       - CONFIG_NRF_CLOUD_AGNSS=n
@@ -179,7 +179,7 @@ tests:
     build_only: true
     extra_args:
       - EXTRA_CONF_FILE="carrier.conf"
-      - EXTRA_DTC_OVERLAY_FILE="carrier.overlay"
+      - EXTRA_DTC_OVERLAY_FILE="carrier-nrf9151.overlay"
     platform_allow:
       - nrf9151dk/nrf9151/ns
     integration_platforms:
@@ -190,7 +190,7 @@ tests:
     build_only: true
     extra_args:
       - EXTRA_CONF_FILE="carrier.conf;carrier-softbank.conf"
-      - EXTRA_DTC_OVERLAY_FILE="carrier.overlay"
+      - EXTRA_DTC_OVERLAY_FILE="carrier-nrf9151.overlay"
       - SB_EXTRA_CONF_FILE=sysbuild-softbank.conf
     platform_allow:
       - nrf9151dk/nrf9151/ns
@@ -200,7 +200,7 @@ tests:
     build_only: true
     extra_args:
       - EXTRA_CONF_FILE="carrier.conf;carrier-lgu.conf"
-      - EXTRA_DTC_OVERLAY_FILE="carrier.overlay"
+      - EXTRA_DTC_OVERLAY_FILE="carrier-nrf9151.overlay"
     platform_allow:
       - nrf9151dk/nrf9151/ns
     tags: exclude_integration
@@ -223,8 +223,8 @@ tests:
     sysbuild: true
     build_only: true
     extra_args:
-      - EXTRA_DTC_OVERLAY_FILE="disable-b0.overlay"
-      - mcuboot_EXTRA_DTC_OVERLAY_FILE="${APP_DIR}/disable-b0.overlay"
+      - EXTRA_DTC_OVERLAY_FILE="disable-b0-nrf9151.overlay"
+      - mcuboot_EXTRA_DTC_OVERLAY_FILE="${APP_DIR}/disable-b0-nrf9151.overlay"
       - SB_CONFIG_SECURE_BOOT_APPCORE=n
     platform_allow:
       - nrf9151dk/nrf9151/ns
