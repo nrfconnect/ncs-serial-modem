@@ -358,19 +358,19 @@ The following configuration files are provided:
   See :ref:`uart_configuration_interposer` for pin details.
 
 * :file:`carrier.conf` - Configuration file that adds |NCS| `LwM2M carrier`_ support.
-  Used in conjunction with :file:`carrier.overlay`.
+  Used in conjunction with :file:`carrier-nrf9151.overlay`.
   See :ref:`sm_carrier_library_support` for more information on how to connect to an operator's device management platform.
 
-* :file:`carrier.overlay` - Devicetree overlay that adds a dedicated flash partition for the LwM2M carrier library NVS storage.
+* :file:`carrier-nrf9151.overlay` - Devicetree overlay that adds a dedicated flash partition for the LwM2M carrier library NVS storage.
   Used in conjunction with :file:`carrier.conf`.
   It does not reserve a ``memfault_coredump_partition``, so the Memfault coredump falls back to RAM in this configuration.
 
 * :file:`carrier-softbank.conf` and :file:`sysbuild-softbank.conf` - Configuration files that add SoftBank configurations needed by the carrier library.
-  Used in conjunction with :file:`carrier.conf` and :file:`carrier.overlay`.
+  Used in conjunction with :file:`carrier.conf` and :file:`carrier-nrf9151.overlay`.
   For more information, see the `Carrier-specific dependencies`_ section of the `LwM2M carrier`_ documentation.
 
 * :file:`carrier-lgu.conf` - This configuration file adds LG U+ configurations needed by the carrier library.
-  Used in conjunction with :file:`carrier.conf` and :file:`carrier.overlay`.
+  Used in conjunction with :file:`carrier.conf` and :file:`carrier-nrf9151.overlay`.
   For more information, see the `Carrier-specific dependencies`_ section of the `LwM2M carrier`_ documentation.
 
 * :file:`cmux.conf` - Configuration file that adds support for the CMUX protocol.
@@ -382,25 +382,25 @@ The following configuration files are provided:
 
 * :file:`trace-backend-cmux.conf` - Configuration file that enables CMUX modem trace backend.
   When enabled, modem traces are transmitted on a dedicated CMUX channel.
-  Must be combined with :file:`trace-backend.overlay`.
+  Must be combined with :file:`trace-backend-nrf9151.overlay`.
   See the :ref:`sm_modem_trace_cmux` documentation for more information.
 
 * :file:`trace-backend-uart.conf` - Configuration file that enables the UART modem trace backend.
   Backend starts disabled and is activated at runtime using ``AT#XTRACE``.
-  Must be combined with :file:`trace-backend.overlay`.
+  Must be combined with :file:`trace-backend-nrf9151.overlay`.
   See the :ref:`sm_logging_uart_backend` documentation for more information.
 
-* :file:`trace-backend.overlay` - Devicetree overlay that defines the SRAM partition used by the modem trace backend.
+* :file:`trace-backend-nrf9151.overlay` - Devicetree overlay that defines the SRAM partition used by the modem trace backend.
   Required when using :file:`trace-backend-uart.conf` or :file:`trace-backend-cmux.conf`.
 
 * :file:`full-fota.conf` - Configuration file that adds full modem FOTA support.
-  Must be combined with :file:`full-fota.overlay`.
+  Must be combined with :file:`full-fota-nrf9151.overlay`.
   See :ref:`SM_AT_FOTA` for more information on how to use full modem FOTA functionality.
 
-* :file:`full-fota.overlay` - Devicetree overlay that adds a dedicated flash partition for modem firmware storage in external flash.
+* :file:`full-fota-nrf9151.overlay` - Devicetree overlay that adds a dedicated flash partition for modem firmware storage in external flash.
   Must be combined with :file:`full-fota.conf`.
 
-* :file:`pgps.overlay` - Devicetree overlay that adds a dedicated flash partition for P-GPS prediction data storage.
+* :file:`pgps-nrf9151.overlay` - Devicetree overlay that adds a dedicated flash partition for P-GPS prediction data storage.
   The overlay resizes the MCUboot primary and secondary slots to free up space for the ``pgps_partition``.
   Required when ``CONFIG_NRF_CLOUD_PGPS`` is enabled.
   Must also be passed to the ``mcuboot`` image using :makevar:`mcuboot_EXTRA_DTC_OVERLAY_FILE` so that MCUboot operates with the same partition layout.
@@ -408,7 +408,7 @@ The following configuration files are provided:
   It does not reserve a ``memfault_coredump_partition``, so the Memfault coredump falls back to RAM in this configuration.
   See :ref:`SM_AT_GNSS` for more information.
 
-* :file:`disable-b0.overlay` - Devicetree overlay for a build configuration without the NSIB (B0) immutable bootloader.
+* :file:`disable-b0-nrf9151.overlay` - Devicetree overlay for a build configuration without the NSIB (B0) immutable bootloader.
   This is intended only for upgrading v1.x.x devices to v2.x.x firmware.
   Must be combined with ``SB_CONFIG_SECURE_BOOT_APPCORE=n`` in the sysbuild configuration and passed to the ``mcuboot`` image using :makevar:`mcuboot_EXTRA_DTC_OVERLAY_FILE` (using the absolute path).
   It does not reserve a ``memfault_coredump_partition``, so the Memfault coredump falls back to RAM in this configuration.

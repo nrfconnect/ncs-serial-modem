@@ -25,7 +25,7 @@ The following changes are mandatory to make your application work in the same wa
   * ``overlay-*.conf`` to ``*.conf``
   * ``overlay-*.overlay`` to ``*.overlay``
 
-* Full FOTA - When compiling, rename ``overlay-full_fota.conf`` to ``full-fota.conf`` and add ``full-fota.overlay`` to the build configuration.
+* Full FOTA - When compiling, rename ``overlay-full_fota.conf`` to ``full-fota.conf`` and add ``full-fota-nrf9151.overlay`` to the build configuration.
   See :ref:`SM_AT_FOTA` for more information.
 
 * ``#XGNSS`` notification had two meanings with alternative syntaxes as follows:
