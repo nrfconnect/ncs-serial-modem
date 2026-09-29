@@ -80,17 +80,17 @@ Available Kconfig fragments and DTS overlays (in `app/`):
 |---|---|
 | `cmux.conf` | Enable CMUX multiplexing |
 | `ppp.conf` | Enable PPP networking |
-| `carrier.conf` / `carrier.overlay` | LwM2M carrier library (Kconfig + flash partition) |
+| `carrier.conf` / `carrier-nrf9151.overlay` | LwM2M carrier library (Kconfig + flash partition) |
 | `carrier-lgu.conf` | LwM2M carrier: LG U+ variant |
 | `carrier-softbank.conf` / `sysbuild-softbank.conf` | LwM2M carrier: SoftBank variant |
-| `full-fota.conf` / `full-fota.overlay` | Full MFW FOTA support (Kconfig + external flash partition) |
+| `full-fota.conf` / `full-fota-nrf9151.overlay` | Full MFW FOTA support (Kconfig + external flash partition) |
 | `nrf-device-provisioning.conf` | nRF Device Provisioning |
 | `external-mcu.overlay` | External MCU UART wiring |
 | `disable-dtr.overlay` | Disable DTR pin |
-| `disable-b0.overlay` | Disable B0 flash partition (moves MCUboot/app partitions) |
-| `pgps.overlay` | P-GPS data flash partition |
+| `disable-b0-nrf9151.overlay` | Disable B0 flash partition (moves MCUboot/app partitions) |
+| `pgps-nrf9151.overlay` | P-GPS data flash partition |
 | `nrf91m1.overlay` | nRF91M1 variant |
-| `trace-backend.overlay` | Modem trace SRAM partition |
+| `trace-backend-nrf9151.overlay` | Modem trace SRAM partition |
 | `trace-backend-uart.conf` | Modem trace over UART |
 | `trace-backend-cmux.conf` | Modem trace over CMUX |
 

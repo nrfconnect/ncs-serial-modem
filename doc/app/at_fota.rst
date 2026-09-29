@@ -37,7 +37,7 @@ The parameters and their defined values are the following:
    .. only:: not nrf91m1
 
      * ``3`` - Start FOTA for full modem update.
-       Can only be used when the :file:`full-fota.conf` configuration file and :file:`full-fota.overlay` devicetree overlay are used.
+       Can only be used when the :file:`full-fota.conf` configuration file and :file:`full-fota-nrf9151.overlay` devicetree overlay are used.
 
    * ``5`` - Start FOTA for MCUboot second-stage bootloader update.
 
