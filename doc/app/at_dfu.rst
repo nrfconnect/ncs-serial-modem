@@ -43,7 +43,7 @@ The following DFU image types are supported:
 
       Full modem firmware DFU is disabled by default.
 
-   If the full modem firmware update fails, the modem will not operate until a successful update is completed.
+   If the full modem firmware update fails after firmware data has been programmed to modem flash, the modem remains unusable until a successful update is completed.
 
 DFU initialize #XDFUINIT
 ========================
@@ -413,7 +413,7 @@ The following example shows a complete full modem firmware update.
 
 .. important::
 
-   If the update fails, the modem will not function until a successful update is performed.
+   If the update fails after the first 8 kB block of firmware data has been programmed, the modem remains unusable until a successful update is performed.
    The bootloader remains intact for retries.
    Ensure a reliable connection between the host and serial modem, and stable power supply before starting the update.
 
@@ -421,6 +421,15 @@ The full modem update consists of two phases:
 
 #. Bootloader segment - Writes the bootloader data.
 #. Firmware segment - Writes the firmware data.
+
+.. note::
+
+   Firmware segment data is buffered and programmed to modem flash in 8 kB blocks.
+   A ``#XDFU: 2,1,0`` notification means the data was accepted, not that it was programmed.
+   With contiguous writes of 8 kB or less, the first block is programmed during the write that brings the total amount of firmware data to 8 kB or more.
+   If that write fails, the modem rejected the firmware, for example, because it is an older version.
+   In that case, the existing modem firmware is left untouched, and you can return to normal mode with the ``AT#XRESET`` command.
+   If a later write or ``AT#XDFUAPPLY`` fails, the modem remains unusable until a full modem firmware update is completed successfully.
 
 .. code-block:: none
 
@@ -449,7 +458,7 @@ The full modem update consists of two phases:
    #XDFU: 2,2,0
 
    // Phase 2: Write firmware segments
-   // Warning: After the first firmware segment write, the modem will be corrupted if the update is not completed successfully.
+   // Warning: Data is programmed to modem flash in 8 kB blocks. A failure after the first block is programmed leaves the modem unusable until the update is completed successfully.
    AT#XDFUWRITE=2,0,4096
    OK
    // 4096 bytes of firmware data
