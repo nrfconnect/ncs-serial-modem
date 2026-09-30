@@ -29,6 +29,7 @@ Reference: [Nordic Tech Docs Style Guide](https://nordicplayground.github.io/tec
 ## Punctuation
 - Use the Oxford comma
 - Use standard American punctuation
+- Avoid colons and semicolons unless a list follows immediately. Prefer a period and a new sentence, or connect clauses with "and", a comma, or other phrasing as appropriate
 
 ## Numbers and Units
 - Always use the abbreviated unit form (e.g., "7 ms"), except when a unit is used without a value — then spell it out (e.g., "dimensions in millimeters")

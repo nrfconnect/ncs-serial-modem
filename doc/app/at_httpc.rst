@@ -16,6 +16,28 @@ You can perform the following using the Socket AT commands:
 * Set socket options with ``AT#XSOCKETOPT`` or ``AT#XSSOCKETOPT``.
 * Close with ``AT#XCLOSE``.
 
+.. _SM_AT_HTTPC_IDLE_TIMEOUT:
+
+Request idle timeout
+--------------------
+
+.. only:: not nrf91m1
+
+   Every active HTTP request has a sliding idle timeout controlled by the :ref:`CONFIG_SM_HTTPC_RESPONSE_TIMEOUT_MS <CONFIG_SM_HTTPC_RESPONSE_TIMEOUT_MS>` Kconfig option (default 30 seconds).
+
+.. only:: nrf91m1
+
+   Every active HTTP request has a sliding idle timeout of 30 seconds.
+
+The timer resets each time data is sent or received:
+
+* Sending request headers or body upload chunks (POST/PUT data mode).
+* Receiving response headers or body bytes.
+* Pulling a body chunk in manual mode (``AT#XHTTPCDATA``).
+
+If no such activity occurs within the configured window, the request is aborted and ``#XHTTPCSTAT: <handle>,-1,<total_bytes>,<connection_close>`` is emitted.
+The timeout is enforced by a background timer that fires independently of normal socket poll events, so a server that stalls silently (no TCP RST or FIN) is also detected.
+
 HTTP request #XHTTPCREQ
 =======================
 
@@ -187,7 +209,7 @@ The parameters and their defined values are the following:
    Integer.
    On successful completion, failure, or timeout, it contains the total number of response body bytes received by the HTTP client.
    For chunked transfer encoding this includes the raw framing bytes (chunk-size lines, ``\r\n`` separators, and the final ``0\r\n\r\n`` terminator).
-   On cancel (``status_code=-1`` from ``AT#XHTTPCCANCEL`` or ``AT#XCLOSE``), it contains the number of response body bytes already delivered to the host.
+   On cancel (``status_code=-1`` from ``AT#XHTTPCCANCEL`` or ``AT#XCLOSE``), or timeout, it contains the number of response body bytes already delivered to the host.
 
 <connection_close>
    * ``0`` - Keep-alive connection.
@@ -488,26 +510,6 @@ Example
    AT#XHTTPCDATA=?
    #XHTTPCDATA: <handle>[,<length>]
    OK
-
-Idle timeout
-============
-
-.. only:: not nrf91m1
-
-   Every active HTTP request has a sliding idle timeout controlled by the :ref:`CONFIG_SM_HTTPC_RESPONSE_TIMEOUT_MS <CONFIG_SM_HTTPC_RESPONSE_TIMEOUT_MS>` Kconfig option (default 30 seconds).
-
-.. only:: nrf91m1
-
-   Every active HTTP request has a sliding idle timeout of 30 seconds.
-
-The timer resets each time data is sent or received:
-
-* Sending request headers or body upload chunks (POST/PUT data mode).
-* Receiving response headers or body bytes.
-* Pulling a body chunk in manual mode (``AT#XHTTPCDATA``).
-
-If no such activity occurs within the configured window, the request is aborted and ``#XHTTPCSTAT: <handle>,-1,<total_bytes>,<connection_close>`` is emitted.
-The timeout is enforced by a background timer that fires independently of normal socket poll events, so a server that stalls silently (no TCP RST or FIN) is also detected.
 
 HTTP request cancel #XHTTPCCANCEL
 =================================

@@ -111,7 +111,7 @@ The parameters and their defined values are the following:
      * ``-5`` - Too many commands received from the server.
        The maximum number of records is 5.
 
-   * ``-6`` - Fatal error; the provisioning client encountered an irrecoverable error.
+   * ``-6`` - Fatal error: the provisioning client encountered an irrecoverable error.
 
 Example
 ~~~~~~~

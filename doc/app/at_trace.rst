@@ -14,7 +14,8 @@ This page describes the AT commands for controlling the shared UART trace backen
    The ``AT#XLOG`` command is always available in the default build.
    The ``AT#XTRACE`` command requires building with the :file:`trace-backend-uart.conf` configuration overlay and the :file:`trace-backend-nrf9151.overlay` devicetree overlay.
    See :ref:`sm_logging_uart_backend` for a full description of the feature.
-   The CMUX modem trace backend (:file:`trace-backend-cmux.conf`) does not use this command; see :ref:`sm_modem_trace_cmux`.
+   The CMUX modem trace backend (:file:`trace-backend-cmux.conf`) does not use this command.
+   See :ref:`sm_modem_trace_cmux`.
 
 The Zephyr application log backend (``AT#XLOG``) and the modem trace backend (``AT#XTRACE``) share a single UART.
 They are mutually exclusive: enabling one while the other is active returns an error.
