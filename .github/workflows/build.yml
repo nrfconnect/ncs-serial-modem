@@ -17,6 +17,11 @@ on:
         description: 'Trigger source'
         required: true
         type: string
+      release_tag:
+        description: 'Git tag for release builds (checkout ref and artifact version)'
+        required: false
+        type: string
+        default: ''
 
 
 jobs:
@@ -29,6 +34,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: serial_modem
+          ref: ${{ inputs.release_tag != '' && inputs.release_tag || github.ref }}
 
       - name: Install build libraries for native_sim
         run: |
@@ -129,7 +135,7 @@ jobs:
         run: |
           mkdir -p artifacts
           mkdir -p artifacts_extras
-          VERSION=${{ github.event.release.tag_name || github.ref_name || 'unknown-version' }}
+          VERSION=${{ inputs.release_tag || github.event.release.tag_name || github.ref_name || 'unknown-version' }}
           NRF9151DK_DIR=twister-out/nrf9151dk_nrf9151_ns/zephyr_gnu/serial_modem/app
           NRF54L15DK_DIR=twister-out/nrf54l15dk_nrf54l15_cpuapp/zephyr_gnu/serial_modem/samples
 
