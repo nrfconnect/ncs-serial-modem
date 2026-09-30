@@ -5,11 +5,39 @@ nRF Cloud AT commands
    :local:
    :depth: 1
 
-The page describes nRF Cloud-related AT commands.
+The page describes the following nRF Cloud-related AT commands:
+
+  * nRF Cloud connection (see :ref:`SM_AT_NRFCLOUD`)
+  * nRF Cloud location (see :ref:`SM_AT_NRFCLOUDPOS`)
+  * nRF Cloud FOTA (see :ref:`SM_AT_NRFCLOUDFOTA`)
+  * nRF Cloud observability (see :ref:`SM_AT_NRFCLOUDOBS` and commands starting with ``#XNRFCLOUDOBS``)
 
 .. note::
    Before using nRF Cloud AT commands, you must onboard and claim the device in nRF Cloud.
    See :ref:`SM_AT_PROVISIONING` for information about device provisioning and claiming.
+
+.. _SM_AT_NRFCLOUDOBS:
+
+Observability #XNRFCLOUDOBS*
+----------------------------
+
+The ``#XNRFCLOUDOBS*`` commands control the Memfault data that the device collects (metrics, events, logs, and, in builds that include it, a coredump) and its upload to nRF Cloud over the CoAP transport.
+
+To use the ``#XNRFCLOUDOBS*`` commands that access the network (``#XNRFCLOUDOBSUPLOAD`` and ``#XNRFCLOUDOBSFORWARD``), the device must be connected to nRF Cloud. See :ref:`SM_AT_NRFCLOUD`.
+
+.. only:: not nrf91m1
+
+   ``#XNRFCLOUDOBSDEVINFO``, ``#XNRFCLOUDOBSCRASH``, and ``#XNRFCLOUDOBSEXPORT`` additionally require the :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG <CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG>` Kconfig option, which is disabled by default.
+
+Upload is host-driven.
+Automatic uploads are disabled by default.
+The host enables them with ``AT#XNRFCLOUDOBSAUTO=1`` or initiates uploads on demand with ``AT#XNRFCLOUDOBSUPLOAD``.
+
+The ``<project_key>`` parameter, used by several commands, is a string.
+It is a 32-character Memfault project key.
+When it is present and not empty, it overrides the server-side project-key routing, sending the data to the specified Memfault project.
+For more information about Memfault project keys, see `Memfault Project Keys`_.
+Find your project key in `Memfault Project Settings`_.
 
 .. _SM_AT_NRFCLOUD:
 
@@ -343,29 +371,6 @@ Test command
 ------------
 
 The test command is not supported.
-
-.. _SM_AT_NRFCLOUDOBS:
-
-nRF Cloud observability
-=======================
-
-The ``#XNRFCLOUDOBS*`` commands control the Memfault data that the device collects (metrics, events, logs, and, in builds that include it, a coredump) and its upload to nRF Cloud over the CoAP transport.
-
-To use the ``#XNRFCLOUDOBS*`` commands that access the network (``#XNRFCLOUDOBSUPLOAD`` and ``#XNRFCLOUDOBSFORWARD``), the device must be connected to nRF Cloud. See :ref:`SM_AT_NRFCLOUD`.
-
-.. only:: not nrf91m1
-
-   ``#XNRFCLOUDOBSDEVINFO``, ``#XNRFCLOUDOBSCRASH``, and ``#XNRFCLOUDOBSEXPORT`` additionally require the :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG <CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG>` Kconfig option, which is disabled by default.
-
-Upload is host-driven.
-Automatic uploads are disabled by default.
-The host enables them with ``AT#XNRFCLOUDOBSAUTO=1`` or initiate uploads on demand with ``AT#XNRFCLOUDOBSUPLOAD``.
-
-The ``<project_key>`` parameter, used by several commands, is a string.
-It is a 32-character Memfault project key.
-When it is present and not empty, it overrides the server-side project-key routing, sending the data to the specified Memfault project.
-For more information about Memfault project keys, see `Memfault Project Keys`_.
-Find your project key in `Memfault Project Settings`_.
 
 .. _SM_AT_NRFCLOUDOBSAUTO:
 
@@ -970,6 +975,12 @@ Set command
 -----------
 
 The set command starts a FOTA check, and the download if requested and an update is available.
+
+.. note::
+
+   The ``#XNRFCLOUDFOTA`` command uses default PDN connection with ID ``0``.
+   Raw sockets must not use the PDN connection at the same time.
+   See :ref:`SM_AT_SOCKET_RAW_SOCKET_LIMITATION` for more information.
 
 Syntax
 ~~~~~~
