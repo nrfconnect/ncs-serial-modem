@@ -10,6 +10,7 @@
 #include <modem/at_parser.h>
 #include <net/fota_download.h>
 #include <nrf_cloud_download.h>
+#include <nrf_modem_delta_dfu.h>
 #include <memfault/ports/zephyr/fota.h>
 #include <memfault/http/http_client.h>
 #include <memfault/nrfconnect_port/coap.h>
@@ -31,6 +32,9 @@ LOG_MODULE_REGISTER(sm_nrfcloud_fota, CONFIG_SM_LOG_LEVEL);
 #define FOTA_KEY_MAX_LEN	32
 #define FOTA_PARAM_OP		1
 #define FOTA_PARAM_KEY		2
+
+/* Default CoAP block size of the NCS downloader, used for nRF Cloud CoAP proxy downloads. */
+#define FOTA_COAP_BLOCK_SIZE	1024
 
 /* <op> values for AT#XNRFCLOUDFOTA. */
 enum {
@@ -75,6 +79,31 @@ static void nrfcloud_fota_check_failed(int rv)
 	urc_send_to(fota_pipe, "\r\n#XNRFCLOUDFOTA: -1,%d\r\n", rv);
 }
 
+/* The NCS downloader's CoAP transport cannot resume from an offset inside a block, and the
+ * modem stores a partial delta image at an arbitrary offset. Erase such an image so that the
+ * download starts from 0 instead of failing. dfu_target_modem_delta waits for the erase.
+ */
+static int nrfcloud_fota_modem_discard_unaligned(void)
+{
+	size_t offset;
+	int err;
+
+	err = nrf_modem_delta_dfu_offset(&offset);
+	if (err != 0 || offset % FOTA_COAP_BLOCK_SIZE == 0) {
+		return 0;
+	}
+
+	LOG_INF("Discarding partial modem image, offset %zu", offset);
+	err = nrf_modem_delta_dfu_erase();
+	if (err != 0 && err != NRF_MODEM_DELTA_DFU_ERASE_PENDING) {
+		LOG_ERR("Partial modem image erase failed: %d", err);
+		/* Positive values are modem DFU status codes, not errnos. */
+		return err < 0 ? err : -EIO;
+	}
+
+	return 0;
+}
+
 /* Query Memfault release management and, if an update is available, start the download.
  * sm_fota_type selects app or modem; sm_fota_stage is already FOTA_STAGE_DOWNLOAD and
  * fota_pipe already set by the caller.
@@ -89,10 +118,13 @@ static void nrfcloud_fota_check(void)
 		rv = memfault_zephyr_fota_app_start();
 		g_mflt_http_client_config.api_key = saved_key;
 	} else {
-		memfault_zephyr_fota_modem_project_key_set(
-			fota_project_key[0] != '\0' ? fota_project_key : NULL);
-		rv = memfault_zephyr_fota_modem_start();
-		memfault_zephyr_fota_modem_project_key_set(NULL);
+		rv = nrfcloud_fota_modem_discard_unaligned();
+		if (rv == 0) {
+			memfault_zephyr_fota_modem_project_key_set(
+				fota_project_key[0] != '\0' ? fota_project_key : NULL);
+			rv = memfault_zephyr_fota_modem_start();
+			memfault_zephyr_fota_modem_project_key_set(NULL);
+		}
 	}
 
 	if (rv < 0) {
