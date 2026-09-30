@@ -185,6 +185,8 @@ The documentation is split into **docsets**, each built by its own Sphinx run ov
 
 The docsets must be sibling directories below the HTML root, because that is where the docset switcher of `sphinx_ncs_theme` looks for them. `doc/build/html/index.html` redirects to the `main` docset, and `versions.json` is copied next to the docsets for the version dropdown.
 
+PDF revision (filename suffix and cover band) is centralized in `doc/_utils/pdf_revision.py`: **main** uses the ``VERSION`` environment variable; **nRF91m1** uses `doc/nrf91m1/DOC_VERSION` or ``NRF91M1_DOC_VERSION`` (set in CI when the file is non-empty). HTML sidebar `version` / `release` for **nrf91m1** follow the manual revision (same source as the PDF); **main** follows ``VERSION``. Filename suffixes use `_v<revision>` when the revision starts with a digit, otherwise `_<revision>` (for example `_v0.1` or `_latest`). Docset metadata and LaTeX wiring stay in `doc/_utils/docsets.py` and `doc/_docsets/conf_common.py`. Bump `doc/nrf91m1/DOC_VERSION` when the nRF91M1 AT command manual changes and add a row to `doc/nrf91m1/revision_history.rst` (Date, Version, Description table, same layout as the legacy nRF91x1 cellular AT command PDF). `versions.json` still lists Serial Modem git release tags for the hosted version switcher.
+
 - Shared Sphinx settings: `doc/_docsets/conf_common.py`. Per-docset settings (project title, root document, exclusions, intersphinx): `doc/_docsets/<docset>/conf.py`.
 - The docset list is declared once in `doc/_utils/docsets.py` (`ALL_DOCSETS`). Adding a docset means adding an entry there, a config directory, and a root document.
 - Relative paths in the config files resolve against the config directory, not `doc/`, so anchor new paths to `DOC_BASE`.
