@@ -1,18 +1,11 @@
-.. title:: Appendix A: UART configuration
+.. raw:: latex
+
+   \nordicStartAppendices
 
 .. _nrf91m1_uart_configuration:
 
-.. only:: html
-
-   Appendix A: UART configuration
-   ##############################
-
-.. only:: latex
-
-   .. raw:: latex
-
-      \chapter*{Appendix A: UART configuration}
-      \addcontentsline{toc}{chapter}{Appendix A: UART configuration}
+UART configuration
+##################
 
 .. include:: ../uart_configuration.rst
    :start-after: nrf91m1_uart_configuration_start

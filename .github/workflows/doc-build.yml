@@ -73,6 +73,13 @@ jobs:
           fi
           echo "VERSION=${VERSION}"
           echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+          if [[ -f doc/nrf91m1/DOC_VERSION ]]; then
+            NRF91M1_DOC_VERSION=$(tr -d '[:space:]' < doc/nrf91m1/DOC_VERSION)
+          fi
+          if [[ -n "${NRF91M1_DOC_VERSION:-}" ]]; then
+            echo "NRF91M1_DOC_VERSION=${NRF91M1_DOC_VERSION}"
+            echo "NRF91M1_DOC_VERSION=${NRF91M1_DOC_VERSION}" >> "$GITHUB_ENV"
+          fi
 
       - name: Build
         working-directory: doc
