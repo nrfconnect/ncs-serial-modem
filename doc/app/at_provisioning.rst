@@ -10,13 +10,23 @@ nRF Provisioning AT commands
 This page describes AT commands for the nRF Device Provisioning service.
 The provisioning client connects to the `nRF Cloud Provisioning Service`_ over CoAP or DTLS and applies device configuration commands (credentials, settings, and firmware updates) issued from the cloud.
 
-To use the provisioning service with the nRF9151 DK, you must first claim the device using its attestation token.
-You can retrieve this token with the ``AT%ATTESTTOKEN`` command.
-For more information, refer to the `nRF Cloud claiming Devices`_ documentation.
+.. only:: not nrf91m1
 
-For other devices, follow the instructions in the `nRF Cloud Provisioning Service`_ documentation, including adding the necessary certificates.
+   To use the provisioning service with the nRF9151 DK, you must first claim the device using its attestation token.
+   You can retrieve this token with the ``AT%ATTESTTOKEN`` command.
+   For more information, refer to the `nRF Cloud claiming Devices`_ documentation.
 
-Any steps that require nRF9151 application firmware support are handled by the |SM|.
+   For other devices, follow the instructions in the `nRF Cloud Provisioning Service`_ documentation, including adding the necessary certificates.
+
+   Any steps that require nRF9151 application firmware support are handled by the |SM|.
+
+.. only:: nrf91m1
+
+   To use the provisioning service, you must first claim the device using its attestation token.
+   You can retrieve this token with the ``AT%ATTESTTOKEN`` command.
+   For more information, refer to the `nRF Cloud claiming Devices`_ documentation.
+
+   Any steps that require application firmware support on the device are handled by the |SM|.
 
 .. only:: not nrf91m1
 
@@ -28,6 +38,9 @@ Any steps that require nRF9151 application firmware support are handled by the |
    During a provisioning session, the modem must be taken offline to write credentials, then brought back online to reconnect to the provisioning server.
    The device signals these requirements through ``#XNRFPROV: 1`` and ``#XNRFPROV: 2`` notifications.
    See the :ref:`unsolicited notifications <xnrfprov_notifications>` section for details.
+
+   Taking the modem offline does not close an nRF Cloud connection opened with :ref:`#XNRFCLOUD <SM_AT_NRFCLOUD>`, which keeps using the credentials it was established with.
+   If the provisioning session updates the nRF Cloud credentials, disconnect with ``AT#XNRFCLOUD=0`` and connect again with ``AT#XNRFCLOUD=1`` for them to take effect.
 
 Trigger provisioning #XNRFPROV
 ===============================
@@ -68,6 +81,7 @@ The parameters and their defined values are the following:
 
 <status>
    * ``0`` - Provisioning successful, or no pending commands on the server.
+     The two cases are not distinguished.
 
    * ``1`` - Host action required: deactivate LTE.
      The host must take the modem offline (for example ``AT+CFUN=4``) so that credentials can be written safely.
