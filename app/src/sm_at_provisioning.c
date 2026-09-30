@@ -89,9 +89,9 @@ static void nrf_provisioning_callback(const struct nrf_provisioning_callback_dat
 		xnrfprov_send_status(XNRFPROV_FATAL_ERROR);
 		break;
 	case NRF_PROVISIONING_EVENT_SCHEDULED_PROVISIONING:
+		/* No URC: the delay would be indistinguishable from a <status> value. */
 		LOG_INF("Provisioning scheduled, next attempt in %lld seconds",
 			event->next_attempt_time_seconds);
-		urc_send("\r\n#XNRFPROV: %lld\r\n", event->next_attempt_time_seconds);
 		break;
 	case NRF_PROVISIONING_EVENT_DONE:
 		LOG_INF("Provisioning done");

@@ -33,6 +33,9 @@ static bool nrfcloud_conn_send_location;
 static void nrfcloud_conn_work_fn(struct k_work *work);
 K_WORK_DEFINE(nrfcloud_conn_work, nrfcloud_conn_work_fn);
 
+static void nrfcloud_session_lost_work_fn(struct k_work *work);
+K_WORK_DEFINE(nrfcloud_session_lost_work, nrfcloud_session_lost_work_fn);
+
 #if defined(CONFIG_SM_NRF_CLOUD_LOCATION)
 
 #define NRFCLOUDPOS_TIMEOUT_SEC 120
@@ -209,6 +212,53 @@ static void nrfcloud_conn_work_fn(struct k_work *work)
 		on_cloud_disconnected();
 	}
 }
+
+/* Runs on the same queue as nrfcloud_conn_work, so that a connect completing concurrently
+ * with the loss of the session is still reported as disconnected.
+ */
+static void nrfcloud_session_lost_work_fn(struct k_work *work)
+{
+	ARG_UNUSED(work);
+
+	if (!sm_nrf_cloud_ready) {
+		return;
+	}
+
+	LOG_INF("nRF Cloud session lost");
+	/* Releases the socket that the modem has already closed. */
+	(void)nrf_cloud_coap_disconnect();
+	on_cloud_disconnected();
+}
+
+/* CFUN=0 closes all sockets, regardless of SO_KEEPOPEN. Other modes that deactivate LTE,
+ * such as CFUN=4, keep the DTLS session, which resumes once LTE is activated again.
+ */
+STATIC void nrfcloud_on_cfun_mode(int mode)
+{
+	if (mode == LTE_LC_FUNC_MODE_POWER_OFF) {
+		sm_k_work_submit_blocking(&nrfcloud_session_lost_work);
+	}
+}
+
+static void nrfcloud_on_cfun(int mode, void *ctx)
+{
+	ARG_UNUSED(ctx);
+
+	nrfcloud_on_cfun_mode(mode);
+}
+NRF_MODEM_LIB_ON_CFUN(sm_nrfcloud_cfun_hook, nrfcloud_on_cfun, NULL);
+
+static void nrfcloud_on_modem_shutdown(void *ctx)
+{
+	ARG_UNUSED(ctx);
+
+	/* Close the socket while the modem library is still up: after it is initialized
+	 * again, the stale descriptor could refer to another socket.
+	 */
+	(void)nrf_cloud_coap_disconnect();
+	sm_k_work_submit_blocking(&nrfcloud_session_lost_work);
+}
+NRF_MODEM_LIB_ON_SHUTDOWN(sm_nrfcloud_shutdown_hook, nrfcloud_on_modem_shutdown, NULL);
 
 SM_AT_CMD_CUSTOM(xnrfcloud, "AT#XNRFCLOUD", handle_at_nrf_cloud);
 STATIC int handle_at_nrf_cloud(enum at_parser_cmd_type cmd_type, struct at_parser *parser,

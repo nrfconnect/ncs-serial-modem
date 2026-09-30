@@ -327,6 +327,58 @@ void test_xnrfcloud_send_location_change_when_connected(void)
 	helper_xnrfcloud_disconnect_ok();
 }
 
+extern void nrfcloud_on_cfun_mode(int mode);
+
+/*
+ * Tests that CFUN=0, which closes all sockets, reports the session as lost.
+ */
+void test_xnrfcloud_cfun_power_off_reports_disconnected(void)
+{
+	helper_xnrfcloud_connect_ok();
+	clear_captured_response();
+
+	__cmock_nrf_cloud_coap_disconnect_ExpectAndReturn(0);
+	nrfcloud_on_cfun_mode(LTE_LC_FUNC_MODE_POWER_OFF);
+	k_sleep(K_MSEC(1));
+
+	resp = get_captured_response();
+	TEST_ASSERT_EQUAL_STRING("\r\n#XNRFCLOUD: 0,0\r\n", resp);
+	TEST_ASSERT_FALSE(sm_nrf_cloud_ready);
+}
+
+/*
+ * Tests that CFUN=4 keeps the session, which SO_KEEPOPEN preserves.
+ */
+void test_xnrfcloud_cfun_offline_keeps_session(void)
+{
+	helper_xnrfcloud_connect_ok();
+	clear_captured_response();
+
+	nrfcloud_on_cfun_mode(LTE_LC_FUNC_MODE_OFFLINE);
+	k_sleep(K_MSEC(1));
+
+	resp = get_captured_response();
+	TEST_ASSERT_NULL(strstr(resp, "#XNRFCLOUD"));
+	TEST_ASSERT_TRUE(sm_nrf_cloud_ready);
+
+	clear_captured_response();
+	helper_xnrfcloud_disconnect_ok();
+}
+
+/*
+ * Tests that CFUN=0 without a session sends nothing.
+ */
+void test_xnrfcloud_cfun_power_off_when_disconnected(void)
+{
+	sm_nrf_cloud_ready = false;
+
+	nrfcloud_on_cfun_mode(LTE_LC_FUNC_MODE_POWER_OFF);
+	k_sleep(K_MSEC(1));
+
+	resp = get_captured_response();
+	TEST_ASSERT_NULL(strstr(resp, "#XNRFCLOUD"));
+}
+
 /* Keeps nrfcloud_conn_work running until the test gives conn_work_release. */
 static int blocking_coap_connect(const char *const app_ver, int num_calls)
 {
