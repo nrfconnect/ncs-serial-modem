@@ -83,11 +83,11 @@ Configuration
 
 Application log output over ``UART1`` is included in the default build.
 
-To also enable the modem trace backend (``AT#XTRACE``), build with the Kconfig overlay:
+To also enable the modem trace backend (``AT#XTRACE``), build with the Kconfig overlay and the devicetree overlay that defines the modem trace SRAM partition:
 
 .. code-block:: console
 
-   west build -p -b nrf9151dk/nrf9151/ns -- -DEXTRA_CONF_FILE="trace-backend-uart.conf"
+   west build -p -b nrf9151dk/nrf9151/ns -- -DEXTRA_CONF_FILE="trace-backend-uart.conf" -DEXTRA_DTC_OVERLAY_FILE="trace-backend-nrf9151.overlay"
 
 After the application is initialized, the UART is suspended.
 Use ``AT#XLOG=1`` to activate application logs and ``AT#XTRACE=1`` to activate modem traces.
@@ -143,14 +143,19 @@ The |SM| application supports collecting modem traces through the CMUX multiplex
 When enabled, modem traces are sent through a dedicated CMUX channel, allowing simultaneous AT commands, PPP data, and trace collection over the same serial port.
 The trace CMUX channel is the first channel after the AT command channel and the PPP channel.
 
+.. note::
+   Unlike the :ref:`shared UART backend <sm_logging_uart_backend>`, the CMUX trace backend does not use ``AT#XTRACE``.
+   When CMUX is started with ``AT#XCMUX``, the trace channel is attached automatically.
+   When CMUX is started with ``AT+CMUX``, or to move the trace output to a different CMUX channel, use ``AT#XCMUXTRACE``.
+
 Configuration
 =============
 
-To use the CMUX trace backend, build the |SM| application with the trace backend configuration overlay in addition to the PPP and CMUX overlays:
+To use the CMUX trace backend, build the |SM| application with the trace backend configuration overlay in addition to the PPP and CMUX overlays, and the devicetree overlay that defines the modem trace SRAM partition:
 
 .. code-block:: console
 
-   west build -p -b nrf9151dk/nrf9151/ns -- -DEXTRA_CONF_FILE="ppp.conf;cmux.conf;trace-backend-cmux.conf"
+   west build -p -b nrf9151dk/nrf9151/ns -- -DEXTRA_CONF_FILE="ppp.conf;cmux.conf;trace-backend-cmux.conf" -DEXTRA_DTC_OVERLAY_FILE="trace-backend-nrf9151.overlay"
 
 For optimal throughput and to minimize trace data loss, configure the UART to run at maximum speed:
 

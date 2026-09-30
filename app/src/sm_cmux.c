@@ -416,7 +416,7 @@ STATIC int handle_at_xcmuxtrace(enum at_parser_cmd_type cmd_type, struct at_pars
 		int ch;
 		int ret = at_parser_num_get(parser, 1, &ch);
 
-		if (ret || (ch < 2 || ch >= CONFIG_SM_CMUX_CHANNEL_COUNT)) {
+		if (ret || (ch < 2 || ch > CONFIG_SM_CMUX_CHANNEL_COUNT)) {
 			return -EINVAL;
 		}
 		pipe = sm_cmux_get_dlci(ch);
