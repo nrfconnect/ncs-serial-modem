@@ -101,7 +101,7 @@ The parameters and their defined values are the following:
    Integer.
    Optional.
    When ``0`` or omitted and no option pairs follow, no request payload is sent and the command returns ``OK`` immediately.
-   A positive integer specifies the total payload length in bytes; the command then returns ``OK`` and enters data mode.
+   A positive integer specifies the total payload length in bytes and the command then returns ``OK`` and enters data mode.
 
    .. note::
 
