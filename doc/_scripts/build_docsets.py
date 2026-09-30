@@ -13,7 +13,7 @@ sources in :file:`doc/`, one Sphinx run per docset and output format, and
 assembles the directory layout that gets published::
 
     <build>/html/index.html         redirect to the default docset
-    <build>/html/versions.json      version list read by the theme
+    <build>/html/versions.json      Serial Modem release list (git tags)
     <build>/html/<docset>/          one directory per docset
     <build>/pdf/<docset>/latex/     LaTeX sources and PDF of one docset
 
@@ -140,7 +140,7 @@ def copy_pdf(docset: str, build_dir: Path) -> None:
         print(f"Skipping the PDF copy of the {docset} docset: no HTML built", flush=True)
         return
 
-    pdf = build_dir / "pdf" / docset / "latex" / f"{docsets.PDF_FILENAMES[docset]}.pdf"
+    pdf = build_dir / "pdf" / docset / "latex" / f"{docsets.pdf_stem(docset)}.pdf"
     print(f"Copying {pdf.name} into the {docset} docset", flush=True)
     shutil.copy(pdf, html_dir / pdf.name)
 
@@ -185,6 +185,8 @@ def main() -> None:
     )
 
     args, sphinx_opts = parser.parse_known_args()
+
+    docsets.apply_build_environment()
 
     build_dir = args.build_dir.absolute()
 
