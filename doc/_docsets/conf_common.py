@@ -184,6 +184,160 @@ def notice_title_commands() -> str:
     )
 
 
+def _latex_text(text: str) -> str:
+    """Escape text for use in LaTeX macro definitions."""
+
+    for char, replacement in (
+        ("\\", r"\textbackslash{}"),
+        ("&", r"\&"),
+        ("%", r"\%"),
+        ("$", r"\$"),
+        ("#", r"\#"),
+        ("_", r"\_"),
+        ("{", r"\{"),
+        ("}", r"\}"),
+        ("~", r"\textasciitilde{}"),
+        ("^", r"\textasciicircum{}"),
+    ):
+        text = text.replace(char, replacement)
+    return text
+
+
+# PDF front page: blue band with parameterized title lines (see
+# :func:`latex_title_page_preamble`).
+LATEX_MAKETITLE = r"""
+\makeatletter
+\let\sphinxrestorepageanchorsetting\relax
+\ifHy@pageanchor\def\sphinxrestorepageanchorsetting{\Hy@pageanchortrue}\fi
+\hypersetup{pageanchor=false}
+\begin{titlepage}
+  \begingroup
+    \def\endgraf{ }\def\and{\& }%
+    \pdfstringdefDisableCommands{\def\\{, }}%
+    \hypersetup{pdfauthor={\@author}, pdftitle={\@title}}%
+  \endgroup
+  % The band bleeds off the left paper edge, which sits 1in+\oddsidemargin
+  % outside the text block. \makebox keeps the line exactly \linewidth wide so
+  % the overhang does not report an overfull box. \fboxsep becomes the band's
+  % inner padding, keeping the title clear of the paper edge, and the minipage
+  % is sized so the band itself stays 0.90\paperwidth by 0.32\paperheight.
+  \begingroup
+    \setlength{\fboxsep}{16mm}%
+    \setlength{\nordicbandwidth}{\dimexpr0.90\paperwidth-2\fboxsep\relax}%
+    \setlength{\nordicbandheight}{\dimexpr0.32\paperheight-2\fboxsep\relax}%
+    \noindent\makebox[\linewidth][l]{%
+      \hspace*{\dimexpr-1in-\oddsidemargin\relax}%
+      \colorbox{nordicblue}{%
+        \begin{minipage}[t][\nordicbandheight][b]{\nordicbandwidth}
+          \sffamily\color{white}
+          {\Huge\raggedright\hyphenpenalty=10000\exhyphenpenalty=10000
+           \nordicPdfBandTitle\par}
+          \vspace{2.5em}
+          \begin{flushright}
+            {\Large\bfseries\leavevmode\nordicPdfBandLineTwo\par}
+            \nordicPrintPdfBandLineThree
+          \end{flushright}
+        \end{minipage}%
+      }%
+    }%
+  \endgroup
+  \vfill
+  % logo.png surrounds the artwork with white padding, so the drawn logo is
+  % only 0.82 of the file height: 35mm here renders it about 28mm tall, the
+  % size in the reference. The negative kern carries it past the 1in text
+  % margin so it ends about 13mm from the paper's right edge.
+  \noindent\makebox[\linewidth][r]{%
+    \includegraphics[height=35mm]{logo.png}\hspace*{-14mm}%
+  }
+\end{titlepage}
+\setcounter{footnote}{0}%
+\let\thanks\relax\let\maketitle\relax
+\clearpage
+\ifdefined\sphinxbackoftitlepage\sphinxbackoftitlepage\fi
+\if@openright\cleardoublepage\else\clearpage\fi
+\sphinxrestorepageanchorsetting
+\makeatother
+"""
+
+
+def _latex_band_line_three(lines: list[str], text: str | None) -> None:
+    """Append LaTeX for the optional third title-page band line."""
+
+    if text:
+        lines.append(r"\nordicbandhaslinethreetrue")
+        lines.append(
+            rf"\newcommand{{\nordicPdfBandLineThree}}{{{_latex_text(text)}}}"
+        )
+    else:
+        lines.append(r"\nordicbandhaslinethreefalse")
+
+
+def latex_title_page_preamble(
+    docset: str,
+    *,
+    author_name: str,
+    release_label: str,
+) -> str:
+    """Return LaTeX macros for the PDF front page of a docset.
+
+    Text comes from :data:`docsets.PDF_TITLES` and
+    :data:`docsets.PDF_GUIDE_TITLES`. When the guide title is empty, the
+    bottom-right lines use ``author_name`` and ``release_label``.
+
+    Args:
+        docset: Docset name.
+        author_name: Author string for the second band line.
+        release_label: Release string for the third band line when no guide
+            title is configured.
+
+    Returns:
+        LaTeX code appended to the shared preamble.
+    """
+
+    title = _latex_text(docsets.PDF_TITLES[docset])
+    guide = docsets.PDF_GUIDE_TITLES.get(docset, "")
+    lines = [rf"\newcommand{{\nordicPdfBandTitle}}{{{title}}}"]
+
+    if guide:
+        lines.append(
+            rf"\newcommand{{\nordicPdfBandLineTwo}}{{{_latex_text(guide)}}}"
+        )
+        _latex_band_line_three(lines, docsets.pdf_band_release(docset))
+    else:
+        lines.append(
+            rf"\newcommand{{\nordicPdfBandLineTwo}}{{{_latex_text(author_name)}}}"
+        )
+        _latex_band_line_three(lines, release_label or None)
+
+    return "\n" + "\n".join(lines) + "\n"
+
+
+def docset_latex_elements(
+    docset: str,
+    *,
+    author_name: str,
+    release_label: str,
+) -> dict:
+    """Return the LaTeX builder options for a docset.
+
+    Args:
+        docset: Docset name.
+        author_name: Author string for the PDF title page.
+        release_label: Release string for the PDF title page.
+
+    Returns:
+        Value for the ``latex_elements`` configuration option.
+    """
+
+    elements = dict(latex_elements)
+    elements["preamble"] = elements["preamble"] + latex_title_page_preamble(
+        docset,
+        author_name=author_name,
+        release_label=release_label,
+    )
+    return elements
+
+
 latex_elements = {
     'papersize': 'a4paper',
     'pointsize': '11pt',
@@ -238,62 +392,7 @@ latex_elements = {
         'verbatimmaxoverfull=0',
         *notice_box_keys(),
     ]),
-    # Replaces \sphinxmaketitle. The page-anchor and clearpage handling around
-    # the titlepage is what Sphinx itself does; only the layout differs.
-    'maketitle': r"""
-\makeatletter
-\let\sphinxrestorepageanchorsetting\relax
-\ifHy@pageanchor\def\sphinxrestorepageanchorsetting{\Hy@pageanchortrue}\fi
-\hypersetup{pageanchor=false}
-\begin{titlepage}
-  \begingroup
-    \def\endgraf{ }\def\and{\& }%
-    \pdfstringdefDisableCommands{\def\\{, }}%
-    \hypersetup{pdfauthor={\@author}, pdftitle={\@title}}%
-  \endgroup
-  % The band bleeds off the left paper edge, which sits 1in+\oddsidemargin
-  % outside the text block. \makebox keeps the line exactly \linewidth wide so
-  % the overhang does not report an overfull box. \fboxsep becomes the band's
-  % inner padding, keeping the title clear of the paper edge, and the minipage
-  % is sized so the band itself stays 0.90\paperwidth by 0.32\paperheight.
-  \begingroup
-    \setlength{\fboxsep}{16mm}%
-    \setlength{\nordicbandwidth}{\dimexpr0.90\paperwidth-2\fboxsep\relax}%
-    \setlength{\nordicbandheight}{\dimexpr0.32\paperheight-2\fboxsep\relax}%
-    \noindent\makebox[\linewidth][l]{%
-      \hspace*{\dimexpr-1in-\oddsidemargin\relax}%
-      \colorbox{nordicblue}{%
-        \begin{minipage}[t][\nordicbandheight][b]{\nordicbandwidth}
-          \sffamily\color{white}
-          {\Huge\raggedright\hyphenpenalty=10000\exhyphenpenalty=10000
-           \@title\par}
-          \vspace{2.5em}
-          \begin{flushright}
-            {\Large\bfseries\@author\par}
-            \vspace{0.4em}
-            {\large\py@release\releaseinfo\par}
-          \end{flushright}
-        \end{minipage}%
-      }%
-    }%
-  \endgroup
-  \vfill
-  % logo.png surrounds the artwork with white padding, so the drawn logo is
-  % only 0.82 of the file height: 35mm here renders it about 28mm tall, the
-  % size in the reference. The negative kern carries it past the 1in text
-  % margin so it ends about 13mm from the paper's right edge.
-  \noindent\makebox[\linewidth][r]{%
-    \includegraphics[height=35mm]{logo.png}\hspace*{-14mm}%
-  }
-\end{titlepage}
-\setcounter{footnote}{0}%
-\let\thanks\relax\let\maketitle\relax
-\clearpage
-\ifdefined\sphinxbackoftitlepage\sphinxbackoftitlepage\fi
-\if@openright\cleardoublepage\else\clearpage\fi
-\sphinxrestorepageanchorsetting
-\makeatother
-""",
+    'maketitle': LATEX_MAKETITLE,
     "preamble": r"""
 \usepackage{sectsty}
 \usepackage{etoolbox}
@@ -303,6 +402,14 @@ latex_elements = {
 % Title page band geometry, computed in \sphinxmaketitle from \fboxsep.
 \newlength{\nordicbandwidth}
 \newlength{\nordicbandheight}
+\newif\ifnordicbandhaslinethree
+\nordicbandhaslinethreefalse
+\newcommand{\nordicPrintPdfBandLineThree}{%
+  \ifnordicbandhaslinethree
+    \vspace{0.4em}%
+    {\large\leavevmode\nordicPdfBandLineThree\par}%
+  \fi
+}
 
 % hyperref is already loaded at this point, so these settings win. Without
 % colorlinks it frames every link with a border instead of tinting the text.
@@ -338,11 +445,78 @@ latex_elements = {
    \vskip 40\p@}%
 }
 % \@chapapp is the "Chapter" label; dropping it leaves "1<gap>Title".
+% After \nordicStartAppendices the number is a letter and the head reads
+% "Appendix A: Title". Sections then number as A.1, A.1.1, following secnumdepth.
+\newif\ifnordicinappendix
+% \appendix resets the chapter counter, so it runs only for the first appendix;
+% every later page that calls this continues with B, C, ...
+\newcommand{\nordicStartAppendices}{%
+  \ifnordicinappendix\else
+    \appendix
+    \nordicinappendixtrue
+  \fi
+}
 \renewcommand{\@makechapterhead}[1]{%
-  \nordicchapterhead{\ifnum\c@secnumdepth>\m@ne\thechapter\hskip0.75em\fi#1}%
+  \nordicchapterhead{%
+    \ifnum\c@secnumdepth>\m@ne
+      \ifnordicinappendix
+        \appendixname~\thechapter:\hskip0.5em
+      \else
+        \thechapter\hskip0.75em
+      \fi
+    \fi
+    #1}%
 }
 % Unnumbered chapters, such as the contents and index heads.
 \renewcommand{\@makeschapterhead}[1]{\nordicchapterhead{#1}}
+
+% Unnumbered chapters for front matter such as the revision history. Appendices
+% are lettered instead, see \nordicStartAppendices. A page brackets its content with
+% these two macros in .. raw:: latex blocks; the first must come before the
+% page title because \chapter reads secnumdepth when it runs. The heading
+% macro above already drops the number when secnumdepth is -1, and \chapter
+% still lists the title in the contents. The depth is saved and restored
+% instead of hard-coded because Sphinx raises it when tocdepth or numfig
+% require it.
+\newcount\nordic@savedsecnumdepth
+\newcommand{\nordicNoChapterNumbers}{%
+  \global\nordic@savedsecnumdepth=\c@secnumdepth
+  \setcounter{secnumdepth}{-1}%
+}
+\newcommand{\nordicRestoreChapterNumbers}{%
+  \setcounter{secnumdepth}{\the\nordic@savedsecnumdepth}%
+}
+
+% Keep the sections of one page out of the contents. The Sphinx :tocdepth:
+% field does not do this in the PDF, because LaTeX uses the one set by the root
+% document. These macros are written into the .toc file, so the depth changes
+% while the contents are typeset, between the entries of the surrounding pages.
+\newcount\nordic@savedtocdepth
+\newcommand{\nordicHideSectionsInToc}{%
+  \addtocontents{toc}{\protect\nordicTocSaveAndLimit}%
+}
+\newcommand{\nordicShowSectionsInToc}{%
+  \addtocontents{toc}{\protect\nordicTocRestore}%
+}
+\newcommand{\nordicTocSaveAndLimit}{%
+  \global\nordic@savedtocdepth=\c@tocdepth
+  \setcounter{tocdepth}{0}%
+}
+\newcommand{\nordicTocRestore}{%
+  \setcounter{tocdepth}{\the\nordic@savedtocdepth}%
+}
+
+% sphinxmanual.cls sets the section number box in the contents to 2.6em from
+% \sphinxtableofcontentshook, which runs when the contents are typeset and so
+% overrides anything defined directly in the preamble. A number such as 16.13
+% nearly fills that box, so the title touches it. The widths are therefore set
+% from the same hook, appended after the class definition. The indent of each
+% level is unchanged and only the space reserved for its number grows.
+\g@addto@macro\sphinxtableofcontentshook{%
+  \renewcommand*\l@section{\@dottedtocline{1}{1.5em}{3.2em}}%
+  %\renewcommand*\l@subsection{\@dottedtocline{2}{4.1em}{4.2em}}%
+  \renewcommand*\l@subsubsection{\@dottedtocline{3}{7.0em}{5.2em}}%
+}
 \makeatother
 
 \sectionfont{\color{nordicblue}}
@@ -494,7 +668,7 @@ def docset_html_context(docset: str) -> dict:
         Dictionary to merge into the ``html_context`` configuration option.
     """
 
-    return {"pdf_filename": f"{docsets.PDF_FILENAMES[docset]}.pdf"}
+    return {"pdf_filename": f"{docsets.pdf_stem(docset)}.pdf"}
 
 
 def docset_latex_documents(docset: str) -> list[tuple[str, str, str, str, str]]:
@@ -515,7 +689,7 @@ def docset_latex_documents(docset: str) -> list[tuple[str, str, str, str, str]]:
     """
 
     _, home = docsets.ALL_DOCSETS[docset]
-    pdf_filename = docsets.PDF_FILENAMES[docset]
-    pdf_title = docsets.PDF_TITLES[docset]
+    pdf_filename = docsets.pdf_stem(docset)
+    pdf_title = docsets.pdf_document_title(docset)
 
-    return [(home, f"{pdf_filename}.tex", f"{pdf_title}", author, "manual")]
+    return [(home, f"{pdf_filename}.tex", pdf_title, author, "manual")]
