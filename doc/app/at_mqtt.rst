@@ -196,6 +196,7 @@ The parameters and their defined values are the following:
    * ``0`` - Acknowledgment of connection request (CONNACK).
    * ``1`` - Disconnection notification (DISCONNECT).
      The MQTT client is disconnected from the MQTT broker once this event is notified.
+     If this event is received without a preceding ``AT#XMQTTCON=0`` command, the host must issue ``AT#XMQTTCON=0`` before connecting again.
 
 <result>
    * ``0`` - Success.
@@ -241,6 +242,15 @@ Examples
    AT#XMQTTCON=0
    OK
    #XMQTTEVT: 1,0
+
+When the MQTT broker closes the connection:
+
+::
+
+   #XMQTTEVT: 1,0
+
+   AT#XMQTTCON=0
+   OK
 
 Read command
 ------------
