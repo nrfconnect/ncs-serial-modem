@@ -72,11 +72,11 @@ static const char *nrfcloud_fota_app_key_swap(void)
 	return saved_key;
 }
 
-/* Reports a failed check/download attempt: logs it and sends the #XNRFCLOUDFOTA error URC. */
+/* Reports a failed check or pre-download setup, logs it and sends #XNRFCLOUDFOTA: 0,1,<error>. */
 static void nrfcloud_fota_check_failed(int rv)
 {
 	LOG_ERR("FOTA check failed: %d", rv);
-	urc_send_to(fota_pipe, "\r\n#XNRFCLOUDFOTA: -1,%d\r\n", rv);
+	urc_send_to(fota_pipe, "\r\n#XNRFCLOUDFOTA: 0,1,%d\r\n", rv);
 }
 
 /* The NCS downloader's CoAP transport cannot resume from an offset inside a block, and the
@@ -132,7 +132,7 @@ static void nrfcloud_fota_check(void)
 		sm_fota_init_state();
 	} else if (rv == 0) {
 		sm_fota_init_state();
-		urc_send_to(fota_pipe, "\r\n#XNRFCLOUDFOTA: 0\r\n");
+		urc_send_to(fota_pipe, "\r\n#XNRFCLOUDFOTA: 0,0,0\r\n");
 	}
 	/* rv == 1: a download started. memfault_fota_download_callback() reports the rest
 	 * through the #XNRFCLOUDFOTA URC.
@@ -171,7 +171,7 @@ static void nrfcloud_fota_check_only(void)
 	if (rv < 0) {
 		nrfcloud_fota_check_failed(rv);
 	} else {
-		urc_send_to(fota_pipe, "\r\n#XNRFCLOUDFOTA: %d\r\n", rv);
+		urc_send_to(fota_pipe, "\r\n#XNRFCLOUDFOTA: 0,0,%d\r\n", rv);
 	}
 
 	/* Release the busy gate held by the handler for the duration of the check. */
