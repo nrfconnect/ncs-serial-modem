@@ -18,8 +18,7 @@ You can perform the following using the Socket AT commands:
 
 .. _SM_AT_HTTPC_IDLE_TIMEOUT:
 
-Request idle timeout
---------------------
+.. rubric:: Request idle timeout
 
 .. only:: not nrf91m1
 
