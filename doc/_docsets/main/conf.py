@@ -22,6 +22,8 @@ DOCSET = "main"
 
 project, root_doc = docsets.ALL_DOCSETS[DOCSET]
 
+version = release = os.environ.get("VERSION", "latest")
+
 exclude_patterns = docset_exclude_patterns(DOCSET) + [
     # Pages that do not apply to the nRF91M1 go here.
     "index_nrf91m1.rst",

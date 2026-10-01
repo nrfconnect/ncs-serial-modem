@@ -29,6 +29,8 @@ DOCSET = "nrf91m1"
 
 project, root_doc = docsets.ALL_DOCSETS[DOCSET]
 
+version = release = "1.0.0"
+
 exclude_patterns = docset_exclude_patterns(DOCSET) + [
     # Pages that do not apply to the nRF91M1 go here.
     "app/at_carrier.rst",

@@ -34,7 +34,6 @@ import docsets  # noqa: E402
 
 copyright = "2026, Nordic Semiconductor"
 author = "Nordic Semiconductor"
-version = release = os.environ.get("VERSION", "latest")
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
