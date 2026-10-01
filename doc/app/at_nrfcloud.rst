@@ -944,9 +944,9 @@ The ``#XNRFCLOUDFOTA`` command checks for and downloads an application or modem 
 
    Requires the :ref:`CONFIG_SM_NRF_CLOUD_FOTA <CONFIG_SM_NRF_CLOUD_FOTA>` Kconfig option.
 
-An application update is staged the same way as ``AT#XFOTA=1``; the host activates it with ``AT#XRESET``.
-A modem update is staged the same way as ``AT#XFOTA=2``; the host activates it with ``AT#XMODEMRESET``.
-Both share their FOTA session with ``#XFOTA``, but progress and completion are reported over the ``#XNRFCLOUDFOTA`` notification instead, using the same ``<fota_stage>``, ``<fota_status>`` and ``<fota_info>`` values as ``#XFOTA``: see :ref:`SM_AT_FOTA` for their meaning and the activation commands.
+An application update is staged the same way as ``AT#XFOTA=1``, that is, the host activates it with ``AT#XRESET``.
+A modem update is staged the same way as ``AT#XFOTA=2``, that is, the host activates it with ``AT#XMODEMRESET``.
+Both share their FOTA session with ``#XFOTA``, but progress and completion are reported over the ``#XNRFCLOUDFOTA`` notification instead, using the same ``<fota_stage>``, ``<fota_status>`` and ``<fota_info>`` tuple as ``#XFOTA`` (see :ref:`SM_AT_FOTA` for download and activation semantics).
 Only one FOTA session, from either command, can be ongoing at a time.
 
 .. note::
@@ -969,7 +969,7 @@ Only one FOTA session, from either command, can be ongoing at a time.
 Set command
 -----------
 
-The set command starts a FOTA check, and the download if an update is available.
+The set command starts a FOTA check, and the download if requested and an update is available.
 
 Syntax
 ~~~~~~
@@ -1010,20 +1010,27 @@ Unsolicited notification
 
 ::
 
-   #XNRFCLOUDFOTA: <result>[,<error>]
    #XNRFCLOUDFOTA: <fota_stage>,<fota_status>[,<fota_info>]
 
-When the check completes without starting a download, the first form is sent:
+The ``<fota_stage>``, ``<fota_status>``, and ``<fota_info>`` parameters use the same values as the ``#XFOTA`` notification:
 
-The parameters and their defined values are the following:
+.. include:: at_fota.rst
+   :start-after: sm_fota_urc_params_start
+   :end-before: sm_fota_urc_params_end
 
-<result>
-   * ``0`` - No update is available.
-   * ``1`` - An update is available (``<op>=4`` and ``<op>=6`` only; ``<op>=1`` and ``<op>=2`` start the download instead).
-   * ``-1`` - The check failed.
-     The ``<error>`` parameter follows with the error code.
+When the FOTA check finishes without starting a download, ``<fota_stage>`` is ``0`` (*Init*) and ``<fota_info>`` indicates the result.
+This form is used by ``#XNRFCLOUDFOTA`` only (not ``#XFOTA``) and specified as follows:
 
-When a download starts, progress and completion are reported with the second form instead, using the same ``<fota_stage>``, ``<fota_status>`` and ``<fota_info>`` values as the ``#XFOTA`` notification described in :ref:`SM_AT_FOTA`.
++-------------------------+----------------------------+----------------------------------------------------+
+|``<fota_stage>``         |``<fota_status>``           | ``<fota_info>``                                    |
++=========================+============================+====================================================+
+|``0`` (namely *Init*)    | ``0`` (namely *OK*)        | ``0`` - No update is available                     |
++-------------------------+----------------------------+----------------------------------------------------+
+|``0`` (namely *Init*)    | ``0`` (namely *OK*)        | ``1`` - An update is available (sent only for      |
+|                         |                            |         ``<op>=4`` and ``<op>=6``                  |
++-------------------------+----------------------------+----------------------------------------------------+
+|``0`` (namely *Init*)    | ``1`` (namely *ERROR*)     | Error code                                         |
++-------------------------+----------------------------+----------------------------------------------------+
 
 Examples
 ~~~~~~~~
@@ -1049,7 +1056,7 @@ The following example checks whether an application update is available, without
 
   OK
 
-  #XNRFCLOUDFOTA: 1
+  #XNRFCLOUDFOTA: 0,0,1
 
 Read command
 ------------

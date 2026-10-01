@@ -185,6 +185,8 @@ Unsolicited notification
 
 The parameters and their defined values are the following:
 
+.. sm_fota_urc_params_start
+
 <fota_stage>
    * ``0`` - Init.
    * ``1`` - Download.
@@ -230,6 +232,8 @@ The parameters and their defined values are the following:
   * ``71303171`` (``NRF_MODEM_DFU_RESULT_AUTH_ERROR``) - Modem firmware update failed due to an authentication error.
   * ``71303172`` (``NRF_MODEM_DFU_RESULT_UUID_ERROR``) - Modem firmware update failed due to UUID mismatch.
   * ``71303173`` (``NRF_MODEM_DFU_RESULT_VOLTAGE_LOW``) - Modem firmware update not executed due to low voltage. The modem will retry the update on reboot.
+
+.. sm_fota_urc_params_end
 
 Read command
 ------------
