@@ -18,8 +18,7 @@ The page describes the following nRF Cloud-related AT commands:
 
 .. _SM_AT_NRFCLOUDOBS:
 
-Observability #XNRFCLOUDOBS*
-----------------------------
+.. rubric:: Observability #XNRFCLOUDOBS*
 
 The ``#XNRFCLOUDOBS*`` commands control the Memfault data that the device collects (metrics, events, logs, and, in builds that include it, a coredump) and its upload to nRF Cloud over the CoAP transport.
 
@@ -372,92 +371,141 @@ Test command
 
 The test command is not supported.
 
-.. _SM_AT_NRFCLOUDOBSAUTO:
+.. _SM_AT_NRFCLOUDFOTA:
 
-Automatic upload #XNRFCLOUDOBSAUTO
-==================================
+nRF Cloud FOTA #XNRFCLOUDFOTA
+=============================
 
-The ``#XNRFCLOUDOBSAUTO`` command configures the automatic upload of the buffered observability data.
+The ``#XNRFCLOUDFOTA`` command checks for and downloads an application or modem firmware update using `Memfault release management`_, delivered over the same nRF Cloud CoAP transport as ``#XNRFCLOUDOBS*``.
 
-The configuration is persistent, so it survives a reboot.
+.. only:: not nrf91m1
+
+   Requires the :ref:`CONFIG_SM_NRF_CLOUD_FOTA <CONFIG_SM_NRF_CLOUD_FOTA>` Kconfig option.
+
+An application update is staged the same way as ``AT#XFOTA=1``, that is, the host activates it with ``AT#XRESET``.
+A modem update is staged the same way as ``AT#XFOTA=2``, that is, the host activates it with ``AT#XMODEMRESET``.
+Both share their FOTA session with ``#XFOTA``, but progress and completion are reported over the ``#XNRFCLOUDFOTA`` notification instead, using the same ``<fota_stage>``, ``<fota_status>`` and ``<fota_info>`` tuple as ``#XFOTA`` (see :ref:`SM_AT_FOTA` for download and activation semantics).
+Only one FOTA session, from either command, can be ongoing at a time.
+
+.. note::
+   Unlike ``AT#XFOTA``, ``#XNRFCLOUDFOTA`` does not support MCUboot bootloader updates.
+   This is expected to be a rare use case. Support for it is planned to be added in a future release.
+
+.. note::
+   ``<op>=2`` uses a dedicated Memfault project key for modem firmware, obtained from Settings > General in that project (a different project than the application's).
+
+   .. only:: not nrf91m1
+
+      Set it with the ``CONFIG_MEMFAULT_FOTA_MODEM_PROJECT_KEY`` Kconfig option, or override it at runtime with the ``<project_key>`` parameter.
+
+   .. only:: nrf91m1
+
+      Use the ``<project_key>`` parameter to set it at runtime.
+
+   When neither is set, the request will target the default project where the device was claimed.
 
 Set command
 -----------
 
-The set command enables or disables the automatic upload and configures its interval.
+The set command starts a FOTA check, and the download if requested and an update is available.
+
+.. note::
+
+   The ``#XNRFCLOUDFOTA`` command uses default PDN connection with ID ``0``.
+   Raw sockets must not use the PDN connection at the same time.
+   See :ref:`SM_AT_SOCKET_RAW_SOCKET_LIMITATION` for more information.
 
 Syntax
 ~~~~~~
 
 ::
 
-   AT#XNRFCLOUDOBSAUTO=<enable>[,<interval_seconds>][,<project_key>]
+   AT#XNRFCLOUDFOTA=<op>[,<project_key>]
 
 The parameters and their defined values are the following:
 
-<enable>
-   * ``0`` - Disable the automatic upload.
-   * ``1`` - Enable the automatic upload.
-
-<interval_seconds>
-   Integer.
-   The interval between two uploads, from ``60`` to ``86400`` seconds.
-   When omitted, the stored interval is kept.
-
-   .. only:: not nrf91m1
-
-      The initial value is set by the :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_AUTO_INTERVAL_SECONDS <CONFIG_SM_NRF_CLOUD_OBSERVABILITY_AUTO_INTERVAL_SECONDS>` Kconfig option.
-
-   .. only:: nrf91m1
-
-      The initial value is 3600 seconds.
+<op>
+   * ``0`` - Cancel an ongoing download.
+     This is effective only after a download has started, that is, after the first ``#XNRFCLOUDFOTA`` progress notification.
+   * ``1`` - Check for and download an application update.
+   * ``2`` - Check for and download a modem firmware update.
+   * ``4`` - Check for an application update, without downloading it.
+   * ``6`` - Check for a modem firmware update, without downloading it.
 
 <project_key>
    String.
-   When omitted, the stored project key is kept, and an empty string clears it.
+   Project key used for the FOTA operation.
 
-The first upload runs when the interval expires, not when the automatic upload is enabled.
-An upload that falls while there is no connection to nRF Cloud is skipped, and the next one is scheduled as usual.
+   .. only:: not nrf91m1
 
-The automatic upload is silent and does not send any unsolicited notifications.
+      For ``<op>=1`` and ``<op>=4``, it overrides the application project key (``CONFIG_MEMFAULT_PROJECT_KEY``), and for ``<op>=2`` and ``<op>=6`` it overrides ``CONFIG_MEMFAULT_FOTA_MODEM_PROJECT_KEY``.
+      If this option is not provided and the corresponding Kconfig setting is unset, the request will target the default project where the device was claimed.
 
-Response
+   .. only:: nrf91m1
+
+      For ``<op>=1`` and ``<op>=4``, it is the application Memfault project key, and for ``<op>=2`` and ``<op>=6`` it is the modem Memfault project key.
+      If this option is not provided, the request will target the default project where the device was claimed.
+
+The command returns ``OK`` immediately and the check runs asynchronously.
+When it completes, an unsolicited notification is sent.
+
+Unsolicited notification
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+::
+
+   #XNRFCLOUDFOTA: <fota_stage>,<fota_status>[,<fota_info>]
+
+The ``<fota_stage>``, ``<fota_status>``, and ``<fota_info>`` parameters use the same values as the ``#XFOTA`` notification:
+
+.. include:: at_fota.rst
+   :start-after: sm_fota_urc_params_start
+   :end-before: sm_fota_urc_params_end
+
+When the FOTA check finishes without starting a download, ``<fota_stage>`` is ``0`` (*Init*) and ``<fota_info>`` indicates the result.
+This form is used by ``#XNRFCLOUDFOTA`` only (not ``#XFOTA``) and specified as follows:
+
++-------------------------+----------------------------+----------------------------------------------------+
+|``<fota_stage>``         |``<fota_status>``           | ``<fota_info>``                                    |
++=========================+============================+====================================================+
+|``0`` (namely *Init*)    | ``0`` (namely *OK*)        | ``0`` - No update is available                     |
++-------------------------+----------------------------+----------------------------------------------------+
+|``0`` (namely *Init*)    | ``0`` (namely *OK*)        | ``1`` - An update is available (sent only for      |
+|                         |                            |         ``<op>=4`` and ``<op>=6``                  |
++-------------------------+----------------------------+----------------------------------------------------+
+|``0`` (namely *Init*)    | ``1`` (namely *ERROR*)     | Error code                                         |
++-------------------------+----------------------------+----------------------------------------------------+
+
+Examples
 ~~~~~~~~
 
-The command returns ``OK``, also when the configuration could not be stored, in which case only its persistence is lost.
+::
+
+  AT#XNRFCLOUDFOTA=1
+
+  OK
+
+  #XNRFCLOUDFOTA: 1,0,45
+
+  #XNRFCLOUDFOTA: 1,0,100
+
+  #XNRFCLOUDFOTA: 4,0
+  AT#XRESET
+
+The following example checks whether an application update is available, without downloading it:
+
+::
+
+  AT#XNRFCLOUDFOTA=4
+
+  OK
+
+  #XNRFCLOUDFOTA: 0,0,1
 
 Read command
 ------------
 
-The read command returns the configuration of the automatic upload.
-
-Syntax
-~~~~~~
-
-::
-
-   AT#XNRFCLOUDOBSAUTO?
-
-Response
-~~~~~~~~
-
-::
-
-   #XNRFCLOUDOBSAUTO: <enable>,<interval_seconds>,<project_key>
-
-Example
-~~~~~~~
-
-::
-
-  AT#XNRFCLOUDOBSAUTO=1,600
-
-  OK
-  AT#XNRFCLOUDOBSAUTO?
-
-  #XNRFCLOUDOBSAUTO: 1,600,""
-
-  OK
+The read command is not supported.
 
 Test command
 ------------
@@ -469,14 +517,14 @@ Syntax
 
 ::
 
-   AT#XNRFCLOUDOBSAUTO=?
+   AT#XNRFCLOUDFOTA=?
 
 Response
 ~~~~~~~~
 
 ::
 
-   #XNRFCLOUDOBSAUTO: (0,1),(60-86400),<project_key>
+   #XNRFCLOUDFOTA: (0,1,2,4,6)[,<project_key>]
 
 .. _SM_AT_NRFCLOUDOBSUPLOAD:
 
@@ -551,78 +599,6 @@ Response
 ::
 
    #XNRFCLOUDOBSUPLOAD: <project_key>
-
-.. _SM_AT_NRFCLOUDOBSCOREDUMP:
-
-Core dump upload #XNRFCLOUDOBSCOREDUMP
-======================================
-
-The ``#XNRFCLOUDOBSCOREDUMP`` command controls whether a stored core dump is included in an upload.
-
-When disabled, ``#XNRFCLOUDOBSUPLOAD`` and the automatic upload send the buffered events, logs, and CDRs but leave the core dump in storage, so it can be uploaded later by enabling this again.
-Core dump upload is enabled by default, and the setting is persisted.
-
-.. note::
-
-   Core dump storage holds a single core dump.
-   While a new core dump is stored, subsequent crashes do not capture a new core dump until the stored one has been uploaded.
-   Keeping the upload disabled prevents new core dumps from being captured.
-
-Set command
------------
-
-The set command enables or disables the core dump upload.
-
-Syntax
-~~~~~~
-
-::
-
-   AT#XNRFCLOUDOBSCOREDUMP=<enable>
-
-The parameters and their defined values are the following:
-
-<enable>
-   * ``0`` - Exclude the stored core dump from uploads.
-   * ``1`` - Include the stored core dump in uploads.
-
-Read command
-------------
-
-The read command returns the current setting.
-
-Syntax
-~~~~~~
-
-::
-
-   AT#XNRFCLOUDOBSCOREDUMP?
-
-Response
-~~~~~~~~
-
-::
-
-   #XNRFCLOUDOBSCOREDUMP: <enable>
-
-Test command
-------------
-
-The test command returns the supported syntax.
-
-Syntax
-~~~~~~
-
-::
-
-   AT#XNRFCLOUDOBSCOREDUMP=?
-
-Response
-~~~~~~~~
-
-::
-
-   #XNRFCLOUDOBSCOREDUMP: (0,1)
 
 .. _SM_AT_NRFCLOUDOBSHEARTBEAT:
 
@@ -758,6 +734,184 @@ Response
 ::
 
    #XNRFCLOUDOBSFORWARD: <base64_chunk>,<project_key>
+
+.. _SM_AT_NRFCLOUDOBSCOREDUMP:
+
+Core dump upload #XNRFCLOUDOBSCOREDUMP
+======================================
+
+The ``#XNRFCLOUDOBSCOREDUMP`` command controls whether a stored core dump is included in an upload.
+
+When disabled, ``#XNRFCLOUDOBSUPLOAD`` and the automatic upload send the buffered events, logs, and CDRs but leave the core dump in storage, so it can be uploaded later by enabling this again.
+Core dump upload is enabled by default, and the setting is persisted.
+
+.. note::
+
+   Core dump storage holds a single core dump.
+   While a new core dump is stored, subsequent crashes do not capture a new core dump until the stored one has been uploaded.
+   Keeping the upload disabled prevents new core dumps from being captured.
+
+Set command
+-----------
+
+The set command enables or disables the core dump upload.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XNRFCLOUDOBSCOREDUMP=<enable>
+
+The parameters and their defined values are the following:
+
+<enable>
+   * ``0`` - Exclude the stored core dump from uploads.
+   * ``1`` - Include the stored core dump in uploads.
+
+Read command
+------------
+
+The read command returns the current setting.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XNRFCLOUDOBSCOREDUMP?
+
+Response
+~~~~~~~~
+
+::
+
+   #XNRFCLOUDOBSCOREDUMP: <enable>
+
+Test command
+------------
+
+The test command returns the supported syntax.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XNRFCLOUDOBSCOREDUMP=?
+
+Response
+~~~~~~~~
+
+::
+
+   #XNRFCLOUDOBSCOREDUMP: (0,1)
+
+.. _SM_AT_NRFCLOUDOBSAUTO:
+
+Automatic upload #XNRFCLOUDOBSAUTO
+==================================
+
+The ``#XNRFCLOUDOBSAUTO`` command configures the automatic upload of the buffered observability data.
+
+The configuration is persistent, so it survives a reboot.
+
+Set command
+-----------
+
+The set command enables or disables the automatic upload and configures its interval.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XNRFCLOUDOBSAUTO=<enable>[,<interval_seconds>][,<project_key>]
+
+The parameters and their defined values are the following:
+
+<enable>
+   * ``0`` - Disable the automatic upload.
+   * ``1`` - Enable the automatic upload.
+
+<interval_seconds>
+   Integer.
+   The interval between two uploads, from ``60`` to ``86400`` seconds.
+   When omitted, the stored interval is kept.
+
+   .. only:: not nrf91m1
+
+      The initial value is set by the :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_AUTO_INTERVAL_SECONDS <CONFIG_SM_NRF_CLOUD_OBSERVABILITY_AUTO_INTERVAL_SECONDS>` Kconfig option.
+
+   .. only:: nrf91m1
+
+      The initial value is 3600 seconds.
+
+<project_key>
+   String.
+   When omitted, the stored project key is kept, and an empty string clears it.
+
+The first upload runs when the interval expires, not when the automatic upload is enabled.
+An upload that falls while there is no connection to nRF Cloud is skipped, and the next one is scheduled as usual.
+
+The automatic upload is silent and does not send any unsolicited notifications.
+
+Response
+~~~~~~~~
+
+The command returns ``OK``, also when the configuration could not be stored, in which case only its persistence is lost.
+
+Read command
+------------
+
+The read command returns the configuration of the automatic upload.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XNRFCLOUDOBSAUTO?
+
+Response
+~~~~~~~~
+
+::
+
+   #XNRFCLOUDOBSAUTO: <enable>,<interval_seconds>,<project_key>
+
+Example
+~~~~~~~
+
+::
+
+  AT#XNRFCLOUDOBSAUTO=1,600
+
+  OK
+  AT#XNRFCLOUDOBSAUTO?
+
+  #XNRFCLOUDOBSAUTO: 1,600,""
+
+  OK
+
+Test command
+------------
+
+The test command returns the supported syntax.
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XNRFCLOUDOBSAUTO=?
+
+Response
+~~~~~~~~
+
+::
+
+   #XNRFCLOUDOBSAUTO: (0,1),(60-86400),<project_key>
 
 .. only:: not nrf91m1
 
@@ -937,158 +1091,3 @@ Response
    ------------
 
    The test command is not supported.
-
-.. _SM_AT_NRFCLOUDFOTA:
-
-nRF Cloud FOTA #XNRFCLOUDFOTA
-=============================
-
-The ``#XNRFCLOUDFOTA`` command checks for and downloads an application or modem firmware update via `Memfault release management`_, delivered over the same nRF Cloud CoAP transport as ``#XNRFCLOUDOBS*``.
-
-.. only:: not nrf91m1
-
-   Requires the :ref:`CONFIG_SM_NRF_CLOUD_FOTA <CONFIG_SM_NRF_CLOUD_FOTA>` Kconfig option.
-
-An application update is staged the same way as ``AT#XFOTA=1``, that is, the host activates it with ``AT#XRESET``.
-A modem update is staged the same way as ``AT#XFOTA=2``, that is, the host activates it with ``AT#XMODEMRESET``.
-Both share their FOTA session with ``#XFOTA``, but progress and completion are reported over the ``#XNRFCLOUDFOTA`` notification instead, using the same ``<fota_stage>``, ``<fota_status>`` and ``<fota_info>`` tuple as ``#XFOTA`` (see :ref:`SM_AT_FOTA` for download and activation semantics).
-Only one FOTA session, from either command, can be ongoing at a time.
-
-.. note::
-   Unlike ``AT#XFOTA``, ``#XNRFCLOUDFOTA`` does not support MCUboot bootloader updates.
-   This is expected to be a rare use case. Support for it is planned to be added in a future release.
-
-.. note::
-   ``<op>=2`` uses a dedicated Memfault project key for modem firmware, obtained from Settings > General in that project (a different project than the application's).
-
-   .. only:: not nrf91m1
-
-      Set it with the ``CONFIG_MEMFAULT_FOTA_MODEM_PROJECT_KEY`` Kconfig option, or override it at runtime with the ``<project_key>`` parameter.
-
-   .. only:: nrf91m1
-
-      Use the ``<project_key>`` parameter to set it at runtime.
-
-   When neither is set, the request will target the default project where the device was claimed.
-
-Set command
------------
-
-The set command starts a FOTA check, and the download if requested and an update is available.
-
-.. note::
-
-   The ``#XNRFCLOUDFOTA`` command uses default PDN connection with ID ``0``.
-   Raw sockets must not use the PDN connection at the same time.
-   See :ref:`SM_AT_SOCKET_RAW_SOCKET_LIMITATION` for more information.
-
-Syntax
-~~~~~~
-
-::
-
-   AT#XNRFCLOUDFOTA=<op>[,<project_key>]
-
-The parameters and their defined values are the following:
-
-<op>
-   * ``0`` - Cancel an ongoing download.
-     This is effective only after a download has started, that is, after the first ``#XNRFCLOUDFOTA`` progress notification.
-   * ``1`` - Check for and download an application update.
-   * ``2`` - Check for and download a modem firmware update.
-   * ``4`` - Check for an application update, without downloading it.
-   * ``6`` - Check for a modem firmware update, without downloading it.
-
-<project_key>
-   String.
-   Project key used for the FOTA operation.
-
-   .. only:: not nrf91m1
-
-      For ``<op>=1`` and ``<op>=4``, it overrides the application project key (``CONFIG_MEMFAULT_PROJECT_KEY``), and for ``<op>=2`` and ``<op>=6`` it overrides ``CONFIG_MEMFAULT_FOTA_MODEM_PROJECT_KEY``.
-      If this option is not provided and the corresponding Kconfig setting is unset, the request will target the default project where the device was claimed.
-
-   .. only:: nrf91m1
-
-      For ``<op>=1`` and ``<op>=4``, it is the application Memfault project key, and for ``<op>=2`` and ``<op>=6`` it is the modem Memfault project key.
-      If this option is not provided, the request will target the default project where the device was claimed.
-
-The command returns ``OK`` immediately and the check runs asynchronously.
-When it completes, an unsolicited notification is sent.
-
-Unsolicited notification
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-::
-
-   #XNRFCLOUDFOTA: <fota_stage>,<fota_status>[,<fota_info>]
-
-The ``<fota_stage>``, ``<fota_status>``, and ``<fota_info>`` parameters use the same values as the ``#XFOTA`` notification:
-
-.. include:: at_fota.rst
-   :start-after: sm_fota_urc_params_start
-   :end-before: sm_fota_urc_params_end
-
-When the FOTA check finishes without starting a download, ``<fota_stage>`` is ``0`` (*Init*) and ``<fota_info>`` indicates the result.
-This form is used by ``#XNRFCLOUDFOTA`` only (not ``#XFOTA``) and specified as follows:
-
-+-------------------------+----------------------------+----------------------------------------------------+
-|``<fota_stage>``         |``<fota_status>``           | ``<fota_info>``                                    |
-+=========================+============================+====================================================+
-|``0`` (namely *Init*)    | ``0`` (namely *OK*)        | ``0`` - No update is available                     |
-+-------------------------+----------------------------+----------------------------------------------------+
-|``0`` (namely *Init*)    | ``0`` (namely *OK*)        | ``1`` - An update is available (sent only for      |
-|                         |                            |         ``<op>=4`` and ``<op>=6``                  |
-+-------------------------+----------------------------+----------------------------------------------------+
-|``0`` (namely *Init*)    | ``1`` (namely *ERROR*)     | Error code                                         |
-+-------------------------+----------------------------+----------------------------------------------------+
-
-Examples
-~~~~~~~~
-
-::
-
-  AT#XNRFCLOUDFOTA=1
-
-  OK
-
-  #XNRFCLOUDFOTA: 1,0,45
-
-  #XNRFCLOUDFOTA: 1,0,100
-
-  #XNRFCLOUDFOTA: 4,0
-  AT#XRESET
-
-The following example checks whether an application update is available, without downloading it:
-
-::
-
-  AT#XNRFCLOUDFOTA=4
-
-  OK
-
-  #XNRFCLOUDFOTA: 0,0,1
-
-Read command
-------------
-
-The read command is not supported.
-
-Test command
-------------
-
-The test command returns the supported syntax.
-
-Syntax
-~~~~~~
-
-::
-
-   AT#XNRFCLOUDFOTA=?
-
-Response
-~~~~~~~~
-
-::
-
-   #XNRFCLOUDFOTA: (0,1,2,4,6)[,<project_key>]
