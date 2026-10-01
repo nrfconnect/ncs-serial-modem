@@ -36,6 +36,9 @@ LOG_MODULE_REGISTER(sm_nrfcloud_fota, CONFIG_SM_LOG_LEVEL);
 /* Default CoAP block size of the NCS downloader, used for nRF Cloud CoAP proxy downloads. */
 #define FOTA_COAP_BLOCK_SIZE	1024
 
+/* Poll interval, in seconds, when waiting for the modem to finish erasing a partial image. */
+#define FOTA_ERASE_POLL_TIME	1
+
 /* <op> values for AT#XNRFCLOUDFOTA. */
 enum {
 	FOTA_STOP	 = 0,
@@ -81,25 +84,61 @@ static void nrfcloud_fota_check_failed(int rv)
 
 /* The NCS downloader's CoAP transport cannot resume from an offset inside a block, and the
  * modem stores a partial delta image at an arbitrary offset. Erase such an image so that the
- * download starts from 0 instead of failing. dfu_target_modem_delta waits for the erase.
+ * download starts from 0 instead of failing.
+ *
+ * The erase is asynchronous in the modem and can take a long time. It must be complete before
+ * the download starts: while it is pending the modem is not usable for the download (network
+ * connection attempts time out) and the modem DFU write session cannot be closed (error 17,
+ * ERASE_PENDING).
  */
 static int nrfcloud_fota_modem_discard_unaligned(void)
 {
 	size_t offset;
 	int err;
+	int time_elapsed = 0;
 
 	err = nrf_modem_delta_dfu_offset(&offset);
-	if (err != 0 || offset % FOTA_COAP_BLOCK_SIZE == 0) {
+	if (err == NRF_MODEM_DELTA_DFU_ERASE_PENDING) {
+		LOG_INF("Modem image erase already in progress");
+	} else if (err != 0 || offset % FOTA_COAP_BLOCK_SIZE == 0) {
 		return 0;
+	} else {
+		LOG_INF("Discarding partial modem image, offset %zu", offset);
+		err = nrf_modem_delta_dfu_erase();
+		if (err != 0 && err != NRF_MODEM_DELTA_DFU_ERASE_PENDING) {
+			LOG_ERR("Partial modem image erase failed: %d", err);
+			/* Positive values are modem DFU status codes, not errnos. */
+			return err < 0 ? err : -EIO;
+		}
 	}
 
-	LOG_INF("Discarding partial modem image, offset %zu", offset);
-	err = nrf_modem_delta_dfu_erase();
-	if (err != 0 && err != NRF_MODEM_DELTA_DFU_ERASE_PENDING) {
-		LOG_ERR("Partial modem image erase failed: %d", err);
-		/* Positive values are modem DFU status codes, not errnos. */
-		return err < 0 ? err : -EIO;
+	sm_fota_stage = FOTA_STAGE_DOWNLOAD_ERASE_PENDING;
+	urc_send_to(fota_pipe, "\r\n#XNRFCLOUDFOTA: %d,%d\r\n", sm_fota_stage, FOTA_STATUS_OK);
+
+	while (true) {
+		k_sleep(K_SECONDS(FOTA_ERASE_POLL_TIME));
+		time_elapsed += FOTA_ERASE_POLL_TIME;
+
+		err = nrf_modem_delta_dfu_offset(&offset);
+		if (err == 0) {
+			break;
+		}
+		if (err != NRF_MODEM_DELTA_DFU_ERASE_PENDING &&
+		    err != NRF_MODEM_DELTA_DFU_INVALID_DATA) {
+			LOG_ERR("Partial modem image erase failed: %d", err);
+			return err < 0 ? err : -EIO;
+		}
+		if (time_elapsed >= CONFIG_DFU_TARGET_MODEM_TIMEOUT) {
+			LOG_ERR("Partial modem image erase timeout");
+			return -ETIME;
+		}
 	}
+
+	LOG_INF("Partial modem image discarded");
+	urc_send_to(fota_pipe, "\r\n#XNRFCLOUDFOTA: %d,%d\r\n", FOTA_STAGE_DOWNLOAD_ERASED,
+		    FOTA_STATUS_OK);
+	/* Back to the download stage; the busy gate must stay held for the check. */
+	sm_fota_stage = FOTA_STAGE_DOWNLOAD;
 
 	return 0;
 }
