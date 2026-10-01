@@ -86,6 +86,14 @@ The parameters and their defined values are the following:
    Integer.
    Indicates whether the device location will be sent to nRF Cloud or not.
 
+The notification is sent when a connect or disconnect operation completes.
+It is also sent with ``<ready>`` set to ``0`` when the connection is lost because the modem is set to minimal functional mode (``AT+CFUN=0``) or the modem library is shut down, for example by ``AT#XMODEMRESET``.
+The host must then connect again with ``AT#XNRFCLOUD=1``.
+
+Other functional modes that deactivate LTE, such as offline mode (``AT+CFUN=4``), keep the connection.
+It stays ready, and it resumes without a new handshake once LTE is activated again.
+Operations that access the network fail while LTE is deactivated.
+
 Example
 ~~~~~~~
 
@@ -118,9 +126,20 @@ Example
   #XNRFCLOUD: 1,1
   AT#XNRFCLOUD=0
 
+  OK
+
   #XNRFCLOUD: 0,1
+  // Connect again. The connection is lost when the modem is set to minimal functional mode.
+  AT#XNRFCLOUD=1
 
   OK
+
+  #XNRFCLOUD: 1,0
+  AT+CFUN=0
+
+  OK
+
+  #XNRFCLOUD: 0,0
 
 Read command
 ------------
@@ -261,6 +280,8 @@ Unsolicited notification
 
    #XNRFCLOUDPOS: <status>[,<type>,<latitude>,<longitude>,<uncertainty>]
 
+The notification is sent when the location request completes.
+
 The parameters and their defined values are the following:
 
 <status>
@@ -268,8 +289,6 @@ The parameters and their defined values are the following:
      Other parameters are also present.
    * ``-1`` - Location request failed.
    * ``<positive integer>`` - Requesting location from the cloud failed with cloud error as defined in :c:enum:`nrf_cloud_error` values.
-
-This is emitted when a successful response to a sent location request is received.
 
 <type>
    The service used to fulfill the location request.
@@ -287,7 +306,7 @@ This is emitted when a successful response to a sent location request is receive
    The longitude in degrees.
 
 <uncertainty>
-   Float.
+   Integer.
    The radius of the uncertainty circle around the location in meters, also known as Horizontal Positioning Error (HPE).
 
 Example
@@ -359,7 +378,7 @@ To use the ``#XNRFCLOUDOBS*`` commands that access the network (``#XNRFCLOUDOBSU
 
 Upload is host-driven.
 Automatic uploads are disabled by default.
-The host enables them with ``AT#XNRFCLOUDOBSAUTO=1`` or initiate uploads on demand with ``AT#XNRFCLOUDOBSUPLOAD``.
+The host enables them with ``AT#XNRFCLOUDOBSAUTO=1`` or initiates uploads on demand with ``AT#XNRFCLOUDOBSUPLOAD``.
 
 The ``<project_key>`` parameter, used by several commands, is a string.
 It is a 32-character Memfault project key.
@@ -560,7 +579,7 @@ Core dump upload is enabled by default, and the setting is persisted.
 .. note::
 
    Core dump storage holds a single core dump.
-   While a new core dump is stored, subsequent crashes do not capture a new core dump until the stored one has been uploaded.
+   While a core dump is stored, subsequent crashes do not capture a new core dump until the stored one has been uploaded.
    Keeping the upload disabled prevents new core dumps from being captured.
 
 Set command
@@ -809,7 +828,7 @@ Response
 
      AT#XNRFCLOUDOBSDEVINFO
 
-     #XNRFCLOUDOBSDEVINFO: "50344654-3037-409f-802d-2206917f23d2","serial_modem","3.4.0","nrf9151dk"
+     #XNRFCLOUDOBSDEVINFO: "50344654-3037-409f-802d-2206917f23d2","app","2.0.0+0","nrf9151dk"
 
      OK
 
