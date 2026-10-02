@@ -25,3 +25,4 @@ nRF91M1 AT Commands
    app/at_socket
    app/at_trace
    app/at_data_mode
+   nrf91m1/appendix_uart
