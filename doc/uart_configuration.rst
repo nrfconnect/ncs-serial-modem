@@ -171,40 +171,42 @@ The following tables shows how to connect the UART pins to the corresponding pin
 nRF91M1 pre-programmed |SM| application
 =======================================
 
+.. nrf91m1_uart_configuration_start
+
 nRF91M1 is a pre-programmed nRF9151 SiP that runs the |SM| application out of the box.
 
 The pin mapping of the nRF91M1 follows the `nrf9151dk`_ board configuration.
 You can flash the nRF91M1 software to the `nrf9151dk`_ board for development and testing purposes.
 
-The following table shows how to connect the UART pins to the corresponding pins on the nRF91M1 SiP:
+The following table shows how to connect the UART pins to the corresponding pins on the nRF91M1 SiP (`nRF9151 LGA pin assignments`_) and on the `nrf9151dk`_ board:
 
 .. list-table::
    :header-rows: 1
 
    * - Signal
-     - `nrf9151dk`_
-     - `nRF9151 LGA pin assignments`_
+     - nRF91M1
+     - nrf9151dk
    * - UART0 TX
-     - P0.27
      - 45
+     - P0.27
    * - UART0 RX
-     - P0.26 (pull-up)
      - 44 (pull-up)
+     - P0.26 (pull-up)
    * - UART0 RTS
-     - P0.14
      - 74
+     - P0.14
    * - UART0 CTS
-     - P0.15 (pull-up)
      - 75 (pull-up)
+     - P0.15 (pull-up)
    * - UART0 DTR
-     - P0.31 (active low, pull-up) (Wire to GND to power on the UART0)
      - 50 (active low, pull-up)
+     - P0.31 (active low, pull-up) (Wire to GND to power on the UART0)
    * - UART0 RI
-     - P0.30 (active low)
      - 49 (active low)
+     - P0.30 (active low)
    * - UART1 TX
-     - P0.29
      - 48
+     - P0.29
 
 **AT UART:**
 
@@ -226,12 +228,17 @@ The following table shows how to connect the UART pins to the corresponding pins
    The nRF91M1 firmware has hardware flow control permanently enabled and cannot be changed.
    When not using hardware flow control, the |SM| **CTS** pin must be wired to **GND** to allow |SM| to transmit.
    Without this, |SM| will see CTS as high (not clear to send) and will not transmit.
-   See :ref:`uart_without_flow_control` for further considerations.
+
+   .. only:: not nrf91m1
+
+      See :ref:`uart_without_flow_control` for further considerations.
 
 By default in the `nrf9151dk`_ board, the UART0 is routed to VCOM0 on the interface chip, and UART1 is routed to VCOM1 on the interface chip.
 This allows the `nrf9151dk`_ board to be used with a PC host for development and testing.
 
 When working with `nrf9151dk`_ board with an external MCU host, you must disable VCOM0 and VCOM1 in the `Board Configurator app`_ to release the UART pins for external use.
+
+.. nrf91m1_uart_configuration_end
 
 This setup is provided in the :file:`app/nrf91m1.overlay` devicetree overlay file.
 
