@@ -145,17 +145,38 @@ def copy_pdf(docset: str, build_dir: Path) -> None:
     shutil.copy(pdf, html_dir / pdf.name)
 
 
-def copy_extra_content(build_dir: Path) -> None:
+def copy_extra_content(build_dir: Path, selected: list[str]) -> None:
     """Copy the content that belongs next to the docsets instead of inside one.
 
     Args:
         build_dir: Documentation build directory.
+        selected: Names of the built docsets, in the order of ALL_DOCSETS.
     """
 
     html_dir = build_dir / "html"
-    for src in (DOC_BASE / "_static" / "html" / "index.html", DOC_BASE / "versions.json"):
-        print(f"Copying {src.name} to the HTML root", flush=True)
-        shutil.copy(src, html_dir / src.name)
+
+    versions = DOC_BASE / "versions.json"
+    print(f"Copying {versions.name} to the HTML root", flush=True)
+    shutil.copy(versions, html_dir / versions.name)
+
+    # The landing page forwards to the default docset, the first of
+    # ALL_DOCSETS, and names it in its own markup. A build that leaves that
+    # docset out, such as a release branch that documents a single device, has
+    # to forward to a docset that it did build, or the published landing page
+    # is a dead link.
+    landing = DOC_BASE / "_static" / "html" / "index.html"
+    html = landing.read_text(encoding="utf-8")
+    default = next(iter(docsets.ALL_DOCSETS))
+    target = default if default in selected else selected[0]
+
+    if target != default:
+        html = html.replace(
+            f"{default}/{docsets.ALL_DOCSETS[default][1]}.html",
+            f"{target}/{docsets.ALL_DOCSETS[target][1]}.html",
+        )
+
+    print(f"Copying {landing.name} to the HTML root, forwarding to {target}", flush=True)
+    (html_dir / landing.name).write_text(html, encoding="utf-8")
 
 
 def main() -> None:
@@ -198,7 +219,7 @@ def main() -> None:
             build_docset(docset, fmt, build_dir, sphinx_opts)
 
     if "html" in formats:
-        copy_extra_content(build_dir)
+        copy_extra_content(build_dir, selected)
 
         # Merging rewrites every index in terms of the others, so it only makes
         # sense once all of them are up to date.
