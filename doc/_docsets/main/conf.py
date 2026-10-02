@@ -26,6 +26,7 @@ exclude_patterns = docset_exclude_patterns(DOCSET) + [
     # Pages that do not apply to the nRF91M1 go here.
     "index_nrf91m1.rst",
     "app/nrf91m1_intro.rst",
+    "nrf91m1/*.rst",
 ]
 
 latex_documents = docset_latex_documents(DOCSET)
