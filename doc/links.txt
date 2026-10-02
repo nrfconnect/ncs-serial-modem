@@ -71,6 +71,10 @@
 
 .. _`Serial LTE modem`: https://nrfconnectdocs.nordicsemi.com/ncs/3.1.1/nrf/applications/serial_lte_modem/README.html
 
+.. ### The nRF91M1 docset is published in the 2-branch version only, see DOCSET_VERSIONS in _utils/docsets.py
+
+.. _`nRF91M1 AT Commands Reference Guide`: https://nrfconnectdocs.nordicsemi.com/addons/addon-serial_modem/2-branch/nrf91m1/index_nrf91m1.html
+
 .. ### nRF Cloud
 
 .. _`nRF Cloud Location Services`: https://docs.nrfcloud.com/docs/platform/location-services

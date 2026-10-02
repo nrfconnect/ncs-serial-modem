@@ -1,0 +1,68 @@
+{% extends "!layout.html" %}
+
+{#- A docset that is published in one version only, see DOCSET_VERSIONS in
+    _utils/docsets.py, is something the theme has no notion of: it builds the
+    version dropdown from the publication-wide versions.json, and links the
+    docset switcher to the docset directory of the version being read. The
+    script below narrows the dropdown of such a docset to its own version, and
+    points the switcher entry of such a docset at that version from wherever it
+    is read. It goes after super(), which emits the ncs.js of the theme, because
+    that is what defines window.NCS, and ahead of the document-ready handler of
+    ncs.js, which is what fills the dropdown. -#}
+{%- block scripts %}
+{{ super() }}
+{%- if pinned_docsets %}
+<script type="text/javascript">
+  (function (pinned_docsets, docset_version) {
+    var ncs = window.NCS;
+
+    if (docset_version && ncs) {
+      var update_drop_down = ncs.updateVersionDropDown;
+      ncs.updateVersionDropDown = function () {
+        update_drop_down.call(this);
+        var menu = $("div.dropdown-menu");
+        menu.empty();
+        menu.append(
+          '<a class="dropdown-item" href="' +
+            this.url_root + docset_version + "/" + this.current_page +
+            '">' + docset_version + "</a>"
+        );
+      };
+    }
+
+    $(function () {
+      $(".navbar-nav a.nav-link, .rst-other-versions a").each(function () {
+        var url = new URL(this.href);
+        var segments = url.pathname.split("/");
+
+        /* The switcher links to <version>/<docset>/<home page>, so those three
+           segments are what identifies one of its entries. They are counted
+           from the end to leave the path of the publication root out of it, and
+           a shorter path has no version to replace, as when the build is served
+           locally. Matching the home page as well keeps the pages below the
+           nrf91m1 directory of the nrf91m1 docset out of this. */
+        if (segments.length < 4) {
+          return;
+        }
+
+        var pinned = pinned_docsets[segments[segments.length - 2]];
+        if (!pinned || pinned.page !== segments[segments.length - 1]) {
+          return;
+        }
+
+        /* A PR preview is a publication of its own, and its switcher has to
+           keep pointing inside the preview for the docsets of a PR to be
+           reviewable. */
+        if (/^PR-\d+$/.test(segments[segments.length - 3])) {
+          return;
+        }
+
+        segments[segments.length - 3] = pinned.version;
+        url.pathname = segments.join("/");
+        this.href = url.href;
+      });
+    });
+  })({{ pinned_docsets | tojson }}, {{ docset_version | tojson }});
+</script>
+{%- endif %}
+{%- endblock %}

@@ -29,6 +29,19 @@ ALL_DOCSETS = {
     "nrf91m1": ("nRF91M1 AT Commands", "index_nrf91m1"),
 }
 
+# The hosted version that a docset is published in, for the docsets that are
+# published in one version only. The version is the directory below the
+# publication root that holds it: an entry of versions.json, or ``latest`` for
+# the build of the main branch. The theme assumes instead that every docset
+# follows the version of the publication, so it builds the version dropdown
+# from the publication-wide versions.json and keeps the docset switcher inside
+# the version being read. :file:`_templates/layout.html` reads this mapping to
+# offer a docset listed here in its own version only, from every version of the
+# publication. A docset that is absent follows the publication.
+DOCSET_VERSIONS = {
+    "nrf91m1": "2-branch",
+}
+
 # PDF base filename produced for each docset (without extension).
 # Used as the LaTeX output filename and as the copy target in the HTML tree.
 # When a doc revision is set (see :func:`doc_revision`), :func:`pdf_stem` appends
