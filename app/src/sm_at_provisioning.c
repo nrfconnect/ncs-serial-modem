@@ -131,13 +131,21 @@ STATIC int handle_at_provision(enum at_parser_cmd_type cmd_type, struct at_parse
 
 static void sm_provisioning_init(int ret, void *ctx)
 {
+	static bool initialized;
 	int err;
+
+	if (initialized) {
+		return;
+	}
 
 	err = nrf_provisioning_init(nrf_provisioning_callback);
 	if (err) {
 		LOG_ERR("Provisioning init failed: %d", err);
 		sm_init_failed = true;
+		return;
 	}
+
+	initialized = true;
 }
 
 NRF_MODEM_LIB_ON_INIT(sm_provisioning_init_hook, sm_provisioning_init, NULL);
