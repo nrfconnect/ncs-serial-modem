@@ -7,7 +7,9 @@ nRF91M1 AT Commands
    :maxdepth: 2
    :caption: Contents
 
-   app/nrf91m1_intro
+   nrf91m1/revision_history
+   nrf91m1/release_notes
+   nrf91m1/intro
    app/at_syntax
    app/at_generic
    app/at_cmux
