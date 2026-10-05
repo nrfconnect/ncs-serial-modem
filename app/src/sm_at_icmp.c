@@ -101,7 +101,14 @@ static void calc_ics(uint8_t *buffer, int len, int hcs_pos)
 	*ptr_hcs = hcs;
 }
 
-static uint32_t send_ping_wait_reply(void)
+/**
+ * @brief Send one ICMP echo request and wait for the reply.
+ *
+ * @retval >0 Round-trip time in milliseconds.
+ * @retval 0 No valid reply was received (send failure, timeout or invalid reply).
+ * @retval -ENOMEM Failed to allocate the packet buffer.
+ */
+static int32_t send_ping_wait_reply(void)
 {
 	static int64_t start_t;
 	int64_t delta_t;
@@ -130,8 +137,8 @@ static uint32_t send_ping_wait_reply(void)
 		total_length = ping_argv.len + header_len + icmp_hdr_len;
 		buf = calloc(1, alloc_size);
 		if (buf == NULL) {
-			LOG_ERR("Ping alloc failed: %zu B", alloc_size);
-			return -1;
+			LOG_ERR("Ping alloc failed: %d B", alloc_size);
+			return -ENOMEM;
 		}
 
 		buf[0] = (4 << 4) + (header_len / 4);      /* Version & header length */
@@ -180,8 +187,8 @@ static uint32_t send_ping_wait_reply(void)
 		total_length = payload_length + header_len;
 		buf = calloc(1, alloc_size);
 		if (buf == NULL) {
-			LOG_ERR("Ping alloc failed: %zu B", alloc_size);
-			return -1;
+			LOG_ERR("Ping alloc failed: %d B", alloc_size);
+			return -ENOMEM;
 		}
 
 		buf[0] = (6 << 4);              /* Version & traffic class 4 bits */
@@ -241,7 +248,7 @@ static uint32_t send_ping_wait_reply(void)
 	if (fd < 0) {
 		LOG_ERR("zsock_socket() error: %d", -errno);
 		free(buf);
-		return (uint32_t)delta_t;
+		return (int32_t)delta_t;
 	}
 
 	/* Use non-primary PDN if specified, fail if cannot proceed
@@ -414,7 +421,7 @@ wait_for_data:
 close_end:
 	(void)zsock_close(fd);
 	free(buf);
-	return (uint32_t)delta_t;
+	return (int32_t)delta_t;
 }
 
 static void ping_task(struct k_work *item)
@@ -430,13 +437,13 @@ static void ping_task(struct k_work *item)
 	ARG_UNUSED(item);
 
 	for (int i = 0; i < ping_argv.count; i++) {
-		uint32_t ping_t = send_ping_wait_reply();
+		int32_t ping_t = send_ping_wait_reply();
 
 		if (ping_t > 0)  {
 			count++;
-			sum += ping_t;
-			rtt_max = MAX(rtt_max, ping_t);
-			rtt_min = MIN(rtt_min, ping_t);
+			sum += (uint32_t)ping_t;
+			rtt_max = MAX(rtt_max, (uint32_t)ping_t);
+			rtt_min = MIN(rtt_min, (uint32_t)ping_t);
 		}
 		k_sleep(K_MSEC(ping_argv.interval));
 	}
