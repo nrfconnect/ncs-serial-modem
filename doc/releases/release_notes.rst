@@ -3,7 +3,7 @@
 Release notes
 #############
 
-For list on changes for a specific |SM| release, refer to the following sections.
+For a list of changes for a specific |SM| release, refer to the following sections.
 See the `releases on GitHub <github_release_>`_ for the complete release history, more detailed changelogs, and downloadable assets.
 
 .. toctree::
