@@ -1,5 +1,5 @@
-Migration notes for |SM| v2.0.0 (working draft)
-###############################################
+Migration notes for |SM| v2.0.0
+###############################
 
 .. contents::
    :local:
