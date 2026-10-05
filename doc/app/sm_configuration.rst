@@ -214,7 +214,7 @@ CONFIG_SM_NRF_CLOUD_OBSERVABILITY_LTE_METRICS - Additional LTE metrics for Memfa
 .. _CONFIG_SM_NRF_CLOUD_FOTA:
 
 CONFIG_SM_NRF_CLOUD_FOTA - nRF Cloud FOTA AT commands
-   This option enables the ``#XNRFCLOUDFOTA*`` commands, which check for and download application and modem firmware updates via `Memfault release management`_, delivered over the same nRF Cloud CoAP transport as ``#XNRFCLOUDOBS*``.
+   This option enables the ``#XNRFCLOUDFOTA*`` commands, which check for and download application and modem firmware updates using `Memfault release management`_, delivered over the same nRF Cloud CoAP transport as ``#XNRFCLOUDOBS*``.
    This requires :ref:`CONFIG_SM_NRF_CLOUD <CONFIG_SM_NRF_CLOUD>`.
    See :ref:`SM_AT_NRFCLOUDFOTA` for more information.
 
