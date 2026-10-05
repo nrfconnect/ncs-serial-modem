@@ -382,17 +382,18 @@ The ``#XNRFCLOUDFOTA`` command checks for and downloads an application or modem 
 
    Requires the :ref:`CONFIG_SM_NRF_CLOUD_FOTA <CONFIG_SM_NRF_CLOUD_FOTA>` Kconfig option.
 
-An application update is staged the same way as ``AT#XFOTA=1``, that is, the host activates it with ``AT#XRESET``.
-A modem update is staged the same way as ``AT#XFOTA=2``, that is, the host activates it with ``AT#XMODEMRESET``.
+An application update is staged the same way as ``AT#XFOTA=1``, that is, the host activates it with the ``AT#XRESET`` AT command.
+A modem update is staged the same way as ``AT#XFOTA=2``, that is, the host activates it with the ``AT#XMODEMRESET`` AT command.
 Both share their FOTA session with ``#XFOTA``, but progress and completion are reported over the ``#XNRFCLOUDFOTA`` notification instead, using the same ``<fota_stage>``, ``<fota_status>`` and ``<fota_info>`` tuple as ``#XFOTA`` (see :ref:`SM_AT_FOTA` for download and activation semantics).
-Only one FOTA session, from either command, can be ongoing at a time.
+Only one FOTA session can be ongoing at a time, regardless of which command initiated it.
 
 .. note::
    Unlike ``AT#XFOTA``, ``#XNRFCLOUDFOTA`` does not support MCUboot bootloader updates.
-   This is expected to be a rare use case. Support for it is planned to be added in a future release.
+   This is expected to be a rare use case.
+   The support is planned for a future release.
 
 .. note::
-   ``<op>=2`` uses a dedicated Memfault project key for modem firmware, obtained from Settings > General in that project (a different project than the application's).
+   ``<op>=2`` uses a dedicated Memfault project key for modem firmware, obtained from the General section of the modem firmware project's Project Settings, which is separate from the application project.
 
    .. only:: not nrf91m1
 
@@ -402,7 +403,7 @@ Only one FOTA session, from either command, can be ongoing at a time.
 
       Use the ``<project_key>`` parameter to set it at runtime.
 
-   When neither is set, the request will target the default project where the device was claimed.
+   When neither is set, the request targets the default project where the device was claimed.
 
 Set command
 -----------
@@ -439,12 +440,12 @@ The parameters and their defined values are the following:
    .. only:: not nrf91m1
 
       For ``<op>=1`` and ``<op>=4``, it overrides the application project key (``CONFIG_MEMFAULT_PROJECT_KEY``), and for ``<op>=2`` and ``<op>=6`` it overrides ``CONFIG_MEMFAULT_FOTA_MODEM_PROJECT_KEY``.
-      If this option is not provided and the corresponding Kconfig setting is unset, the request will target the default project where the device was claimed.
+      If this option is not provided and the corresponding Kconfig setting is unset, the request targets the default project where the device was claimed.
 
    .. only:: nrf91m1
 
       For ``<op>=1`` and ``<op>=4``, it is the application Memfault project key, and for ``<op>=2`` and ``<op>=6`` it is the modem Memfault project key.
-      If this option is not provided, the request will target the default project where the device was claimed.
+      If this option is not provided, the request targets the default project where the device was claimed.
 
 The command returns ``OK`` immediately and the check runs asynchronously.
 When it completes, an unsolicited notification is sent.
@@ -533,7 +534,7 @@ On-demand upload #XNRFCLOUDOBSUPLOAD
 
 The ``#XNRFCLOUDOBSUPLOAD`` command uploads the buffered observability data to nRF Cloud.
 
-The captured logs are collected before the upload, so that they are included.
+The captured logs are collected before the upload so that they are included.
 
 Set command
 -----------
