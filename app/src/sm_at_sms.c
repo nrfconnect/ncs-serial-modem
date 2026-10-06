@@ -221,8 +221,10 @@ static void sms_concat_handle(struct sms_data *const data)
 					   SMS_MAX_PAYLOAD_LEN_CHARS);
 		}
 		sms_concat_append(sms_ctx.concat_rsp_buf, concat_msg_len, &pos, "\"\r\n", 3);
-		data_send(sms_ctx.pipe, (uint8_t *)sms_ctx.concat_rsp_buf,
-			  strlen(sms_ctx.concat_rsp_buf));
+		/* urc_send_to() queues the message and sends it from sm_work_q. data_send()
+		 * would send it here, blocking the system work queue that drains the pipe.
+		 */
+		urc_send_to(sms_ctx.pipe, "%s", sms_ctx.concat_rsp_buf);
 	} else {
 		/* If new messages for the concatenated message are not received
 		 * within 3 minutes, discard the concatenated message.
