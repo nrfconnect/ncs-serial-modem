@@ -236,7 +236,7 @@ The following table shows how to connect the UART pins to the corresponding pins
 By default in the `nrf9151dk`_ board, the UART0 is routed to VCOM0 on the interface chip, and UART1 is routed to VCOM1 on the interface chip.
 This allows the `nrf9151dk`_ board to be used with a PC host for development and testing.
 
-When working with `nrf9151dk`_ board with an external MCU host, you must disable VCOM0 and VCOM1 in the `Board Configurator app`_ to release the UART pins for external use.
+When working with `nrf9151dk`_ board with an external MCU host, you must disable VCOM0 in the `Board Configurator app`_ to release the UART pins for external use.
 
 .. nrf91m1_uart_configuration_end
 
