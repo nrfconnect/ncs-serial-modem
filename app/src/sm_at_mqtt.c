@@ -696,6 +696,7 @@ STATIC int handle_at_mqtt_connect(enum at_parser_cmd_type cmd_type, struct at_pa
 
 			mqtt_conn = calloc(1, sizeof(*mqtt_conn));
 			if (!mqtt_conn) {
+				LOG_ERR("Failed to allocate %s", "MQTT connection");
 				return -ENOMEM;
 			}
 
