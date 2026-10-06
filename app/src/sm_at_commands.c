@@ -138,8 +138,16 @@ void final_call(void (*func)(void))
 {
 	/* Delegate the final call to a worker so that the "OK" response is properly sent. */
 	static struct k_work_delayable worker;
+	static bool initialized;
+
+	/* Re-initializing a scheduled work item corrupts the kernel timeout list. */
+	if (initialized && k_work_delayable_is_pending(&worker)) {
+		LOG_WRN("Final call already pending");
+		return;
+	}
 
 	k_work_init_delayable(&worker, (k_work_handler_t)func);
+	initialized = true;
 	k_work_schedule_for_queue(&sm_work_q, &worker, SM_UART_RESPONSE_DELAY);
 }
 
