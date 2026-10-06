@@ -34,8 +34,9 @@ The parameters and their defined values are the following:
 
 <length>
    Integer.
-   The length of the buffer size.
-   The value range is ``0`` to ``65535``.
+   The length of the ICMP payload, in bytes.
+   The value range is ``0`` to ``1472`` for IPv4 and ``0`` to ``1452`` for IPv6.
+   These limits come from the MTU of 1500 bytes minus the IP and ICMP headers.
 
 <timeout>
    Integer.
