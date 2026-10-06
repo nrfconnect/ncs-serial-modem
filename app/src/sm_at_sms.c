@@ -107,8 +107,10 @@ static void sms_concat_handle(struct sms_data *const data)
 	 * and we discard the current and try with the new message.
 	 * We may end up in changing from one message to another one if two
 	 * concatenated messages are received at the same time in mixed order.
+	 * A reference number of 0 is valid in the UDH.
 	 */
-	if (sms_ctx.ref_number != 0 && sms_ctx.ref_number != header->concatenated.ref_number) {
+	if (sms_ctx.concat_rsp_buf != NULL &&
+	    sms_ctx.ref_number != header->concatenated.ref_number) {
 		LOG_ERR("Concat msg ref mismatch stored=%d received=%d",
 			sms_ctx.ref_number, header->concatenated.ref_number);
 		sms_concat_clear(&sms_ctx);
@@ -124,7 +126,7 @@ static void sms_concat_handle(struct sms_data *const data)
 	size_t concat_msg_len = SM_SMS_AT_HEADER_INFO_MAX_LEN +
 		(size_t)SMS_MAX_PAYLOAD_LEN_CHARS * header->concatenated.total_msgs + 1;
 
-	if (sms_ctx.ref_number == 0) {
+	if (sms_ctx.concat_rsp_buf == NULL) {
 		sms_ctx.ref_number = header->concatenated.ref_number;
 
 		if (header->concatenated.total_msgs > MAX_CONCATENATED_MESSAGE) {

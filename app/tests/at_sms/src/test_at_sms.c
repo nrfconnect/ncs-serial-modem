@@ -187,6 +187,51 @@ void test_xsms_concat_out_of_order_no_overflow(void)
 	TEST_ASSERT_TRUE(pos_b < pos_c);
 }
 
+/*
+ * Test: a concatenated SMS with UDH reference number 0 (a legal value) is
+ * reassembled correctly. Previously ref_number == 0 was used as the "no
+ * message in progress" sentinel, so for reference 0 the staging buffer was
+ * re-allocated for every part (leaking the previous one) and only the last
+ * part survived in the emitted #XSMS URC. The test sends the parts out of
+ * order, so it also covers a part arriving while a ref 0 message is in progress.
+ */
+void test_xsms_concat_ref_number_zero(void)
+{
+	struct sms_data data;
+	const uint8_t total_msgs = 3;
+	const uint16_t ref_number = 0;
+	const uint8_t order[] = {2, 1, 3};
+
+	for (size_t i = 0; i < ARRAY_SIZE(order); i++) {
+		fill_concat_part(&data, ref_number, total_msgs, order[i],
+				 (char)('A' + order[i] - 1));
+		sms_stub_deliver(&data);
+	}
+
+	k_sleep(K_MSEC(10));
+
+	const char *response = get_captured_response();
+
+	TEST_ASSERT_TRUE(strstr(response, "#XSMS:") != NULL);
+	TEST_ASSERT_TRUE(strstr(response, "1234567890") != NULL);
+
+	/* Every part must be present, contiguous and in sequence order. */
+	const char *p = response;
+
+	for (uint8_t seq = 1; seq <= total_msgs; seq++) {
+		char expected[SMS_MAX_PAYLOAD_LEN_CHARS + 1];
+
+		memset(expected, (char)('A' + seq - 1), SMS_MAX_PAYLOAD_LEN_CHARS);
+		expected[SMS_MAX_PAYLOAD_LEN_CHARS] = '\0';
+
+		p = strstr(p, expected);
+		TEST_ASSERT_NOT_NULL_MESSAGE(p, "Missing or out-of-order message segment");
+		p += SMS_MAX_PAYLOAD_LEN_CHARS;
+	}
+
+	TEST_ASSERT_TRUE(strstr(response, "\"\r\n") != NULL);
+}
+
 extern int unity_main(void);
 
 int main(void)
