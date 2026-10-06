@@ -246,6 +246,10 @@ STATIC int handle_at_trace(enum at_parser_cmd_type cmd_type, struct at_parser *p
 			}
 			ret = trace_backend_activate();
 			if (ret) {
+				/* Give the UART back, so that AT#XTRACE and AT#XLOG can be
+				 * enabled later.
+				 */
+				(void)uart_suspend();
 				return ret;
 			}
 			trace_active = true;
