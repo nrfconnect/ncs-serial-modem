@@ -95,6 +95,7 @@ config SM_UART_TX_BUF_SIZE
 
 config SM_URC_BUFFER_SIZE
 	int "TX buffer size for unsolicited result codes (URC)"
+	range 128 4096
 	default 4096
 	help
 	  Buffer, in which unsolicited result codes (URC) are stored before being sent to the host.
@@ -107,6 +108,7 @@ config SM_URC_BUFFER_SIZE
 	  This can be reduced if your use cases do not require lengthy notifications.
 	  Note: %NCELLMEAS notifications can be nearly 4kB in size,
 	  which explains the default value.
+	  The maximum value is the size of the buffer that the result codes are formatted in.
 
 config SM_AT_ECHO_MAX_LEN
 	int "Maximum length of AT command echo"
