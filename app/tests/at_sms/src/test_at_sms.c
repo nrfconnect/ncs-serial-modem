@@ -125,9 +125,14 @@ void test_xsms_concat_max_size_no_overflow(void)
 		sms_stub_deliver(&data);
 	}
 
-	/* The final part triggers urc_send_to(), which is processed
-	 * asynchronously via sm_work_q and captured via the wrapped
-	 * sm_at_send(); give the work queue a moment to run.
+	/* The message must be queued, not sent from the SMS callback, which runs on the
+	 * system work queue that drains the pipe.
+	 */
+	TEST_ASSERT_EQUAL_STRING_MESSAGE("", get_captured_response(),
+					 "The message must not be sent from the SMS callback");
+
+	/* The message is sent from sm_work_q and captured via the wrapped sm_at_send();
+	 * give the work queue a moment to run.
 	 */
 	k_sleep(K_MSEC(10));
 
