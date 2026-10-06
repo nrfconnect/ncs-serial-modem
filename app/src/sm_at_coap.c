@@ -110,11 +110,13 @@ static void coap_close_request(struct coap_request *req);
 static struct coap_request *alloc_request(void)
 {
 	if (coap_pending_req) {
+		LOG_ERR("Request already active");
 		return NULL;
 	}
 
 	coap_pending_req = calloc(1, sizeof(struct coap_request));
 	if (!coap_pending_req) {
+		LOG_ERR("Failed to allocate %s", "CoAP request");
 		return NULL;
 	}
 
@@ -706,7 +708,6 @@ STATIC int handle_at_coap_req(enum at_parser_cmd_type cmd_type, struct at_parser
 		req = alloc_request();
 		k_mutex_unlock(&coap_mutex);
 		if (!req) {
-			LOG_ERR("Request already active or out of memory");
 			return -EBUSY;
 		}
 
@@ -722,6 +723,7 @@ STATIC int handle_at_coap_req(enum at_parser_cmd_type cmd_type, struct at_parser
 		if (req->manual_rx) {
 			req->rx_buf = malloc(CONFIG_COAP_CLIENT_BLOCK_SIZE);
 			if (!req->rx_buf) {
+				LOG_ERR("Failed to allocate %s", "CoAP receive buffer");
 				ret = -ENOMEM;
 				goto cleanup_req;
 			}
@@ -798,6 +800,7 @@ STATIC int handle_at_coap_req(enum at_parser_cmd_type cmd_type, struct at_parser
 		if (payload_len > 0) {
 			req->staging = malloc(CONFIG_COAP_CLIENT_BLOCK_SIZE);
 			if (!req->staging) {
+				LOG_ERR("Failed to allocate %s", "CoAP payload buffer");
 				ret = -ENOMEM;
 				goto cleanup_req;
 			}

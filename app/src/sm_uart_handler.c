@@ -137,7 +137,7 @@ static int rx_enable(void)
 
 	buf = rx_buf_alloc();
 	if (!buf) {
-		LOG_ERR("UART RX failed to allocate buffer");
+		LOG_ERR("Failed to allocate %s", "UART RX buffer");
 		return -ENOMEM;
 	}
 

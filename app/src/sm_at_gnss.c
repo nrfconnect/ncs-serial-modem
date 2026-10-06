@@ -348,7 +348,7 @@ static void agnss_requestor(struct k_work *)
 	char *agnss_rest_data_buf = calloc(1, NRF_CLOUD_AGNSS_MAX_DATA_SIZE);
 
 	if (!agnss_rest_data_buf) {
-		LOG_ERR("Failed to allocate A-GNSS data buffer");
+		LOG_ERR("Failed to allocate %s", "A-GNSS data buffer");
 		return;
 	}
 

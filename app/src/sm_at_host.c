@@ -648,7 +648,7 @@ static bool set_sm_mode(struct sm_at_host_ctx *ctx, enum sm_operation_mode mode)
 					CONFIG_SM_DATAMODE_BUF_SIZE);
 				ctx->data_rb_buf = malloc(CONFIG_SM_DATAMODE_BUF_SIZE);
 				if (ctx->data_rb_buf == NULL) {
-					LOG_ERR("Failed to allocate data mode buffer");
+					LOG_ERR("Failed to allocate %s", "data mode buffer");
 					return false;
 				}
 				ring_buf_init(&ctx->data_rb, CONFIG_SM_DATAMODE_BUF_SIZE,
@@ -1065,7 +1065,7 @@ static int sm_at_send_internal(struct sm_at_host_ctx *ctx, const uint8_t *data, 
 			struct urc_msg *msg = calloc(1, sizeof(struct urc_msg) + len + 1);
 
 			if (!msg) {
-				LOG_ERR("Failed to allocate URC message");
+				LOG_ERR("Failed to allocate %s", "URC message");
 				return -ENOMEM;
 			}
 			memcpy(msg->urc, data, len);
@@ -1912,7 +1912,7 @@ static int sm_at_host_ctx_init(struct sm_at_host_ctx *ctx, struct modem_pipe *pi
 
 	ctx->at_buf = malloc(AT_BUF_MIN_SIZE);
 	if (!ctx->at_buf) {
-		LOG_ERR("Failed to allocate AT command buffer");
+		LOG_ERR("Failed to allocate %s", "AT command buffer");
 		return -ENOMEM;
 	}
 	ctx->at_buf_size = AT_BUF_MIN_SIZE;
@@ -1967,7 +1967,7 @@ static struct sm_at_host_ctx *sm_at_host_create(struct modem_pipe *pipe)
 	/* Allocate new instance from heap */
 	ctx = malloc(sizeof(*ctx));
 	if (!ctx) {
-		LOG_ERR("Failed to allocate AT host context");
+		LOG_ERR("Failed to allocate %s", "AT host context");
 		return NULL;
 	}
 
