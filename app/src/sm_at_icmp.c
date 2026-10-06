@@ -476,7 +476,6 @@ static int ping_test_handler(const char *target)
 	ret = zsock_getaddrinfo(target, NULL, NULL, &res);
 	if (ret != 0) {
 		LOG_ERR("zsock_getaddrinfo(dest) error: %d", ret);
-		rsp_send("\"%s\"\r\n", zsock_gai_strerror(ret));
 		return -EAGAIN;
 	}
 
