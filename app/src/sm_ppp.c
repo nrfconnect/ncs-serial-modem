@@ -337,12 +337,24 @@ static int ppp_start(void)
 
 	struct ppp_context *const ctx = net_if_l2_data(ppp_iface);
 
-	if (!configure_ppp_link_ip_addresses(ctx)) {
-		return -EADDRNOTAVAIL;
-	}
-
 	if (!ppp_pipe) {
 		return -EINVAL;
+	}
+
+	if (!configure_ppp_link_ip_addresses(ctx)) {
+		if (sm_ppp_keep_pipe_attached || sm_ppp_detach_at_pipe) {
+			/* The pipe is dedicated to PPP or still owned by the AT host.
+			 * Keep waiting, +CGEV starts PPP when the PDN is activated.
+			 */
+			return -EADDRNOTAVAIL;
+		}
+
+		/* AT+CGDATA has already sent CONNECT and released the pipe from the AT host.
+		 * Return it through ppp_stop(), which does nothing unless PPP is starting.
+		 */
+		ppp_state = PPP_STATE_STARTING;
+		ret = -EADDRNOTAVAIL;
+		goto error;
 	}
 
 	ppp_state = PPP_STATE_STARTING;
@@ -756,6 +768,8 @@ STATIC int handle_at_cgdata(enum at_parser_cmd_type cmd_type, struct at_parser *
 	}
 	ppp_pipe = pipe;
 	sm_ppp_keep_pipe_attached = false;
+	/* May be left set by a deferred AT#XPPP=1. */
+	sm_ppp_detach_at_pipe = false;
 	ppp_pdn_cid = cid;
 	/* Do not block the sm_work_q while waiting for PDP context activation */
 	ppp_pdn_timeout = sys_timepoint_calc(PDN_ACTIVATION_TIMEOUT);

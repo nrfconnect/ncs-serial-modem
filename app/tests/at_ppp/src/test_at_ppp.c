@@ -180,6 +180,31 @@ void test_ppp_start_without_ip_address_fails(void)
 	TEST_ASSERT_EQUAL_UINT(0, ppp_stub_socket_calls);
 }
 
+/* AT#XPPP=1 is accepted before the network is attached, and PPP starts once the PDN is
+ * activated. The AT host keeps the UART in the meantime, so AT+CFUN=1 can still be sent.
+ */
+void test_ppp_start_defers_until_pdn_activation(void)
+{
+	ppp_stub_ipv4_addr[0] = '\0';
+	ppp_stub_ipv6_addr[0] = '\0';
+
+	send_at_ok("AT#XPPP=1");
+	TEST_ASSERT_TRUE_MESSAGE(sm_ppp_is_stopped(), "PPP must wait for the PDN");
+	TEST_ASSERT_EQUAL_UINT(0, ppp_stub_net_if_up_calls);
+
+	/* AT+CFUN=1 re-subscribes to the +CGEV notifications. */
+	TEST_ASSERT_TRUE_MESSAGE(ppp_stub_pipe_in_at_mode(UART_PIPE),
+				 "The UART pipe must remain in AT mode while PPP is deferred");
+	TEST_ASSERT_EQUAL_INT(0, ppp_stub_send_at("AT+CFUN=1"));
+
+	strcpy(ppp_stub_ipv4_addr, "192.0.2.1");
+	at_monitor_dispatch("+CGEV: ME PDN ACT 0\r\n");
+	pump();
+
+	TEST_ASSERT_TRUE_MESSAGE(ppp_is_running(), "+CGEV did not start PPP");
+	TEST_ASSERT_EQUAL_UINT(1, ppp_stub_net_if_up_calls);
+}
+
 void test_ppp_start_with_ipv6_only(void)
 {
 	ppp_stub_ipv4_addr[0] = '\0';
@@ -211,6 +236,42 @@ void test_ppp_start_via_cgdata(void)
 	TEST_ASSERT_TRUE(ppp_is_running());
 	TEST_ASSERT_NOT_NULL(strstr(ppp_stub_get_output(), "CONNECT"));
 	TEST_ASSERT_EQUAL_UINT(1, ppp_stub_net_if_up_calls);
+}
+
+/* The PDP context is reported as active, but it has no IP address when PPP starts. The pipe was
+ * already handed over to PPP for CONNECT, so it must be returned to the AT host.
+ */
+void test_ppp_start_via_cgdata_returns_pipe_without_ip_address(void)
+{
+	ppp_stub_ipv4_addr[0] = '\0';
+	ppp_stub_ipv6_addr[0] = '\0';
+
+	TEST_ASSERT_EQUAL_INT(-AT_COMMAND_CONTINUE_RET, ppp_stub_send_at("AT+CGDATA=\"PPP\""));
+	pump();
+
+	TEST_ASSERT_TRUE(sm_ppp_is_stopped());
+	TEST_ASSERT_EQUAL_UINT(0, ppp_stub_net_if_up_calls);
+	TEST_ASSERT_EQUAL_UINT(1, ppp_stub_host_release_calls);
+	TEST_ASSERT_EQUAL_UINT_MESSAGE(1, ppp_stub_host_attach_calls,
+				       "The pipe was not returned to the AT host");
+}
+
+/* A deferred AT#XPPP=1 must not make a following AT+CGDATA wait for the PDN. */
+void test_ppp_start_via_cgdata_after_deferred_start_returns_pipe(void)
+{
+	ppp_stub_ipv4_addr[0] = '\0';
+	ppp_stub_ipv6_addr[0] = '\0';
+
+	send_at_ok("AT#XPPP=1");
+	TEST_ASSERT_TRUE(sm_ppp_is_stopped());
+
+	TEST_ASSERT_EQUAL_INT(-AT_COMMAND_CONTINUE_RET, ppp_stub_send_at("AT+CGDATA=\"PPP\""));
+	pump();
+
+	TEST_ASSERT_TRUE(sm_ppp_is_stopped());
+	TEST_ASSERT_EQUAL_UINT(0, ppp_stub_net_if_up_calls);
+	TEST_ASSERT_EQUAL_UINT_MESSAGE(1, ppp_stub_host_attach_calls,
+				       "The pipe was not returned to the AT host");
 }
 
 void test_ppp_start_via_cgdata_fails_without_lte(void)
