@@ -49,7 +49,7 @@ Apply the repository's existing Copilot instructions in addition to this checkli
 ### Modem AT forwarding & response handling
 - Handlers never call `nrf_modem_at_printf()` / `nrf_modem_at_scanf()` directly — they use
   `sm_util_at_printf()` / `sm_util_at_scanf()` so AT interception still works.
-- Responses use `rsp_send()` only for output that comfortably fits the 512-byte
+- Responses use `rsp_send()` only for output that comfortably fits the 4096-byte
   (`SM_AT_MAX_RSP_LEN`) static buffer; anything larger or non-`printf`-style uses `data_send()`
   with a pre-formatted buffer.
 - URCs use `urc_send()` (safe from any thread) rather than writing to the UART pipe directly.

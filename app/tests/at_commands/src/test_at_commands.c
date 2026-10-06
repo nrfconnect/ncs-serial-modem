@@ -351,6 +351,33 @@ void test_xbootinfo_test(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 }
 
+/*
+ * Test: a long modem notification, such as %NCELLMEAS with a GCI search, is sent as URC
+ * in full, preceded by CRLF, and not truncated.
+ */
+void test_urc_long_modem_notification(void)
+{
+	static char notification[2000];
+	static char expected[sizeof(notification) + sizeof("\r\n")];
+	const char *response;
+	const size_t body_len = sizeof(notification) - sizeof("%NCELLMEAS: \r\n");
+
+	memset(notification, 'A', body_len);
+	memcpy(notification, "%NCELLMEAS: ", strlen("%NCELLMEAS: "));
+	strcpy(notification + body_len, "\r\n");
+	strcpy(expected, "\r\n");
+	strcat(expected, notification);
+
+	clear_captured_response();
+	/* This is how sm_at_urc_filter.c forwards the modem notifications. */
+	urc_send("\r\n%s", notification);
+	/* The URC is sent from the work queue. */
+	k_sleep(K_MSEC(10));
+
+	response = get_captured_response();
+	TEST_ASSERT_EQUAL_STRING(expected, response);
+}
+
 extern int unity_main(void);
 
 int main(void)

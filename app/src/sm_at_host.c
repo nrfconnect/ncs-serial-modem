@@ -47,8 +47,10 @@ LOG_MODULE_REGISTER(sm_at_host, CONFIG_SM_LOG_LEVEL);
 /* Sized with the maximum response the nrf modem can generate. Modem URC's use a separate buffer. */
 #define MODEM_RSP_BUF_SIZE  2048
 
-/* Sized for the longest formatted response for AT#X...; large payloads must use data_send(). */
-#define SM_AT_MAX_RSP_LEN   512
+/* Sized for the longest modem URC, which is forwarded with urc_send() and limited by
+ * CONFIG_SM_URC_BUFFER_SIZE. Large payloads must use data_send().
+ */
+#define SM_AT_MAX_RSP_LEN   4096
 
 /* Operation mode variables */
 enum sm_operation_mode {
