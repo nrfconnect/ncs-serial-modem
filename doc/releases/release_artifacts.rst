@@ -45,8 +45,3 @@ The artifacts are zipped and contain build files such as:
      - Application image Kconfig options.
 
 For more details about the build artifacts, see the `build output files`_ documentation.
-
-.. note::
-
-   Do not use ``_mtrace`` variants for power measurements.
-   The trace UART with HW flow control enabled due to RTT application logging has approximately 700 uA overhead on the power consumption.
