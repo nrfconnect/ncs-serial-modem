@@ -156,7 +156,7 @@ jobs:
             cp "${src_dir}/${app_build_dir}/zephyr/.config" "${temp}/${base}.config"
             cp "${src_dir}/${app_build_dir}/zephyr/zephyr.elf" "${temp}/${base}.elf"
             cp "${src_dir}/${app_build_dir}/zephyr/zephyr.dts" "${temp}/${base}.dts"
-            if [ -z "$host" ]; then
+            if [ "$host" = "0" ]; then
               cp "${src_dir}/${app_build_dir}/zephyr/zephyr.signed.bin" "${temp}/${base}.signed.bin"
               cp "${src_dir}/dfu_application.zip" "${temp}/${base}_dfu_application.zip"
             fi
