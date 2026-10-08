@@ -43,7 +43,8 @@ static struct ping_argv_t {
 	uint32_t waitms;
 	uint16_t count;
 	uint32_t interval;
-	uint16_t pdn;
+	uint16_t cid;
+	int pdn_id;
 	uint16_t id;
 	uint16_t seq;
 } ping_argv;
@@ -368,18 +369,15 @@ static int send_ping_wait_reply(uint16_t seq, uint32_t *rtt_ms)
 
 	/* Use non-primary PDN if specified, fail if cannot proceed
 	 */
-	int pdn = 0;
-
-	if (ping_argv.pdn != 0) {
-		pdn = ping_argv.pdn;
-
-		if (zsock_setsockopt(fd, SOL_SOCKET, SO_BINDTOPDN, &pdn, sizeof(int))) {
+	if (ping_argv.cid != 0) {
+		if (zsock_setsockopt(fd, SOL_SOCKET, SO_BINDTOPDN, &ping_argv.pdn_id,
+				     sizeof(int))) {
 			err = -errno;
 			LOG_WRN("SO_BINDTOPDN error: %d", err);
 			goto close_end;
 		}
 	}
-	LOG_DBG("Use PDN: %d", pdn);
+	LOG_DBG("Use PDN ID: %d", ping_argv.pdn_id);
 
 	/* We have a blocking socket and we do not want to block for
 	 * a long for sending. Thus, let's set the timeout:
@@ -516,8 +514,29 @@ static int ping_test_handler(const char *target, struct ping_argv_t *args)
 {
 	int ret;
 	struct zsock_addrinfo *res;
+	char service[16];
+	struct zsock_addrinfo hints = {
+		.ai_flags = AI_PDNSERV,
+	};
 
-	ret = zsock_getaddrinfo(target, NULL, NULL, &res);
+	/* The socket option and the DNS query take the PDN ID, not the cid. It is 0 for the
+	 * default PDN connection.
+	 */
+	args->pdn_id = 0;
+	if (args->cid != 0) {
+		args->pdn_id = sm_util_pdn_id_get(args->cid);
+		if (args->pdn_id < 0) {
+			return args->pdn_id;
+		}
+	}
+
+	/* Resolve the target on the PDN connection that is pinged over. Otherwise the query goes
+	 * to the DNS server of the default PDN connection, which can give another answer, or none.
+	 * The service is only the PDN ID. The port is not needed, and with AI_NUMERICSERV it would
+	 * have to be given, as "port:pdn_id", and be other than 0.
+	 */
+	snprintf(service, sizeof(service), "%d", args->pdn_id);
+	ret = zsock_getaddrinfo(target, service, &hints, &res);
 	if (ret != 0) {
 		LOG_ERR("zsock_getaddrinfo(dest) error: %d", ret);
 		return -EAGAIN;
@@ -536,7 +555,7 @@ static int ping_test_handler(const char *target, struct ping_argv_t *args)
 		}
 
 		LOG_INF("Ping target's IPv4 address");
-		util_get_ip_addr(args->pdn, ipv4_addr, NULL);
+		util_get_ip_addr(args->cid, ipv4_addr, NULL);
 		if (!*ipv4_addr) {
 			LOG_ERR("Local IPv4 address not found");
 			zsock_freeaddrinfo(res);
@@ -565,7 +584,7 @@ static int ping_test_handler(const char *target, struct ping_argv_t *args)
 		}
 
 		LOG_INF("Ping target's IPv6 address");
-		util_get_ip_addr(args->pdn, NULL, ipv6_addr);
+		util_get_ip_addr(args->cid, NULL, ipv6_addr);
 		if (!*ipv6_addr) {
 			LOG_ERR("Local IPv6 address not found");
 			zsock_freeaddrinfo(res);
@@ -635,12 +654,16 @@ STATIC int handle_at_icmp_ping(enum at_parser_cmd_type cmd_type, struct at_parse
 				return err;
 			};
 		}
-		args.pdn = 0; /* default 0 primary PDN */
+		args.cid = 0; /* default 0 primary PDN */
 		if (param_count > 6) {
-			err = at_parser_num_get(parser, 6, &args.pdn);
+			err = at_parser_num_get(parser, 6, &args.cid);
 			if (err < 0) {
 				return err;
 			};
+			if (args.cid > 10) {
+				LOG_ERR("Invalid cid: %u", args.cid);
+				return -EINVAL;
+			}
 		}
 
 		if (!atomic_cas(&ping_in_progress, 0, 1)) {
