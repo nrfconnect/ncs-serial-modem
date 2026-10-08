@@ -6,7 +6,7 @@
 
 # SM core symbols — normally defined inside menu "Nordic Serial Modem" in
 # app/Kconfig. Redefined here as standalone symbols because the app Kconfig
-# cannot be rsourced (it owns mainmenu and sources Kconfig.zephyr itself).
+# cannot be re-sourced (it owns mainmenu and sources Kconfig.zephyr itself).
 
 # NRF_MODEM_LIB_MEM_DIAG is normally gated by NRF_MODEM_LIB; define it here
 # so the nrf_modem_lib_diag_stats mock compiles with the full struct definition.
