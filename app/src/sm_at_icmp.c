@@ -35,6 +35,7 @@ LOG_MODULE_REGISTER(sm_icmp, CONFIG_SM_LOG_LEVEL);
 static struct ping_argv_t {
 	struct zsock_addrinfo *src;
 	struct zsock_addrinfo *dest;
+	int family;
 	uint16_t len;
 	uint32_t waitms;
 	uint16_t count;
@@ -42,6 +43,7 @@ static struct ping_argv_t {
 	uint16_t pdn;
 } ping_argv;
 static struct modem_pipe *ping_pipe;
+static atomic_t ping_in_progress;
 
 static void ping_task(struct k_work *item);
 K_WORK_DEFINE(ping_work, ping_task);
@@ -125,7 +127,6 @@ static int32_t send_ping_wait_reply(void)
 	uint8_t *data = NULL;
 	uint8_t rep = 0;
 	uint8_t header_len = 0;
-	struct zsock_addrinfo *si = ping_argv.src;
 	const int alloc_size = ICMP_DEFAULT_LINK_MTU;
 	struct zsock_pollfd fds[1];
 	int dpllen, pllen, len;
@@ -135,7 +136,7 @@ static int32_t send_ping_wait_reply(void)
 	const uint16_t icmp_hdr_len = ICMP_HDR_LEN;
 	struct timeval tv;
 
-	if (si->ai_family == NET_AF_INET) {
+	if (ping_argv.family == NET_AF_INET) {
 		/* Generate IPv4 ICMP EchoReq */
 
 		/* Ping header */
@@ -472,9 +473,11 @@ static void ping_task(struct k_work *item)
 
 	zsock_freeaddrinfo(si);
 	zsock_freeaddrinfo(di);
+
+	atomic_clear(&ping_in_progress);
 }
 
-static int ping_test_handler(const char *target)
+static int ping_test_handler(const char *target, struct ping_argv_t *args)
 {
 	int ret;
 	struct zsock_addrinfo *res;
@@ -489,64 +492,67 @@ static int ping_test_handler(const char *target)
 	if (res->ai_family == NET_AF_INET) {
 		char ipv4_addr[NET_INET_ADDRSTRLEN];
 
-		if (ping_argv.len > ICMP_IPV4_MAX_LEN) {
+		args->family = NET_AF_INET;
+		if (args->len > ICMP_IPV4_MAX_LEN) {
 			LOG_ERR("Ping length too long for %s: len=%u max=%d", "IPv4",
-				ping_argv.len, ICMP_IPV4_MAX_LEN);
+				args->len, ICMP_IPV4_MAX_LEN);
 			zsock_freeaddrinfo(res);
 			return -EINVAL;
 		}
 
 		LOG_INF("Ping target's IPv4 address");
-		util_get_ip_addr(ping_argv.pdn, ipv4_addr, NULL);
+		util_get_ip_addr(args->pdn, ipv4_addr, NULL);
 		if (!*ipv4_addr) {
 			LOG_ERR("Local IPv4 address not found");
 			zsock_freeaddrinfo(res);
 			return -1;
 		}
 
-		ping_argv.dest = res;
+		args->dest = res;
 		res = NULL;
 		ret = zsock_getaddrinfo(ipv4_addr, NULL, NULL, &res);
 		if (ret != 0) {
 			LOG_ERR("zsock_getaddrinfo(src) error: %d", ret);
-			zsock_freeaddrinfo(ping_argv.dest);
+			zsock_freeaddrinfo(args->dest);
+			args->dest = NULL;
 			return -ret;
 		}
-		ping_argv.src = res;
+		args->src = res;
 	} else if (res->ai_family == NET_AF_INET6) {
 		char ipv6_addr[NET_INET6_ADDRSTRLEN];
 
-		if (ping_argv.len > ICMP_IPV6_MAX_LEN) {
+		args->family = NET_AF_INET6;
+		if (args->len > ICMP_IPV6_MAX_LEN) {
 			LOG_ERR("Ping length too long for %s: len=%u max=%d", "IPv6",
-				ping_argv.len, ICMP_IPV6_MAX_LEN);
+				args->len, ICMP_IPV6_MAX_LEN);
 			zsock_freeaddrinfo(res);
 			return -EINVAL;
 		}
 
 		LOG_INF("Ping target's IPv6 address");
-		util_get_ip_addr(ping_argv.pdn, NULL, ipv6_addr);
+		util_get_ip_addr(args->pdn, NULL, ipv6_addr);
 		if (!*ipv6_addr) {
 			LOG_ERR("Local IPv6 address not found");
 			zsock_freeaddrinfo(res);
 			return -1;
 		}
 
-		ping_argv.dest = res;
+		args->dest = res;
 		res = NULL;
 		ret = zsock_getaddrinfo(ipv6_addr, NULL, NULL, &res);
 		if (ret != 0) {
 			LOG_ERR("zsock_getaddrinfo(src) error: %d", ret);
-			zsock_freeaddrinfo(ping_argv.dest);
+			zsock_freeaddrinfo(args->dest);
+			args->dest = NULL;
 			return -ret;
 		}
-		ping_argv.src = res;
+		args->src = res;
 	} else {
 		LOG_ERR("Address family not supported: %d", res->ai_family);
 		zsock_freeaddrinfo(res);
 		return -EAFNOSUPPORT;
 	}
 
-	k_work_submit_to_queue(&sm_work_q, &ping_work);
 	return 0;
 }
 
@@ -557,6 +563,10 @@ STATIC int handle_at_icmp_ping(enum at_parser_cmd_type cmd_type, struct at_parse
 	int err = -EINVAL;
 	char target[SM_MAX_DNS_LEN + 1] = {0};
 	size_t size = sizeof(target);
+	/* Parsed into a local copy so that a command rejected below cannot alter the request
+	 * that an already queued ping_task() reads.
+	 */
+	struct ping_argv_t args = {0};
 
 	switch (cmd_type) {
 	case AT_PARSER_CMD_TYPE_SET:
@@ -564,42 +574,54 @@ STATIC int handle_at_icmp_ping(enum at_parser_cmd_type cmd_type, struct at_parse
 		if (err < 0) {
 			return err;
 		}
-		err = at_parser_num_get(parser, 2, &ping_argv.len);
+		err = at_parser_num_get(parser, 2, &args.len);
 		if (err < 0) {
 			return err;
 		}
-		err = at_parser_num_get(parser, 3, &ping_argv.waitms);
+		err = at_parser_num_get(parser, 3, &args.waitms);
 		if (err < 0) {
 			return err;
 		}
-		ping_argv.count = 1; /* default 1 */
+		args.count = 1; /* default 1 */
 		if (param_count > 4) {
-			err = at_parser_num_get(parser, 4, &ping_argv.count);
+			err = at_parser_num_get(parser, 4, &args.count);
 			if (err < 0) {
 				return err;
 			};
-			if (ping_argv.count == 0) {
+			if (args.count == 0) {
 				LOG_ERR("Count must be greater than 0");
 				return -EINVAL;
 			}
 		}
-		ping_argv.interval = 1000; /* default 1s */
+		args.interval = 1000; /* default 1s */
 		if (param_count > 5) {
-			err = at_parser_num_get(parser, 5, &ping_argv.interval);
+			err = at_parser_num_get(parser, 5, &args.interval);
 			if (err < 0) {
 				return err;
 			};
 		}
-		ping_argv.pdn = 0; /* default 0 primary PDN */
+		args.pdn = 0; /* default 0 primary PDN */
 		if (param_count > 6) {
-			err = at_parser_num_get(parser, 6, &ping_argv.pdn);
+			err = at_parser_num_get(parser, 6, &args.pdn);
 			if (err < 0) {
 				return err;
 			};
 		}
 
+		if (!atomic_cas(&ping_in_progress, 0, 1)) {
+			return -EBUSY;
+		}
+
+		err = ping_test_handler(target, &args);
+		if (err) {
+			atomic_clear(&ping_in_progress);
+			return err;
+		}
+
+		/* Hand the validated request over to ping_task(), which releases it. */
+		ping_argv = args;
 		ping_pipe = sm_at_host_get_current_pipe();
-		err = ping_test_handler(target);
+		k_work_submit_to_queue(&sm_work_q, &ping_work);
 		break;
 
 	default:
