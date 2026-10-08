@@ -6,7 +6,7 @@
 
 # SM core and PPP/CMUX symbols — normally defined inside menu "Nordic Serial Modem"
 # in app/Kconfig. Redefined here as standalone symbols because the app Kconfig
-# cannot be rsourced (it owns mainmenu and sources Kconfig.zephyr itself).
+# cannot be re-sourced (it owns mainmenu and sources Kconfig.zephyr itself).
 
 # Integer log level: 0=off 1=err 2=wrn 3=inf 4=dbg (Zephyr log_config template)
 config SM_LOG_LEVEL

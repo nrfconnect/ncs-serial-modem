@@ -47,6 +47,15 @@ void uart_stub_tx_done_drain(void)
 	k_sem_take(&tx_done, K_MSEC(200));
 }
 
+/* Discard tx_done credits without waiting. Unlike uart_stub_tx_done_drain() this does not let
+ * virtual time pass, so it is suitable when URCs sent by a background task have already
+ * settled and a command is about to be sent.
+ */
+void uart_stub_tx_done_reset(void)
+{
+	k_sem_reset(&tx_done);
+}
+
 static int pipe_open(void *data)
 {
 	struct modem_pipe *pipe = (struct modem_pipe *)data;
