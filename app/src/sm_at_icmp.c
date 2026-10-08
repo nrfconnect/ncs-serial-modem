@@ -9,6 +9,7 @@
 #include <limits.h>
 #include <stdio.h>
 #include <string.h>
+#include <zephyr/random/random.h>
 #include <zephyr/net/socket.h>
 #include "sm_util.h"
 #include "sm_at_host.h"
@@ -43,6 +44,8 @@ static struct ping_argv_t {
 	uint16_t count;
 	uint32_t interval;
 	uint16_t pdn;
+	uint16_t id;
+	uint16_t seq;
 } ping_argv;
 static struct modem_pipe *ping_pipe;
 static atomic_t ping_in_progress;
@@ -143,14 +146,14 @@ static uint16_t icmp6_checksum(const uint8_t *ip, const uint8_t *icmp, int icmp_
  *
  * Everything that arrives on the PDN is delivered to the raw socket, so the packet is
  * untrusted. It must be a well formed echo reply, from the address that was pinged, carrying
- * the sequence number of the request, with valid checksum and length. Anything else is not a
- * reply to us and must simply be ignored.
+ * the identifier and the sequence number of the request, with valid checksum and length.
+ * Anything else is not a reply to us and must simply be ignored.
  *
  * @param buf Received packet, starting from the IP header.
  * @param len Length of the received packet.
  * @param seq Sequence number of the request.
  */
-static bool is_echo_reply(const uint8_t *buf, int len, uint8_t seq)
+static bool is_echo_reply(const uint8_t *buf, int len, uint16_t seq)
 {
 	const uint8_t *icmp;
 	int header_len;
@@ -217,7 +220,11 @@ static bool is_echo_reply(const uint8_t *buf, int len, uint8_t seq)
 		}
 	}
 
-	return icmp[7] == seq;
+	if (((icmp[4] << 8) + icmp[5]) != ping_argv.id || ((icmp[6] << 8) + icmp[7]) != seq) {
+		return false;
+	}
+
+	return true;
 }
 
 /**
@@ -226,6 +233,7 @@ static bool is_echo_reply(const uint8_t *buf, int len, uint8_t seq)
  * The wait ends at a fixed deadline measured from the moment the request is sent. Packets
  * that are not the reply do not extend it.
  *
+ * @param[in]  seq     Sequence number of the request.
  * @param[out] rtt_ms  Round-trip time in milliseconds, set only on success.
  *
  * @retval 0 A valid reply was received.
@@ -233,9 +241,8 @@ static bool is_echo_reply(const uint8_t *buf, int len, uint8_t seq)
  * @retval -ENOMEM Failed to allocate the packet buffer.
  * @retval other Negative errno of the failed socket operation.
  */
-static int send_ping_wait_reply(uint32_t *rtt_ms)
+static int send_ping_wait_reply(uint16_t seq, uint32_t *rtt_ms)
 {
-	static uint8_t seqnr;
 	int64_t start_t;
 	int64_t remaining;
 	uint16_t total_length;
@@ -286,13 +293,14 @@ static int send_ping_wait_reply(uint32_t *rtt_ms)
 		data[0] = ICMP_ECHO_REQ;                    /* Type (echo req) */
 		/* data[1] = 0; */                          /* Code */
 		/* data[2..3] */                            /* checksum, calculated later */
-		/* data[4..5] = 0; */                       /* Identifier */
-		/* data[6] = 0;  */                         /* seqnr >> 8 */
-		data[7] = ++seqnr;
+		data[4] = ping_argv.id >> 8;                /* Identifier */
+		data[5] = ping_argv.id & 0xFF;              /* Identifier */
+		data[6] = seq >> 8;                         /* Sequence number */
+		data[7] = seq & 0xFF;                       /* Sequence number */
 
 		/* Payload */
 		for (int i = 8; i < total_length - header_len; i++) {
-			data[i] = (i + seqnr) % 10 + '0';
+			data[i] = (i + seq) % 10 + '0';
 		}
 
 		/* ICMP CRC */
@@ -330,13 +338,14 @@ static int send_ping_wait_reply(uint32_t *rtt_ms)
 		data[0] = ICMP6_ECHO_REQ;        /* Type (echo req) */
 		/* data[1] = 0; */               /* Code */
 		/* data[2..3] */                 /* checksum, calculated later */
-		/* data[4..5] = 0; */            /* Identifier */
-		/* data[6] = 0; */               /* seqnr >> 8 */
-		data[7] = ++seqnr;
+		data[4] = ping_argv.id >> 8;     /* Identifier */
+		data[5] = ping_argv.id & 0xFF;   /* Identifier */
+		data[6] = seq >> 8;              /* Sequence number */
+		data[7] = seq & 0xFF;            /* Sequence number */
 
 		/* Payload */
 		for (int i = 0; i < ping_argv.len; i++) {
-			data[i + icmp_hdr_len] = (i + seqnr) % 10 + '0';
+			data[i + icmp_hdr_len] = (i + seq) % 10 + '0';
 		}
 
 		/* ICMPv6 CRC */
@@ -432,7 +441,7 @@ static int send_ping_wait_reply(uint32_t *rtt_ms)
 			continue;
 		}
 
-		if (is_echo_reply(buf, len, seqnr)) {
+		if (is_echo_reply(buf, len, seq)) {
 			*rtt_ms = (uint32_t)(k_uptime_get() - start_t);
 			err = 0;
 			goto close_end;
@@ -463,7 +472,7 @@ static void ping_task(struct k_work *item)
 	for (int i = 0; i < ping_argv.count; i++) {
 		uint32_t rtt = 0;
 
-		if (send_ping_wait_reply(&rtt) == 0) {
+		if (send_ping_wait_reply((uint16_t)(ping_argv.seq + i), &rtt) == 0) {
 			count++;
 			sum += rtt;
 			rtt_max = MAX(rtt_max, rtt);
@@ -638,7 +647,11 @@ STATIC int handle_at_icmp_ping(enum at_parser_cmd_type cmd_type, struct at_parse
 			return err;
 		}
 
+		uint32_t rnd = sys_rand32_get();
+
 		/* Hand the validated request over to ping_task(), which releases it. */
+		args.id = rnd & 0xFFFF;
+		args.seq = rnd >> 16;
 		ping_argv = args;
 		ping_pipe = sm_at_host_get_current_pipe();
 		k_work_submit_to_queue(&sm_work_q, &ping_work);
