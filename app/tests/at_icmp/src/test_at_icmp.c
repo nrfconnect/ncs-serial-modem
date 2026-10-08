@@ -674,6 +674,16 @@ void test_ipv6_echo_request_is_not_a_reply(void)
 	ignored_then_valid(true, F_TYPE_REQ);
 }
 
+void test_ipv4_wrong_identifier_is_ignored(void)
+{
+	ignored_then_valid(false, F_WRONG_ID);
+}
+
+void test_ipv6_wrong_identifier_is_ignored(void)
+{
+	ignored_then_valid(true, F_WRONG_ID);
+}
+
 void test_ipv4_wrong_sequence_is_ignored(void)
 {
 	ignored_then_valid(false, F_WRONG_SEQ);
@@ -732,6 +742,19 @@ void test_ipv4_wrong_source_is_ignored(void)
 void test_ipv6_wrong_source_is_ignored(void)
 {
 	ignored_then_valid(true, F_WRONG_SRC);
+}
+
+void test_only_forged_replies_are_a_loss(void)
+{
+	script_add(0, F_WRONG_ID, 10);
+	script_add(0, F_WRONG_SEQ, 10);
+	script_add(0, F_WRONG_SRC, 10);
+	script_add(0, F_TYPE_REQ, 10);
+	run_ping("AT#XPING=\"1.2.3.4\",32,1000\r\n");
+	assert_ok();
+	TEST_ASSERT_TRUE(wait_done());
+	settle();
+	TEST_ASSERT_NULL(strstr(get_captured_response(), "#XPING"));
 }
 
 /* Timeouts */
@@ -843,6 +866,30 @@ void test_identifier_and_sequence(void)
 	TEST_ASSERT_EQUAL_UINT16(req_id[0], req_id[2]);
 	TEST_ASSERT_EQUAL_UINT16((uint16_t)(req_seq[0] + 1), req_seq[1]);
 	TEST_ASSERT_EQUAL_UINT16((uint16_t)(req_seq[0] + 2), req_seq[2]);
+}
+
+void test_identifier_and_sequence_vary_between_commands(void)
+{
+	uint16_t ids[4];
+	uint16_t seqs[4];
+	bool id_varies = false;
+	bool seq_varies = false;
+
+	for (int i = 0; i < 4; i++) {
+		/* Start every command from a clean emulator, as at the start of a test */
+		setUp();
+		script_add(0, F_NONE, 5);
+		run_ping("AT#XPING=\"1.2.3.4\",8,1000\r\n");
+		TEST_ASSERT_TRUE(wait_done());
+		ids[i] = req_id[0];
+		seqs[i] = req_seq[0];
+	}
+	for (int i = 1; i < 4; i++) {
+		id_varies |= ids[i] != ids[0];
+		seq_varies |= seqs[i] != seqs[0];
+	}
+	TEST_ASSERT_TRUE(id_varies);
+	TEST_ASSERT_TRUE(seq_varies);
 }
 
 /* Validation and error paths */
