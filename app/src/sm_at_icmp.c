@@ -5,6 +5,8 @@
  */
 #include <zephyr/logging/log.h>
 #include <zephyr/kernel.h>
+#include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <string.h>
 #include <zephyr/net/socket.h>
@@ -110,29 +112,113 @@ static void calc_ics(uint8_t *buffer, int len, int hcs_pos)
 }
 
 /**
+ * @brief Compute the ICMPv6 checksum, including the IPv6 pseudo header.
+ *
+ * See RFC 4443 section 2.3 and RFC 2460 section 8.1. The checksum field itself is skipped.
+ *
+ * @param ip       IPv6 header.
+ * @param icmp     ICMPv6 message.
+ * @param icmp_len Length of the ICMPv6 message, at least ICMP_HDR_LEN.
+ */
+static uint16_t icmp6_checksum(const uint8_t *ip, const uint8_t *icmp, int icmp_len)
+{
+	uint8_t tbuf[2] __aligned(2) = {0, ip[IP_NEXT_HEADER_POS]};
+	uint32_t hcs;
+
+	hcs = check_ics(ip + 8, 32);            /* Pseudo header: source + dest */
+	hcs += check_ics(ip + 4, 2);            /* Pseudo header: payload length */
+	hcs += check_ics(tbuf, 2);              /* Pseudo header: next header */
+	hcs += check_ics(icmp, 2);              /* ICMP: type & code */
+	hcs += check_ics(icmp + 4, icmp_len - 4); /* ICMP: header data + data */
+
+	while (hcs > 0xFFFF) {
+		hcs = (hcs & 0xFFFF) + (hcs >> 16);
+	}
+
+	return hcs;
+}
+
+/**
+ * @brief Check whether a received packet is the echo reply to our request.
+ *
+ * Everything that arrives on the PDN is delivered to the raw socket, so the packet is
+ * untrusted. A packet that is malformed, or does not carry the sequence number of the request
+ * or a valid checksum and length, is not a reply to us and must simply be ignored.
+ *
+ * @param buf Received packet, starting from the IP header.
+ * @param len Length of the received packet.
+ * @param seq Sequence number of the request.
+ */
+static bool is_echo_reply(const uint8_t *buf, int len, uint8_t seq)
+{
+	const uint8_t *icmp;
+	int header_len;
+	int ip_len;
+
+	if (ping_argv.family == NET_AF_INET) {
+		header_len = NET_IPV4H_LEN;
+		if (len < header_len + ICMP_HDR_LEN || buf[IP_PROTOCOL_POS] != IPPROTO_ICMP) {
+			return false;
+		}
+		ip_len = (buf[2] << 8) + buf[3];
+		if (ip_len != len) {
+			return false;
+		}
+
+		icmp = buf + header_len;
+		if (check_ics(icmp, len - header_len) != 0) {
+			return false;
+		}
+	} else {
+		uint16_t plhcs;
+
+		header_len = NET_IPV6H_LEN;
+		if (len < header_len + ICMP_HDR_LEN || buf[IP_NEXT_HEADER_POS] != IPPROTO_ICMPV6) {
+			return false;
+		}
+		ip_len = (buf[4] << 8) + buf[5] + header_len;
+		if (ip_len != len) {
+			return false;
+		}
+
+		icmp = buf + header_len;
+		plhcs = icmp[2] + (icmp[3] << 8);
+		if (plhcs != icmp6_checksum(buf, icmp, len - header_len)) {
+			return false;
+		}
+	}
+
+	return icmp[7] == seq;
+}
+
+/**
  * @brief Send one ICMP echo request and wait for the reply.
  *
- * @retval >0 Round-trip time in milliseconds.
- * @retval 0 No valid reply was received (send failure, timeout or invalid reply).
+ * The wait ends at a fixed deadline measured from the moment the request is sent. Packets
+ * that are not the reply do not extend it.
+ *
+ * @param[out] rtt_ms  Round-trip time in milliseconds, set only on success.
+ *
+ * @retval 0 A valid reply was received.
+ * @retval -ETIMEDOUT No valid reply was received in time.
  * @retval -ENOMEM Failed to allocate the packet buffer.
+ * @retval other Negative errno of the failed socket operation.
  */
-static int32_t send_ping_wait_reply(void)
+static int send_ping_wait_reply(uint32_t *rtt_ms)
 {
-	static int64_t start_t;
-	int64_t delta_t;
-	int32_t timeout;
 	static uint8_t seqnr;
+	int64_t start_t;
+	int64_t remaining;
 	uint16_t total_length;
 	uint8_t *buf = NULL;
 	uint8_t *data = NULL;
-	uint8_t rep = 0;
 	uint8_t header_len = 0;
 	const int alloc_size = ICMP_DEFAULT_LINK_MTU;
 	struct zsock_pollfd fds[1];
-	int dpllen, pllen, len;
+	int len;
 	int fd;
-	int plseqnr;
 	int ret;
+	int err = 0;
 	const uint16_t icmp_hdr_len = ICMP_HDR_LEN;
 	struct timeval tv;
 
@@ -182,7 +268,6 @@ static int32_t send_ping_wait_reply(void)
 
 		/* ICMP CRC */
 		calc_ics(data, total_length - header_len, 2);
-		rep = ICMP_ECHO_REP;
 	} else {
 		/* Generate IPv6 ICMP EchoReq */
 
@@ -225,37 +310,22 @@ static int32_t send_ping_wait_reply(void)
 			data[i + icmp_hdr_len] = (i + seqnr) % 10 + '0';
 		}
 
-		/* ICMPv6 CRC: https://tools.ietf.org/html/rfc4443#section-2.3
-		 * for IPv6 pseudo header see: https://tools.ietf.org/html/rfc2460#section-8.1
-		 */
-		uint32_t hcs = check_ics(buf + 8, 32);   /* Pseudo header: source + dest */
-		uint8_t tbuf[2];
+		/* ICMPv6 CRC */
+		uint16_t hcs = icmp6_checksum(buf, data, icmp_hdr_len + ping_argv.len);
 
-		hcs += check_ics(buf + 4, 2);            /* Pseudo header: payload length */
-
-		tbuf[0] = 0;
-		tbuf[1] = buf[6];
-
-		hcs += check_ics(tbuf, 2);                /* Pseudo header: Next header */
-		hcs += check_ics(data, 2);                /* ICMP: Type & Code */
-		hcs += check_ics(data + 4, 4 + ping_argv.len); /* ICMP: Header data + Data */
-		while (hcs > 0xFFFF) {
-			hcs = (hcs & 0xFFFF) + (hcs >> 16);
-		}
 		data[2] = hcs & 0xFF;
 		data[3] = hcs >> 8;
-		rep = ICMP6_ECHO_REP;
 	}
 
 	/* Send the ping */
 	errno = 0;
-	delta_t = 0;
 
 	fd = zsock_socket(AF_PACKET, SOCK_RAW, 0);
 	if (fd < 0) {
-		LOG_ERR("zsock_socket() error: %d", -errno);
+		err = -errno;
+		LOG_ERR("zsock_socket() error: %d", err);
 		free(buf);
-		return (int32_t)delta_t;
+		return err;
 	}
 
 	/* Use non-primary PDN if specified, fail if cannot proceed
@@ -266,7 +336,8 @@ static int32_t send_ping_wait_reply(void)
 		pdn = ping_argv.pdn;
 
 		if (zsock_setsockopt(fd, SOL_SOCKET, SO_BINDTOPDN, &pdn, sizeof(int))) {
-			LOG_WRN("SO_BINDTOPDN error: %d", -errno);
+			err = -errno;
+			LOG_WRN("SO_BINDTOPDN error: %d", err);
 			goto close_end;
 		}
 	}
@@ -293,149 +364,66 @@ static int32_t send_ping_wait_reply(void)
 
 	/* Include also a sending time to measured RTT: */
 	start_t = k_uptime_get();
-	timeout = ping_argv.waitms;
 
 	ret = zsock_send(fd, buf, total_length, 0);
 	if (ret <= 0) {
-		LOG_ERR("zsock_send() error: %d", -errno);
+		err = errno ? -errno : -EIO;
+		LOG_ERR("zsock_send() error: %d", err);
 		goto close_end;
 	}
 
-	/* Now after zsock_send(), calculate how much there's still time left */
-	delta_t = k_uptime_delta(&start_t);
-	timeout = ping_argv.waitms - (int32_t)delta_t;
-
-wait_for_data:
 	fds[0].fd = fd;
 	fds[0].events = ZSOCK_POLLIN;
 
-	do {
-		if (timeout <= 0) {
+	while (true) {
+		remaining = (int64_t)ping_argv.waitms - (k_uptime_get() - start_t);
+		if (remaining <= 0) {
 			LOG_WRN("Ping timeout");
-			delta_t = 0;
+			err = -ETIMEDOUT;
 			goto close_end;
 		}
 
-		ret = zsock_poll(fds, 1, timeout);
+		ret = zsock_poll(fds, 1, MIN(remaining, (int64_t)INT_MAX));
 		if (ret == 0) {
-			LOG_WRN("Ping timeout");
-			delta_t = 0;
-			goto close_end;
+			/* Re-evaluate the deadline above */
+			continue;
 		} else if (ret < 0) {
-			LOG_ERR("zsock_poll() error: %d", -errno);
-			delta_t = 0;
+			err = -errno;
+			LOG_ERR("zsock_poll() error: %d", err);
 			goto close_end;
 		}
 
 		len = zsock_recv(fd, buf, alloc_size, 0);
-
-		/* Calculate again, how much there's still time left */
-		delta_t = k_uptime_delta(&start_t);
-		timeout = ping_argv.waitms - (int32_t)delta_t;
-
-		if (len <= 0) {
+		if (len < 0) {
 			if (errno != EAGAIN && errno != EWOULDBLOCK) {
-				LOG_ERR("zsock_recv() error: %d ret=%d",
-					-errno, len);
-				delta_t = 0;
+				err = -errno;
+				LOG_ERR("zsock_recv() error: %d", err);
 				goto close_end;
 			}
-		}
-		if (len < header_len) {
-			/* Data length error, ignore "silently" and wait for the
-			 * next datagram. Without this continue, the checks below
-			 * would inspect stale bytes left in buf by a previous
-			 * iteration (or the zero-initialised allocation) and could
-			 * accept them as a valid echo reply (CERT EXP33-C).
-			 */
-			LOG_WRN("Recv too short: %d B", len);
 			continue;
 		}
 
-		if ((rep == ICMP_ECHO_REP && buf[IP_PROTOCOL_POS] == IPPROTO_ICMP) ||
-		    (rep == ICMP6_ECHO_REP && buf[IP_NEXT_HEADER_POS] == IPPROTO_ICMPV6)) {
-			/* if not ipv4/ipv6 echo reply, ignore silently,
-			 * otherwise break the loop and go to parse the response
-			 */
-			break;
-		}
-	} while (true);
-
-	if (rep == ICMP_ECHO_REP) {
-		/* Check ICMP HCS */
-		int hcs = check_ics(data, len - header_len);
-
-		if (hcs != 0) {
-			LOG_ERR("IPv4 HCS error hcs=%d len=%d", hcs, len);
-			delta_t = 0;
+		if (is_echo_reply(buf, len, seqnr)) {
+			*rtt_ms = (uint32_t)(k_uptime_get() - start_t);
+			err = 0;
 			goto close_end;
 		}
-		pllen = (buf[2] << 8) + buf[3]; /* Raw socket payload length */
-	} else {
-		/* Check ICMP6 CRC */
-		uint32_t hcs = check_ics(buf + 8, 32);   /* Pseudo header source + dest */
-		uint8_t tbuf[2];
 
-		hcs += check_ics(buf + 4, 2);   /* Pseudo header packet length */
-
-		tbuf[0] = 0;
-		tbuf[1] = buf[6];
-		hcs += check_ics(tbuf, 2);              /* Pseudo header Next header */
-		hcs += check_ics(data, 2);              /* Type & Code */
-		hcs += check_ics(data + 4, len - header_len - 4); /* Header data + Data */
-
-		while (hcs > 0xFFFF) {
-			hcs = (hcs & 0xFFFF) + (hcs >> 16);
-		}
-
-		int plhcs = data[2] + (data[3] << 8);
-
-		if (plhcs != hcs) {
-			LOG_ERR("IPv6 HCS error plhcs=0x%x hcs=0x%x", plhcs, hcs);
-			delta_t = 0;
-			goto close_end;
-		}
-		/* Raw socket payload length */
-		pllen = (buf[4] << 8) + buf[5] + header_len; /* Payload length - hdr */
+		/* Not the reply to our request, keep waiting until the deadline */
+		LOG_DBG("Ignoring packet: %d B", len);
 	}
-
-	/* Data payload length: */
-	dpllen = pllen - header_len - icmp_hdr_len;
-
-	/* Check seqnr and length */
-	plseqnr = data[7];
-	if (plseqnr != seqnr) {
-		/* This is not the reply you are looking for */
-
-		/* Wait for the next response if there' still time */
-		if (timeout > 0) {
-			goto wait_for_data;
-		} else {
-			delta_t = 0;
-			goto close_end;
-		}
-	}
-	if (pllen != len) {
-		LOG_ERR("Length mismatch expected=%d got=%d", pllen, len);
-		delta_t = 0;
-		goto close_end;
-	}
-
-	/* Result */
-	urc_send_to(ping_pipe, "#XPING: %d.%03d seconds\r\n",
-		(uint32_t)(delta_t)/1000, (uint32_t)(delta_t)%1000);
 
 close_end:
 	(void)zsock_close(fd);
 	free(buf);
-	return (int32_t)delta_t;
+	return err;
 }
 
 static void ping_task(struct k_work *item)
 {
 	struct zsock_addrinfo *si = ping_argv.src;
 	struct zsock_addrinfo *di = ping_argv.dest;
-	uint32_t sum = 0;
+	uint64_t sum = 0;
 	uint32_t count = 0;
 	uint32_t rtt_min = 0xFFFFFFFF;
 	uint32_t rtt_max = 0;
@@ -444,13 +432,15 @@ static void ping_task(struct k_work *item)
 	ARG_UNUSED(item);
 
 	for (int i = 0; i < ping_argv.count; i++) {
-		int32_t ping_t = send_ping_wait_reply();
+		uint32_t rtt = 0;
 
-		if (ping_t > 0)  {
+		if (send_ping_wait_reply(&rtt) == 0) {
 			count++;
-			sum += (uint32_t)ping_t;
-			rtt_max = MAX(rtt_max, (uint32_t)ping_t);
-			rtt_min = MIN(rtt_min, (uint32_t)ping_t);
+			sum += rtt;
+			rtt_max = MAX(rtt_max, rtt);
+			rtt_min = MIN(rtt_min, rtt);
+			urc_send_to(ping_pipe, "#XPING: %u.%03u seconds\r\n", rtt / 1000,
+				    rtt % 1000);
 		}
 		k_sleep(K_MSEC(ping_argv.interval));
 	}
@@ -460,15 +450,16 @@ static void ping_task(struct k_work *item)
 		ping_argv.count, count, lost, lost * 100 / ping_argv.count);
 
 	if (count > 1) {
-		uint32_t avg = (sum + count/2) / count;
+		/* The average of 32-bit values fits in 32 bits */
+		uint32_t avg = (uint32_t)((sum + count / 2) / count);
 		int avg_s = avg / 1000;
 		int avg_f = avg % 1000;
 
 		urc_send_to(ping_pipe, "#XPING: average %d.%03d seconds\r\n",
 			avg_s, avg_f);
 
-		LOG_INF("RTT min=%dms max=%dms avg=%dms",
-			rtt_min, rtt_max, sum / count);
+		LOG_INF("RTT min=%ums max=%ums avg=%ums",
+			rtt_min, rtt_max, (uint32_t)(sum / count));
 	}
 
 	zsock_freeaddrinfo(si);
