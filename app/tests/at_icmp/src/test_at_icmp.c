@@ -601,7 +601,84 @@ void test_zero_length_payload(void)
 	assert_request(false, 0);
 }
 
+/* Packets that are not the reply must not end the wait, but must not be accepted either.
+ * Each is followed by the real reply, which arrives 40 ms after the request.
+ */
+static void ignored_then_valid(bool v6, unsigned int flags)
+{
+	if (v6) {
+		use_v6();
+	}
+	script_add(0, flags, 10);
+	script_add(0, F_NONE, 30);
+	run_ping(v6 ? "AT#XPING=\"2001:DB8::1\",32,1000\r\n" : "AT#XPING=\"1.2.3.4\",32,1000\r\n");
+	assert_ok();
+	TEST_ASSERT_TRUE(wait_done());
+	TEST_ASSERT_TRUE(wait_for_response("#XPING: 0.0", 3000));
+
+	/* Accepting the first packet would report 10 ms */
+	TEST_ASSERT_GREATER_OR_EQUAL_INT(40, first_rtt_ms());
+	TEST_ASSERT_LESS_OR_EQUAL_INT(45, first_rtt_ms());
+}
+
+void test_ipv4_bad_checksum_is_ignored(void)
+{
+	ignored_then_valid(false, F_BAD_CSUM);
+}
+
+void test_ipv6_bad_checksum_is_ignored(void)
+{
+	ignored_then_valid(true, F_BAD_CSUM);
+}
+
+void test_ipv4_wrong_sequence_is_ignored(void)
+{
+	ignored_then_valid(false, F_WRONG_SEQ);
+}
+
+void test_ipv6_wrong_sequence_is_ignored(void)
+{
+	ignored_then_valid(true, F_WRONG_SEQ);
+}
+
 /* Timeouts */
+
+void test_no_reply_times_out(void)
+{
+	int64_t t0 = k_uptime_get();
+
+	run_ping("AT#XPING=\"1.2.3.4\",32,1000,1,0\r\n");
+	assert_ok();
+	TEST_ASSERT_TRUE(wait_done());
+	TEST_ASSERT_LESS_THAN_INT64(1100, k_uptime_get() - t0);
+	settle();
+	TEST_ASSERT_NULL(strstr(get_captured_response(), "#XPING"));
+}
+
+void test_unrelated_traffic_does_not_extend_timeout(void)
+{
+	int64_t t0;
+
+	/* A packet every 400 ms, less than the timeout of 1000 ms */
+	junk_gap_ms = 400;
+	t0 = k_uptime_get();
+	run_ping("AT#XPING=\"1.2.3.4\",32,1000,1,0\r\n");
+	assert_ok();
+	TEST_ASSERT_TRUE(wait_done());
+	TEST_ASSERT_LESS_THAN_INT64(1100, k_uptime_get() - t0);
+}
+
+void test_forged_replies_do_not_extend_timeout(void)
+{
+	int64_t t0 = k_uptime_get();
+
+	for (int i = 0; i < MAX_STEPS; i++) {
+		script_add(0, F_BAD_CSUM, 400);
+	}
+	run_ping("AT#XPING=\"1.2.3.4\",32,1000,1,0\r\n");
+	TEST_ASSERT_TRUE(wait_done());
+	TEST_ASSERT_LESS_THAN_INT64(1100, k_uptime_get() - t0);
+}
 
 void test_reply_after_deadline_is_a_loss(void)
 {
@@ -610,6 +687,16 @@ void test_reply_after_deadline_is_a_loss(void)
 	TEST_ASSERT_TRUE(wait_done());
 	settle();
 	TEST_ASSERT_NULL(strstr(get_captured_response(), "#XPING"));
+}
+
+void test_timeout_above_int32_max(void)
+{
+	script_add(0, F_NONE, 20);
+	run_ping("AT#XPING=\"1.2.3.4\",32,3000000000\r\n");
+	assert_ok();
+	TEST_ASSERT_TRUE(wait_done());
+	TEST_ASSERT_TRUE(wait_for_response("#XPING: 0.0", 3000));
+	TEST_ASSERT_GREATER_THAN_INT(0, poll_timeout_min);
 }
 
 /* Statistics */
@@ -624,6 +711,18 @@ void test_statistics(void)
 	TEST_ASSERT_TRUE(wait_done());
 	assert_average(20);
 	TEST_ASSERT_EQUAL_INT(3, req_count);
+}
+
+void test_reply_within_a_millisecond_is_received(void)
+{
+	/* An RTT of 0 ms is a reply, not a loss */
+	script_add(0, F_NONE, 0);
+	script_add(1, F_NONE, 0);
+	run_ping("AT#XPING=\"1.2.3.4\",32,1000,2,0\r\n");
+	assert_ok();
+	TEST_ASSERT_TRUE(wait_done());
+	TEST_ASSERT_TRUE(wait_for_response("#XPING: average 0.000 seconds", 3000));
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "#XPING: 0.000 seconds"));
 }
 
 void test_lost_requests_are_left_out_of_the_average(void)
