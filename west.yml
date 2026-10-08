@@ -13,7 +13,7 @@ manifest:
     - name: nrf
       remote: ncs
       repo-path: sdk-nrf
-      revision: v3.5.0-preview2
+      revision: v3.5.0-preview3
       import:
         name-allowlist:
           - cjson
@@ -23,6 +23,7 @@ manifest:
           - libmodem
           - mbedtls
           - mcuboot
+          - memfault-firmware-sdk
           - nrfxlib
           - oberon-psa-crypto
           - segger
@@ -31,8 +32,3 @@ manifest:
           - zcbor
           - zephyr
           - littlefs
-
-    - name: memfault-firmware-sdk
-      url: https://github.com/memfault/memfault-firmware-sdk
-      path: modules/lib/memfault-firmware-sdk
-      revision: 1.45.0
