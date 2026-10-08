@@ -653,7 +653,7 @@ STATIC int handle_at_icmp_ping(enum at_parser_cmd_type cmd_type, struct at_parse
 		args.seq = rnd >> 16;
 		ping_argv = args;
 		ping_pipe = sm_at_host_get_current_pipe();
-		err = k_work_submit_to_queue(&sm_work_q, &ping_work);
+		err = sm_k_work_submit_blocking(&ping_work);
 		if (err < 0) {
 			LOG_ERR("Failed to schedule ping: %d", err);
 			zsock_freeaddrinfo(ping_argv.src);
