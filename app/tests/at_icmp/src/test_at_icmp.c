@@ -63,6 +63,13 @@ extern const char *test_cgpaddr_response;
 #define F_WRONG_SEQ   BIT(3)
 #define F_WRONG_SRC   BIT(4)
 #define F_IP_OPTIONS  BIT(5) /* Valid, but the IPv4 header carries options */
+#define F_TINY        BIT(6) /* Shorter than an IP header */
+#define F_TRUNCATED   BIT(7) /* Cut off inside the ICMP header */
+#define F_LEN_LONG    BIT(8) /* The IP length claims more than was received */
+#define F_LEN_SHORT   BIT(9) /* The IP length claims less than was received */
+
+/* How much the IP length of a reply differs from the length that is received */
+#define LEN_SKEW      4
 
 static const uint8_t v4_dest[4] = {1, 2, 3, 4};
 static const uint8_t v4_local[4] = {10, 0, 0, 2};
@@ -131,15 +138,17 @@ static uint16_t inet_cs(const uint8_t *d, int n)
 
 /* Checksum of an ICMPv6 message including the pseudo header (RFC 8200 section 8.1). Returns 0 for
  * a message with a correct checksum, and the checksum to store for one with a zeroed checksum.
+ * The message is @p n bytes and the length in the pseudo header is @p plen, which differs from
+ * @p n only for a packet whose IP payload length is wrong.
  */
-static uint16_t icmp6_cs(const uint8_t *ip, const uint8_t *icmp, int n)
+static uint16_t icmp6_cs(const uint8_t *ip, const uint8_t *icmp, int n, int plen)
 {
 	static uint8_t tmp[IPV6_HDR + PKT_MAX];
 
 	memcpy(tmp, ip + 8, 32);
 	memset(tmp + 32, 0, 8);
-	tmp[34] = n >> 8;
-	tmp[35] = n & 0xFF;
+	tmp[34] = plen >> 8;
+	tmp[35] = plen & 0xFF;
 	tmp[39] = 58;
 	memcpy(tmp + 40, icmp, n);
 	return inet_cs(tmp, 40 + n);
@@ -193,6 +202,8 @@ static void build_reply(const uint8_t *req, int len, unsigned int flags, struct 
 	int ip_hdr = v6 ? IPV6_HDR : IPV4_HDR;
 	int opt = (!v6 && (flags & F_IP_OPTIONS)) ? 4 : 0;
 	int icmp_len = len - ip_hdr;
+	int skew = (flags & F_LEN_LONG) ? LEN_SKEW : (flags & F_LEN_SHORT) ? -LEN_SKEW : 0;
+	int ip_len;
 	uint8_t *out = p->data;
 	uint8_t *icmp = out + ip_hdr + opt;
 	uint8_t tmp[16];
@@ -208,6 +219,10 @@ static void build_reply(const uint8_t *req, int len, unsigned int flags, struct 
 		memcpy(tmp, out + 8, 16);
 		memcpy(out + 8, out + 24, 16);
 		memcpy(out + 24, tmp, 16);
+		/* Payload length of the IP header */
+		ip_len = icmp_len + skew;
+		out[4] = ip_len >> 8;
+		out[5] = ip_len & 0xFF;
 	} else {
 		memcpy(tmp, out + 12, 4);
 		memcpy(out + 12, out + 16, 4);
@@ -215,9 +230,11 @@ static void build_reply(const uint8_t *req, int len, unsigned int flags, struct 
 		if (opt) {
 			out[0] = 0x46;
 			memset(out + IPV4_HDR, 0x01, opt); /* NOP options */
-			out[2] = p->len >> 8;
-			out[3] = p->len & 0xFF;
 		}
+		/* Total length of the IP header */
+		ip_len = p->len + skew;
+		out[2] = ip_len >> 8;
+		out[3] = ip_len & 0xFF;
 		out[10] = 0;
 		out[11] = 0;
 		cs = inet_cs(out, IPV4_HDR + opt);
@@ -240,11 +257,19 @@ static void build_reply(const uint8_t *req, int len, unsigned int flags, struct 
 
 	icmp[2] = 0;
 	icmp[3] = 0;
-	cs = v6 ? icmp6_cs(out, icmp, icmp_len) : inet_cs(icmp, icmp_len);
+	/* The checksum is valid also for a wrong IP length, so that only the length is at fault */
+	cs = v6 ? icmp6_cs(out, icmp, icmp_len, ip_len) : inet_cs(icmp, icmp_len);
 	icmp[2] = cs >> 8;
 	icmp[3] = cs & 0xFF;
 	if (flags & F_BAD_CSUM) {
 		icmp[3] ^= 0xFF;
+	}
+
+	/* What is received is cut off, and the length of the IP header is left as it was */
+	if (flags & F_TINY) {
+		p->len = IPV4_HDR / 2;
+	} else if (flags & F_TRUNCATED) {
+		p->len = ip_hdr + ICMP_HDR / 2;
 	}
 }
 
@@ -531,7 +556,7 @@ static void assert_request(bool v6, int payload_len)
 		TEST_ASSERT_EQUAL_MEMORY(v6_local, last_req + 8, 16);
 		TEST_ASSERT_EQUAL_MEMORY(v6_dest, last_req + 24, 16);
 		TEST_ASSERT_EQUAL_UINT8(ICMP6_ECHO_REQ, icmp[0]);
-		TEST_ASSERT_EQUAL_UINT16(0, icmp6_cs(last_req, icmp, icmp_len));
+		TEST_ASSERT_EQUAL_UINT16(0, icmp6_cs(last_req, icmp, icmp_len, icmp_len));
 	} else {
 		TEST_ASSERT_EQUAL_UINT8(1, last_req[9]);
 		TEST_ASSERT_EQUAL_INT(last_req_len, (last_req[2] << 8) | last_req[3]);
@@ -601,6 +626,14 @@ void test_zero_length_payload(void)
 	assert_request(false, 0);
 }
 
+void test_reply_with_ip_options(void)
+{
+	script_add(0, F_IP_OPTIONS, 20);
+	run_ping("AT#XPING=\"1.2.3.4\",32,1000\r\n");
+	TEST_ASSERT_TRUE(wait_done());
+	TEST_ASSERT_TRUE(wait_for_response("#XPING: 0.0", 3000));
+}
+
 /* Packets that are not the reply must not end the wait, but must not be accepted either.
  * Each is followed by the real reply, which arrives 40 ms after the request.
  */
@@ -631,6 +664,16 @@ void test_ipv6_bad_checksum_is_ignored(void)
 	ignored_then_valid(true, F_BAD_CSUM);
 }
 
+void test_ipv4_echo_request_is_not_a_reply(void)
+{
+	ignored_then_valid(false, F_TYPE_REQ);
+}
+
+void test_ipv6_echo_request_is_not_a_reply(void)
+{
+	ignored_then_valid(true, F_TYPE_REQ);
+}
+
 void test_ipv4_wrong_sequence_is_ignored(void)
 {
 	ignored_then_valid(false, F_WRONG_SEQ);
@@ -639,6 +682,56 @@ void test_ipv4_wrong_sequence_is_ignored(void)
 void test_ipv6_wrong_sequence_is_ignored(void)
 {
 	ignored_then_valid(true, F_WRONG_SEQ);
+}
+
+void test_ipv4_tiny_packet_is_ignored(void)
+{
+	ignored_then_valid(false, F_TINY);
+}
+
+void test_ipv6_tiny_packet_is_ignored(void)
+{
+	ignored_then_valid(true, F_TINY);
+}
+
+void test_ipv4_truncated_packet_is_ignored(void)
+{
+	ignored_then_valid(false, F_TRUNCATED);
+}
+
+void test_ipv6_truncated_packet_is_ignored(void)
+{
+	ignored_then_valid(true, F_TRUNCATED);
+}
+
+void test_ipv4_length_above_received_is_ignored(void)
+{
+	ignored_then_valid(false, F_LEN_LONG);
+}
+
+void test_ipv6_length_above_received_is_ignored(void)
+{
+	ignored_then_valid(true, F_LEN_LONG);
+}
+
+void test_ipv4_length_below_received_is_ignored(void)
+{
+	ignored_then_valid(false, F_LEN_SHORT);
+}
+
+void test_ipv6_length_below_received_is_ignored(void)
+{
+	ignored_then_valid(true, F_LEN_SHORT);
+}
+
+void test_ipv4_wrong_source_is_ignored(void)
+{
+	ignored_then_valid(false, F_WRONG_SRC);
+}
+
+void test_ipv6_wrong_source_is_ignored(void)
+{
+	ignored_then_valid(true, F_WRONG_SRC);
 }
 
 /* Timeouts */
