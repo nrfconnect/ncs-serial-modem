@@ -29,8 +29,8 @@ Syntax
 * The ``<url>`` parameter is a string.
   It represents the hostname, the IPv4, or the IPv6 address of the target host.
 * The ``<length>`` parameter is an integer.
-  It represents the length of the buffer size.
-  The value range is ``0`` to ``65535``.
+  The value range is ``0`` to ``1472`` for IPv4 and ``0`` to ``1452`` for IPv6.
+  These limits come from the MTU of 1500 bytes minus the IP and ICMP headers.
 * The ``<timeout>`` parameter is an integer.
   It represents the time to wait for each reply, in milliseconds.
   The value range is ``0`` to ``4294967295``.

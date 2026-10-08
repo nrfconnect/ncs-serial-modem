@@ -17,6 +17,12 @@ LOG_MODULE_REGISTER(sm_icmp, CONFIG_SM_LOG_LEVEL);
 #define ICMP_DEFAULT_LINK_MTU    1500
 #define ICMP_HDR_LEN             8
 
+/* Maximum payload that still fits the ICMP_DEFAULT_LINK_MTU sized packet buffer allocated in
+ * send_ping_wait_reply(). The IPv6 limit is lower because its header is larger.
+ */
+#define ICMP_IPV4_MAX_LEN        (ICMP_DEFAULT_LINK_MTU - NET_IPV4H_LEN - ICMP_HDR_LEN)
+#define ICMP_IPV6_MAX_LEN        (ICMP_DEFAULT_LINK_MTU - NET_IPV6H_LEN - ICMP_HDR_LEN)
+
 /* Next header: */
 #define IP_NEXT_HEADER_POS  6
 #define IP_PROTOCOL_POS     9
@@ -472,6 +478,13 @@ static int ping_test_handler(const char *target)
 	if (res->ai_family == AF_INET) {
 		char ipv4_addr[INET_ADDRSTRLEN];
 
+		if (ping_argv.len > ICMP_IPV4_MAX_LEN) {
+			LOG_ERR("Ping length too long for %s: len=%u max=%d", "IPv4",
+				ping_argv.len, ICMP_IPV4_MAX_LEN);
+			zsock_freeaddrinfo(res);
+			return -EINVAL;
+		}
+
 		LOG_INF("Ping target's IPv4 address");
 		util_get_ip_addr(ping_argv.pdn, ipv4_addr, NULL);
 		if (!*ipv4_addr) {
@@ -492,6 +505,13 @@ static int ping_test_handler(const char *target)
 	} else if (res->ai_family == AF_INET6) {
 		char ipv6_addr[INET6_ADDRSTRLEN];
 
+		if (ping_argv.len > ICMP_IPV6_MAX_LEN) {
+			LOG_ERR("Ping length too long for %s: len=%u max=%d", "IPv6",
+				ping_argv.len, ICMP_IPV6_MAX_LEN);
+			zsock_freeaddrinfo(res);
+			return -EINVAL;
+		}
+
 		LOG_INF("Ping target's IPv6 address");
 		util_get_ip_addr(ping_argv.pdn, NULL, ipv6_addr);
 		if (!*ipv6_addr) {
@@ -510,7 +530,9 @@ static int ping_test_handler(const char *target)
 		}
 		ping_argv.src = res;
 	} else {
-		LOG_WRN("Address family not supported: %d", res->ai_family);
+		LOG_ERR("Address family not supported: %d", res->ai_family);
+		zsock_freeaddrinfo(res);
+		return -EAFNOSUPPORT;
 	}
 
 	k_work_submit_to_queue(&sm_work_q, &ping_work);
