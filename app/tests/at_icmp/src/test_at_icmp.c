@@ -815,6 +815,39 @@ void test_timeout_above_int32_max(void)
 	TEST_ASSERT_GREATER_THAN_INT(0, poll_timeout_min);
 }
 
+/* Work queue */
+
+void test_replies_are_reported_while_the_ping_runs(void)
+{
+	/* The URC of a reply is flushed from sm_work_q. If the ping occupied that queue, the URCs
+	 * would be buffered on the heap until the ping ends, and with a large <count> that is
+	 * unbounded.
+	 */
+	script_add(0, F_NONE, 10);
+	script_add(1, F_NONE, 10);
+	script_add(2, F_NONE, 10);
+	run_ping("AT#XPING=\"1.2.3.4\",32,1000,3,1000\r\n");
+	assert_ok();
+	TEST_ASSERT_TRUE(wait_for_response("#XPING: 0.0", 900));
+	/* Two more requests, and their intervals, are still to come */
+	TEST_ASSERT_EQUAL_UINT(0, k_sem_count_get(&freed_sem));
+	TEST_ASSERT_TRUE(wait_done());
+	assert_average(10);
+}
+
+void test_other_commands_are_served_during_a_ping(void)
+{
+	/* No reply, so the ping waits for the whole timeout */
+	run_ping("AT#XPING=\"1.2.3.4\",32,5000\r\n");
+	assert_ok();
+	clear_captured_response();
+	/* Rejected as busy, which can be answered only if sm_work_q is free */
+	send_at_command("AT#XPING=\"1.2.3.4\",32,5000\r\n");
+	assert_error();
+	TEST_ASSERT_EQUAL_UINT(0, k_sem_count_get(&freed_sem));
+	TEST_ASSERT_TRUE(wait_done());
+}
+
 /* Statistics */
 
 void test_statistics(void)
