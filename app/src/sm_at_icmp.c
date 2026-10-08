@@ -142,8 +142,9 @@ static uint16_t icmp6_checksum(const uint8_t *ip, const uint8_t *icmp, int icmp_
  * @brief Check whether a received packet is the echo reply to our request.
  *
  * Everything that arrives on the PDN is delivered to the raw socket, so the packet is
- * untrusted. A packet that is malformed, or does not carry the sequence number of the request
- * or a valid checksum and length, is not a reply to us and must simply be ignored.
+ * untrusted. It must be a well formed echo reply, from the address that was pinged, carrying
+ * the sequence number of the request, with valid checksum and length. Anything else is not a
+ * reply to us and must simply be ignored.
  *
  * @param buf Received packet, starting from the IP header.
  * @param len Length of the received packet.
@@ -156,8 +157,21 @@ static bool is_echo_reply(const uint8_t *buf, int len, uint8_t seq)
 	int ip_len;
 
 	if (ping_argv.family == NET_AF_INET) {
-		header_len = NET_IPV4H_LEN;
-		if (len < header_len + ICMP_HDR_LEN || buf[IP_PROTOCOL_POS] != IPPROTO_ICMP) {
+		const struct sockaddr_in *dst = (const struct sockaddr_in *)ping_argv.dest->ai_addr;
+
+		if (len < NET_IPV4H_LEN || (buf[0] >> 4) != 4) {
+			return false;
+		}
+		/* The reply may carry IP options */
+		header_len = (buf[0] & 0x0F) * 4;
+		if (header_len < NET_IPV4H_LEN || len < header_len + ICMP_HDR_LEN) {
+			return false;
+		}
+		if (buf[IP_PROTOCOL_POS] != IPPROTO_ICMP) {
+			return false;
+		}
+		/* Source address */
+		if (memcmp(buf + 12, &dst->sin_addr.s_addr, 4) != 0) {
 			return false;
 		}
 		ip_len = (buf[2] << 8) + buf[3];
@@ -166,14 +180,26 @@ static bool is_echo_reply(const uint8_t *buf, int len, uint8_t seq)
 		}
 
 		icmp = buf + header_len;
+		if (icmp[0] != ICMP_ECHO_REP || icmp[1] != 0) {
+			return false;
+		}
 		if (check_ics(icmp, len - header_len) != 0) {
 			return false;
 		}
 	} else {
+		const struct sockaddr_in6 *dst =
+			(const struct sockaddr_in6 *)ping_argv.dest->ai_addr;
 		uint16_t plhcs;
 
 		header_len = NET_IPV6H_LEN;
-		if (len < header_len + ICMP_HDR_LEN || buf[IP_NEXT_HEADER_POS] != IPPROTO_ICMPV6) {
+		if (len < header_len + ICMP_HDR_LEN || (buf[0] >> 4) != 6) {
+			return false;
+		}
+		if (buf[IP_NEXT_HEADER_POS] != IPPROTO_ICMPV6) {
+			return false;
+		}
+		/* Source address */
+		if (memcmp(buf + 8, dst->sin6_addr.s6_addr, 16) != 0) {
 			return false;
 		}
 		ip_len = (buf[4] << 8) + buf[5] + header_len;
@@ -182,6 +208,9 @@ static bool is_echo_reply(const uint8_t *buf, int len, uint8_t seq)
 		}
 
 		icmp = buf + header_len;
+		if (icmp[0] != ICMP6_ECHO_REP || icmp[1] != 0) {
+			return false;
+		}
 		plhcs = icmp[2] + (icmp[3] << 8);
 		if (plhcs != icmp6_checksum(buf, icmp, len - header_len)) {
 			return false;
@@ -410,7 +439,7 @@ static int send_ping_wait_reply(uint32_t *rtt_ms)
 		}
 
 		/* Not the reply to our request, keep waiting until the deadline */
-		LOG_DBG("Ignoring packet: %d B", len);
+		LOG_DBG_RATELIMIT_RATE(1000, "Ignoring packet: %d B", len);
 	}
 
 close_end:
