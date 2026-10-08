@@ -7,7 +7,8 @@
 /**
  * @file nrf_modem_at_wrapper.c
  * Wrapper for nrf_modem_at_cmd to route AT#XPING to its handler and to fake the
- * AT+CGPADDR response that util_get_ip_addr() reads the local address from.
+ * AT+CGPADDR response that util_get_ip_addr() reads the local address from, and the
+ * AT%XGETPDNID response that sm_util_pdn_id_get() reads the PDN ID from.
  */
 
 #include <string.h>
@@ -19,6 +20,9 @@
 
 /* Response to AT+CGPADDR, set by the test. NULL makes the command fail. */
 const char *test_cgpaddr_response;
+
+/* Response to AT%XGETPDNID, set by the test. NULL makes the command fail. */
+const char *test_pdn_id_response;
 
 /* CMock-generated internal function for handling mock expectations.
  * Not in header because CMock doesn't generate declarations for variadic functions.
@@ -51,6 +55,14 @@ int nrf_modem_at_cmd(void *buf, size_t buf_size, const char *fmt, ...)
 			return -EINVAL;
 		}
 		snprintf(buf, buf_size, "%s", test_cgpaddr_response);
+		return 0;
+	}
+
+	if (strncmp(at_cmd, "AT%XGETPDNID", 12) == 0) {
+		if (test_pdn_id_response == NULL) {
+			return -EINVAL;
+		}
+		snprintf(buf, buf_size, "%s", test_pdn_id_response);
 		return 0;
 	}
 
