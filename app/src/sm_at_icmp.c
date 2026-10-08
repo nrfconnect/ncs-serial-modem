@@ -480,24 +480,23 @@ static void ping_task(struct k_work *item)
 			urc_send_to(ping_pipe, "#XPING: %u.%03u seconds\r\n", rtt / 1000,
 				    rtt % 1000);
 		}
-		k_sleep(K_MSEC(ping_argv.interval));
+		if (i + 1 < ping_argv.count) {
+			k_sleep(K_MSEC(ping_argv.interval));
+		}
 	}
 
 	lost = ping_argv.count - count;
-	LOG_INF("Packets sent=%d received=%d lost=%d (%d%% loss)",
+	LOG_INF("Packets sent=%u received=%u lost=%u (%u%% loss)",
 		ping_argv.count, count, lost, lost * 100 / ping_argv.count);
 
 	if (count > 1) {
 		/* The average of 32-bit values fits in 32 bits */
 		uint32_t avg = (uint32_t)((sum + count / 2) / count);
-		int avg_s = avg / 1000;
-		int avg_f = avg % 1000;
 
-		urc_send_to(ping_pipe, "#XPING: average %d.%03d seconds\r\n",
-			avg_s, avg_f);
+		urc_send_to(ping_pipe, "#XPING: average %u.%03u seconds\r\n",
+			    avg / 1000, avg % 1000);
 
-		LOG_INF("RTT min=%ums max=%ums avg=%ums",
-			rtt_min, rtt_max, (uint32_t)(sum / count));
+		LOG_INF("RTT min=%ums max=%ums avg=%ums", rtt_min, rtt_max, avg);
 	}
 
 	zsock_freeaddrinfo(si);
@@ -544,7 +543,7 @@ static int ping_test_handler(const char *target, struct ping_argv_t *args)
 			LOG_ERR("zsock_getaddrinfo(src) error: %d", ret);
 			zsock_freeaddrinfo(args->dest);
 			args->dest = NULL;
-			return -ret;
+			return -EAGAIN;
 		}
 		args->src = res;
 	} else if (res->ai_family == NET_AF_INET6) {
@@ -573,7 +572,7 @@ static int ping_test_handler(const char *target, struct ping_argv_t *args)
 			LOG_ERR("zsock_getaddrinfo(src) error: %d", ret);
 			zsock_freeaddrinfo(args->dest);
 			args->dest = NULL;
-			return -ret;
+			return -EAGAIN;
 		}
 		args->src = res;
 	} else {
@@ -654,7 +653,15 @@ STATIC int handle_at_icmp_ping(enum at_parser_cmd_type cmd_type, struct at_parse
 		args.seq = rnd >> 16;
 		ping_argv = args;
 		ping_pipe = sm_at_host_get_current_pipe();
-		k_work_submit_to_queue(&sm_work_q, &ping_work);
+		err = k_work_submit_to_queue(&sm_work_q, &ping_work);
+		if (err < 0) {
+			LOG_ERR("Failed to schedule ping: %d", err);
+			zsock_freeaddrinfo(ping_argv.src);
+			zsock_freeaddrinfo(ping_argv.dest);
+			atomic_clear(&ping_in_progress);
+			return err;
+		}
+		err = 0;
 		break;
 
 	default:
