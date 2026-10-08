@@ -850,6 +850,23 @@ void test_lost_requests_are_left_out_of_the_average(void)
 	assert_average(20);
 }
 
+void test_no_interval_is_waited_after_the_last_request(void)
+{
+	int64_t t0 = k_uptime_get();
+	int64_t elapsed;
+
+	script_add(0, F_NONE, 10);
+	script_add(1, F_NONE, 10);
+	run_ping("AT#XPING=\"1.2.3.4\",32,1000,2,5000\r\n");
+	assert_ok();
+	TEST_ASSERT_TRUE(wait_done());
+
+	/* One interval between the two requests, but none after the second */
+	elapsed = k_uptime_get() - t0;
+	TEST_ASSERT_TRUE(elapsed >= 5000);
+	TEST_ASSERT_LESS_THAN_INT64(5100, elapsed);
+}
+
 /* Identifier and sequence number */
 
 void test_identifier_and_sequence(void)
@@ -967,12 +984,6 @@ void test_destination_resolution_failure(void)
 void test_source_resolution_failure(void)
 {
 	gai_src_ret = GAI_FAIL;
-	/* The command returns the negated getaddrinfo() error. The AT host takes a positive value
-	 * for the return value of nrf_modem_at_cmd() and decodes its type and value. It is not a
-	 * CME or CMS error.
-	 */
-	__cmock_nrf_modem_at_err_type_IgnoreAndReturn(NRF_MODEM_AT_ERROR);
-	__cmock_nrf_modem_at_err_IgnoreAndReturn(-GAI_FAIL);
 	run_ping("AT#XPING=\"1.2.3.4\",32,1000\r\n");
 	/* A plain ERROR, not an encoded modem error */
 	assert_error();
