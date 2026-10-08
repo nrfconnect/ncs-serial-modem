@@ -14,6 +14,8 @@ ICMP echo request #XPING
 
 The ``#XPING`` command sends an ICMP Echo Request, also known as *Ping*.
 
+Only one ping request can be active at a time.
+
 Set command
 -----------
 
