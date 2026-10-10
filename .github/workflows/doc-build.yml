@@ -25,6 +25,9 @@ on:
 
 env:
   DOXYGEN_VERSION: 1.12.0
+  # The branch that documents the nRF91M1 docset, apart from the rest of the
+  # documentation.
+  NRF91M1_BRANCH: v2-branch
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -61,18 +64,43 @@ jobs:
           pip-install: |
             -r doc/requirements.txt
 
-      - name: Check version
+      - name: Check version and docset
         run: |
+          # An update to the nRF91M1 release branch documents the nRF91M1
+          # docset, and publishes into the same "latest" directory as main: the
+          # upload replaces what it brings and leaves the rest, so that
+          # latest/nrf91m1 comes from that branch while latest/main keeps
+          # coming from main. Everything else documents the main docset, main
+          # as "latest" and a tag as its own version. A pull request documents
+          # the docset of the branch it targets, so that its preview shows what
+          # that branch would publish.
           VERSION_REGEX="^v([0-9a-zA-Z\.\-]+)$"
-          if [[ ${GITHUB_REF#refs/tags/} =~ $VERSION_REGEX ]]; then
-            VERSION=${BASH_REMATCH[1]}
-          elif [[ ${GITHUB_REF#refs/heads/} == "main" ]]; then
-            VERSION="latest"
-          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            VERSION="pr-${{ github.event.number }}"
+
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BRANCH="${{ github.base_ref }}"
+          else
+            BRANCH="${GITHUB_REF#refs/heads/}"
           fi
-          echo "VERSION=${VERSION}"
+
+          if [[ "${BRANCH}" == "${NRF91M1_BRANCH}" ]]; then
+            DOCSET="nrf91m1"
+          else
+            DOCSET="main"
+          fi
+
+          # The pull request case comes first: BRANCH is then the target of the
+          # request, which would otherwise be taken for a build of that branch.
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            VERSION="pr-${{ github.event.number }}"
+          elif [[ ${GITHUB_REF#refs/tags/} =~ $VERSION_REGEX ]]; then
+            VERSION=${BASH_REMATCH[1]}
+          elif [[ "${BRANCH}" == "main" || "${BRANCH}" == "${NRF91M1_BRANCH}" ]]; then
+            VERSION="latest"
+          fi
+
+          echo "VERSION=${VERSION} DOCSET=${DOCSET}"
           echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+          echo "DOCSET=${DOCSET}" >> "$GITHUB_ENV"
           if [[ -f doc/nrf91m1/DOC_VERSION ]]; then
             NRF91M1_DOC_VERSION=$(tr -d '[:space:]' < doc/nrf91m1/DOC_VERSION)
           fi
@@ -85,7 +113,7 @@ jobs:
         working-directory: doc
         run: |
           doxygen
-          python _scripts/build_docsets.py -b build --format html --format pdf
+          python _scripts/build_docsets.py -b build --format html --format pdf --docset "${DOCSET}"
 
       - name: Prepare Azure upload
         run: |
@@ -129,4 +157,5 @@ jobs:
           name: sphinx-pdf
           retention-days: 5
           # One PDF per docset, kept apart by the docset directory in the path.
-          path: doc/build/pdf/*/latex/ncs-serial-modem.pdf
+          # Each one is named after its docset, in docsets.PDF_FILENAMES.
+          path: doc/build/pdf/*/latex/*.pdf
