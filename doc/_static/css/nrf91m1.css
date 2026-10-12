@@ -1,0 +1,17 @@
+/* Hides the version dropdown of the page header. Listed in
+   doc/_docsets/nrf91m1/conf.py only, so it applies to the nRF91M1 docset and
+   leaves the other docsets with theirs. The theme declares
+   "display: flex !important" on the button, so !important is the only way to
+   outrank it. */
+.ncs-btn-versions {
+  display: none !important;
+}
+
+/* The header spaces its buttons with a flex gap, so hiding the button on its
+   own would leave that gap behind as a hole. Taking out the wrapper closes the
+   gap and removes the empty dropdown menu with it. The theme already styles
+   this same wrapper through :has(), so relying on it here asks nothing new of
+   the browser. */
+.dropdown:has(> .ncs-btn-versions) {
+  display: none;
+}

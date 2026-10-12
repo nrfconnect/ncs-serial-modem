@@ -24,7 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from conf_common import *  # noqa: F401,F403
 from conf_common import docsets, docset_exclude_patterns, html_theme_options, \
-    docset_latex_documents, docset_html_context, docset_latex_elements
+    docset_latex_documents, docset_html_context, docset_latex_elements, html_css_files
 from pdf_revision import revision_for  # noqa: E402 — conf_common adds ``doc/_utils``
 
 DOCSET = Path(__file__).resolve().parent.name
@@ -55,11 +55,13 @@ latex_elements = docset_latex_elements(
 html_theme_options["docset"] = DOCSET
 html_context = docset_html_context(DOCSET)
 
-# Lets this docset link into the main docset with :external+main:. The mapping
-# is only available once the main docset has been built, which is why
-# _scripts/build_docsets.py builds the docsets in order.
-intersphinx_mapping = {}
+# Styling that belongs to this docset alone. The shared stylesheet comes from
+# conf_common and stays first, so these rules win on equal specificity.
+html_css_files = [*html_css_files, "css/nrf91m1.css"]
 
-_main_mapping = docsets.get_intersphinx_mapping("main")
-if _main_mapping:
-    intersphinx_mapping["main"] = _main_mapping
+# Lets this docset link into the main docset, both with :external+main: and
+# through the plain references that fall back to it. The inventory comes from
+# the local build of the main docset when there is one, which is why
+# _scripts/build_docsets.py builds the docsets in order, and from the published
+# documentation otherwise, so that building this docset alone still resolves.
+intersphinx_mapping = {"main": docsets.get_intersphinx_mapping("main")}

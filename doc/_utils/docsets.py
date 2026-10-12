@@ -39,6 +39,13 @@ PDF_FILENAMES = {
 }
 
 # Primary title on the PDF front page (top of the blue band).
+# Root of the published documentation, holding the docsets of the development
+# version. A docset that is built on its own takes the inventory of the docsets
+# it references from here, since they are not built next to it.
+PUBLISHED_URL = "https://nrfconnectdocs.nordicsemi.com/addons/addon-serial_modem/latest"
+
+# PDF filename produced for each docset (without extension).
+# Used as the LaTeX output filename and as the copy target in the HTML tree.
 PDF_TITLES = {
     "main": "Serial Modem Documentation",
     "nrf91m1": "nRF91M1 AT Commands",
@@ -136,18 +143,26 @@ def get_builddir() -> Path:
     return (outputdir / ".." / "..").resolve()
 
 
-def get_intersphinx_mapping(docset: str) -> tuple[str, str] | None:
+def get_intersphinx_mapping(docset: str) -> tuple[str, str]:
     """Return the intersphinx mapping for a docset.
+
+    The target stays relative, because the docsets are siblings both in the
+    build directory and in the published documentation. Only the inventory
+    differs: the one of the local build when that docset was built, and the
+    published one otherwise, so that building a single docset still resolves
+    the references into the docsets it was built without.
 
     Args:
         docset: Docset name.
 
     Returns:
-        Intersphinx mapping, or ``None`` if the docset has not been built yet.
+        Intersphinx mapping of the docset.
     """
 
+    target = str(Path("..") / docset)
     inventory = get_builddir() / "html" / docset / "objects.inv"
-    if not inventory.exists():
-        return None
 
-    return (str(Path("..") / docset), str(inventory))
+    if inventory.exists():
+        return (target, str(inventory))
+
+    return (target, f"{PUBLISHED_URL}/{docset}/objects.inv")

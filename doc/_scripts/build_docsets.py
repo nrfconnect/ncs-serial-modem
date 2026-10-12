@@ -145,12 +145,24 @@ def copy_pdf(docset: str, build_dir: Path) -> None:
     shutil.copy(pdf, html_dir / pdf.name)
 
 
-def copy_extra_content(build_dir: Path) -> None:
+def copy_extra_content(build_dir: Path, selected: list[str]) -> None:
     """Copy the content that belongs next to the docsets instead of inside one.
+
+    This content describes the documentation as a whole: the landing page
+    forwards to the default docset and the version list feeds the version
+    dropdown. A build that leaves the default docset out is published into the
+    directory of a build that has it, next to the docsets it did not build, so
+    it must not bring copies of its own that would replace the right ones.
 
     Args:
         build_dir: Documentation build directory.
+        selected: Names of the built docsets, in the order of ALL_DOCSETS.
     """
+
+    default = next(iter(docsets.ALL_DOCSETS))
+    if default not in selected:
+        print(f"Skipping the HTML root content: no {default} docset built", flush=True)
+        return
 
     html_dir = build_dir / "html"
     for src in (DOC_BASE / "_static" / "html" / "index.html", DOC_BASE / "versions.json"):
@@ -200,7 +212,7 @@ def main() -> None:
             build_docset(docset, fmt, build_dir, sphinx_opts)
 
     if "html" in formats:
-        copy_extra_content(build_dir)
+        copy_extra_content(build_dir, selected)
 
         # Merging rewrites every index in terms of the others, so it only makes
         # sense once all of them are up to date.
