@@ -166,6 +166,38 @@ The following tables shows how to connect the UART pins to the corresponding pin
       The RI pin is connected to the blue LED, which is used to indicate incoming data.
 
 
+.. nrf91m1_uart_power_pins_start
+
+Power and reset pins
+====================
+
+The following pins supply, power on, and reset the |SiP|:
+
+.. list-table::
+   :header-rows: 1
+
+   * - Signal
+     - |SiP_pin|
+   * - `ENABLE <nRF9151 Hardware Design Guidelines — ENABLE_>`_
+     - 10 (active high)
+   * - `nRESET <nRF9151 Hardware Design Guidelines — nRESET_>`_
+     - 9 (active low, external pull-up not allowed)
+   * - `VDD <nRF9151 Hardware Design Guidelines — VDD_>`_
+     - 14
+   * - `VDD_GPIO <nRF9151 Hardware Design Guidelines — VDD_GPIO_>`_
+     - 65
+
+The |SM| firmware has no watchdog.
+The host must therefore be able to reset the |SiP| to a known state, either by power cycling it with **ENABLE** or by using **nRESET**.
+
+.. note::
+   The pins listed here are not the only pins that can be useful with the |SiP|.
+   For the complete pin list, see the `nRF9151 LGA pin assignments`_.
+   For hardware integration guidance, see the `nRF9151 Hardware Integration`_ page.
+
+.. nrf91m1_uart_power_pins_end
+
+
 .. _uart_configuration_nrf91m1:
 
 nRF91M1 pre-programmed |SM| application
@@ -416,6 +448,17 @@ Driving it to a logic high powers on the |SiP|.
 Driving it to a logic low brings the device into an extremely low-current state.
 Any internal state not retained in non‑volatile memory is lost, and a full boot-up sequence is required when **ENABLE** is reasserted.
 See `nRF9151 Hardware Design Guidelines — ENABLE`_ for more information about the ENABLE pin.
+
+Reset scenario
+==============
+
+To reset the |SiP| to a known state, do one of the following:
+
+* Drive **nRESET** low for at least 5 µs.
+* Power cycle the |SiP| with **ENABLE**.
+  Keep **ENABLE** low for at least 1 s.
+
+After the reset, the startup sequence is the same as in the `Boot-up scenario`_.
 
 .. nrf91m1_uart_power_management_end
 

@@ -2,3 +2,4 @@
 
 .. |SM| replace:: Serial Modem
 .. |SiP| replace:: nRF9151 SiP
+.. |SiP_pin| replace:: LGA pin

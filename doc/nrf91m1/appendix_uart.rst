@@ -65,7 +65,7 @@ The following table shows how to connect the UART pins to the corresponding pins
    :header-rows: 1
 
    * - Signal
-     - nRF91M1 pin
+     - |SiP_pin|
    * - UART0 TX
      - 45
    * - UART0 RX
@@ -80,6 +80,8 @@ The following table shows how to connect the UART pins to the corresponding pins
      - 49 (active low)
    * - UART1 TX
      - 48
+   * - UART1 RX
+     - 47 (pull-up, not connected to the host)
 
 **AT UART:**
 
@@ -96,6 +98,10 @@ The following table shows how to connect the UART pins to the corresponding pins
 .. important::
    Operating the |SM| without hardware flow control is strongly not recommended.
    See :ref:`uart_without_flow_control` for more information.
+
+.. include:: ../uart_configuration.rst
+   :start-after: nrf91m1_uart_power_pins_start
+   :end-before: nrf91m1_uart_power_pins_end
 
 .. include:: ../uart_configuration.rst
    :start-after: nrf91m1_uart_power_management_start

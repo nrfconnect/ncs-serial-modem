@@ -2,3 +2,4 @@
 
 .. |SM| replace:: nRF91M1 module
 .. |SiP| replace:: nRF91M1 module
+.. |SiP_pin| replace:: nRF91M1 module pin
