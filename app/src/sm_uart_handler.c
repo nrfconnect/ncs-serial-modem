@@ -78,6 +78,7 @@ static struct {
 
 	struct k_work notify_transmit_idle;
 	struct k_work notify_closed;
+	struct k_work_delayable notify_receive_ready;
 } sm_pipe;
 
 #endif
@@ -185,6 +186,33 @@ static int rx_disable(void)
 	return 0;
 }
 
+/* Signal that received data is available. With an open pipe (CMUX or PPP), the pipe user
+ * is notified without going through sm_work_q, so that CMUX frames, including control
+ * frames, are processed while sm_work_q is executing an AT command.
+ * A delayed notification never postpones one that is already pending.
+ * May be called from the UART callback.
+ */
+static void rx_notify(k_timeout_t delay)
+{
+	const bool now = K_TIMEOUT_EQ(delay, K_NO_WAIT);
+
+#if SM_PIPE
+	if (atomic_test_bit(&sm_pipe.state, SM_PIPE_STATE_OPEN_BIT)) {
+		if (now) {
+			modem_pipe_notify_receive_ready(&sm_pipe.pipe);
+		} else {
+			k_work_schedule(&sm_pipe.notify_receive_ready, delay);
+		}
+		return;
+	}
+#endif
+	if (now) {
+		k_work_reschedule_for_queue(&sm_work_q, &rx_process_work, K_NO_WAIT);
+	} else {
+		k_work_schedule_for_queue(&sm_work_q, &rx_process_work, delay);
+	}
+}
+
 static void rx_recovery(void)
 {
 	int err;
@@ -197,7 +225,7 @@ static void rx_recovery(void)
 
 	err = rx_enable();
 	if (err) {
-		k_work_schedule_for_queue(&sm_work_q, &rx_process_work, K_MSEC(UART_RX_MARGIN_MS));
+		rx_notify(K_MSEC(UART_RX_MARGIN_MS));
 	}
 
 	atomic_clear_bit(&uart_state, SM_UART_STATE_RX_RECOVERY_BIT);
@@ -235,6 +263,15 @@ static void rx_process(struct k_work *work)
 		}
 
 		if (stop_at_receive) {
+#if SM_PIPE
+			/* The pipe was opened while this event was being processed. The data
+			 * that follows the command is now back in the queue, hand it over.
+			 */
+			if (atomic_test_bit(&sm_pipe.state, SM_PIPE_STATE_OPEN_BIT) &&
+			    k_msgq_num_used_get(&rx_event_queue)) {
+				modem_pipe_notify_receive_ready(&sm_pipe.pipe);
+			}
+#endif
 			break;
 		}
 	}
@@ -363,7 +400,7 @@ static void uart_callback(const struct device *dev, struct uart_event *evt, void
 			rx_buf_unref(evt->data.rx.buf);
 			break;
 		}
-		k_work_schedule_for_queue(&sm_work_q, &rx_process_work, K_NO_WAIT);
+		rx_notify(K_NO_WAIT);
 		break;
 	case UART_RX_BUF_REQUEST:
 		if (k_msgq_num_free_get(&rx_event_queue) < UART_RX_EVENT_COUNT_FOR_BUF) {
@@ -388,7 +425,7 @@ static void uart_callback(const struct device *dev, struct uart_event *evt, void
 		break;
 	case UART_RX_DISABLED:
 		atomic_clear_bit(&uart_state, SM_UART_STATE_RX_ENABLED_BIT);
-		k_work_reschedule_for_queue(&sm_work_q, &rx_process_work, K_NO_WAIT);
+		rx_notify(K_NO_WAIT);
 		break;
 	default:
 		break;
@@ -736,6 +773,11 @@ static int pipe_open(void *data)
 	atomic_set_bit(&sm_pipe.state, SM_PIPE_STATE_OPEN_BIT);
 	modem_pipe_notify_opened(&sm_pipe.pipe);
 
+	/* Data received in AT mode just before the switch is routed to the pipe. */
+	if (k_msgq_num_used_get(&rx_event_queue)) {
+		modem_pipe_notify_receive_ready(&sm_pipe.pipe);
+	}
+
 	return 0;
 }
 
@@ -832,6 +874,7 @@ static int pipe_close(void *data)
 	}
 
 	atomic_clear_bit(&sm_pipe.state, SM_PIPE_STATE_OPEN_BIT);
+	(void)k_work_cancel_delayable(&sm_pipe.notify_receive_ready);
 
 	return sm_uart_handler_disable();
 }
@@ -852,6 +895,12 @@ static void notify_closed_fn(struct k_work *work)
 {
 	ARG_UNUSED(work);
 	modem_pipe_notify_closed(&sm_pipe.pipe);
+}
+
+static void notify_receive_ready_fn(struct k_work *work)
+{
+	ARG_UNUSED(work);
+	modem_pipe_notify_receive_ready(&sm_pipe.pipe);
 }
 
 static void at_to_cmux_switch(void)
@@ -877,6 +926,7 @@ struct modem_pipe *sm_uart_pipe_init(sm_pipe_tx_t pipe_tx_cb)
 {
 	k_work_init(&sm_pipe.notify_transmit_idle, notify_transmit_idle_fn);
 	k_work_init(&sm_pipe.notify_closed, notify_closed_fn);
+	k_work_init_delayable(&sm_pipe.notify_receive_ready, notify_receive_ready_fn);
 
 	sm_pipe.tx_cb = pipe_tx_cb;
 	atomic_set_bit(&sm_pipe.state, SM_PIPE_STATE_INIT_BIT);
