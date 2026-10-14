@@ -1,0 +1,14 @@
+tests:
+  serial_modem.hil.cmux_cld_latency:
+    sysbuild: true
+    harness: ztest
+    harness_config:
+      fixture: nrf91_serial_modem
+    timeout: 600
+    tags:
+      - cmux
+    platform_allow:
+      - native_sim
+      - nrf54l15dk/nrf54l15/cpuapp
+    integration_platforms:
+      - native_sim

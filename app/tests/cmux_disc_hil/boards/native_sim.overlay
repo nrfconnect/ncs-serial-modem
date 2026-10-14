@@ -1,0 +1,23 @@
+/*
+ * Copyright (c) 2026 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+ */
+
+/*
+ * Host serial port that is connected to the nRF91 Serial Modem UART.
+ * Override at runtime with --uart2_port=<device>.
+ */
+/ {
+	aliases {
+		sm-uart = &uart2;
+	};
+
+	uart2: uart2 {
+		status = "okay";
+		compatible = "zephyr,native-tty-uart";
+		serial-port = "/dev/ttyACM0";
+		current-speed = <115200>;
+		hw-flow-control;
+	};
+};
