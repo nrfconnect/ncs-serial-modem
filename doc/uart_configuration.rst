@@ -171,74 +171,15 @@ The following tables shows how to connect the UART pins to the corresponding pin
 nRF91M1 pre-programmed |SM| application
 =======================================
 
-.. nrf91m1_uart_configuration_start
-
 nRF91M1 is a pre-programmed nRF9151 SiP that runs the |SM| application out of the box.
 
-The pin mapping of the nRF91M1 follows the `nrf9151dk`_ board configuration.
-You can flash the nRF91M1 software to the `nrf9151dk`_ board for development and testing purposes.
+.. only:: html
 
-The following table shows how to connect the UART pins to the corresponding pins on the nRF91M1 SiP (`nRF9151 LGA pin assignments`_) and on the `nrf9151dk`_ board:
+   For the UART configuration of the nRF91M1, see the `nRF91M1 UART configuration <../nrf91m1/nrf91m1/appendix_uart.html#nrf91m1-uart-configuration>`_ appendix in the nRF91M1 AT Commands documentation.
 
-.. list-table::
-   :header-rows: 1
+.. only:: not html
 
-   * - Signal
-     - nRF91M1
-     - nrf9151dk
-   * - UART0 TX
-     - 45
-     - P0.27
-   * - UART0 RX
-     - 44 (pull-up)
-     - P0.26 (pull-up)
-   * - UART0 RTS
-     - 74
-     - P0.14
-   * - UART0 CTS
-     - 75 (pull-up)
-     - P0.15 (pull-up)
-   * - UART0 DTR
-     - 50 (active low, pull-up)
-     - P0.31 (active low, pull-up) (Wire to GND to power on the UART0)
-   * - UART0 RI
-     - 49 (active low)
-     - P0.30 (active low)
-   * - UART1 TX
-     - 48
-     - P0.29
-
-**AT UART:**
-
-* UART instance: UART0 (VCOM0)
-* Baud rate: 115200
-* Hardware flow control: Enabled
-
-**Log / Trace UART:**
-
-* UART instance: UART1 (VCOM1)
-* Baud rate: 1000000
-* Hardware flow control: Disabled
-
-.. important::
-   When working with the `nrf9151dk`_ board with a PC host, the **DTR** pin must be wired to **GND** to power on the UART0.
-   Currently, you must use a physical jumper wire, but in the future, the `Board Configurator app`_ can be used.
-
-.. important::
-   The nRF91M1 firmware has hardware flow control permanently enabled and cannot be changed.
-   When not using hardware flow control, the |SM| **CTS** pin must be wired to **GND** to allow |SM| to transmit.
-   Without this, |SM| will see CTS as high (not clear to send) and will not transmit.
-
-   .. only:: not nrf91m1
-
-      See :ref:`uart_without_flow_control` for further considerations.
-
-By default in the `nrf9151dk`_ board, the UART0 is routed to VCOM0 on the interface chip, and UART1 is routed to VCOM1 on the interface chip.
-This allows the `nrf9151dk`_ board to be used with a PC host for development and testing.
-
-When working with `nrf9151dk`_ board with an external MCU host, you must disable VCOM0 in the `Board Configurator app`_ to release the UART pins for external use.
-
-.. nrf91m1_uart_configuration_end
+   For the UART configuration of the nRF91M1, see the UART configuration appendix in the nRF91M1 AT Commands documentation.
 
 This setup is provided in the :file:`app/nrf91m1.overlay` devicetree overlay file.
 
@@ -488,21 +429,11 @@ Operating without hardware flow control
    Hardware flow control ensures reliable communication and prevents timing-related issues.
    Without hardware flow control, there is a risk of data loss in UART communication, especially in high-throughput scenarios.
 
-The approach differs depending on whether you are using the pre-programmed nRF91M1 or a custom |SM| build.
+The approach for a custom |SM| build is the following:
 
-.. tabs::
-
-   .. group-tab:: nRF91M1 pre-programmed |SM| application
-
-      * **Wire the CTS pin to GND** — The nRF91M1 has hardware flow control permanently enabled.
-        Wiring CTS to GND holds the line low, allowing |SM| to transmit.
-      * **Leave RTS unconnected** — The RTS pin is not used and can be left floating.
-
-   .. group-tab:: |SM| application (nRF9151)
-
-      * **Remove** ``hw-flow-control;`` **from the UART node in the overlay** — With hardware flow control disabled, the UART peripheral does not monitor CTS and |SM| transmits unconditionally.
-      * **Remove the** ``bias-pull-up`` **from the CTS pinctrl group in the overlay** — This avoids a pull resistor drawing current against any external signal.
-      * **Leave CTS and RTS unconnected** — Neither pin is used and both can be left floating.
+* **Remove** ``hw-flow-control;`` **from the UART node in the overlay** — With hardware flow control disabled, the UART peripheral does not monitor CTS and |SM| transmits unconditionally.
+* **Remove the** ``bias-pull-up`` **from the CTS pinctrl group in the overlay** — This avoids a pull resistor drawing current against any external signal.
+* **Leave CTS and RTS unconnected** — Neither pin is used and both can be left floating.
 
 **Key requirements:**
 
@@ -514,6 +445,8 @@ The approach differs depending on whether you are using the pre-programmed nRF91
 **Buffer configuration:**
 
 Increase :ref:`CONFIG_SM_UART_RX_BUF_SIZE <CONFIG_SM_UART_RX_BUF_SIZE>` and possibly :ref:`CONFIG_SM_UART_RX_BUF_COUNT <CONFIG_SM_UART_RX_BUF_COUNT>` to provide sufficient buffer space for your use case.
+
+.. _uart_zephyr_cellular_modem_driver:
 
 Automatic UART power management using Zephyr's Cellular Modem driver
 ====================================================================
