@@ -18,4 +18,4 @@ The AT commands are documented in the following guides:
 The nRF91M1 module supports the following modem firmware:
 
 * ``mfw_nrf91x1`` v2.0.4 (pre-programmed on the module)
-* ``mfw_nrf9151-ntn`` v1.0.1 (can be loaded using the :ref:`DFU_AT_commands`)
+* ``mfw_nrf9151-ntn`` v1.0.1 (can be updated using the :ref:`DFU_AT_commands`)
