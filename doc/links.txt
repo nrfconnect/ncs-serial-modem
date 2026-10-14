@@ -92,6 +92,10 @@
 .. _`nRF9151 Product Specification`: https://docs.nordicsemi.com/bundle/ps_nrf9151/page/nRF9151_html5_keyfeatures.html
 .. _`nRF9151 LGA pin assignments`: https://docs.nordicsemi.com/bundle/ps_nrf9151/page/pin.html#ariaid-title2
 .. _`nRF9151 Hardware Design Guidelines — ENABLE`: https://docs.nordicsemi.com/bundle/nwp_056/page/WP/nwp_054/enable.html
+.. _`nRF9151 Hardware Design Guidelines — nRESET`: https://docs.nordicsemi.com/r/bundle/nwp_056/page/wp/nwp_054/nreset.html
+.. _`nRF9151 Hardware Design Guidelines — VDD`: https://docs.nordicsemi.com/r/bundle/nwp_056/page/wp/nwp_056/vdd.html
+.. _`nRF9151 Hardware Design Guidelines — VDD_GPIO`: https://docs.nordicsemi.com/r/bundle/nwp_056/page/wp/nwp_054/vdd_gpio.html
+.. _`nRF9151 Hardware Integration`: https://docs.nordicsemi.com/r/bundle/nwp_056/page/wp/nwp_054/hardware_integration.html
 .. _`nRF9151 anomaly 36`: https://docs.nordicsemi.com/bundle/errata_nRF9151_Rev2/page/ERR/nRF9151/Rev2/latest/anomaly_151_36.html
 
 .. ### AT command specifications
