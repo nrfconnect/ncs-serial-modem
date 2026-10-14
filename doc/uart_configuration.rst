@@ -22,7 +22,7 @@ The UART connection serves as the physical transport layer, carrying both AT com
 
 The following UART signals are used:
 
-.. list-table:: UART Signals
+.. list-table::
    :header-rows: 1
    :widths: 15 20 65
 
@@ -127,7 +127,7 @@ The following tables shows how to connect the UART pins to the corresponding pin
 
       When hardware flow control is not used, remove ``hw-flow-control;`` from the ``uart2`` node and remove the ``bias-pull-up`` from the CTS pin in the overlay.
       With hardware flow control disabled, the UART peripheral does not monitor the CTS pin, so |SM| transmits unconditionally.
-      The CTS and RTS pins can be left unconnected.
+      The RTS and CTS pins can be left unconnected.
       See :ref:`uart_without_flow_control` for further considerations.
 
       This setup is provided in the :file:`app/external-mcu.overlay` overlay file.
@@ -157,7 +157,7 @@ The following tables shows how to connect the UART pins to the corresponding pin
       * Baud rate: 115200
       * Hardware flow control: Disabled
 
-      Hardware flow control is disabled, as there are no RTS/CTS pins on the Thingy:91 X interface chip.
+      Hardware flow control is disabled, as there are no RTS and CTS pins on the Thingy:91 X interface chip.
 
       The DTR pin defaults to pull-up with the active high level, so the UART is always powered on.
       This pin is shared with **Button 0**, which you can use to manually toggle the DTR state.
@@ -171,74 +171,9 @@ The following tables shows how to connect the UART pins to the corresponding pin
 nRF91M1 pre-programmed |SM| application
 =======================================
 
-.. nrf91m1_uart_configuration_start
-
 nRF91M1 is a pre-programmed nRF9151 SiP that runs the |SM| application out of the box.
 
-The pin mapping of the nRF91M1 follows the `nrf9151dk`_ board configuration.
-You can flash the nRF91M1 software to the `nrf9151dk`_ board for development and testing purposes.
-
-The following table shows how to connect the UART pins to the corresponding pins on the nRF91M1 SiP (`nRF9151 LGA pin assignments`_) and on the `nrf9151dk`_ board:
-
-.. list-table::
-   :header-rows: 1
-
-   * - Signal
-     - nRF91M1
-     - nrf9151dk
-   * - UART0 TX
-     - 45
-     - P0.27
-   * - UART0 RX
-     - 44 (pull-up)
-     - P0.26 (pull-up)
-   * - UART0 RTS
-     - 74
-     - P0.14
-   * - UART0 CTS
-     - 75 (pull-up)
-     - P0.15 (pull-up)
-   * - UART0 DTR
-     - 50 (active low, pull-up)
-     - P0.31 (active low, pull-up) (Wire to GND to power on the UART0)
-   * - UART0 RI
-     - 49 (active low)
-     - P0.30 (active low)
-   * - UART1 TX
-     - 48
-     - P0.29
-
-**AT UART:**
-
-* UART instance: UART0 (VCOM0)
-* Baud rate: 115200
-* Hardware flow control: Enabled
-
-**Log / Trace UART:**
-
-* UART instance: UART1 (VCOM1)
-* Baud rate: 1000000
-* Hardware flow control: Disabled
-
-.. important::
-   When working with the `nrf9151dk`_ board with a PC host, the **DTR** pin must be wired to **GND** to power on the UART0.
-   Currently, you must use a physical jumper wire, but in the future, the `Board Configurator app`_ can be used.
-
-.. important::
-   The nRF91M1 firmware has hardware flow control permanently enabled and cannot be changed.
-   When not using hardware flow control, the |SM| **CTS** pin must be wired to **GND** to allow |SM| to transmit.
-   Without this, |SM| will see CTS as high (not clear to send) and will not transmit.
-
-   .. only:: not nrf91m1
-
-      See :ref:`uart_without_flow_control` for further considerations.
-
-By default in the `nrf9151dk`_ board, the UART0 is routed to VCOM0 on the interface chip, and UART1 is routed to VCOM1 on the interface chip.
-This allows the `nrf9151dk`_ board to be used with a PC host for development and testing.
-
-When working with `nrf9151dk`_ board with an external MCU host, you must disable VCOM0 in the `Board Configurator app`_ to release the UART pins for external use.
-
-.. nrf91m1_uart_configuration_end
+For the UART configuration of the nRF91M1, see the `nRF91M1 UART configuration`_ appendix in the nRF91M1 AT Commands documentation.
 
 This setup is provided in the :file:`app/nrf91m1.overlay` devicetree overlay file.
 
@@ -333,7 +268,7 @@ Host application
 
       * UART instance: VCOM0
       * Baud rate: 115200
-      * Hardware flow control: CTS/RTS Enabled
+      * Hardware flow control: RTS/CTS Enabled
       * Line terminator: CRLF
       * AT command terminator: CR
 
@@ -402,41 +337,45 @@ Host application
       See the :ref:`sm_ppp_shell_sample` for more information.
 
 
+.. nrf91m1_uart_power_management_start
+
 Controlling the UART power state
 ********************************
 
-The |SM| application's UART power state is controlled by the **DTR** signal.
+The UART power state of the |SM| is controlled by the **DTR** signal.
 When DTR is asserted by the host, the UART is enabled and ready for communication.
 When DTR is deasserted, the UART is powered down to save power.
 
 When the UART is powered down, it releases its high-speed clocks, which are then automatically stopped by the system's power management.
-This achieves the lowest possible power consumption, as the UART is one of the primary power consumers in |SM| configurations.
+This achieves the lowest possible power consumption, as the UART is one of the primary power consumers in |SM|.
 Power consumption can be reduced from hundreds of microamps to just a few microamps when the UART is powered down.
 
 UART power management is completely independent of the modem power management (CFUN, PSM, eDRX, and so on).
-By actively managing the UART power state through DTR control, the nRF9151 SiP achieves ultra-low power consumption of approximately 2 µA when the cellular modem enters  Power Saving Mode (PSM) and the UART is powered down.
+By actively managing the UART power state through DTR control, the |SiP| achieves ultra-low power consumption of approximately 2 µA when the cellular modem enters  Power Saving Mode (PSM) and the UART is powered down.
 This is a reduction of over 99% compared to the 400-450 µA consumed when the UART remains active during idle periods.
-The nRF9151 SiP retains all the RAM content while in any of the power saving modes, so the application can resume from where it left off when the UART is powered up.
+The |SiP| retains all the RAM content while in any of the power saving modes, so the application can resume from where it left off when the UART is powered up.
 Full network context is maintained, including socket connections, TLS/DTLS sessions, and so on.
 LTE connection is automatically resumed when there is outgoing data to be sent.
 No other GPIO control is required to utilize the PSM or eDRX modes.
 
+.. _uart_incoming_data_wake_up:
+
 Incoming data wake-up
 =====================
 
-When the UART is powered down and there is incoming data, the |SM| application asserts the **RI** pin to notify the host.
-The RI signal is handled by the modem driver on the host, which powers up the UART device and asserts the DTR line, signaling the |SM| that the UART is powered on and ready to receive data.
-The RI signal remains asserted until the nRF91 UART is activated and ready to transmit data.
+When the UART is powered down and there is incoming data, the |SM| asserts the **RI** pin to notify the host.
+The host must handle the RI signal by powering up its UART device and asserting the DTR line, signaling to the |SM| that the UART is powered on and ready to receive data.
+The RI signal remains asserted until the UART is activated and ready to transmit data.
 
-.. figure:: images/cmux-wakeup-timing.svg
+.. figure:: /images/cmux-wakeup-timing.svg
    :alt: Modem waking up the host timing diagram
 
    Sequence diagram showing the wake-up sequence when the UART is powered down
 
 This sequence diagram illustrates the wake-up sequence when the UART is powered down.
 The RI signal triggers the host to power up its UART and assert DTR.
-Once the host UART is ready and DTR is asserted, the nRF91 enables its UART interface.
-The RI signal remains active throughout this process and only returns to inactive once the nRF91 UART is active.
+Once the host UART is ready and DTR is asserted, the |SM| enables its UART interface.
+The RI signal remains active throughout this process and only returns to inactive once the |SM| UART is active.
 This coordinated wake-up ensures both ends of the communication link are ready before data transmission begins.
 
 **With hardware flow control -**  The host can observe its CTS pin (connected to |SM|'s RTS) to know when |SM| is ready to receive data.
@@ -453,7 +392,7 @@ Host-initiated wake-up
 When the host processor needs to send data, it first powers up the UART device, then asserts the DTR signal to indicate that the UART is active.
 The modem detects the DTR assertion and powers up its UART interface, allowing communication to resume.
 
-.. figure:: images/cmux-host-wakeup-modem.svg
+.. figure:: /images/cmux-host-wakeup-modem.svg
    :alt: Host waking up the modem
 
    Sequence diagram showing host-initiated wake-up of the modem
@@ -462,21 +401,23 @@ The modem detects the DTR assertion and powers up its UART interface, allowing c
 Boot-up scenario
 ================
 
-To boot-up the |SM| application, the host asserts **ENABLE**, **DTR**, and enables its UART (driving |SM| **CTS** low).
+To boot-up the |SM|, the host asserts **ENABLE**, **DTR**, and enables its UART (driving |SM| **CTS** low).
 The |SM| firmware initializes within approximately 2000 ms, during which it activates its UART and asserts **RTS** to signal readiness.
 |SM| then transmits a ``"Ready"`` message on **TX**, confirming that the link is operational.
 
-.. figure:: images/boot-up-sequence.svg
+.. figure:: /images/boot-up-sequence.svg
    :alt: Boot-up sequence diagram
 
    Signal sequence during boot-up
 
 
-The **ENABLE** pin (pin **10** on the nRF9151 SiP) is a high-impedance control input for the nRF9151 internal power management unit (PMU).
-Driving it to a logic high powers on the SiP.
+The **ENABLE** pin (pin **10** on the |SiP|) is a high-impedance control input for the internal power management unit (PMU) of the |SiP|.
+Driving it to a logic high powers on the |SiP|.
 Driving it to a logic low brings the device into an extremely low-current state.
 Any internal state not retained in non‑volatile memory is lost, and a full boot-up sequence is required when **ENABLE** is reasserted.
 See `nRF9151 Hardware Design Guidelines — ENABLE`_ for more information about the ENABLE pin.
+
+.. nrf91m1_uart_power_management_end
 
 .. _uart_without_flow_control:
 
@@ -488,21 +429,11 @@ Operating without hardware flow control
    Hardware flow control ensures reliable communication and prevents timing-related issues.
    Without hardware flow control, there is a risk of data loss in UART communication, especially in high-throughput scenarios.
 
-The approach differs depending on whether you are using the pre-programmed nRF91M1 or a custom |SM| build.
+The approach for a custom |SM| build is the following:
 
-.. tabs::
-
-   .. group-tab:: nRF91M1 pre-programmed |SM| application
-
-      * **Wire the CTS pin to GND** — The nRF91M1 has hardware flow control permanently enabled.
-        Wiring CTS to GND holds the line low, allowing |SM| to transmit.
-      * **Leave RTS unconnected** — The RTS pin is not used and can be left floating.
-
-   .. group-tab:: |SM| application (nRF9151)
-
-      * **Remove** ``hw-flow-control;`` **from the UART node in the overlay** — With hardware flow control disabled, the UART peripheral does not monitor CTS and |SM| transmits unconditionally.
-      * **Remove the** ``bias-pull-up`` **from the CTS pinctrl group in the overlay** — This avoids a pull resistor drawing current against any external signal.
-      * **Leave CTS and RTS unconnected** — Neither pin is used and both can be left floating.
+* **Remove** ``hw-flow-control;`` **from the UART node in the overlay** — With hardware flow control disabled, the UART peripheral does not monitor CTS and |SM| transmits unconditionally.
+* **Remove the** ``bias-pull-up`` **from the CTS pinctrl group in the overlay** — This avoids a pull resistor drawing current against any external signal.
+* **Leave RTS and CTS unconnected** — Neither pin is used and both can be left floating.
 
 **Key requirements:**
 
@@ -514,6 +445,8 @@ The approach differs depending on whether you are using the pre-programmed nRF91
 **Buffer configuration:**
 
 Increase :ref:`CONFIG_SM_UART_RX_BUF_SIZE <CONFIG_SM_UART_RX_BUF_SIZE>` and possibly :ref:`CONFIG_SM_UART_RX_BUF_COUNT <CONFIG_SM_UART_RX_BUF_COUNT>` to provide sufficient buffer space for your use case.
+
+.. _uart_zephyr_cellular_modem_driver:
 
 Automatic UART power management using Zephyr's Cellular Modem driver
 ====================================================================

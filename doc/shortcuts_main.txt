@@ -1,3 +1,4 @@
 .. ### Docset-specific replacements (main)
 
 .. |SM| replace:: Serial Modem
+.. |SiP| replace:: nRF9151 SiP
