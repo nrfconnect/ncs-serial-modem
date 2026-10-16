@@ -105,10 +105,24 @@ breathe_projects = {"ncs-serial-modem": str(DOC_BASE / "_build_doxygen" / "xml")
 breathe_default_project = "ncs-serial-modem"
 breathe_default_members = ("members",)
 
-# Include following files at the end of each .rst file.
-rst_epilog = """
+def docset_rst_epilog(docset: str) -> str:
+    """Return the ``rst_epilog`` for a docset.
+
+    Shared shortcut definitions live in :file:`shortcuts_common.txt`.
+    Docset-specific replacements (for example ``|SM|``) live in
+    :file:`shortcuts_<docset>.txt`.
+
+    Args:
+        docset: Docset name.
+
+    Returns:
+        Value for the ``rst_epilog`` configuration option.
+    """
+
+    return f"""
 .. include:: /links.txt
-.. include:: /shortcuts.txt
+.. include:: /shortcuts_common.txt
+.. include:: /shortcuts_{docset}.txt
 """
 
 

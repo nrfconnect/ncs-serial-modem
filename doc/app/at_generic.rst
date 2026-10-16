@@ -105,16 +105,16 @@ Example
    +IPR: (),(115200,230400,460800,921600,1000000)
    OK
 
-|SM| echo E0/E1
-===============
+Echo E0/E1
+==========
 
-The ``E`` command enables or disables the AT command echo feature of the |SM| application.
+The ``E`` command enables or disables the AT command echo feature of the |SM|.
 
 Set command
 -----------
 
 The set command enables or disables the AT command echo feature.
-While enabled, the |SM| application echoes back all the characters that are received in the AT command mode.
+While enabled, the |SM| echoes back all the characters that are received in the AT command mode.
 
 .. note::
 
@@ -161,10 +161,10 @@ The test command is not supported.
 
 .. _SM_AT_XSMVER:
 
-|SM| version #XSMVER
-=====================
+Serial Modem version #XSMVER
+============================
 
-The ``#XSMVER`` command return the versions of the |SM| and |NCS| in which the |SM| application is built.
+The ``#XSMVER`` command returns the versions of the Serial Modem application firmware and |NCS| in which the application firmware is built.
 
 Set command
 -----------
@@ -189,7 +189,7 @@ The parameters and their defined values are the following:
 
 <sm_version>
    String.
-   The version of the |SM| application in Git-describe style.
+   The version of the |SM| in Git-describe style.
    The ``major.minor.patch`` prefix comes from :file:`app/VERSION`.
    The optional ``-N-g<hash>`` suffix (and ``-dirty``) comes from ``git describe`` in the application tree.
 
@@ -321,7 +321,7 @@ The test command is not supported.
 Power saving #XSLEEP
 ====================
 
-The ``#XSLEEP`` command makes the |SM| application to enter idle or sleep mode.
+The ``#XSLEEP`` command makes the |SM| to enter idle or sleep mode.
 
 .. note::
 
@@ -332,13 +332,13 @@ The ``#XSLEEP`` command makes the |SM| application to enter idle or sleep mode.
 
 .. note::
 
-   If you want to do power measurements on the nRF91 Series development kit while running the |SM| application, remember to disable unused peripherals.
+   If you want to do power measurements on the nRF91 Series development kit while running the |SM|, remember to disable unused peripherals.
 
 
 Set command
 -----------
 
-The set command makes the |SM| application enter either Idle or Sleep mode.
+The set command makes the |SM| enter either Idle or Sleep mode.
 
 Syntax
 ~~~~~~
@@ -515,7 +515,7 @@ Modem reset #XMODEMRESET
 The ``#XMODEMRESET`` command performs a reset of the modem.
 
 The modem is set to minimal function mode (via ``+CFUN=0``) before being reset.
-The |SM| application is not restarted.
+The |SM| is not restarted.
 After the command returns, the modem will be in minimal function mode.
 
 Set command
