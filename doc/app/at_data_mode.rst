@@ -7,7 +7,7 @@ Data mode
    :local:
    :depth: 2
 
-The |SM| (SM) application can run in the two operation modes defined by the AT command set: AT-command mode and data mode.
+The |SM| can run in the two operation modes defined by the AT command set: AT-command mode and data mode.
 
 When running in data mode, the application does the following:
 
@@ -33,7 +33,7 @@ However, the |SM| data mode is applied automatically when any of the following A
 Entering data mode
 ==================
 
-The |SM| application enters data mode when an AT command to send data out does not carry the payload.
+The |SM| enters data mode when an AT command to send data out does not carry the payload.
 See the following examples:
 
 * ``AT#XSEND=0,2,0`` makes |SM| enter data mode to receive arbitrary data to transmit for socket 0.
@@ -54,7 +54,7 @@ Other examples:
 
    * ``AT#XCARRIER="app_data_set"``
 
-The |SM| application sends an *OK* response when it successfully enters data mode.
+The |SM| sends an *OK* response when it successfully enters data mode.
 
 Sending data in data mode
 =========================
@@ -62,17 +62,17 @@ Sending data in data mode
 Any arbitrary data received from the MCU is sent to LTE network *as-is*.
 
 .. note::
-   If sending fails while in data mode, the |SM| application drops any further data received from the UART until data mode is exited, as described in the :ref:`exiting_data_mode` section.
+   If sending fails while in data mode, the |SM| drops any further data received from the UART until data mode is exited, as described in the :ref:`exiting_data_mode` section.
    When data mode was entered with ``<data_len>``, no termination string is sent.
    The MCU receives ``#XDATAMODE`` at the expected byte boundary instead.
 
    .. only:: not nrf91m1
 
-      When the data mode was entered without ``<data_len>``, the |SM| application also sends the termination string, set by the :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` Kconfig option, to the MCU to signal the error.
+      When the data mode was entered without ``<data_len>``, the |SM| also sends the termination string, set by the :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` Kconfig option, to the MCU to signal the error.
 
    .. only:: nrf91m1
 
-      When the data mode was entered without ``<data_len>``, the |SM| application also sends the termination string ``+++`` to the MCU to signal the error.
+      When the data mode was entered without ``<data_len>``, the |SM| also sends the termination string ``+++`` to the MCU to signal the error.
 
 .. _exiting_data_mode:
 
@@ -90,21 +90,21 @@ Exiting data mode
 The pattern string could be sent alone or as an affix to the data.
 The pattern string must be sent in full.
 
-If ``<data_len>`` is specified in the AT command and the specified data length is reached, the |SM| application exits data mode.
+If ``<data_len>`` is specified in the AT command and the specified data length is reached, the |SM| exits data mode.
 The termination command is not used in this case.
 
 If a send operation fails while in data mode, such as when the socket in data mode encounters an error, the same exit conditions apply.
 The MCU must send the termination command if ``<data_len>`` was not specified.
 If ``<data_len>`` was specified, the MCU must send the remaining bytes required to reach the specified length.
 
-When exiting the data mode, the |SM| application sends the ``#XDATAMODE`` unsolicited notification.
+When exiting the data mode, the |SM| sends the ``#XDATAMODE`` unsolicited notification.
 
-After exiting the data mode, the |SM| application returns to the AT command mode.
+After exiting the data mode, the |SM| returns to the AT command mode.
 
 Triggering the transmission
 ===========================
 
-The |SM| application buffers all the arbitrary data received from the UART bus before initiating the transmission.
+The |SM| buffers all the arbitrary data received from the UART bus before initiating the transmission.
 
 The transmission of the buffered data to the LTE network is triggered in the following scenarios:
 
@@ -118,7 +118,7 @@ For more information, see the :ref:`sm_data_mode_ctrl` command.
 Flow control in data mode
 =========================
 
-When |SM| fills its UART receive buffers, it disables UART reception. If ``hw-flow-control`` is enabled for the UART, hardware flow control is imposed. Without hardware flow control, the |SM| application will drop incoming data while the UART reception is disabled.
+When |SM| fills its UART receive buffers, it disables UART reception. If ``hw-flow-control`` is enabled for the UART, hardware flow control is imposed. Without hardware flow control, the |SM| will drop incoming data while the UART reception is disabled.
 |SM| reenables UART reception when the data has been moved to the data mode buffer.
 If the data mode buffer fills, the data are transmitted to the LTE network.
 

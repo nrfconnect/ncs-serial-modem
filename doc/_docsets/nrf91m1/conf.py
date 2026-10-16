@@ -23,13 +23,15 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from conf_common import *  # noqa: F401,F403
-from conf_common import docsets, docset_exclude_patterns, html_theme_options, \
-    docset_latex_documents, docset_html_context, docset_latex_elements
+from conf_common import docsets, docset_exclude_patterns, docset_rst_epilog, \
+    html_theme_options, docset_latex_documents, docset_html_context, \
+    docset_latex_elements
 from pdf_revision import revision_for  # noqa: E402 — conf_common adds ``doc/_utils``
 
 DOCSET = Path(__file__).resolve().parent.name
 
 project, root_doc = docsets.ALL_DOCSETS[DOCSET]
+rst_epilog = docset_rst_epilog(DOCSET)
 
 # HTML sidebar (grey line under title): manual revision from doc/nrf91m1/DOC_VERSION.
 version = release = revision_for(DOCSET)
