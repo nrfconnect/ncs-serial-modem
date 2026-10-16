@@ -1,7 +1,6 @@
 .. ### Versions
 
 .. |NCS| replace:: nRF Connect SDK
-.. |SM| replace:: Serial Modem
 
 .. |VSC| replace:: Visual Studio Code
 .. |nRFVSC| replace:: nRF Connect for VS Code

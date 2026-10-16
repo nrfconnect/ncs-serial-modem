@@ -154,8 +154,8 @@ The parameters and their defined values are the following:
    Integer.
    The length of the data chunk to write.
 
-After the command returns ``OK``, the |SM| application enters data mode to receive exactly ``<len>`` bytes of firmware data.
-When the data has been received and written, the |SM| application sends a ``#XDFU`` unsolicited notification with the status.
+After the command returns ``OK``, the |SM| enters data mode to receive exactly ``<len>`` bytes of firmware data.
+When the data has been received and written, the |SM| sends a ``#XDFU`` unsolicited notification with the status.
 
 Example
 ~~~~~~~
@@ -280,7 +280,7 @@ Example
 DFU unsolicited notification #XDFU
 ==================================
 
-The |SM| application sends the ``#XDFU`` unsolicited notification to report the status of DFU write and apply operations.
+The |SM| sends the ``#XDFU`` unsolicited notification to report the status of DFU write and apply operations.
 
 Unsolicited notification
 ------------------------
@@ -415,7 +415,7 @@ The following example shows a complete full modem firmware update.
 
    If the update fails after the first 8 kB block of firmware data has been programmed, the modem remains unusable until a successful update is performed.
    The bootloader remains intact for retries.
-   Ensure a reliable connection between the host and serial modem, and stable power supply before starting the update.
+   Ensure a reliable connection between the host and |SM|, and stable power supply before starting the update.
 
 The full modem update consists of two phases:
 

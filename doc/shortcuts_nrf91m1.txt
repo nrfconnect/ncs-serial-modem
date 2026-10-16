@@ -1,0 +1,3 @@
+.. ### Docset-specific replacements (nRF91M1)
+
+.. |SM| replace:: nRF91M1 module
