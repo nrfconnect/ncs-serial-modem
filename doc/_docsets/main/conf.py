@@ -16,12 +16,14 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from conf_common import *  # noqa: F401,F403
-from conf_common import docsets, docset_exclude_patterns, html_theme_options, \
-    docset_latex_documents, docset_html_context, docset_latex_elements
+from conf_common import docsets, docset_exclude_patterns, docset_rst_epilog, \
+    html_theme_options, docset_latex_documents, docset_html_context, \
+    docset_latex_elements
 
 DOCSET = Path(__file__).resolve().parent.name
 
 project, root_doc = docsets.ALL_DOCSETS[DOCSET]
+rst_epilog = docset_rst_epilog(DOCSET)
 
 exclude_patterns = docset_exclude_patterns(DOCSET) + [
     # Pages that do not apply to the nRF91M1 go here.
