@@ -341,7 +341,7 @@ For the process described here, |SM|'s UARTs must be connected to the Linux host
 
       $ sudo pppd noauth <UART_dev> <baud_rate> local crtscts debug noipdefault connect "/usr/sbin/chat -v -t60 '' AT+CFUN=1 OK AT+CGDATA CONNECT" nodetach
 
-   Replace ``<UART_dev>`` by the device file assigned to the Serial Modem's UART and ``<baud_rate>`` by the baud rate of the UART.
+   Replace ``<UART_dev>`` by the device file assigned to the UART of the |SM| and ``<baud_rate>`` by the baud rate of the UART.
    Typically, the device file assigned to it is :file:`/dev/ttyACM0` for an nRF9151 DK.
    To run PPPD in backround, remove the ``nodetach`` option and observe the logs in :file:`/var/log/syslog`.
 
