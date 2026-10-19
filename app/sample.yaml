@@ -228,6 +228,21 @@ tests:
       - SB_CONFIG_SECURE_BOOT_APPCORE=n
     platform_allow:
       - nrf9151dk/nrf9151/ns
+  serial_modem.nusim:
+    sysbuild: true
+    build_only: true
+    extra_args:
+      - app_SNIPPET="nrf91-nusim"
+      - EXTRA_DTC_OVERLAY_FILE="nusim-nrf9151.overlay;nusim-sram-nrf9151.overlay"
+      - mcuboot_EXTRA_DTC_OVERLAY_FILE="${APP_DIR}/nusim-nrf9151.overlay"
+      - mcuboot_CONFIG_BOOT_FIH_PROFILE_MEDIUM=y
+    extra_configs:
+      - CONFIG_SM_NRF_CLOUD=n
+    modules:
+      - redteamobile-nusim
+    platform_allow:
+      - nrf9151dk/nrf9151/ns
+    tags: exclude_integration
   serial_modem.debug_stats_stacks:
     sysbuild: true
     build_only: true

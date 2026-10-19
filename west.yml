@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 
 manifest:
+  # Optional projects. Enable with: west config manifest.group-filter -- +nusim
+  group-filter: [-nusim]
+
   self:
     import: submanifests
 
@@ -36,3 +39,10 @@ manifest:
       url: https://github.com/memfault/memfault-firmware-sdk
       path: modules/lib/memfault-firmware-sdk
       revision: 1.45.0
+
+    - name: redteamobile-nusim
+      url: https://github.com/redteamobile/ncs-nusim-app.git
+      path: modules/lib/redteamobile-nusim
+      revision: main
+      groups:
+        - nusim
