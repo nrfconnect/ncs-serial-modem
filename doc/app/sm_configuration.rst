@@ -425,6 +425,19 @@ The following configuration files are provided:
 * :file:`nrf-device-provisioning.conf` - Configuration file that enables the nRF Cloud device provisioning client and its AT command interface.
   See :ref:`SM_AT_PROVISIONING` for more information.
 
+* :file:`nusim-nrf9151.overlay` - Devicetree overlay that defines the flash partition layout for a nuSIM build.
+  The overlay resizes the primary and secondary application slots to fit the larger TF-M image, and adds the TF-M ITS and OTP partitions used by nuSIM.
+  You must combine this overlay with :file:`nusim-sram-nrf9151.overlay` and the ``nrf91-nusim`` snippet, apply the to the application image using ``app_SNIPPET``.
+  You must also pass this overlay to the ``mcuboot`` image using :makevar:`mcuboot_EXTRA_DTC_OVERLAY_FILE` so that MCUboot operates with the same partition layout.
+  Provide the absolute path to the overlay file.
+  The snippet is provided by the nuSIM module, which you enable in the west manifest using ``west config manifest.group-filter -- +nusim``.
+  The nuSIM profile is stored in TF-M ITS, so do not move or resize the TF-M ITS and OTP partitions after devices are provisioned.
+  If you need more information on using nuSIM, contact Nordic Semiconductor's technical support on `DevZone`_.
+
+* :file:`nusim-sram-nrf9151.overlay` - Devicetree overlay that defines the SRAM partition layout for a nuSIM build.
+  The overlay increases the secure RAM to 64 kB for TF-M and defines the SRAM partition used by the modem trace backend.
+  You must combine this overlay with :file:`nusim-nrf9151.overlay`.
+
 The board-specific devicetree overlays (:file:`boards/*.overlay`) set up configurations that are specific to each supported development kit.
 All of them configure the DTR to be deasserted from a button and RI to drive an LED.
 
