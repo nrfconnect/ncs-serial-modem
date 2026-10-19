@@ -1,0 +1,11 @@
+# Copyright (c) 2026 Nordic Semiconductor
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+
+manifest:
+  projects:
+    - name: redteamobile-nusim
+      url: https://github.com/redteamobile/ncs-nusim-app.git
+      path: modules/lib/redteamobile-nusim
+      revision: cac154aab85f54d799cf50309fe5c133e6676fcc
+      groups:
+        - nusim

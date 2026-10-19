@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 
 manifest:
+  # Optional projects. Enable with: west config manifest.group-filter -- +nusim
+  group-filter: [-nusim]
+
   self:
     import: submanifests
 
