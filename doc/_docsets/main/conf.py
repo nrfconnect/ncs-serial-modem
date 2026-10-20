@@ -16,9 +16,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from conf_common import *  # noqa: F401,F403
-from conf_common import docsets, docset_exclude_patterns, docset_rst_epilog, \
+from conf_common import author, docsets, docset_exclude_patterns, docset_rst_epilog, \
     html_theme_options, docset_latex_documents, docset_html_context, \
-    docset_latex_elements
+    docset_latex_elements, release
 
 DOCSET = Path(__file__).resolve().parent.name
 

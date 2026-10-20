@@ -7,10 +7,12 @@ Cellular PPP modem
    :local:
    :depth: 2
 
+.. sm_cellular_modem_overview_start
+
 Overview
 ********
 
-|SM| can provide a Point-to-Point Protocol (PPP) link over a UART so that a host can use the nRF91 Series SiP as a cellular dial-up modem.
+|SM| can provide a Point-to-Point Protocol (PPP) link over a UART so that a host can use the |SiP| as a cellular dial-up modem.
 This is typically used in one of the following ways:
 
 * **Linux host** - The host runs a standard PPP daemon (``pppd``) and establishes a PPP network interface (``ppp0``).
@@ -21,6 +23,10 @@ This is typically used in one of the following ways:
 
 PPP and CMUX are controlled through AT commands.
 For details, see :ref:`SM_AT_PPP` and :ref:`SM_AT_CMUX`.
+
+.. sm_cellular_modem_overview_end
+
+.. sm_cellular_modem_ppp_cmux_start
 
 PPP and CMUX
 ************
@@ -86,10 +92,12 @@ Send ``AT#XCMUXURC=2`` to route URCs to DLC channel 2, start CMUX with ``AT+CMUX
    The sequence diagrams in this section show ``+CEREG:`` and ``+CGEV:`` URCs on the AT channel for illustration.
    By default, |SM| does not forward these URCs to the host.
 
+.. sm_cellular_modem_ppp_cmux_end
+
 Use case: Linux host
 ********************
 
-This section describes how to use an nRF91 Series SiP running |SM| as a PPP modem for a Linux device.
+This section describes how to use an |SiP| running |SM| as a PPP modem for a Linux device.
 
 Prerequisites
 =============
@@ -249,16 +257,16 @@ Use case: Zephyr host
 *********************
 
 This section describes how to use |SM| as a modem that is controlled by Zephyr's cellular modem driver.
-The controlling chip runs a Zephyr application, which uses Zephyr's native IP stack.
+The host runs a Zephyr application, which uses Zephyr's native IP stack.
 
 .. note::
 
-   Zephyr's cellular modem driver support has some limitations when used with an nRF91 Series SiP:
+   Zephyr's cellular modem driver support has some limitations when used with an |SiP|:
 
    * GNSS functionality is not available through the driver.
    * eDRX or PSM configuration through the driver is not supported.
      Requires manual changes of the modem settings through AT commands.
-   * Power saving feature requires UART with DTR and RI pins connected between the controlling chip and the SiP.
+   * Power saving feature requires UART with DTR and RI pins connected between the host and the |SiP|.
      See :ref:`uart_configuration` for more information.
    * System mode is not configured. See the `%XSYSTEMMODE`_ command in the AT command Reference Guide for more details.
 
@@ -318,29 +326,29 @@ The dial script issues ``AT+CGDATA`` on DLC channel 2, which starts PPP on that 
 
     Zephyr modem driver uses DLC1 as the AT command channel and starts PPP on DLC2 using AT+CGDATA.
 
-Configuration
-=============
+Setup
+=====
 
 Both sides must be compiled with matching configuration:
 
-nRF91 Series SiP running |SM|
------------------------------
+|SiP| running |SM|
+------------------
 
 Include the following configuration overlays:
 
 * :file:`cmux.conf` - Enable CMUX.
 * :file:`ppp.conf` - Enable PPP.
-* :file:`external-mcu.overlay` - Configure UART (pins, baud rate), DTR, and RI pins used between the MCU and the SiP.
+* :file:`external-mcu.overlay` - Configure UART (pins, baud rate), DTR, and RI pins used between the MCU and the |SiP|.
 
-Controlling chip running Zephyr
--------------------------------
+Host running Zephyr
+-------------------
 
 Start from the configuration files in the :ref:`sm_ppp_shell_sample` sample.
 In particular:
 
 * :file:`prj.conf` enables the required Zephyr subsystems.
 * :file:`boards/nrf54l15dk_nrf54l15_cpuapp.conf.conf` Board-specific configuration.
-* :file:`boards/nrf54l15dk_nrf54l15_cpuapp.overlay` - Configure UART (pins, baud rate), DTR and RI pins used between the MCU and the SiP.
+* :file:`boards/nrf54l15dk_nrf54l15_cpuapp.overlay` - Configure UART (pins, baud rate), DTR and RI pins used between the MCU and the |SiP|.
 
 Depending on your hardware, a devicetree overlay is needed to describe the modem UART and power control pins.
 The modem node in the overlay must use ``compatible = "nordic,nrf91-sm-v2"`` to select the |SM| modem driver:
@@ -367,10 +375,7 @@ The modem node in the overlay must use ``compatible = "nordic,nrf91-sm-v2"`` to 
 The ``nordic,nrf91-sm-v2`` binding is compatible with |SM| application v2.0.0 and later.
 Devicetree settings also control the CMUX power-saving behavior.
 
-Flashing and running
-====================
-
-Before using a Zephyr host to control the SiP, make sure the modem system mode is set to your desired configuration including PSM and eDRX settings.
+Before using a Zephyr host to control the |SiP|, make sure the modem system mode is set to your desired configuration including PSM and eDRX settings.
 When the Zephyr's modem driver starts up, it will perform the following steps:
 
 * Enable the UART interface.
@@ -404,14 +409,23 @@ This approach is unreliable in various recovery scenarios, because PPP startup a
 
     Legacy ``nrf91-slm`` driver starts CMUX using ``AT#XCMUX=1``, then uses ``AT#XCMUX=2`` to switch the AT channel to DLC2 and starts PPP on DLC1.
 
+.. sm_cellular_modem_operational_notes_start
+
 Operational notes
 *****************
 
-* nRF91 Series SiP automatically activates the default PDP context.
+* The |SiP| automatically activates the default PDP context.
   Manually configuring the APN is typically not required.
 
-* nRF91 Series SiP automatically restarts a network scan when connectivity is lost.
+* The |SiP| automatically restarts a network scan when connectivity is lost.
   Manual dial-up scripts are typically not required for LTE connection recovery.
 
 * When you use the proprietary ``AT#XCMUX=1`` and ``AT#XPPP=1`` commands, CMUX channel allocation is static (by default, allocating DLC channel 1 to PPP and DLC channel 2 to AT).
   See :ref:`SM_AT_CMUX` and :ref:`SM_AT_PPP` for details.
+
+* If you enable packet domain URC forwarding with ``AT+CGEREP=1``, you might see a packet domain event (``+CGEV: IPV6 FAIL 0``).
+  This event indicates a failure to obtain an IPv6 address.
+  This  is normal and you can ignore it, because the modem does not require an IPv6 address when you use PPP.
+  The host's IP stack handles IPv6 addressing.
+
+.. sm_cellular_modem_operational_notes_end
