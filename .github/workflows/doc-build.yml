@@ -85,7 +85,7 @@ jobs:
         working-directory: doc
         run: |
           doxygen
-          python _scripts/build_docsets.py -b build --format html --format pdf
+          python _scripts/build_docsets.py -b build --format html --format pdf -W --keep-going
 
       - name: Prepare Azure upload
         run: |

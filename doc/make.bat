@@ -14,6 +14,9 @@ if "%PYTHON%" == "" (
 if "%BUILDDIR%" == "" (
 	set BUILDDIR=_build_sphinx
 )
+if "%SPHINXOPTS%" == "" (
+	set SPHINXOPTS=-W --keep-going
+)
 
 %PYTHON% --version >NUL 2>NUL
 if errorlevel 1 (
