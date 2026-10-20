@@ -134,6 +134,8 @@
 
 .. _`Serial Modem`: https://nrfconnectdocs.nordicsemi.com/addons/addon-serial_modem/latest/main/index.html
 .. _`Serial Modem UART Zephyr cellular modem driver auto power`: https://nrfconnectdocs.nordicsemi.com/addons/addon-serial_modem/latest/main/uart_configuration.html#uart-zephyr-cellular-modem-driver
+.. _`Serial Modem PPP Linux host`: https://nrfconnectdocs.nordicsemi.com/addons/addon-serial_modem/latest/main/app/sm_cellular_modem.html#use-case-linux-host
+.. _`Serial Modem PPP Zephyr host`: https://nrfconnectdocs.nordicsemi.com/addons/addon-serial_modem/latest/main/app/sm_cellular_modem.html#use-case-zephyr-host
 .. _`nRF91M1 UART configuration`: https://nrfconnectdocs.nordicsemi.com/addons/addon-serial_modem/latest/nrf91m1/nrf91m1/appendix_uart.html#nrf91m1-uart-configuration
 
 .. _`DevZone`: https://devzone.nordicsemi.com/
