@@ -219,3 +219,7 @@ Cellular PPP modem
 For information on how the |SM| works as a cellular PPP modem, see :ref:`nrf91m1_cellular_modem`.
 For information on how to configure a Linux host with the `nrf9151dk`_ board running nRF91M1 firmware, see `Serial Modem PPP Linux host`_.
 For a Zephyr host, see `Serial Modem PPP Zephyr host`_.
+
+.. include:: ../uart_configuration.rst
+   :start-after: nrf91m1_uart_security_models_start
+   :end-before: nrf91m1_uart_security_models_end
