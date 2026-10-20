@@ -6,7 +6,7 @@
 
 # You can set these variables from the command line, and also from the
 # environment.
-SPHINXOPTS    ?=
+SPHINXOPTS    ?= -W --keep-going
 PYTHON        ?= python3
 BUILDDIR      ?= _build_sphinx
 
