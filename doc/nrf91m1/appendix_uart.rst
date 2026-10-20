@@ -157,7 +157,7 @@ The UART receive buffer of the |SM| is fixed to 532 bytes and cannot be configur
 Operating with the nRF9151 DK
 *****************************
 
-You can flash the nRF91M1 software to the `nrf9151dk`_ board for development and testing purposes.
+You can flash the nRF91M1 firmware to the `nrf9151dk`_ board for development and testing purposes.
 On the DK, the SiP is an nRF9151, and the UART pins follow the pin mapping of the nRF91M1 as listed in the following table:
 
 .. list-table::
@@ -210,3 +210,12 @@ External MCU host
 =================
 
 When you use the `nrf9151dk`_ board with an external MCU host, you must disable VCOM0 in the `Board Configurator app`_ to release the UART pins for external use.
+
+.. _nrf91m1_uart_cellular_ppp_modem:
+
+Cellular PPP modem
+==================
+
+For information on how the |SM| works as a cellular PPP modem, see :ref:`nrf91m1_cellular_modem`.
+For information on how to configure a Linux host with the `nrf9151dk`_ board running nRF91M1 firmware, see `Serial Modem PPP Linux host`_.
+For a Zephyr host, see `Serial Modem PPP Zephyr host`_.
