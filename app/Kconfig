@@ -18,6 +18,8 @@ config HEAP_MEM_POOL_ADD_SIZE_SERIAL_MODEM
 
 config SM_BLOCKING_WORK_Q
 	bool
+	help
+	  Work queue for operations that block for a long time.
 
 config SM_BLOCKING_WORK_Q_STACK_SIZE
 	int "Stack size for the blocking operations work queue"
@@ -257,6 +259,13 @@ config SM_SMS
 config SM_GNSS
 	bool "GNSS support"
 	default y
+
+config SM_ICMP
+	bool "ICMP ping support"
+	default y
+	select SM_BLOCKING_WORK_Q
+	help
+	  Enable the ping command for sending ICMP echo requests.
 
 config SM_COAPC
 	bool "CoAP client support"

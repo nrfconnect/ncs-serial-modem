@@ -168,6 +168,11 @@ CONFIG_SM_SMS - SMS support in |SM|
 CONFIG_SM_GNSS - GNSS support in |SM|
    This option enables additional AT commands for using the GNSS service.
 
+.. _CONFIG_SM_ICMP:
+
+CONFIG_SM_ICMP - ICMP ping support in |SM|
+   This option enables AT command for sending ICMP echo requests.
+
 .. _CONFIG_SM_NRF_CLOUD:
 
 CONFIG_SM_NRF_CLOUD - nRF Cloud support in |SM|
