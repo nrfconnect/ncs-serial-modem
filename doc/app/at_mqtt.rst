@@ -9,11 +9,96 @@ MQTT client AT commands
 
 This page describes the AT commands used to operate the MQTT client.
 
-.. note::
+.. only:: not nrf91m1
 
-   The MQTT client holds no internal state information for publish and subscript.
-   It will not retransmit packets or guarantee packet delivery according to QoS classes.
-   This deviates from MQTT v3.1.1.
+   The MQTT client supports MQTT v3.1.1 and, as an experimental feature, MQTT v5.0.
+   MQTT v3.1.1 is the default.
+   To use MQTT v5.0, set the ``<version>`` parameter of ``#XMQTTCFG`` to ``5``.
+   MQTT v5.0 requires the :ref:`CONFIG_SM_MQTTC_VERSION_5_0` Kconfig option, which is enabled by default.
+   Examples use MQTT v3.1.1 unless stated otherwise.
+
+   .. rubric:: Supported MQTT v5.0 features
+
+   The AT commands support the following MQTT v5.0 features:
+
+   * Session Expiry Interval and the Session Present flag, with ``#XMQTTCFG`` and ``#XMQTTEVT``.
+   * Message Expiry Interval, with ``#XMQTTPUB``, ``#XMQTTPUBEMPTY``, ``#XMQTTMSG``, and ``#XMQTTWILL``.
+   * Reason codes of acknowledgments and of DISCONNECT packets from the broker, with ``#XMQTTEVT``.
+   * Payload Format Indicator, Content Type, Response Topic, Correlation Data, and User Property.
+     :ref:`SM_AT_MQTT_XMQTTPUBPROP` sets them for outgoing messages, and :ref:`SM_AT_MQTT_XMQTTMSGPROP` reports them for incoming messages.
+   * Will Delay Interval, with :ref:`SM_AT_MQTT_XMQTTWILL`.
+   * Topic aliases for outgoing messages.
+
+   The AT commands do not support other MQTT v5.0 properties, subscription options, or enhanced authentication.
+
+   .. rubric:: Broker limits
+
+   With MQTT v5.0, the broker announces its limits in the CONNACK packet.
+    The client applies the following limits for the rest of the connection:
+
+   * **Capabilities and Keep Alive.**
+     The client applies Server Keep Alive and enforces Maximum QoS, Retain Available, Wildcard Subscription Available, and Shared Subscription Available.
+     Maximum QoS limits publications, not the QoS of subscriptions.
+     If the broker omits a capability, the client assumes QoS 2 and support for retained messages and wildcard and shared subscriptions.
+   * **Maximum Packet Size.**
+     The client checks the size of each outgoing packet, including the headers and the payload.
+     If the property is absent, only the protocol and local buffer limits apply.
+   * **Receive Maximum.**
+     The broker's limit applies to unacknowledged QoS 1 and QoS 2 publications together, and it defaults to 65,535.
+     QoS 0 publications do not count toward the limit.
+     A publication stops counting when PUBACK, PUBCOMP, or a PUBREC with a failure reason code arrives.
+     The client does not queue requests, so retry after an acknowledgment arrives.
+     The limit for incoming publications is fixed at 65,535.
+   * **Topic Alias Maximum.**
+     The client assigns topic aliases to the first topics it publishes to, up to the broker's limit or :ref:`CONFIG_SM_MQTTC_TOPIC_ALIAS_MAX`, whichever is lower.
+     Later publications to those topics omit the topic name.
+     The client does not reassign aliases.
+
+   The client checks publish, subscribe, and unsubscribe requests against these limits.
+   A request that exceeds a limit returns ``ERROR``, and the client sends no packet.
+   For ``#XMQTTPUB`` in data mode, the client checks the request before entering data mode and checks the payload again before sending.
+   If a check fails in data mode, ``#XDATAMODE: -1`` reports the failure when data mode ends.
+   Unsubscribe requests are only checked against Maximum Packet Size.
+   If an acknowledgment that the client must send exceeds Maximum Packet Size, the client closes the connection.
+
+   The limits, topic aliases, and the count of unacknowledged publications apply to one MQTT connection.
+   Each new connection with ``#XMQTTCON`` starts again from the values in its CONNACK.
+
+   .. rubric:: Packet identifiers and topic aliases
+
+   Publications, subscriptions, and unsubscriptions share one packet identifier sequence.
+   With MQTT v5.0, the client does not reuse a packet identifier until its acknowledgment arrives.
+
+   By default, the client does not accept topic aliases from the broker, so incoming messages always have full topic names.
+   To enable incoming topic aliases, see :ref:`CONFIG_SM_MQTTC_TOPIC_ALIAS_MAX`.
+
+   .. rubric:: Multiple AT channels
+
+   While ``#XMQTTPUB`` receives a payload in data mode, the ``#XMQTTPUB``, ``#XMQTTPUBEMPTY``, ``#XMQTTPUBPROP``, and ``#XMQTTCON`` connect commands sent from other AT channels (CMUX) return ``ERROR``.
+   Disconnect requests are still allowed.
+
+   .. note::
+
+      The Serial Modem application enforces Maximum Packet Size.
+      However, the MQTT library can send a DISCONNECT packet on a protocol error without this check.
+
+.. only:: nrf91m1
+
+   .. note::
+
+      The MQTT client holds no internal state information for publish and subscribe.
+      It will not retransmit packets or guarantee packet delivery according to QoS classes.
+      This deviates from MQTT v3.1.1.
+
+.. only:: not nrf91m1
+
+   .. note::
+
+      The MQTT client does not store the messages it publishes.
+      It does not retransmit packets or guarantee packet delivery according to QoS classes.
+      This deviates from MQTT v3.1.1 and MQTT v5.0.
+      With MQTT v5.0, the client only keeps the packet identifiers that wait for an acknowledgment.
+      It uses them to apply the broker's Receive Maximum limit to publications and to avoid reusing a packet identifier before its acknowledgment arrives.
 
 .. _SM_AT_MQTT_XMQTTEVT:
 
@@ -25,9 +110,20 @@ MQTT client AT commands report protocol events as unsolicited notifications:
 Unsolicited notification
 ------------------------
 
-::
+.. only:: nrf91m1
 
-   #XMQTTEVT: <evt_type>,<result>
+   ::
+
+      #XMQTTEVT: <evt_type>,<result>
+
+.. only:: not nrf91m1
+
+   ::
+
+      #XMQTTEVT: <evt_type>,<result>[,<detail>]
+
+   MQTT v5.0 adds an event-specific ``<detail>`` field, described below.
+   MQTT v3.1.1 notifications retain the two-field format.
 
 The parameters and their defined values are the following:
 
@@ -38,7 +134,8 @@ The parameters and their defined values are the following:
    * ``0`` - Connection acknowledgment (CONNACK).
    * ``1`` - Disconnection (DISCONNECT).
      The MQTT client is disconnected from the MQTT broker when the |SM| sends this event.
-     If the host receives this event without a preceding ``AT#XMQTTCON=0`` command, the host must issue ``AT#XMQTTCON=0`` before connecting again.
+     If the host receives this event without a preceding ``AT#XMQTTCON=0`` command, the |SM| has already closed the connection.
+     The host can connect again with ``AT#XMQTTCON`` without disconnecting first, and ``AT#XMQTTCON=0`` returns ``ERROR``.
    * ``2`` - Incoming publish (PUBLISH).
      A subscribed topic received a message.
      The |SM| delivers the payload in a separate ``#XMQTTMSG`` notification.
@@ -53,11 +150,102 @@ The parameters and their defined values are the following:
      The |SM| can send this event at any time while connected, when the keep alive interval expires and the client pings the broker.
 
 <result>
-   * ``0`` - Success.
-   * *Negative value* - Error code indicating the reason for the failure.
+   .. only:: nrf91m1
+
+      * ``0`` - Success.
+      * *Positive value* - For CONNACK, the MQTT v3.1.1 return code of a rejected connection.
+      * *Negative value* - A local error code.
+        For PUBREC and PUBREL, this can also indicate a failure to send the next QoS 2 acknowledgment.
+
+   .. only:: not nrf91m1
+
+      * ``0`` - The event was processed without a local error.
+        For acknowledgment events with a ``<reason_code>`` field, check that field for the broker's outcome.
+      * *Positive value* - A broker-supplied code for CONNACK or DISCONNECT.
+        For CONNACK, this is the MQTT v3.1.1 return code or the MQTT v5.0 reason code.
+        For a broker-initiated MQTT v5.0 DISCONNECT, this is the reason code.
+      * *Negative value* - A local error code.
+        For PUBREC and PUBREL, this can also indicate a failure to send the next QoS 2 acknowledgment.
+
+.. only:: not nrf91m1
+
+   <detail>
+      Integer.
+      For a successful MQTT v5.0 CONNACK (``<evt_type>`` ``0``), this value is ``<session_present>``.
+
+      * ``0`` - The broker starts a new session.
+        The host must subscribe to the required topics.
+      * ``1`` - The broker resumes a stored session for this client ID.
+        Existing subscriptions are restored without subscribing again.
+
+      Clean Start ``1`` always starts a new session.
+      Clean Start ``0`` can also start a new session if no stored session exists or the previous session has expired.
+      A failed CONNACK has no third field.
+
+      For acknowledgment events ``3`` to ``8``, this value is ``<reason_code>``.
+
+   Reason codes
+   ~~~~~~~~~~~~
+
+   ``<reason_code>``
+      Integer.
+      The MQTT v5.0 reason code from the received acknowledgment.
+      Present for successfully decoded PUBACK, PUBREC, PUBREL, PUBCOMP, SUBACK, and UNSUBACK events.
+      It is absent for MQTT v3.1.1 and for the other event types.
+      For CONNACK and DISCONNECT, ``<result>`` reports the broker's code instead.
+
+      Reason codes below ``128`` indicate success, and codes ``128`` or higher indicate failure.
+      For SUBACK, ``0``, ``1``, and ``2`` indicate the granted QoS level.
+      For example, ``#XMQTTEVT: 7,0,135`` reports a decoded SUBACK that rejects the subscription as not authorized.
+      A ``<result>`` of ``0`` alone does not mean that the broker accepted the request.
+
+      If PUBREC contains a failure reason code, the client does not send PUBREL, and the QoS 2 exchange ends without PUBCOMP.
 
 The commands describe which ``<evt_type>`` values each command can trigger.
 All notifications use the syntax documented in this section.
+
+.. only:: not nrf91m1
+
+   Examples
+   ~~~~~~~~
+
+   The following examples use MQTT v5.0.
+
+   After a successful connection with a new session:
+
+   ::
+
+      #XMQTTEVT: 0,0,0
+
+   After reconnecting with Clean Start ``0`` while the broker still has the stored session:
+
+   ::
+
+      #XMQTTEVT: 0,0,1
+
+   ::
+
+      AT#XMQTTSUB="nrf91/sm/mqtt/topic1",1
+      OK
+      #XMQTTEVT: 7,0,1
+
+   A broker can acknowledge a publication with reason code ``16`` (No matching subscribers).
+   It can also return ``0`` (Success) when no subscriptions match.
+
+   ::
+
+      AT#XMQTTPUB="nrf91/sm/mqtt/nobody","Test message",1,0
+      OK
+      #XMQTTEVT: 3,0,16
+
+   A rejected connection reports the CONNACK reason code in ``<result>``.
+   For example, ``137`` means Server busy.
+   The subsequent DISCONNECT reports the local connection refusal error.
+
+   ::
+
+      #XMQTTEVT: 0,137
+      #XMQTTEVT: 1,-111
 
 MQTT configure #XMQTTCFG
 ========================
@@ -72,9 +260,19 @@ The set command allows you to configure the MQTT client.
 Syntax
 ~~~~~~
 
-::
+.. only:: nrf91m1
 
-   AT#XMQTTCFG=<client_id>[,<keep_alive>[,<clean_session>]]
+   ::
+
+      AT#XMQTTCFG=<client_id>[,<keep_alive>[,<clean_session>]]
+
+.. only:: not nrf91m1
+
+   ::
+
+      AT#XMQTTCFG=<client_id>[,<keep_alive>[,<clean_session>[,<version>[,<session_expiry>]]]]
+
+Omitted parameters use their default values, not the values from the previous configuration.
 
 The parameters and their defined values are the following:
 
@@ -88,11 +286,49 @@ The parameters and their defined values are the following:
    The maximum Keep Alive time in seconds for MQTT.
    The default Keep Alive time is 60 seconds.
 
-<clean_session>
-   * ``0`` - Connect to a MQTT broker using a persistent session.
-   * ``1`` - Connect to a MQTT broker using a clean session.
+   .. only:: not nrf91m1
 
-   The default is using a persistent session.
+      With MQTT v5.0, a successful CONNACK can override this interval with the Server Keep Alive property.
+      A server value of ``0`` disables keep-alive pings for that connection.
+      If the property is absent, the configured interval applies.
+      The read command continues to report the configured interval, and each new connection starts with that interval.
+
+<clean_session>
+   * ``0`` - Resume an existing session for this client ID, if one exists.
+   * ``1`` - Discard any existing session and start a new session.
+
+   The default is ``1``.
+   With MQTT v3.1.1, this parameter sets the Clean Session flag.
+   A value of ``0`` also keeps the broker-side session after disconnection.
+
+   .. only:: not nrf91m1
+
+      With MQTT v5.0, it sets the Clean Start flag.
+      For MQTT v5.0, ``0`` alone does not keep the session after disconnection.
+      Set a nonzero ``<session_expiry>`` to keep the broker-side session.
+
+.. only:: not nrf91m1
+
+   <version>
+      Integer.
+      The MQTT protocol version.
+
+      * ``4`` - MQTT v3.1.1 (default).
+      * ``5`` - MQTT v5.0.
+        Returns ``ERROR`` if MQTT v5.0 support is not built into the firmware.
+
+   <session_expiry>
+      Integer.
+      The MQTT v5.0 Session Expiry Interval in seconds, from ``0`` to ``4294967295``.
+      It controls how long the broker keeps the session after the network connection closes.
+
+      * ``0`` - End the session when the network connection closes (default).
+      * ``4294967295`` - The session does not expire.
+
+      A nonzero value requires ``<version>`` to be ``5``.
+      To resume a stored session, reconnect with the same client ID and ``<clean_session>`` set to ``0`` before the session expires.
+      Check the Session Present flag in :ref:`SM_AT_MQTT_XMQTTEVT` to determine whether the broker resumes the session.
+      Broker-side session storage does not add client-side retransmission or delivery guarantees.
 
 Examples
 ~~~~~~~~
@@ -101,6 +337,22 @@ Examples
 
    AT#XMQTTCFG="MyMQTT-Client-ID",300,1
    OK
+
+.. only:: not nrf91m1
+
+   Configure MQTT v5.0 with a new session that ends on disconnection:
+
+   ::
+
+      AT#XMQTTCFG="MyMQTT-Client-ID",300,1,5
+      OK
+
+   Configure MQTT v5.0 to resume a session and keep it for one hour after disconnection:
+
+   ::
+
+      AT#XMQTTCFG="MyMQTT-Client-ID",300,0,5,3600
+      OK
 
 Read command
 ------------
@@ -117,9 +369,17 @@ Syntax
 Response syntax
 ~~~~~~~~~~~~~~~
 
-::
+.. only:: nrf91m1
 
-   #XMQTTCFG: <client_id>,<keep_alive>,<clean_session>
+   ::
+
+      #XMQTTCFG: <client_id>,<keep_alive>,<clean_session>
+
+.. only:: not nrf91m1
+
+   ::
+
+      #XMQTTCFG: <client_id>,<keep_alive>,<clean_session>,<version>,<session_expiry>
 
 The parameters and their defined values are the following:
 
@@ -131,18 +391,44 @@ The parameters and their defined values are the following:
    Integer.
    The maximum Keep Alive time in seconds for MQTT.
 
-<clean_session>
-   * ``0`` - Connect to a MQTT broker using a persistent session.
-   * ``1`` - Connect to a MQTT broker using a clean session.
+.. only:: nrf91m1
+
+   <clean_session>
+      * ``0`` - Connect to a MQTT broker using a persistent session.
+      * ``1`` - Connect to a MQTT broker using a clean session.
+
+.. only:: not nrf91m1
+
+   <clean_session>
+      The configured Clean Session (MQTT v3.1.1) or Clean Start (MQTT v5.0) flag.
+
+   <version>
+      * ``4`` - MQTT v3.1.1.
+      * ``5`` - MQTT v5.0.
+
+   <session_expiry>
+      Integer.
+      The configured MQTT v5.0 Session Expiry Interval in seconds.
+      The value is ``0`` with MQTT v3.1.1.
 
 Examples
 ~~~~~~~~
 
-::
+.. only:: nrf91m1
 
-   AT#XMQTTCFG?
-   #XMQTTCFG: "MyMQTT-Client-ID",60,0
-   OK
+   ::
+
+      AT#XMQTTCFG?
+      #XMQTTCFG: "MyMQTT-Client-ID",60,0
+      OK
+
+.. only:: not nrf91m1
+
+   ::
+
+      AT#XMQTTCFG?
+      #XMQTTCFG: "MyMQTT-Client-ID",300,0,5,3600
+      OK
 
 Test command
 ------------
@@ -159,18 +445,36 @@ Syntax
 Response syntax
 ~~~~~~~~~~~~~~~
 
-::
+.. only:: nrf91m1
 
-   #XMQTTCFG: <client_id>,<keep_alive>,<clean_session>
+   ::
+
+      #XMQTTCFG: <client_id>,<keep_alive>,<clean_session>
+
+.. only:: not nrf91m1
+
+   ::
+
+      #XMQTTCFG: <client_id>,<keep_alive>,<clean_session>,<version>,<session_expiry>
 
 Examples
 ~~~~~~~~
 
-::
+.. only:: nrf91m1
 
-   AT#XMQTTCFG=?
-   #XMQTTCFG: <client_id>,,<keep_alive>,<clean_session>
-   OK
+   ::
+
+      AT#XMQTTCFG=?
+      #XMQTTCFG: <client_id>,<keep_alive>,<clean_session>
+      OK
+
+.. only:: not nrf91m1
+
+   ::
+
+      AT#XMQTTCFG=?
+      #XMQTTCFG: <client_id>,<keep_alive>,<clean_session>,<version>,<session_expiry>
+      OK
 
 
 MQTT connect #XMQTTCON
@@ -180,11 +484,15 @@ The ``#XMQTTCON`` command allows you to connect to and disconnect from the MQTT 
 
 This command can send ``#XMQTTEVT`` with the following ``<evt_type>`` values:
 
-* ``0`` - After a successful connect request (``<op>`` ``1`` or ``2``).
+* ``0`` - When the broker acknowledges or rejects a connect request (``<op>`` ``1`` or ``2``).
 * ``1`` - After a disconnect request (``<op>`` ``0``), when the broker closes the connection, or when the client disconnects for other reasons.
 * ``9`` - While connected, when the broker responds to a keep alive ping.
 
 See :ref:`SM_AT_MQTT_XMQTTEVT` for the notification syntax and parameter descriptions.
+
+.. only:: not nrf91m1
+
+   The connect request includes the Will set with :ref:`SM_AT_MQTT_XMQTTWILL`.
 
 Set command
 -----------
@@ -231,6 +539,23 @@ The parameters and their defined values are the following:
    Integer.
    The credential of the security tag used for establishing a secure connection.
 
+.. only:: not nrf91m1
+
+   With ``<op>`` ``0``, the command takes one optional parameter:
+
+   ::
+
+      AT#XMQTTCON=0[,<with_will>]
+
+   <with_will>
+      Integer.
+
+      * ``0`` - Normal disconnection (default).
+        The broker discards the Will message.
+      * ``1`` - Disconnect with Will Message (MQTT v5.0 reason code ``4``).
+        The broker publishes the Will message set with :ref:`SM_AT_MQTT_XMQTTWILL`.
+        Requires MQTT v5.0.
+
 Examples
 ~~~~~~~~
 
@@ -252,14 +577,16 @@ Examples
    OK
    #XMQTTEVT: 1,0
 
-When the MQTT broker closes the connection:
+When the MQTT broker closes the connection, the client is already disconnected.
+Connect again without ``AT#XMQTTCON=0``:
 
 ::
 
-   #XMQTTEVT: 1,0
+   #XMQTTEVT: 1,-128
 
-   AT#XMQTTCON=0
+   AT#XMQTTCON=1,"","","mqtt.server.com",1883
    OK
+   #XMQTTEVT: 0,0
 
 Read command
 ------------
@@ -289,6 +616,7 @@ The parameters and their defined values are the following:
 <client_id>
    String.
    The MQTT client ID.
+   Present only when ``<status>`` is ``1``.
 
 <url>
    String.
@@ -303,7 +631,7 @@ The parameters and their defined values are the following:
 <sec_tag>
    Integer.
    The credential of the security tag used for establishing a secure connection.
-   Present only when ``<status>`` is ``1``.
+   Present only when ``<status>`` is ``1`` and the connection uses a security tag.
 
 Examples
 ~~~~~~~~
@@ -311,7 +639,7 @@ Examples
 ::
 
    AT#XMQTTCON?
-   #XMQTTCON: 1,"","","mqtt.server.com",1883
+   #XMQTTCON: 1,"MyMQTT-Client-ID","mqtt.server.com",1883
    OK
 
 Test command
@@ -324,7 +652,7 @@ Syntax
 
 ::
 
-   #XMQTTCON=?
+   AT#XMQTTCON=?
 
 Response syntax
 ~~~~~~~~~~~~~~~
@@ -352,11 +680,21 @@ When the MQTT client has successfully subscribed to a topic using :ref:`SM_AT_MQ
 Unsolicited notification
 ------------------------
 
-::
+.. only:: nrf91m1
 
-   #XMQTTMSG: <topic_length>,<message_length>
-   <topic_received>
-   <message>
+   ::
+
+      #XMQTTMSG: <topic_length>,<message_length>
+      <topic_received>
+      <message>
+
+.. only:: not nrf91m1
+
+   ::
+
+      #XMQTTMSG: <topic_length>,<message_length>[,<msg_expiry>]
+      <topic_received>
+      <message>
 
 The parameters and their defined values are the following:
 
@@ -368,6 +706,13 @@ The parameters and their defined values are the following:
    Integer.
    The length of the ``<message>`` field.
 
+.. only:: not nrf91m1
+
+   <msg_expiry>
+      Integer.
+      The remaining MQTT v5.0 Message Expiry Interval in seconds.
+      This field is present only when the received message contains the property.
+
 <topic_received>
    String.
    The topic that received the message.
@@ -377,6 +722,11 @@ The parameters and their defined values are the following:
    The message received from the topic, forwarded without conversion or escaping.
    Read exactly ``<message_length>`` bytes, as the payload can contain NUL bytes and line breaks.
 
+.. only:: not nrf91m1
+
+   With MQTT v5.0, ``#XMQTTMSGPROP`` notifications can precede ``#XMQTTMSG``.
+   See :ref:`SM_AT_MQTT_XMQTTMSGPROP`.
+
 .. _SM_AT_MQTT_XMQTTSUB:
 
 MQTT subscribe #XMQTTSUB
@@ -384,7 +734,11 @@ MQTT subscribe #XMQTTSUB
 
 The ``#XMQTTSUB`` command allows you to subscribe to an MQTT topic.
 
-On successful subscription, the |SM| sends ``#XMQTTEVT`` with ``<evt_type>`` ``7`` (SUBACK).
+When the broker acknowledges a subscribe request, the |SM| sends ``#XMQTTEVT`` with ``<evt_type>`` ``7`` (SUBACK).
+
+.. only:: not nrf91m1
+
+   With MQTT v5.0, check ``<reason_code>`` for the granted QoS or the reason for rejection.
 
 When a message is published on a subscribed topic, the |SM| sends ``#XMQTTMSG`` and ``#XMQTTEVT`` with ``<evt_type>`` ``2`` (PUBLISH).
 For incoming QoS 2 messages, the |SM| also sends ``#XMQTTEVT`` with ``<evt_type>`` ``5`` (PUBREL).
@@ -470,14 +824,24 @@ The read command is not supported.
 Test command
 ------------
 
-The test command is not supported.
+The test command requires an active MQTT connection.
+
+::
+
+   AT#XMQTTSUB=?
+   #XMQTTSUB: <topic>,(0,1,2)
+   OK
 
 MQTT unsubscribe #XMQTTUNSUB
 ============================
 
 The ``#XMQTTUNSUB`` command allows you to unsubscribe from an MQTT topic.
 
-On successful unsubscription, the |SM| sends ``#XMQTTEVT`` with ``<evt_type>`` ``8`` (UNSUBACK).
+When the broker acknowledges an unsubscribe request, the |SM| sends ``#XMQTTEVT`` with ``<evt_type>`` ``8`` (UNSUBACK).
+
+.. only:: not nrf91m1
+
+   With MQTT v5.0, check ``<reason_code>`` for the result.
 
 See :ref:`SM_AT_MQTT_XMQTTEVT` for the notification syntax and parameter descriptions.
 
@@ -517,7 +881,15 @@ The read command is not supported.
 Test command
 ------------
 
-The test command is not supported.
+The test command requires an active MQTT connection.
+
+::
+
+   AT#XMQTTUNSUB=?
+   #XMQTTUNSUB: <topic>
+   OK
+
+.. _SM_AT_MQTT_XMQTTPUB:
 
 MQTT publish #XMQTTPUB
 ======================
@@ -526,8 +898,15 @@ The ``#XMQTTPUB`` command allows you to publish messages on MQTT topics.
 
 Depending on the QoS level, this command can send ``#XMQTTEVT`` with the following ``<evt_type>`` values:
 
-* ``3`` - QoS 1 (PUBACK).
-* ``4`` and ``6`` - QoS 2 (PUBREC, then PUBCOMP).
+.. only:: nrf91m1
+
+   * ``3`` - QoS 1 (PUBACK).
+   * ``4`` and ``6`` - QoS 2 (PUBREC, then PUBCOMP).
+
+.. only:: not nrf91m1
+
+   * ``3`` - QoS 1 (PUBACK).
+   * ``4`` and ``6`` - QoS 2 (PUBREC, then PUBCOMP unless PUBREC contains a failure reason code).
 
 QoS ``0`` does not produce an ``#XMQTTEVT`` notification.
 
@@ -541,21 +920,40 @@ The set command allows you to publish messages on MQTT topics.
 Syntax
 ~~~~~~
 
-::
+.. only:: nrf91m1
 
-   AT#XMQTTPUB=<topic>[,<msg>[,<qos>[,<retain>[,<data_len>]]]]
+   ::
 
+      AT#XMQTTPUB=<topic>[,<msg>[,<qos>[,<retain>[,<data_len>]]]]
+
+.. only:: not nrf91m1
+
+   ::
+
+      AT#XMQTTPUB=<topic>[,<msg>[,<qos>[,<retain>[,<data_len>[,<msg_expiry>]]]]]
 
 The parameters and their defined values are the following:
 
 <topic>
-   String.
-   The topic on which data is published.
+   .. only:: nrf91m1
+
+      String.
+      The topic on which data is published.
+
+   .. only:: not nrf91m1
+
+      Non-empty string.
+      The topic on which data is published.
+      It must not contain the wildcard characters ``+`` or ``#``.
 
 <msg>
    String.
    The payload on the topic being published.
    If the payload is empty (for example, ``""``), |SM| enters :ref:`sm_data_mode`.
+
+   .. only:: not nrf91m1
+
+      To publish a zero-length payload without entering data mode, use :ref:`SM_AT_MQTT_XMQTTPUBEMPTY`.
 
 <qos>
    * ``0`` - Lowest Quality of Service (default value).
@@ -575,6 +973,7 @@ The parameters and their defined values are the following:
    Optional, only used when ``<msg>`` is empty (data mode).
    Sets the number of bytes of payload to publish in data mode.
    When the required number of bytes are received, the payload is published and the data mode is exited.
+   With a non-empty ``<msg>``, set ``<data_len>`` to ``0``.
 
    .. only:: not nrf91m1
 
@@ -588,6 +987,23 @@ The parameters and their defined values are the following:
 
    The value ``0`` is equivalent to omitting the parameter.
    Specifying a non-zero ``<data_len>`` together with a non-empty ``<msg>`` results in an error.
+   If the host pauses for longer than the data mode time limit, the |SM| publishes the bytes received so far as a separate message.
+   See :ref:`sm_data_mode` for the time limit.
+
+   .. only:: not nrf91m1
+
+      With the value ``0``, data mode ends with the termination command.
+      If no payload precedes the termination command, nothing is published.
+      To publish a zero-length payload, use :ref:`SM_AT_MQTT_XMQTTPUBEMPTY`.
+
+.. only:: not nrf91m1
+
+   <msg_expiry>
+      Integer.
+      MQTT v5.0 Message Expiry Interval in seconds.
+      The default value ``0`` means that the message does not expire.
+
+   To send other MQTT v5.0 properties with the message, set them with :ref:`SM_AT_MQTT_XMQTTPUBPROP` before this command.
 
 Examples
 ~~~~~~~~
@@ -596,6 +1012,16 @@ Examples
 
    AT#XMQTTPUB="nrf91/sm/mqtt/topic0","Test message with QoS 0",0,0
    OK
+
+.. only:: not nrf91m1
+
+   Publish a message that expires after one hour, using MQTT v5.0:
+
+   ::
+
+      AT#XMQTTPUB="nrf91/sm/mqtt/topic0","Test message with expiry",1,0,0,3600
+      OK
+      #XMQTTEVT: 3,0,0
 
 ::
 
@@ -634,4 +1060,427 @@ The read command is not supported.
 Test command
 ------------
 
-The test command is not supported.
+The test command requires an active MQTT connection.
+
+.. only:: nrf91m1
+
+   ::
+
+      AT#XMQTTPUB=?
+      #XMQTTPUB: <topic>,<msg>,(0,1,2),(0,1)[,<data_len>]
+      OK
+
+.. only:: not nrf91m1
+
+   ::
+
+      AT#XMQTTPUB=?
+      #XMQTTPUB: <topic>,<msg>,(0,1,2),(0,1)[,<data_len>[,<msg_expiry>]]
+      OK
+
+.. Sections inside an only directive must stay at the end of the page. Sphinx moves them up
+   the document tree, so a label after the directive would no longer precede its section title.
+
+.. only:: not nrf91m1
+
+   .. _SM_AT_MQTT_XMQTTPUBEMPTY:
+
+   MQTT empty publish #XMQTTPUBEMPTY
+   =================================
+
+   .. note::
+
+      This AT command is `Experimental <Software maturity levels_>`_.
+
+   The ``#XMQTTPUBEMPTY`` command publishes a zero-length payload without entering data mode.
+   It supports MQTT v3.1.1 and MQTT v5.0 and requires an active MQTT connection.
+
+   Set command
+   -----------
+
+   ::
+
+      AT#XMQTTPUBEMPTY=<topic>[,<qos>[,<retain>[,<msg_expiry>]]]
+
+   <topic>
+      Non-empty string.
+      The topic on which the empty payload is published.
+      It must not contain the wildcard characters ``+`` or ``#``.
+
+   <qos>
+      Integer.
+      The Quality of Service level, ``0``, ``1``, or ``2``.
+      The default is ``0``.
+
+   <retain>
+      Integer.
+      Set to ``0`` (default) for a normal publication or ``1`` to delete the broker's retained message for this topic.
+      Connected subscribers can also receive the empty publication.
+
+   <msg_expiry>
+      Integer.
+      The MQTT v5.0 Message Expiry Interval in seconds, as described for :ref:`SM_AT_MQTT_XMQTTPUB`.
+      The default is ``0``, which sends no Message Expiry Interval.
+
+   The command applies the same broker capability and packet size checks as ``#XMQTTPUB`` and uses the properties set with :ref:`SM_AT_MQTT_XMQTTPUBPROP`.
+   The command returns ``OK`` when the MQTT library accepts the message for sending, or ``ERROR`` on failure.
+   A QoS 1 publication produces a PUBACK event.
+   A QoS 2 publication produces PUBREC and PUBCOMP events, unless PUBREC reports a failure.
+   For acknowledgment details, see :ref:`SM_AT_MQTT_XMQTTEVT`.
+   The command does not produce ``#XDATAMODE`` notifications.
+
+   Example
+   ~~~~~~~
+
+   Delete a retained message using QoS 1 with MQTT v5.0:
+
+   ::
+
+      AT#XMQTTPUBEMPTY="nrf91/sm/mqtt/topic1",1,1
+      OK
+      #XMQTTEVT: 3,0,0
+
+   Read command
+   ------------
+
+   The read command is not supported.
+
+   Test command
+   ------------
+
+   ::
+
+      AT#XMQTTPUBEMPTY=?
+      #XMQTTPUBEMPTY: <topic>,(0,1,2),(0,1)[,<msg_expiry>]
+      OK
+
+   .. _SM_AT_MQTT_XMQTTPUBPROP:
+
+   Outgoing message properties #XMQTTPUBPROP
+   =========================================
+
+   .. note::
+
+      This AT command is `Experimental <Software maturity levels_>`_.
+
+   The ``#XMQTTPUBPROP`` command sets MQTT v5.0 properties for the next ``#XMQTTPUB`` or ``#XMQTTPUBEMPTY`` command.
+   The properties apply only to that command.
+   The |SM| clears them when the command completes, whether it succeeds or fails.
+   When ``#XMQTTPUB`` enters data mode, they apply to every publication sent in data mode, and the |SM| clears them when data mode ends.
+   Disconnecting also clears them.
+   The command requires an active MQTT v5.0 connection and :ref:`CONFIG_SM_MQTTC_VERSION_5_0`.
+
+   Set command
+   -----------
+
+   Syntax
+   ~~~~~~
+
+   ::
+
+      AT#XMQTTPUBPROP=0
+      AT#XMQTTPUBPROP=1,<payload_format>
+      AT#XMQTTPUBPROP=<type>,<value>
+      AT#XMQTTPUBPROP=38,<name>,<value>
+
+   <type>
+      Integer.
+      The MQTT v5.0 property identifier, as in :ref:`SM_AT_MQTT_XMQTTMSGPROP`:
+
+      * ``0`` - Clear all properties set for the next publication.
+      * ``1`` - Payload Format Indicator.
+      * ``3`` - Content Type.
+      * ``8`` - Response Topic.
+      * ``9`` - Correlation Data.
+      * ``38`` - User Property. Each command adds one user property.
+
+   <payload_format>
+      * ``0`` - The payload is unspecified bytes (default).
+        The |SM| omits the property, which has the same meaning.
+      * ``1`` - The payload is UTF-8 encoded character data.
+        The |SM| does not check the payload.
+
+   <value>
+      String.
+      The property value.
+      A Response Topic must not contain the wildcard characters ``+`` or ``#``.
+      Specify Correlation Data as an even number of hexadecimal digits.
+      The |SM| sends Correlation Data as binary data.
+      Setting Content Type, Response Topic, or Correlation Data again replaces the earlier value.
+      An empty string removes the property.
+
+   <name>, <value>
+      Non-empty strings.
+      The name and value of a user property.
+      Several user properties can have the same name.
+
+   The ``CONFIG_MQTT_USER_PROPERTIES_MAX`` Kconfig option of the MQTT library limits the number of user properties.
+   The default is ``4``.
+   The values set for one publication, including replaced values, must fit in :ref:`CONFIG_SM_MQTTC_PUB_PROP_BUF_SIZE <CONFIG_SM_MQTTC_PUB_PROP_BUF_SIZE>` bytes.
+   The topic and the encoded properties must also fit in :ref:`CONFIG_SM_MQTTC_MESSAGE_BUFFER_LEN <CONFIG_SM_MQTTC_MESSAGE_BUFFER_LEN>` bytes.
+
+   The publish command includes the properties in the broker's Maximum Packet Size check.
+
+   Example
+   ~~~~~~~
+
+   Publish a JSON request with a Response Topic, Correlation Data, and a user property:
+
+   ::
+
+      AT#XMQTTPUBPROP=1,1
+      OK
+      AT#XMQTTPUBPROP=3,"application/json"
+      OK
+      AT#XMQTTPUBPROP=8,"nrf91/sm/rsp"
+      OK
+      AT#XMQTTPUBPROP=9,"0A1B2C3D"
+      OK
+      AT#XMQTTPUBPROP=38,"fw","2.0.0"
+      OK
+      AT#XMQTTPUB="nrf91/sm/req","",1
+      OK
+      {"get":"temp"}+++
+      #XDATAMODE: 0
+      #XMQTTEVT: 3,0,0
+
+   Read command
+   ------------
+
+   The read command is not supported.
+
+   Test command
+   ------------
+
+   ::
+
+      AT#XMQTTPUBPROP=?
+      #XMQTTPUBPROP: (0,1,3,8,9,38)
+      OK
+
+   .. _SM_AT_MQTT_XMQTTMSGPROP:
+
+   Incoming message properties #XMQTTMSGPROP
+   =========================================
+
+   .. note::
+
+      This AT command is `Experimental <Software maturity levels_>`_.
+
+   The ``#XMQTTMSGPROP`` command enables reporting of MQTT v5.0 properties of incoming messages.
+   When reporting is enabled, the |SM| sends one ``#XMQTTMSGPROP`` notification for each reported property of an incoming message, before its ``#XMQTTMSG`` notification.
+   Reporting is disabled by default, and the setting applies to all later connections.
+   MQTT v3.1.1 messages have no properties.
+   The command requires :ref:`CONFIG_SM_MQTTC_VERSION_5_0`.
+
+   Set command
+   -----------
+
+   Syntax
+   ~~~~~~
+
+   ::
+
+      AT#XMQTTMSGPROP=<mode>
+
+   <mode>
+      * ``0`` - Do not report properties (default).
+      * ``1`` - Report properties.
+
+   Read command
+   ------------
+
+   ::
+
+      AT#XMQTTMSGPROP?
+      #XMQTTMSGPROP: <mode>
+      OK
+
+   Test command
+   ------------
+
+   ::
+
+      AT#XMQTTMSGPROP=?
+      #XMQTTMSGPROP: (0,1)
+      OK
+
+   Unsolicited notification
+   ------------------------
+
+   The notification syntax depends on the property type:
+
+   ::
+
+      #XMQTTMSGPROP: 1,<payload_format>
+      #XMQTTMSGPROP: <type>,<length>
+      <value>
+      #XMQTTMSGPROP: 38,<name_length>,<value_length>
+      <name><value>
+
+   <type>
+      Integer.
+      The MQTT v5.0 property identifier.
+      The properties are reported in the following order:
+
+      * ``1`` - Payload Format Indicator.
+      * ``3`` - Content Type.
+      * ``8`` - Response Topic.
+      * ``9`` - Correlation Data.
+      * ``38`` - User Property. One notification for each user property.
+
+   <payload_format>
+      * ``0`` - The payload is unspecified bytes.
+      * ``1`` - The payload is UTF-8 encoded character data.
+
+   <length>, <value_length>
+      Integer.
+      The length of the value in bytes.
+
+   <name_length>
+      Integer.
+      The length of the user property name in bytes.
+
+   <value>, <name><value>
+      Raw bytes.
+      The property value, or the user property name immediately followed by its value, forwarded without conversion or escaping.
+      Read exactly the given number of bytes, as Correlation Data can contain NUL bytes and line breaks.
+
+   The ``CONFIG_MQTT_USER_PROPERTIES_MAX`` Kconfig option of the MQTT library limits the number of reported user properties.
+   The default is ``4``.
+   Further user properties are not reported.
+
+   Example
+   ~~~~~~~
+
+   A message with a JSON payload, Content Type ``application/json``, and Payload Format Indicator ``1``:
+
+   ::
+
+      AT#XMQTTMSGPROP=1
+      OK
+      #XMQTTMSGPROP: 1,1
+      #XMQTTMSGPROP: 3,16
+      application/json
+      #XMQTTMSG: 13,9
+      nrf91/sm/cmd1
+      {"led":1}
+      #XMQTTEVT: 2,0
+
+   .. _SM_AT_MQTT_XMQTTWILL:
+
+   MQTT Will #XMQTTWILL
+   ====================
+
+   .. note::
+
+      This AT command is `Experimental <Software maturity levels_>`_.
+
+   The ``#XMQTTWILL`` command sets the Will message of the MQTT client.
+   The client sends the Will message to the broker in the connect request of ``#XMQTTCON``.
+   The broker publishes the Will message if the connection ends without a disconnect request from the client, for example after a network failure or a missed keep-alive.
+   It does not publish the Will message after ``AT#XMQTTCON=0``, unless ``AT#XMQTTCON=0,1`` requests it with MQTT v5.0.
+
+   The Will message applies to all later connections until the command changes or clears it.
+   If you change the Will message while connected, the change applies at the next connection.
+   The command supports MQTT v3.1.1 and MQTT v5.0.
+
+   Set command
+   -----------
+
+   Syntax
+   ~~~~~~
+
+   ::
+
+      AT#XMQTTWILL=<topic>[,<msg>[,<qos>[,<retain>[,<will_delay>[,<msg_expiry>]]]]]
+
+   <topic>
+      String.
+      The topic on which the broker publishes the Will message, up to 128 bytes.
+      It must not contain the wildcard characters ``+`` or ``#``.
+      An empty string clears the Will message, and the command then takes no other parameters.
+
+   <msg>
+      String.
+      The Will message, up to 128 bytes.
+      The default is an empty message.
+
+   <qos>
+      Integer.
+      The Quality of Service level of the Will message, ``0``, ``1``, or ``2``.
+      The default is ``0``.
+
+   <retain>
+      Integer.
+      Set to ``1`` to have the broker retain the Will message.
+      The default is ``0``.
+
+   <will_delay>
+      Integer.
+      The MQTT v5.0 Will Delay Interval in seconds.
+      The broker publishes the Will message when the interval ends or when the session ends, whichever comes first.
+      If the client reconnects before that, the broker does not publish it.
+      The default is ``0``, which publishes the Will message without delay.
+
+   <msg_expiry>
+      Integer.
+      The MQTT v5.0 Message Expiry Interval of the Will message in seconds.
+      The default is ``0``, which means that the Will message does not expire.
+
+   Nonzero values of ``<will_delay>`` and ``<msg_expiry>`` require MQTT v5.0, which you select with the ``<version>`` parameter of ``#XMQTTCFG``.
+   The broker can refuse the connection if it does not support the QoS level or the retain flag of the Will message.
+
+   Example
+   ~~~~~~~
+
+   ::
+
+      AT#XMQTTWILL="nrf91/sm/status","offline",1,1
+      OK
+      AT#XMQTTCON=1,"","","mqtt.server.com",1883
+      OK
+      #XMQTTEVT: 0,0
+
+   Clear the Will:
+
+   ::
+
+      AT#XMQTTWILL=""
+      OK
+
+   Read command
+   ------------
+
+   The read command shows the Will.
+
+   ::
+
+      AT#XMQTTWILL?
+      #XMQTTWILL: <topic>,<msg_length>,<qos>,<retain>,<will_delay>,<msg_expiry>
+      OK
+
+   Without a Will, the response is ``#XMQTTWILL: ""``.
+
+   <msg_length>
+      Integer.
+      The length of the Will message in bytes.
+      The response does not include the message.
+
+   Example
+   ~~~~~~~
+
+   ::
+
+      AT#XMQTTWILL?
+      #XMQTTWILL: "nrf91/sm/status",7,1,1,0,0
+      OK
+
+   Test command
+   ------------
+
+   ::
+
+      AT#XMQTTWILL=?
+      #XMQTTWILL: <topic>,<msg>,(0,1,2),(0,1)[,<will_delay>[,<msg_expiry>]]
+      OK
