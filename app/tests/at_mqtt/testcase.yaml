@@ -5,3 +5,11 @@ tests:
       - native_sim
     integration_platforms:
       - native_sim
+  serial_modem.unit_test.at_mqtt.mqtt_3_1_1_only:
+    sysbuild: true
+    extra_configs:
+      - CONFIG_SM_TEST_MQTT_VERSION_5_0=n
+    platform_allow:
+      - native_sim
+    integration_platforms:
+      - native_sim
