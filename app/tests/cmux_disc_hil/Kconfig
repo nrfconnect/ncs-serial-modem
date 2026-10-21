@@ -1,0 +1,53 @@
+#
+# Copyright (c) 2026 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+menu "CMUX close down latency HIL test"
+
+config TEST_CMUX_AT_DLCI
+	int "DLCI used for AT commands"
+	range 1 2
+	default 1
+	help
+	  Serial Modem accepts DLCI 1, or DLCI 2 when PPP is enabled.
+
+config TEST_CMUX_NETWORK_WAIT_S
+	int "Maximum time to wait for network registration after AT+CFUN=1"
+	default 30
+	help
+	  A registered modem takes several seconds to process AT+CFUN=0, which keeps the
+	  retried AT+CFUN=0 queued behind it. The test continues without registration
+	  when this time elapses.
+
+config TEST_CMUX_CFUN_RETRY_DELAY_MS
+	int "Delay before re-sending AT+CFUN=0 without waiting for the response"
+	default 100
+	help
+	  Emulates a host that times out and retries AT+CFUN=0. The retry must be sent
+	  before the first AT+CFUN=0 completes, otherwise the iteration does not
+	  exercise the scenario and is not counted.
+
+config TEST_CMUX_ITERATIONS
+	int "Number of retried AT+CFUN=0 cycles"
+	range 1 100
+	default 3
+
+config TEST_CMUX_CLD_MAX_LATENCY_MS
+	int "Maximum accepted time from CLD to the CLD response"
+	default 100
+	help
+	  The default equals the 100 ms T1 timer of the host in EXTG-287, after which
+	  that host re-transmits the command.
+
+config TEST_CMUX_PIPELINE_ITERATIONS
+	int "Number of AT#XCMUX cycles with a pipelined CMUX frame"
+	range 1 100
+	default 10
+	help
+	  The receive handoff race is narrow, so the pipelined start is repeated.
+
+endmenu
+
+source "Kconfig.zephyr"

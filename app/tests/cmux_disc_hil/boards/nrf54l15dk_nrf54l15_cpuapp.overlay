@@ -1,0 +1,40 @@
+/*
+ * Copyright (c) 2026 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+ */
+
+/*
+ * Same wiring as the sm_ppp_shell sample: UART0 on the P0 connector ("uart30") is connected
+ * to the nRF91 Serial Modem and the console is on VCOM1 ("uart20").
+ *
+ * Note: Disable VCOM0 from Board Configurator to release UART0 for Serial Modem.
+ *
+ * DTR is on the P1 connector. The test does not control it, so it is kept asserted to keep
+ * the Serial Modem UART enabled.
+ */
+/ {
+	chosen {
+		zephyr,console = &uart20;
+	};
+
+	aliases {
+		sm-uart = &uart30;
+	};
+};
+
+&uart30 {
+	status = "okay";
+	current-speed = <115200>;
+	hw-flow-control;
+};
+
+&gpio1 {
+	status = "okay";
+
+	mdm_dtr_hog: mdm-dtr-hog {
+		gpio-hog;
+		gpios = <11 GPIO_ACTIVE_LOW>;
+		output-high;
+	};
+};
