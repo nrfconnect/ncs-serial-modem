@@ -43,6 +43,7 @@
 /* Response capture helpers (stubs/sm_at_host_stubs.c) */
 extern const char *get_captured_response(void);
 extern void clear_captured_response(void);
+extern void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt);
 
 /* Poll callback registered by sm_at_mqtt.c via SO_POLLCB. */
 static socket_ncs_pollcb_t mqtt_pollcb;
@@ -256,8 +257,8 @@ static int mqtt_connect_version_stub(struct mqtt_client *client, int num_calls)
 	return 0;
 }
 
-/* Configure with cfg_cmd, connect, check the CONNECT protocol version, disconnect. */
-static void mqtt_connect_with_version(const char *cfg_cmd, uint8_t expected_version)
+/* Configure with cfg_cmd, connect, and check the CONNECT protocol version. */
+static void mqtt_connect_version(const char *cfg_cmd, uint8_t expected_version)
 {
 	const char *resp;
 
@@ -276,6 +277,12 @@ static void mqtt_connect_with_version(const char *cfg_cmd, uint8_t expected_vers
 	TEST_ASSERT_NOT_NULL(strstr(resp, "OK"));
 	TEST_ASSERT_EQUAL_UINT8(expected_version, connect_protocol_version);
 	__cmock_mqtt_connect_Stub(NULL);
+	clear_captured_response();
+}
+
+static void mqtt_disconnect_ok(void)
+{
+	const char *resp;
 
 	clear_captured_response();
 	__cmock_mqtt_disconnect_ExpectAnyArgsAndReturn(0);
@@ -283,6 +290,25 @@ static void mqtt_connect_with_version(const char *cfg_cmd, uint8_t expected_vers
 	resp = get_captured_response();
 	TEST_ASSERT_NOT_NULL(strstr(resp, "OK"));
 	clear_captured_response();
+}
+
+/* Configure with cfg_cmd, connect, check the CONNECT protocol version, disconnect. */
+static void mqtt_connect_with_version(const char *cfg_cmd, uint8_t expected_version)
+{
+	mqtt_connect_version(cfg_cmd, expected_version);
+	mqtt_disconnect_ok();
+}
+
+/* Pass evt to the MQTT event handler and return the URC output. */
+static const char *inject_mqtt_evt(const struct mqtt_evt *evt)
+{
+	clear_captured_response();
+	mqtt_evt_handler(NULL, evt);
+	k_sleep(K_MSEC(50));
+	/* The URC was sent from the work queue without a waiter for its tx_done credit. */
+	uart_stub_tx_done_reset();
+
+	return get_captured_response();
 }
 
 /*
@@ -348,13 +374,213 @@ void test_mqtt_config_version(void)
 	clear_captured_response();
 	send_at_command("AT#XMQTTCFG?\r\n");
 	resp = get_captured_response();
-	TEST_ASSERT_NOT_NULL(strstr(resp, "#XMQTTCFG: \"test_client\",30,0,4"));
+	TEST_ASSERT_NOT_NULL(strstr(resp, "#XMQTTCFG: \"test_client\",30,0,4,0\r\n"));
 
 	clear_captured_response();
 	send_at_command("AT#XMQTTCFG=?\r\n");
 	resp = get_captured_response();
-	TEST_ASSERT_NOT_NULL(
-		strstr(resp, "#XMQTTCFG: <client_id>,<keep_alive>,<clean_session>,<version>"));
+	TEST_ASSERT_NOT_NULL(strstr(resp, "#XMQTTCFG: <client_id>,<keep_alive>,<clean_session>,"
+					  "<version>,<session_expiry>"));
+}
+
+/*
+ * Test: A session expiry interval is accepted only with MQTT 5.0.
+ */
+void test_mqtt_config_session_expiry(void)
+{
+	const char *resp;
+
+	send_at_command("AT#XMQTTCFG=\"test_client\",60,0,4,300\r\n");
+	resp = get_captured_response();
+	TEST_ASSERT_NOT_NULL(strstr(resp, "ERROR"));
+
+	clear_captured_response();
+	send_at_command("AT#XMQTTCFG=\"test_client\",60,0,4,0\r\n");
+	resp = get_captured_response();
+	TEST_ASSERT_NOT_NULL(strstr(resp, "OK"));
+
+	clear_captured_response();
+	send_at_command("AT#XMQTTCFG=\"test_client\",60,0,5,300\r\n");
+	resp = get_captured_response();
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	TEST_ASSERT_NOT_NULL(strstr(resp, "OK"));
+
+	clear_captured_response();
+	send_at_command("AT#XMQTTCFG?\r\n");
+	resp = get_captured_response();
+	TEST_ASSERT_NOT_NULL(strstr(resp, "#XMQTTCFG: \"test_client\",60,0,5,300\r\n"));
+
+	/* Reconfiguring without the parameter resets the interval. */
+	clear_captured_response();
+	send_at_command("AT#XMQTTCFG=\"test_client\",60,0,5\r\n");
+	resp = get_captured_response();
+	TEST_ASSERT_NOT_NULL(strstr(resp, "OK"));
+
+	clear_captured_response();
+	send_at_command("AT#XMQTTCFG?\r\n");
+	resp = get_captured_response();
+	TEST_ASSERT_NOT_NULL(strstr(resp, "#XMQTTCFG: \"test_client\",60,0,5,0\r\n"));
+#else
+	TEST_ASSERT_NOT_NULL(strstr(resp, "ERROR"));
+#endif
+}
+
+/*
+ * Test: MQTT 3.1.1 events keep the two-field #XMQTTEVT format.
+ */
+void test_mqtt_evt_no_reason_code_3_1_1(void)
+{
+	const char *resp;
+	struct mqtt_evt evt = {
+		.type = MQTT_EVT_PUBACK,
+		.result = 0,
+		.param.puback.message_id = 1,
+	};
+	char expected[32];
+
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,4\r\n", MQTT_VERSION_3_1_1);
+
+	resp = inject_mqtt_evt(&evt);
+	snprintf(expected, sizeof(expected), "#XMQTTEVT: %d,0\r\n", MQTT_EVT_PUBACK);
+	TEST_ASSERT_NOT_NULL(strstr(resp, expected));
+
+	mqtt_disconnect_ok();
+}
+
+/*
+ * Test: MQTT 5.0 acknowledgment reason codes are reported in #XMQTTEVT.
+ */
+void test_mqtt_evt_reason_codes_5_0(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	const char *resp;
+	uint8_t suback_rc = 0x87;
+	uint8_t unsuback_rc = 0x11;
+	struct mqtt_evt evt;
+	char expected[32];
+
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,5\r\n", MQTT_VERSION_5_0);
+
+	/* PUBACK: No matching subscribers. */
+	evt = (struct mqtt_evt){
+		.type = MQTT_EVT_PUBACK,
+		.param.puback = {.message_id = 1, .reason_code = 0x10},
+	};
+	resp = inject_mqtt_evt(&evt);
+	snprintf(expected, sizeof(expected), "#XMQTTEVT: %d,0,16\r\n", MQTT_EVT_PUBACK);
+	TEST_ASSERT_NOT_NULL(strstr(resp, expected));
+
+	/* SUBACK: Not authorized. */
+	evt = (struct mqtt_evt){
+		.type = MQTT_EVT_SUBACK,
+		.param.suback = {.message_id = 2, .return_codes = {.data = &suback_rc, .len = 1}},
+	};
+	resp = inject_mqtt_evt(&evt);
+	snprintf(expected, sizeof(expected), "#XMQTTEVT: %d,0,135\r\n", MQTT_EVT_SUBACK);
+	TEST_ASSERT_NOT_NULL(strstr(resp, expected));
+
+	/* UNSUBACK: No subscription existed. */
+	evt = (struct mqtt_evt){
+		.type = MQTT_EVT_UNSUBACK,
+		.param.unsuback = {.message_id = 3,
+				   .reason_codes = {.data = &unsuback_rc, .len = 1}},
+	};
+	resp = inject_mqtt_evt(&evt);
+	snprintf(expected, sizeof(expected), "#XMQTTEVT: %d,0,17\r\n", MQTT_EVT_UNSUBACK);
+	TEST_ASSERT_NOT_NULL(strstr(resp, expected));
+
+	/* A failed decode reports the error without a reason code. */
+	evt = (struct mqtt_evt){
+		.type = MQTT_EVT_PUBACK,
+		.result = -EINVAL,
+	};
+	resp = inject_mqtt_evt(&evt);
+	snprintf(expected, sizeof(expected), "#XMQTTEVT: %d,%d\r\n", MQTT_EVT_PUBACK, -EINVAL);
+	TEST_ASSERT_NOT_NULL(strstr(resp, expected));
+
+	mqtt_disconnect_ok();
+#else
+	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
+#endif
+}
+
+/*
+ * Test: A PUBREC with a failure reason code is not followed by PUBREL.
+ */
+void test_mqtt_pubrec_failure_5_0(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	const char *resp;
+	struct mqtt_evt evt;
+	char expected[32];
+
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,5\r\n", MQTT_VERSION_5_0);
+
+	/* Success: PUBREL is sent. */
+	__cmock_mqtt_publish_qos2_release_ExpectAnyArgsAndReturn(0);
+	evt = (struct mqtt_evt){
+		.type = MQTT_EVT_PUBREC,
+		.param.pubrec = {.message_id = 5, .reason_code = 0},
+	};
+	resp = inject_mqtt_evt(&evt);
+	snprintf(expected, sizeof(expected), "#XMQTTEVT: %d,0,0\r\n", MQTT_EVT_PUBREC);
+	TEST_ASSERT_NOT_NULL(strstr(resp, expected));
+
+	/* Quota exceeded: no PUBREL. CMock fails the test on an unexpected call. */
+	evt = (struct mqtt_evt){
+		.type = MQTT_EVT_PUBREC,
+		.param.pubrec = {.message_id = 6, .reason_code = 0x97},
+	};
+	resp = inject_mqtt_evt(&evt);
+	snprintf(expected, sizeof(expected), "#XMQTTEVT: %d,0,151\r\n", MQTT_EVT_PUBREC);
+	TEST_ASSERT_NOT_NULL(strstr(resp, expected));
+
+	mqtt_disconnect_ok();
+#else
+	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
+#endif
+}
+
+#if defined(CONFIG_MQTT_VERSION_5_0)
+static uint32_t connect_session_expiry;
+
+static int mqtt_connect_session_stub(struct mqtt_client *client, int num_calls)
+{
+	ARG_UNUSED(num_calls);
+
+	connect_session_expiry = client->prop.session_expiry_interval;
+	return 0;
+}
+#endif
+
+/*
+ * Test: The session expiry interval is passed to the MQTT library.
+ */
+void test_mqtt_connect_session_expiry_5_0(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	const char *resp;
+
+	connect_session_expiry = 0;
+
+	send_at_command("AT#XMQTTCFG=\"test_client\",60,0,5,3600\r\n");
+	resp = get_captured_response();
+	TEST_ASSERT_NOT_NULL(strstr(resp, "OK"));
+
+	clear_captured_response();
+	__cmock_zsock_getaddrinfo_Stub(getaddrinfo_stub);
+	__cmock_zsock_freeaddrinfo_Ignore();
+	__cmock_mqtt_connect_Stub(mqtt_connect_session_stub);
+	send_at_command("AT#XMQTTCON=1,\"user\",\"pass\",\"broker.example.com\",1883\r\n");
+	resp = get_captured_response();
+	TEST_ASSERT_NOT_NULL(strstr(resp, "OK"));
+	TEST_ASSERT_EQUAL_UINT32(3600, connect_session_expiry);
+	__cmock_mqtt_connect_Stub(NULL);
+
+	mqtt_disconnect_ok();
+#else
+	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
+#endif
 }
 
 /*

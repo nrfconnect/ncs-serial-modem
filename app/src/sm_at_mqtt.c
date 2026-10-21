@@ -28,6 +28,9 @@ LOG_MODULE_REGISTER(sm_mqtt, CONFIG_SM_LOG_LEVEL);
 
 #define SM_MQTT_VERSION_DEFAULT MQTT_VERSION_3_1_1
 
+/* MQTT 5.0 section 2.4: reason codes from 0x80 indicate failure. */
+#define SM_MQTT_REASON_CODE_FAILURE 0x80
+
 /**@brief MQTT client operations. */
 enum sm_mqttcon_operation {
 	MQTTC_DISCONNECT,
@@ -135,11 +138,49 @@ static int drain_publish_payload(struct mqtt_client *const c)
 	return 0;
 }
 
+/* Reason code of an MQTT 5.0 acknowledgment, or -1 when there is none to report. */
+static int mqtt_evt_reason_code(const struct mqtt_evt *evt)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	if (client.protocol_version != MQTT_VERSION_5_0 || evt->result != 0) {
+		return -1;
+	}
+
+	switch (evt->type) {
+	case MQTT_EVT_PUBACK:
+		return evt->param.puback.reason_code;
+	case MQTT_EVT_PUBREC:
+		return evt->param.pubrec.reason_code;
+	case MQTT_EVT_PUBREL:
+		return evt->param.pubrel.reason_code;
+	case MQTT_EVT_PUBCOMP:
+		return evt->param.pubcomp.reason_code;
+	case MQTT_EVT_SUBACK:
+		/* AT#XMQTTSUB subscribes to one topic, so there is one reason code. */
+		if (evt->param.suback.return_codes.len == 0) {
+			return -1;
+		}
+		return evt->param.suback.return_codes.data[0];
+	case MQTT_EVT_UNSUBACK:
+		if (evt->param.unsuback.reason_codes.len == 0) {
+			return -1;
+		}
+		return evt->param.unsuback.reason_codes.data[0];
+	default:
+		return -1;
+	}
+#else
+	ARG_UNUSED(evt);
+	return -1;
+#endif
+}
+
 /**@brief MQTT client event handler
  */
 void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 {
 	int ret;
+	int reason;
 
 	ret = evt->result;
 	switch (evt->type) {
@@ -168,10 +209,17 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 			break;
 		}
 		LOG_DBG("PUBREC id=%u", evt->param.pubrec.message_id);
+#if defined(CONFIG_MQTT_VERSION_5_0)
+		/* MQTT 5.0 section 4.3.3: no PUBREL after a PUBREC failure reason code. */
+		if (evt->param.pubrec.reason_code >= SM_MQTT_REASON_CODE_FAILURE) {
+			LOG_WRN("PUBREC id=%u failed: 0x%02x", evt->param.pubrec.message_id,
+				evt->param.pubrec.reason_code);
+			break;
+		}
+#endif
 		{
-			struct mqtt_pubrel_param param = {
-				.message_id = evt->param.pubrel.message_id
-			};
+			struct mqtt_pubrel_param param = {.message_id =
+								  evt->param.pubrec.message_id};
 			ret = mqtt_publish_qos2_release(&client, &param);
 			if (ret) {
 				LOG_ERR("QoS2 release failed: %d", ret);
@@ -222,7 +270,13 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 	 * which would place it ahead of the #XMQTTMSG header and payload.
 	 */
 	if (evt->type != MQTT_EVT_PUBLISH) {
-		urc_send_to(ctx.pipe, "\r\n#XMQTTEVT: %d,%d\r\n", evt->type, ret);
+		reason = mqtt_evt_reason_code(evt);
+		if (reason >= 0) {
+			urc_send_to(ctx.pipe, "\r\n#XMQTTEVT: %d,%d,%d\r\n", evt->type, ret,
+				    reason);
+		} else {
+			urc_send_to(ctx.pipe, "\r\n#XMQTTEVT: %d,%d\r\n", evt->type, ret);
+		}
 	}
 }
 
@@ -442,7 +496,8 @@ static bool mqtt_version_supported(uint16_t version)
 
 /**@brief Configure the MQTT client structure
  */
-static int do_mqtt_config(uint16_t keep_alive, uint8_t clean_session, uint16_t version)
+static int do_mqtt_config(uint16_t keep_alive, uint8_t clean_session, uint16_t version,
+			  uint32_t session_expiry)
 {
 	if (ctx.connected) {
 		return -EINVAL;
@@ -452,6 +507,10 @@ static int do_mqtt_config(uint16_t keep_alive, uint8_t clean_session, uint16_t v
 	}
 	if (!mqtt_version_supported(version)) {
 		LOG_ERR("Unsupported MQTT version: %u", version);
+		return -EINVAL;
+	}
+	if (session_expiry != 0 && version != MQTT_VERSION_5_0) {
+		LOG_ERR("Session expiry interval requires MQTT 5.0");
 		return -EINVAL;
 	}
 
@@ -472,6 +531,9 @@ static int do_mqtt_config(uint16_t keep_alive, uint8_t clean_session, uint16_t v
 	client.keepalive = keep_alive;
 	/* MQTT Clean Session configuration */
 	client.clean_session = clean_session;
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	client.prop.session_expiry_interval = session_expiry;
+#endif
 
 	return 0;
 }
@@ -645,6 +707,7 @@ STATIC int handle_at_mqtt_config(enum at_parser_cmd_type cmd_type, struct at_par
 	uint16_t keep_alive = CONFIG_MQTT_KEEPALIVE;
 	uint16_t clean_session = MQTT_CLEAN_SESSION_INIT;
 	uint16_t version = SM_MQTT_VERSION_DEFAULT;
+	uint32_t session_expiry = 0;
 
 	switch (cmd_type) {
 	case AT_PARSER_CMD_TYPE_SET:
@@ -672,17 +735,27 @@ STATIC int handle_at_mqtt_config(enum at_parser_cmd_type cmd_type, struct at_par
 				return err;
 			}
 		}
-		err = do_mqtt_config(keep_alive, (uint8_t)clean_session, version);
+		if (param_count > 5) {
+			err = at_parser_num_get(parser, 5, &session_expiry);
+			if (err) {
+				return err;
+			}
+		}
+		err = do_mqtt_config(keep_alive, (uint8_t)clean_session, version, session_expiry);
 		break;
 
 	case AT_PARSER_CMD_TYPE_READ:
-		rsp_send("\r\n#XMQTTCFG: \"%s\",%d,%d,%d\r\n", mqtt_clientid, client.keepalive,
-			 client.clean_session, client.protocol_version);
+#if defined(CONFIG_MQTT_VERSION_5_0)
+		session_expiry = client.prop.session_expiry_interval;
+#endif
+		rsp_send("\r\n#XMQTTCFG: \"%s\",%d,%d,%d,%u\r\n", mqtt_clientid, client.keepalive,
+			 client.clean_session, client.protocol_version, session_expiry);
 		err = 0;
 		break;
 
 	case AT_PARSER_CMD_TYPE_TEST:
-		rsp_send("\r\n#XMQTTCFG: <client_id>,<keep_alive>,<clean_session>,<version>\r\n");
+		rsp_send("\r\n#XMQTTCFG: <client_id>,<keep_alive>,<clean_session>,<version>,"
+			 "<session_expiry>\r\n");
 		err = 0;
 		break;
 
@@ -1006,7 +1079,7 @@ static int sm_at_mqtt_init(void)
 	ctx.sec_tag = SEC_TAG_TLS_INVALID;
 
 	strcpy(mqtt_clientid, SM_DEFAULT_CID);
-	do_mqtt_config(CONFIG_MQTT_KEEPALIVE, MQTT_CLEAN_SESSION_INIT, SM_MQTT_VERSION_DEFAULT);
+	do_mqtt_config(CONFIG_MQTT_KEEPALIVE, MQTT_CLEAN_SESSION_INIT, SM_MQTT_VERSION_DEFAULT, 0);
 
 	return 0;
 }
