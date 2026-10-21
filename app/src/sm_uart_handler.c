@@ -56,7 +56,8 @@ enum sm_uart_state {
 	SM_UART_STATE_TX_ENABLED_BIT,
 	SM_UART_STATE_RX_ENABLED_BIT,
 	SM_UART_STATE_RX_RECOVERY_BIT,
-	SM_UART_STATE_RX_RECOVERY_DISABLED_BIT
+	SM_UART_STATE_RX_RECOVERY_DISABLED_BIT,
+	SM_UART_STATE_RX_BUF_PENDING_BIT
 };
 static atomic_t uart_state;
 
@@ -125,6 +126,43 @@ static void rx_buf_unref(void *buf)
 	}
 }
 
+static int rx_buf_supply(void)
+{
+	struct rx_buf_t *buf;
+	int err;
+
+	/* Claim the request first, so that a new request raised meanwhile is not cleared. */
+	if (!atomic_test_and_clear_bit(&uart_state, SM_UART_STATE_RX_BUF_PENDING_BIT)) {
+		return 0;
+	}
+
+	if (k_msgq_num_free_get(&rx_event_queue) < UART_RX_EVENT_COUNT_FOR_BUF) {
+		err = -ENOSPC;
+		goto pending;
+	}
+
+	buf = rx_buf_alloc();
+	if (!buf) {
+		err = -ENOMEM;
+		goto pending;
+	}
+
+	err = uart_rx_buf_rsp(sm_uart_dev, buf->buf, sizeof(buf->buf));
+	if (err) {
+		rx_buf_unref(buf);
+		/* RX is off (recovery starts with a new buffer) or a next buffer is already set. */
+		if (err != -EACCES && err != -EBUSY) {
+			goto pending;
+		}
+	}
+
+	return 0;
+
+pending:
+	atomic_set_bit(&uart_state, SM_UART_STATE_RX_BUF_PENDING_BIT);
+	return err;
+}
+
 static int rx_enable(void)
 {
 	struct rx_buf_t *buf;
@@ -141,6 +179,7 @@ static int rx_enable(void)
 		return -ENOMEM;
 	}
 
+	atomic_clear_bit(&uart_state, SM_UART_STATE_RX_BUF_PENDING_BIT);
 	ret = uart_rx_enable(sm_uart_dev, buf->buf, sizeof(buf->buf), UART_RX_TIMEOUT_US);
 	if (ret) {
 		LOG_ERR("UART RX enable failed: %d", ret);
@@ -272,7 +311,6 @@ static inline void uart_callback_notify_pipe_closure(void)
 
 static void uart_callback(const struct device *dev, struct uart_event *evt, void *user_data)
 {
-	struct rx_buf_t *buf;
 	struct rx_event_t rx_event;
 	int err;
 
@@ -316,19 +354,11 @@ static void uart_callback(const struct device *dev, struct uart_event *evt, void
 		modem_pipe_notify_receive_ready(&sm_pipe.pipe);
 		break;
 	case UART_RX_BUF_REQUEST:
-		if (k_msgq_num_free_get(&rx_event_queue) < UART_RX_EVENT_COUNT_FOR_BUF) {
-			LOG_WRN("Disabling UART RX: %s", "no event space");
-			break;
-		}
-		buf = rx_buf_alloc();
-		if (!buf) {
-			LOG_WRN("Disabling UART RX: %s", "no buffers");
-			break;
-		}
-		err = uart_rx_buf_rsp(sm_uart_dev, buf->buf, sizeof(buf->buf));
-		if (err) {
-			LOG_WRN("Disabling UART RX: %d", err);
-			rx_buf_unref(buf);
+		/* The next buffer is supplied from pipe_receive() if none is available now. */
+		atomic_set_bit(&uart_state, SM_UART_STATE_RX_BUF_PENDING_BIT);
+		err = rx_buf_supply();
+		if (err && err != -ENOSPC && err != -ENOMEM) {
+			LOG_WRN("UART RX buffer response failed: %d", err);
 		}
 		break;
 	case UART_RX_BUF_RELEASED:
@@ -555,6 +585,7 @@ static int pipe_receive(void *data, uint8_t *buf, size_t size)
 			}
 		}
 	}
+	rx_buf_supply();
 	if (k_msgq_num_used_get(&rx_event_queue) == 0) {
 		/* Try to recover RX, in case it was disabled. */
 		rx_recovery();
