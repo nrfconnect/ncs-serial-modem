@@ -246,6 +246,117 @@ void test_mqtt_basic(void)
 	TEST_ASSERT_NOT_NULL(strstr(resp, "OK"));
 }
 
+static uint8_t connect_protocol_version;
+
+static int mqtt_connect_version_stub(struct mqtt_client *client, int num_calls)
+{
+	ARG_UNUSED(num_calls);
+
+	connect_protocol_version = client->protocol_version;
+	return 0;
+}
+
+/* Configure with cfg_cmd, connect, check the CONNECT protocol version, disconnect. */
+static void mqtt_connect_with_version(const char *cfg_cmd, uint8_t expected_version)
+{
+	const char *resp;
+
+	connect_protocol_version = 0;
+
+	send_at_command(cfg_cmd);
+	resp = get_captured_response();
+	TEST_ASSERT_NOT_NULL(strstr(resp, "OK"));
+
+	clear_captured_response();
+	__cmock_zsock_getaddrinfo_Stub(getaddrinfo_stub);
+	__cmock_zsock_freeaddrinfo_Ignore();
+	__cmock_mqtt_connect_Stub(mqtt_connect_version_stub);
+	send_at_command("AT#XMQTTCON=1,\"user\",\"pass\",\"broker.example.com\",1883\r\n");
+	resp = get_captured_response();
+	TEST_ASSERT_NOT_NULL(strstr(resp, "OK"));
+	TEST_ASSERT_EQUAL_UINT8(expected_version, connect_protocol_version);
+	__cmock_mqtt_connect_Stub(NULL);
+
+	clear_captured_response();
+	__cmock_mqtt_disconnect_ExpectAnyArgsAndReturn(0);
+	send_at_command("AT#XMQTTCON=0\r\n");
+	resp = get_captured_response();
+	TEST_ASSERT_NOT_NULL(strstr(resp, "OK"));
+	clear_captured_response();
+}
+
+/*
+ * Test: The client connects using MQTT 3.1.1 when the version is omitted.
+ */
+void test_mqtt_connect_default_version(void)
+{
+	mqtt_connect_with_version("AT#XMQTTCFG=\"test_client\",60,1\r\n", MQTT_VERSION_3_1_1);
+}
+
+/*
+ * Test: The client connects using MQTT 3.1.1 when version 4 is given.
+ */
+void test_mqtt_connect_version_3_1_1(void)
+{
+	mqtt_connect_with_version("AT#XMQTTCFG=\"test_client\",60,1,4\r\n", MQTT_VERSION_3_1_1);
+}
+
+/*
+ * Test: Version 5 is accepted only when the library supports MQTT 5.0.
+ */
+void test_mqtt_connect_version_5_0(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	const char *resp;
+
+	mqtt_connect_with_version("AT#XMQTTCFG=\"test_client\",60,1,5\r\n", MQTT_VERSION_5_0);
+
+	send_at_command("AT#XMQTTCFG?\r\n");
+	resp = get_captured_response();
+	TEST_ASSERT_NOT_NULL(strstr(resp, "#XMQTTCFG: \"test_client\",60,1,5"));
+#else
+	const char *resp;
+
+	send_at_command("AT#XMQTTCFG=\"test_client\",60,1,5\r\n");
+	resp = get_captured_response();
+	TEST_ASSERT_NOT_NULL(strstr(resp, "ERROR"));
+#endif
+}
+
+/*
+ * Test: Unsupported version values are rejected and the read command
+ * reports the version.
+ */
+void test_mqtt_config_version(void)
+{
+	const char *resp;
+
+	send_at_command("AT#XMQTTCFG=\"test_client\",60,1,3\r\n");
+	resp = get_captured_response();
+	TEST_ASSERT_NOT_NULL(strstr(resp, "ERROR"));
+
+	clear_captured_response();
+	send_at_command("AT#XMQTTCFG=\"test_client\",60,1,6\r\n");
+	resp = get_captured_response();
+	TEST_ASSERT_NOT_NULL(strstr(resp, "ERROR"));
+
+	clear_captured_response();
+	send_at_command("AT#XMQTTCFG=\"test_client\",30,0\r\n");
+	resp = get_captured_response();
+	TEST_ASSERT_NOT_NULL(strstr(resp, "OK"));
+
+	clear_captured_response();
+	send_at_command("AT#XMQTTCFG?\r\n");
+	resp = get_captured_response();
+	TEST_ASSERT_NOT_NULL(strstr(resp, "#XMQTTCFG: \"test_client\",30,0,4"));
+
+	clear_captured_response();
+	send_at_command("AT#XMQTTCFG=?\r\n");
+	resp = get_captured_response();
+	TEST_ASSERT_NOT_NULL(
+		strstr(resp, "#XMQTTCFG: <client_id>,<keep_alive>,<clean_session>,<version>"));
+}
+
 /*
  * Test: Incoming PUBLISH whose payload is delivered in several parts.
  * - The read stub returns the payload in small chunks and injects one -EAGAIN,

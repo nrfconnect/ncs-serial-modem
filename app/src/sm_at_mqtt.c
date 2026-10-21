@@ -26,6 +26,8 @@ LOG_MODULE_REGISTER(sm_mqtt, CONFIG_SM_LOG_LEVEL);
 /* Initial value of clean session flag is done this way also in MQTT library.*/
 #define MQTT_CLEAN_SESSION_INIT (IS_ENABLED(CONFIG_MQTT_CLEAN_SESSION) ? 1U : 0U)
 
+#define SM_MQTT_VERSION_DEFAULT MQTT_VERSION_3_1_1
+
 /**@brief MQTT client operations. */
 enum sm_mqttcon_operation {
 	MQTTC_DISCONNECT,
@@ -432,9 +434,15 @@ static int broker_init(void)
 	return 0;
 }
 
+static bool mqtt_version_supported(uint16_t version)
+{
+	return version == MQTT_VERSION_3_1_1 ||
+	       (IS_ENABLED(CONFIG_MQTT_VERSION_5_0) && version == MQTT_VERSION_5_0);
+}
+
 /**@brief Configure the MQTT client structure
  */
-static int do_mqtt_config(uint16_t keep_alive, uint8_t clean_session)
+static int do_mqtt_config(uint16_t keep_alive, uint8_t clean_session, uint16_t version)
 {
 	if (ctx.connected) {
 		return -EINVAL;
@@ -442,10 +450,16 @@ static int do_mqtt_config(uint16_t keep_alive, uint8_t clean_session)
 	if (clean_session != 0 && clean_session != 1) {
 		return -EINVAL;
 	}
+	if (!mqtt_version_supported(version)) {
+		LOG_ERR("Unsupported MQTT version: %u", version);
+		return -EINVAL;
+	}
 
 	/* Init MQTT client */
 	mqtt_client_init(&client);
 
+	/* Overrides the default of mqtt_client_init(), which depends on library support. */
+	client.protocol_version = (uint8_t)version;
 	client.evt_cb = mqtt_evt_handler;
 
 	/* MQTT client id configuration */
@@ -630,6 +644,7 @@ STATIC int handle_at_mqtt_config(enum at_parser_cmd_type cmd_type, struct at_par
 	int err = -EINVAL;
 	uint16_t keep_alive = CONFIG_MQTT_KEEPALIVE;
 	uint16_t clean_session = MQTT_CLEAN_SESSION_INIT;
+	uint16_t version = SM_MQTT_VERSION_DEFAULT;
 
 	switch (cmd_type) {
 	case AT_PARSER_CMD_TYPE_SET:
@@ -651,17 +666,23 @@ STATIC int handle_at_mqtt_config(enum at_parser_cmd_type cmd_type, struct at_par
 				return err;
 			}
 		}
-		err = do_mqtt_config(keep_alive, (uint8_t)clean_session);
+		if (param_count > 4) {
+			err = at_parser_num_get(parser, 4, &version);
+			if (err) {
+				return err;
+			}
+		}
+		err = do_mqtt_config(keep_alive, (uint8_t)clean_session, version);
 		break;
 
 	case AT_PARSER_CMD_TYPE_READ:
-		rsp_send("\r\n#XMQTTCFG: \"%s\",%d,%d\r\n",
-			 mqtt_clientid, client.keepalive, client.clean_session);
+		rsp_send("\r\n#XMQTTCFG: \"%s\",%d,%d,%d\r\n", mqtt_clientid, client.keepalive,
+			 client.clean_session, client.protocol_version);
 		err = 0;
 		break;
 
 	case AT_PARSER_CMD_TYPE_TEST:
-		rsp_send("\r\n#XMQTTCFG: <client_id>,<keep_alive>,<clean_session>\r\n");
+		rsp_send("\r\n#XMQTTCFG: <client_id>,<keep_alive>,<clean_session>,<version>\r\n");
 		err = 0;
 		break;
 
@@ -985,7 +1006,7 @@ static int sm_at_mqtt_init(void)
 	ctx.sec_tag = SEC_TAG_TLS_INVALID;
 
 	strcpy(mqtt_clientid, SM_DEFAULT_CID);
-	do_mqtt_config(CONFIG_MQTT_KEEPALIVE, MQTT_CLEAN_SESSION_INIT);
+	do_mqtt_config(CONFIG_MQTT_KEEPALIVE, MQTT_CLEAN_SESSION_INIT, SM_MQTT_VERSION_DEFAULT);
 
 	return 0;
 }

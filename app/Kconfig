@@ -353,6 +353,18 @@ config SM_MQTTC_MESSAGE_BUFFER_LEN
 	  Specifies maximum message size that can be transmitted/received through
 	  MQTT (excluding MQTT PUBLISH payload).
 
+config SM_MQTTC_VERSION_5_0
+	bool "MQTT 5.0 support [EXPERIMENTAL]"
+	default y
+	help
+	  Build the MQTT library with MQTT 5.0 protocol support.
+	  The MQTT client uses MQTT 3.1.1 unless MQTT 5.0 is selected with
+	  the AT#XMQTTCFG command.
+
+choice MQTT_VERSION_SUPPORT
+	default MQTT_VERSION_5_0 if SM_MQTTC_VERSION_5_0
+endchoice
+
 endif # SM_MQTTC
 
 if SM_GNSS
