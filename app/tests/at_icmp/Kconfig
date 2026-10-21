@@ -37,6 +37,10 @@ config SM_LOG_LEVEL
 config SM_CR_LF_TERMINATION
 	bool "CR+LF termination"
 
+config SM_BLOCKING_WORK_Q
+	bool
+	default y
+
 config SM_URC_DELAY_WITH_INCOMPLETE_ECHO_MS
 	int "URC delay with incomplete echo (ms)"
 	default 1000
