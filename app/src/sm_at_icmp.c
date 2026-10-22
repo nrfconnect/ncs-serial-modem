@@ -463,6 +463,7 @@ static void ping_task(struct k_work *item)
 	struct zsock_addrinfo *di = ping_argv.dest;
 	uint64_t sum = 0;
 	uint32_t count = 0;
+	uint32_t sent = 0;
 	uint32_t rtt_min = 0xFFFFFFFF;
 	uint32_t rtt_max = 0;
 	uint32_t lost;
@@ -471,23 +472,29 @@ static void ping_task(struct k_work *item)
 
 	for (int i = 0; i < ping_argv.count; i++) {
 		uint32_t rtt = 0;
+		int err;
 
-		if (send_ping_wait_reply((uint16_t)(ping_argv.seq + i), &rtt) == 0) {
+		sent++;
+		err = send_ping_wait_reply((uint16_t)(ping_argv.seq + i), &rtt);
+		if (err == 0) {
 			count++;
 			sum += rtt;
 			rtt_max = MAX(rtt_max, rtt);
 			rtt_min = MIN(rtt_min, rtt);
 			urc_send_to(ping_pipe, "#XPING: %u.%03u seconds\r\n", rtt / 1000,
 				    rtt % 1000);
+		} else if (err == -ENETUNREACH || err == -ENETDOWN) {
+			LOG_WRN("Ping stopped, no network: %d", err);
+			break;
 		}
 		if (i + 1 < ping_argv.count) {
 			k_sleep(K_MSEC(ping_argv.interval));
 		}
 	}
 
-	lost = ping_argv.count - count;
+	lost = sent - count;
 	LOG_INF("Packets sent=%u received=%u lost=%u (%u%% loss)",
-		ping_argv.count, count, lost, lost * 100 / ping_argv.count);
+		sent, count, lost, lost * 100 / sent);
 
 	if (count > 1) {
 		/* The average of 32-bit values fits in 32 bits */
