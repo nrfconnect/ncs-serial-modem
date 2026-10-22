@@ -56,6 +56,8 @@ The Data Terminal Ready (DTR) and Ring Indicator (RI) signals are the control si
    Using the |SM| without connecting RTS and CTS to the host is `experimental <Software maturity levels_>`_ and strongly not recommended.
    See :ref:`uart_without_flow_control` for more information.
 
+.. _nrf91m1_uart_pin_assignment:
+
 |SM| pin assignment
 *******************
 
@@ -100,12 +102,12 @@ The following table shows how to connect the UART pins to the corresponding pins
    See :ref:`uart_without_flow_control` for more information.
 
 .. include:: ../uart_configuration.rst
-   :start-after: nrf91m1_uart_power_pins_start
-   :end-before: nrf91m1_uart_power_pins_end
+   :start-after: uart_power_pins_start
+   :end-before: uart_power_pins_end
 
 .. include:: ../uart_configuration.rst
-   :start-after: nrf91m1_uart_power_management_start
-   :end-before: nrf91m1_uart_power_management_end
+   :start-after: uart_power_management_start
+   :end-before: uart_power_management_end
 
 Zephyr hosts
 ============

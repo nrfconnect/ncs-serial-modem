@@ -702,6 +702,8 @@ Example
    #XBOOTINFO: (0,1)
    OK
 
+.. _SM_AT_XMODEM:
+
 Modem fault #XMODEM
 ===================
 
