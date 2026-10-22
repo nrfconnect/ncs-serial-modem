@@ -292,9 +292,10 @@ int util_str_to_int(const char *str_buf, int base, int *output)
 #define PORT_MAX_SIZE    5 /* 0xFFFF = 65535 */
 #define PDN_ID_MAX_SIZE  2 /* 0..10 */
 
-int util_resolve_host(int cid, const char *host, uint16_t port, int family, struct sockaddr *sa)
+int util_resolve_host(uint8_t cid, const char *host, uint16_t port, int family, struct sockaddr *sa)
 {
 	int err;
+	int pdn_id = 0;
 	char service[PORT_MAX_SIZE + PDN_ID_MAX_SIZE + 2];
 	struct zsock_addrinfo *ai = NULL;
 	struct zsock_addrinfo hints = {
@@ -306,8 +307,20 @@ int util_resolve_host(int cid, const char *host, uint16_t port, int family, stru
 		return DNS_EAI_AGAIN;
 	}
 
+	/* The DNS query takes the PDN ID, not the cid. It is 0 for the default PDN connection. */
+	if (cid != 0) {
+		pdn_id = sm_util_pdn_id_get(cid);
+		if (pdn_id < 0) {
+			return pdn_id;
+		}
+	}
+
+	if (pdn_id > 10) {
+		return -EINVAL;
+	}
+
 	/* "service" shall be formatted as follows: "port:pdn_id" */
-	snprintf(service, sizeof(service), "%hu:%d", port, cid);
+	snprintf(service, sizeof(service), "%hu:%d", port, pdn_id);
 	err = zsock_getaddrinfo(host, service, &hints, &ai);
 	if (!err) {
 		*sa = *(ai->ai_addr);
