@@ -26,7 +26,7 @@ Syntax
 
 ::
 
-   AT#XPING=<url>,<length>,<timeout>[,<count>[,<interval>[,<pdn>]]]
+   AT#XPING=<url>,<length>,<timeout>[,<count>[,<interval>[,<cid>]]]
 
 The parameters and their defined values are the following:
 
@@ -57,7 +57,7 @@ The parameters and their defined values are the following:
    The default value is ``1000``.
    The value range is ``0`` to ``4294967295``.
 
-<pdn>
+<cid>
    Integer.
    Represents ``cid`` in the ``+CGDCONT`` command.
    The default value is ``0``.
