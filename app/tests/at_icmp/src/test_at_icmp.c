@@ -102,6 +102,9 @@ static uint16_t req_id[MAX_REQ];
 static uint16_t req_seq[MAX_REQ];
 static int socket_calls;
 static int poll_timeout_min;
+static int send_calls;
+static int send_errno;     /* errno of a failing send, 0 for none */
+static int send_fail_from; /* The send call from which on the send fails */
 
 /* Address resolution state */
 struct ai_holder {
@@ -313,7 +316,14 @@ static ssize_t send_stub(int sock, const void *buf, size_t len, int flags, int n
 	const uint8_t *req = buf;
 	bool v6 = (req[0] >> 4) == 6;
 	int ip_hdr = v6 ? IPV6_HDR : IPV4_HDR;
-	int idx = req_count++;
+	int call = send_calls++;
+	int idx;
+
+	if (send_errno && call >= send_fail_from) {
+		errno = send_errno;
+		return -1;
+	}
+	idx = req_count++;
 
 	memcpy(last_req, buf, len);
 	last_req_len = len;
@@ -422,6 +432,9 @@ void setUp(void)
 	req_count = 0;
 	socket_calls = 0;
 	poll_timeout_min = 0;
+	send_calls = 0;
+	send_errno = 0;
+	send_fail_from = 0;
 	gai_dest_ret = 0;
 	gai_src_ret = 0;
 	k_sem_reset(&freed_sem);
@@ -1031,6 +1044,43 @@ void test_source_resolution_failure(void)
 	assert_ok();
 	TEST_ASSERT_TRUE(wait_done());
 	TEST_ASSERT_TRUE(wait_for_response("#XPING: 0.0", 3000));
+}
+
+void test_ping_stops_when_there_is_no_network(void)
+{
+	const int errnos[] = {ENETUNREACH, ENETDOWN};
+
+	for (int i = 0; i < ARRAY_SIZE(errnos); i++) {
+		int64_t t0;
+		int64_t elapsed;
+
+		/* Start every round from a clean emulator, as at the start of a test */
+		setUp();
+		/* The network is lost after the first request, with four more to go */
+		script_add(0, F_NONE, 10);
+		send_errno = errnos[i];
+		send_fail_from = 1;
+		t0 = k_uptime_get();
+		run_ping("AT#XPING=\"1.2.3.4\",32,1000,5,1000\r\n");
+		assert_ok();
+		TEST_ASSERT_TRUE(wait_done());
+		elapsed = k_uptime_get() - t0;
+
+		/* It ended at the first failure, after the interval that preceded it */
+		TEST_ASSERT_EQUAL_INT(2, send_calls);
+		TEST_ASSERT_LESS_THAN_INT64(1500, elapsed);
+	}
+}
+
+void test_ping_goes_on_after_other_send_errors(void)
+{
+	script_add(0, F_NONE, 10);
+	send_errno = EIO;
+	send_fail_from = 1;
+	run_ping("AT#XPING=\"1.2.3.4\",32,200,3,0\r\n");
+	TEST_ASSERT_TRUE(wait_done());
+	/* A failure that is not about the network does not end the ping */
+	TEST_ASSERT_EQUAL_INT(3, send_calls);
 }
 
 void test_no_local_ipv6_address(void)
