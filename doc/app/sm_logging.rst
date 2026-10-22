@@ -1,34 +1,97 @@
 .. _sm_logging:
 
-Logging
-#######
+Logging and tracing
+###################
 
 .. contents::
    :local:
    :depth: 3
 
-The application MCU and the modem produce separate logs with their own methods.
-Logs often refer to the |SM| application logging while the modem logs are referred to as modem traces in many places.
+The |SM| and the modem produce separate logs with their own methods.
+The logs of the |SM| are called application logs, and the logs of the modem are called modem traces.
+
+.. application_logging_start
 
 Application logging
 *******************
 
-|SM| outputs B0, MCUboot, and application logs over ``UART1`` (VCOM1 on the nRF9151 DK) during boot.
+The |SM| outputs B0, MCUboot, and application logs over |log_uart| during boot.
 After the application is initialized, the log backend is disabled, and the UART is suspended.
-Use ``AT#XLOG=1`` to enable application logs and resume the UART.
+Use ``AT#XLOG=1`` or ``AT#XLOG=2`` to enable application logs and resume the UART.
 This avoids UART power overhead when logs are not needed during normal operation.
 See :ref:`SM_AT_trace` for the full command reference.
 
-The ``zephyr,console`` and ``ncs,sm-uart`` chosen nodes must point to different UARTs.
-|SM| enables asynchronous reception on the AT command UART and cannot suspend it.
-The build fails if both nodes point to the same UART.
+`Nordic Semiconductor support <DevZone_>`_ might ask you for application logs when investigating an issue.
+
+.. only:: not nrf91m1
+
+   The ``zephyr,console`` and ``ncs,sm-uart`` chosen nodes must point to different UARTs.
+   The |SM| enables asynchronous reception on the AT command UART and cannot suspend it.
+   The build fails if both nodes point to the same UART.
+
+   TF-M logging must use the same UART as the application. For more details, see `shared TF-M logging`_.
 
 .. note::
    The negative error codes that are visible in logs are *errno* codes defined in `nrf_errno.h`_.
 
-The default logging level for the |SM| is ``CONFIG_SM_LOG_LEVEL_DBG``.
+.. _sm_logging_levels:
 
-TF-M logging must use the same UART as the application. For more details, see `shared TF-M logging`_.
+Log levels
+==========
+
+The |SM| uses the following log levels, from the most severe to the most verbose:
+
+.. list-table::
+   :header-rows: 1
+   :widths: auto
+
+   * - Level
+     - Usage
+   * - Error (ERR)
+     - An operation failed and the |SM| cannot complete it.
+   * - Warning (WRN)
+     - Something unexpected happened, but the |SM| can continue.
+   * - Information (INF)
+     - Normal operation. Includes the AT commands, responses, and notifications as text, with sensitive payloads redacted.
+   * - Debug (DBG)
+     - Detailed internal information for debugging. Includes the AT commands, responses, and notifications as raw hex dumps.
+
+.. only:: not nrf91m1
+
+   The |SM| shows a log message only if its level is enabled.
+   Enabling a level also enables all the levels above it in the list.
+   The log level is set at build time separately for each software component.
+
+   By default, the |SM| logs at the debug level, which is required for ``AT#XLOG=2``.
+   To change the level, set one of the ``CONFIG_SM_LOG_LEVEL_ERR``, ``CONFIG_SM_LOG_LEVEL_WRN``, ``CONFIG_SM_LOG_LEVEL_INF``, or ``CONFIG_SM_LOG_LEVEL_DBG`` Kconfig options.
+   The other components, such as Zephyr and the |NCS| libraries, log at the information level unless their level is set explicitly.
+   To change the level of a component, set its own Kconfig option, for example, the ``CONFIG_MODEM_CMUX_LOG_LEVEL_DBG`` Kconfig option.
+   The ``CONFIG_LOG_DEFAULT_LEVEL`` Kconfig option sets the default level for the components that do not set their own.
+
+You select what the |SM| outputs on the log UART at runtime with the ``AT#XLOG`` command:
+
+.. list-table::
+   :header-rows: 1
+   :widths: auto
+
+   * - ``AT#XLOG`` mode
+     - Log UART
+     - AT traffic logged as
+   * - ``0``
+     - Suspended
+     - Not output
+   * - ``1``
+     - Active
+     - Information level text, with sensitive payloads redacted
+   * - ``2``
+     - Active
+     - Debug level hex dump
+
+Use mode ``1`` for normal troubleshooting.
+Use mode ``2`` only when you need the exact bytes of the AT traffic, for example when the redaction hides the information that you need.
+Mode ``2`` outputs sensitive payloads, such as credentials, so do not share these logs publicly.
+
+.. application_logging_end
 
 .. _sm_logging_rtt:
 
@@ -70,24 +133,54 @@ See `Testing and optimization`_ for instructions.
    Otherwise, you can choose not to capture RTT logs.
    Having only RTT logs enabled does not cause this issue.
 
+.. modem_traces_start
+
+.. _sm_logging_modem_traces:
+
+Modem traces
+************
+
+The modem outputs modem traces that you can use to analyze the behavior of the modem.
+Collect the modem traces for the following purposes:
+
+* Inspecting the IP-level traffic during development.
+* Analyzing network issues.
+* Investigating modem crashes and suspected modem failures with the crash dump.
+
+`Nordic Semiconductor support <DevZone_>`_ might ask you for modem traces when investigating an issue.
+
+Enable the modem traces before the problem occurs, because they cannot be collected afterwards.
+If the |SM| reports a modem fault with the :ref:`#XMODEM: FAULT <SM_AT_XMODEM>` notification, or if you suspect another modem failure, repeat the scenario with the modem traces enabled.
+
+.. modem_traces_end
+
+.. shared_uart_backend_start
+
 .. _sm_logging_uart_backend:
 
-Shared UART log and trace backend
-**********************************
+Modem traces through UART
+=========================
 
-The |SM| application routes Zephyr application logs to ``UART1`` (VCOM1 on the nRF9151 DK) by default.
+The |SM| outputs modem traces over |log_uart|.
+The UART is shared with the application logs.
 The baud rate of the shared UART is set to 1000000 to support the high data rate required for modem traces.
 
 Configuration
-=============
+-------------
 
-Application log output over ``UART1`` is included in the default build.
+.. only:: not nrf91m1
 
-To also enable the modem trace backend (``AT#XTRACE``), build with the Kconfig overlay and the devicetree overlay that defines the modem trace SRAM partition:
+   Application log output over ``UART1`` is included in the default build.
 
-.. code-block:: console
+   To also enable the modem trace backend (``AT#XTRACE``), build with the Kconfig overlay and the devicetree overlay that defines the modem trace SRAM partition:
 
-   west build -p -b nrf9151dk/nrf9151/ns -- -DEXTRA_CONF_FILE="trace-backend-uart.conf" -DEXTRA_DTC_OVERLAY_FILE="trace-backend-nrf9151.overlay"
+   .. code-block:: console
+
+      west build -p -b nrf9151dk/nrf9151/ns -- -DEXTRA_CONF_FILE="trace-backend-uart.conf" -DEXTRA_DTC_OVERLAY_FILE="trace-backend-nrf9151.overlay"
+
+.. only:: nrf91m1
+
+   The application log output over ``UART1`` and the modem trace backend (``AT#XTRACE``) are both included in the |SM|.
 
 After the application is initialized, the UART is suspended.
 Use ``AT#XLOG=1`` to activate application logs and ``AT#XTRACE=1`` to activate modem traces.
@@ -104,12 +197,15 @@ See :ref:`SM_AT_trace` for the full command reference.
    An active trace or log backend adds approximately 700 uA overhead.
 
 Collecting traces
-=================
+-----------------
+
+The modem traces cannot be enabled while the application logs are enabled, so send ``AT#XLOG=0`` first.
 
 To collect modem traces using the shared UART backend:
 
-1. Connect the `Cellular Monitor app`_ to ``UART1`` (VCOM1 on the nRF9151 DK) at 1000000 baud rate.
-#. Enable modem trace collection:
+1. Capture the trace data from |log_uart| at 1000000 baud rate, for example, with the `Cellular Monitor app`_.
+   See the Cellular Monitor app documentation for how to capture and save the trace.
+#. Enable modem trace collection with the AT command UART:
 
    .. code-block:: console
 
@@ -123,7 +219,7 @@ To collect modem traces using the shared UART backend:
       AT+CFUN=1
       OK
 
-#. Wait for the modem to register on the network and collect the traces in the `Cellular Monitor app`_.
+#. Wait for the modem to register on the network and collect the traces.
 #. When done, disable the modem trace backend:
 
    .. code-block:: console
@@ -131,13 +227,12 @@ To collect modem traces using the shared UART backend:
       AT#XTRACE=0
       OK
 
-You can analyze the captured trace file in the `Cellular Monitor app`_ to inspect AT commands, network events, and IP-level details.
-If the modem crashes and the crash dump collection was enabled, you can send the trace file to `Nordic Semiconductor support <DevZone_>`_ for further analysis.
+.. shared_uart_backend_end
 
 .. _sm_modem_trace_cmux:
 
 Modem traces through CMUX
-*************************
+=========================
 
 The |SM| application supports collecting modem traces through the CMUX multiplexer.
 When enabled, modem traces are sent through a dedicated CMUX channel, allowing simultaneous AT commands, PPP data, and trace collection over the same serial port.
@@ -149,7 +244,7 @@ The trace CMUX channel is the first channel after the AT command channel and the
    When CMUX is started with ``AT+CMUX``, or to move the trace output to a different CMUX channel, use ``AT#XCMUXTRACE``.
 
 Configuration
-=============
+-------------
 
 To use the CMUX trace backend, build the |SM| application with the trace backend configuration overlay in addition to the PPP and CMUX overlays, and the devicetree overlay that defines the modem trace SRAM partition:
 
@@ -167,7 +262,7 @@ For optimal throughput and to minimize trace data loss, configure the UART to ru
    The amount depends on the UART speed, ongoing modem operations, and the trace level set with ``AT%XMODEMTRACE``.
 
 Setting trace level
-===================
+-------------------
 
 Configure the modem trace level using the `AT%XMODEMTRACE <xmodemtrace_>`_ command.
 
@@ -176,7 +271,7 @@ This provides the most trace data and includes the crash dump collection.
 Depending on the drop rate you observe, you might need to select a different ``<set_id>`` to reduce the amount of trace data generated.
 
 Collecting traces through CMUX on Linux
-=======================================
+---------------------------------------
 
 The :file:`sm_start_ppp.sh` script for Linux host includes support for collecting modem traces.
 Use the ``-T`` flag to enable trace collection.
@@ -203,8 +298,15 @@ The stop script automatically terminates trace collection and preserves the trac
    Waiting for Shutdown script to complete...
    Stopping trace collection...
 
+.. analyzing_traces_start
 
-You can open the :file:`/var/log/nrf91-modem-trace.bin` file using the `Cellular Monitor app`_ for analysis.
-This allows you to see the AT commands, network, and IP-level details of the communication between the modem and the cellular network.
+.. _sm_logging_analyzing_traces:
 
-If the modem crashes and the crash dump collection was enabled, you can send the trace file to `Nordic Semiconductor support <DevZone_>`_ for further analysis.
+Analyzing traces
+================
+
+You can analyze the captured trace file in the `Cellular Monitor app`_ to inspect AT commands, network events, and IP-level details of the communication between the modem and the cellular network.
+
+If you suspect a modem failure, or if the modem crashes and the trace collection was enabled, you can send the trace file to `Nordic Semiconductor support <DevZone_>`_ for further analysis.
+
+.. analyzing_traces_end
