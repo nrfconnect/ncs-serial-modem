@@ -166,7 +166,7 @@ The following tables shows how to connect the UART pins to the corresponding pin
       The RI pin is connected to the blue LED, which is used to indicate incoming data.
 
 
-.. nrf91m1_uart_power_pins_start
+.. uart_power_pins_start
 
 Power and reset pins
 ====================
@@ -195,7 +195,7 @@ The host must therefore be able to reset the |SiP| to a known state, either by p
    For the complete pin list, see the `nRF9151 LGA pin assignments`_.
    For hardware integration guidance, see the `nRF9151 Hardware Integration`_ page.
 
-.. nrf91m1_uart_power_pins_end
+.. uart_power_pins_end
 
 
 .. _uart_configuration_nrf91m1:
@@ -369,7 +369,7 @@ Host application
       See the :ref:`sm_ppp_shell_sample` for more information.
 
 
-.. nrf91m1_uart_power_management_start
+.. uart_power_management_start
 
 Controlling the UART power state
 ********************************
@@ -460,7 +460,7 @@ To reset the |SiP| to a known state, do one of the following:
 
 After the reset, the startup sequence is the same as in the `Boot-up scenario`_.
 
-.. nrf91m1_uart_power_management_end
+.. uart_power_management_end
 
 .. _uart_without_flow_control:
 
