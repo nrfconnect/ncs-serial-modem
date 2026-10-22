@@ -3,3 +3,4 @@
 .. |SM| replace:: Serial Modem
 .. |SiP| replace:: nRF9151 SiP
 .. |SiP_pin| replace:: LGA pin
+.. |log_uart| replace:: ``UART1`` (VCOM1 on the nRF9151 DK)
