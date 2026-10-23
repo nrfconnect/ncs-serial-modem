@@ -133,17 +133,19 @@ int util_str_to_int(const char *str, int base, int *output);
  *
  * This function wraps up zsock_getaddrinfo() to return first resolved address.
  *
- * @param[in] cid PDP Context ID as defined in "+CGDCONT" command (0~10).
+ * @param[in] cid PDP Context ID as defined in "+CGDCONT" command (0~10), 0 for the default PDN
+ *            connection. It is converted to the PDN ID with sm_util_pdn_id_get().
  * @param[in] host Name or IP address of remote host.
  * @param[in] port Service port of remote host.
  * @param[in] family Desired address family for the returned address.
  * @param[out] sa The returned address.
  *
  * @retval 0 If the operation was successful.
- *           Otherwise, an errno code or a dns_resolve_status enum value
- *           (defined in `zephyr/net/dns_resolve.h`).
+ *           Otherwise, an errno code, an error of sm_util_pdn_id_get() or a
+ *           dns_resolve_status enum value (defined in `zephyr/net/dns_resolve.h`).
  */
-int util_resolve_host(int cid, const char *host, uint16_t port, int family, struct sockaddr *sa);
+int util_resolve_host(uint8_t cid, const char *host, uint16_t port, int family,
+		      struct sockaddr *sa);
 
 /**
  * @brief Get peer IP address and port in printable format.

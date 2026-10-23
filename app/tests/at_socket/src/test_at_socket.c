@@ -739,6 +739,30 @@ static int mock_getaddrinfo_success_callback(const char *host, const char *servi
 	return 0;
 }
 
+/* The service string that zsock_getaddrinfo() was called with */
+static char getaddrinfo_service[16];
+
+static int mock_getaddrinfo_service_callback(const char *host, const char *service,
+					     const struct zsock_addrinfo *hints,
+					     struct zsock_addrinfo **res, int num_calls)
+{
+	snprintf(getaddrinfo_service, sizeof(getaddrinfo_service), "%s", service);
+
+	return mock_getaddrinfo_success_callback(host, service, hints, res, num_calls);
+}
+
+/* Expect one AT%XGETPDNID, answered with the PDN ID 3 */
+static void expect_pdn_id_3(void)
+{
+	static const char pdn_id_resp[] = "%XGETPDNID: 3\r\nOK\r\n";
+
+	__cmock_nrf_modem_at_cmd_CMockExpectAnyArgsAndReturn(__LINE__, 0);
+	__cmock_nrf_modem_at_cmd_CMockReturnMemThruPtr_buf(__LINE__, (void *)pdn_id_resp,
+							   sizeof(pdn_id_resp));
+	__cmock_nrf_modem_at_cmd_CMockIgnoreArg_len(__LINE__);
+	__cmock_nrf_modem_at_cmd_CMockIgnoreArg_fmt(__LINE__);
+}
+
 /*
  * Test: Socket connect operation via AT command
  * - Command: AT#XCONNECT=<handle>,"<url>",<port>\r\n
@@ -772,6 +796,60 @@ void test_xconnect_operation(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
+	__cmock_nrf_close_ExpectAndReturn(1, 0);
+	send_at_command("AT#XCLOSE=1\r\n");
+}
+
+/*
+ * Test: The host name is resolved on the PDN connection of the socket
+ * - The DNS query takes the PDN ID, which is not the cid of the socket
+ */
+void test_xconnect_resolves_on_the_pdn_id(void)
+{
+	/* Create a socket on cid 1, which is PDN ID 3 */
+	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 1);
+	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
+	expect_pdn_id_3();
+	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_BINDTOPDN */
+	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Poll callback */
+	send_at_command("AT#XSOCKET=1,1,0,1\r\n");
+	clear_captured_response();
+
+	expect_pdn_id_3();
+	__cmock_zsock_getaddrinfo_Stub(mock_getaddrinfo_service_callback);
+	__cmock_zsock_freeaddrinfo_Expect(NULL);
+	__cmock_zsock_freeaddrinfo_IgnoreArg_ai();
+	__cmock_nrf_connect_ExpectAnyArgsAndReturn(0);
+
+	send_at_command("AT#XCONNECT=1,\"test.server.com\",80\r\n");
+
+	TEST_ASSERT_EQUAL_STRING("80:3", getaddrinfo_service);
+	TEST_ASSERT_TRUE(strstr(get_captured_response(), "#XCONNECT: 1,1") != NULL);
+
+	__cmock_nrf_close_ExpectAndReturn(1, 0);
+	send_at_command("AT#XCLOSE=1\r\n");
+}
+
+/* The default PDN connection is resolved on without looking up its PDN ID */
+void test_xconnect_resolves_on_the_default_pdn(void)
+{
+	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_STREAM, NRF_IPPROTO_TCP, 1);
+	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0);
+	send_at_command("AT#XSOCKET=1,1,0\r\n");
+	clear_captured_response();
+
+	/* No AT%XGETPDNID is expected */
+	__cmock_zsock_getaddrinfo_Stub(mock_getaddrinfo_service_callback);
+	__cmock_zsock_freeaddrinfo_Expect(NULL);
+	__cmock_zsock_freeaddrinfo_IgnoreArg_ai();
+	__cmock_nrf_connect_ExpectAnyArgsAndReturn(0);
+
+	send_at_command("AT#XCONNECT=1,\"test.server.com\",80\r\n");
+
+	TEST_ASSERT_EQUAL_STRING("80:0", getaddrinfo_service);
+	TEST_ASSERT_TRUE(strstr(get_captured_response(), "#XCONNECT: 1,1") != NULL);
+
 	__cmock_nrf_close_ExpectAndReturn(1, 0);
 	send_at_command("AT#XCLOSE=1\r\n");
 }
@@ -1101,6 +1179,37 @@ void test_xsendto_unformatted_string(void)
 	TEST_ASSERT_TRUE(strstr(response, "OK") != NULL);
 
 	/* Close socket */
+	__cmock_nrf_close_ExpectAndReturn(4, 0);
+	send_at_command("AT#XCLOSE=4\r\n");
+}
+
+/* The host name of a datagram is resolved on the PDN ID of the socket */
+void test_xsendto_resolves_on_the_pdn_id(void)
+{
+	/* Create a socket on cid 1, which is PDN ID 3 */
+	__cmock_nrf_socket_ExpectAndReturn(NRF_AF_INET, NRF_SOCK_DGRAM, NRF_IPPROTO_UDP, 4);
+	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_SNDTIMEO */
+	expect_pdn_id_3();
+	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* SO_BINDTOPDN */
+	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Poll callback */
+	send_at_command("AT#XSOCKET=1,2,0,1\r\n");
+	clear_captured_response();
+
+	expect_pdn_id_3();
+	__cmock_zsock_getaddrinfo_Stub(mock_getaddrinfo_service_callback);
+	__cmock_zsock_freeaddrinfo_Expect(NULL);
+	__cmock_zsock_freeaddrinfo_IgnoreArg_ai();
+	__cmock_nrf_setsockopt_ExpectAnyArgsAndReturn(0); /* Clear send callback */
+	__cmock_nrf_sendto_ExpectAndReturn(4, NULL, 5, 0, NULL,
+					   sizeof(struct nrf_sockaddr_in), 5);
+	__cmock_nrf_sendto_IgnoreArg_message();
+	__cmock_nrf_sendto_IgnoreArg_dest_addr();
+
+	send_at_command("AT#XSENDTO=4,0,0,\"192.168.1.1\",5000,\"Hello\"\r\n");
+
+	TEST_ASSERT_EQUAL_STRING("5000:3", getaddrinfo_service);
+	TEST_ASSERT_TRUE(strstr(get_captured_response(), "4,0,5") != NULL);
+
 	__cmock_nrf_close_ExpectAndReturn(4, 0);
 	send_at_command("AT#XCLOSE=4\r\n");
 }
