@@ -23,7 +23,7 @@ During boot, the UART outputs logs from B0, MCUboot, and the application.
 After initialization, the UART is suspended when no backend is active and resumed when at least one backend is enabled.
 
 The trace UART is configured at 1000000 baud rate to support the high data rate required for the modem traces.
-Trace data is available through the UART1 interface (VCOM1 on the nRF9151 DK).
+Trace data is available through |log_uart|.
 
 
 Application log AT#XLOG
