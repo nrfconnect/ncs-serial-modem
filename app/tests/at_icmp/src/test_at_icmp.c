@@ -40,6 +40,9 @@ extern void clear_captured_response(void);
 /* Response to AT+CGPADDR - provided by nrf_modem_at_wrapper.c */
 extern const char *test_cgpaddr_response;
 
+/* Response to AT%XGETPDNID - provided by nrf_modem_at_wrapper.c */
+extern const char *test_pdn_id_response;
+
 #define GAI_FAIL (-3)
 
 #define PKT_MAX     1600
@@ -119,6 +122,12 @@ static struct ai_holder local_ai;
 static const char *local_str;
 static int gai_dest_ret;
 static int gai_src_ret;
+/* How the target, and not the local address, was asked to be resolved */
+static char dest_service[16];
+static int dest_flags;
+static int dest_gai_calls;
+/* PDN passed to SO_BINDTOPDN, or -1 */
+static int bound_pdn;
 
 static K_SEM_DEFINE(freed_sem, 0, 16);
 
@@ -303,6 +312,9 @@ static int socket_stub(int family, int type, int proto, int num_calls)
 static int setsockopt_stub(int sock, int level, int optname, const void *optval,
 			   net_socklen_t optlen, int num_calls)
 {
+	if (level == SOL_SOCKET && optname == SO_BINDTOPDN) {
+		bound_pdn = *(const int *)optval;
+	}
 	return 0;
 }
 
@@ -398,6 +410,9 @@ static int getaddrinfo_stub(const char *host, const char *service,
 		}
 		*res = &local_ai.ai;
 	} else {
+		dest_gai_calls++;
+		snprintf(dest_service, sizeof(dest_service), "%s", service ? service : "(null)");
+		dest_flags = hints ? hints->ai_flags : 0;
 		if (gai_dest_ret) {
 			return gai_dest_ret;
 		}
@@ -437,6 +452,11 @@ void setUp(void)
 	send_fail_from = 0;
 	gai_dest_ret = 0;
 	gai_src_ret = 0;
+	dest_service[0] = '\0';
+	dest_flags = 0;
+	dest_gai_calls = 0;
+	bound_pdn = -1;
+	test_pdn_id_response = NULL;
 	k_sem_reset(&freed_sem);
 	clear_captured_response();
 	use_v4();
@@ -1098,6 +1118,48 @@ void test_no_local_ipv4_address(void)
 	test_cgpaddr_response = NULL;
 	run_ping("AT#XPING=\"1.2.3.4\",32,1000\r\n");
 	assert_error();
+	TEST_ASSERT_EQUAL_INT(0, socket_calls);
+}
+
+/* PDN connection */
+
+void test_target_is_resolved_on_the_pdn(void)
+{
+	/* The cid is 1, the PDN ID the modem has given it is 3. The DNS query and the socket both
+	 * need the PDN ID, and must agree on it.
+	 */
+	test_pdn_id_response = "%XGETPDNID: 3\r\nOK\r\n";
+	script_add(0, F_NONE, 10);
+	run_ping("AT#XPING=\"example.com\",32,1000,1,0,1\r\n");
+	assert_ok();
+	TEST_ASSERT_TRUE(wait_done());
+	TEST_ASSERT_EQUAL_INT(1, dest_gai_calls);
+	/* Only the PDN ID. With AI_NUMERICSERV the service would need a port other than 0 */
+	TEST_ASSERT_EQUAL_STRING("3", dest_service);
+	TEST_ASSERT_BITS(AI_PDNSERV | ZSOCK_AI_NUMERICSERV, AI_PDNSERV, dest_flags);
+	TEST_ASSERT_EQUAL_INT(3, bound_pdn);
+	TEST_ASSERT_TRUE(wait_for_response("#XPING: 0.0", 3000));
+}
+
+void test_target_is_resolved_on_the_default_pdn(void)
+{
+	/* No lookup of a PDN ID, and the socket is not bound, for the default PDN connection */
+	script_add(0, F_NONE, 10);
+	run_ping("AT#XPING=\"example.com\",32,1000\r\n");
+	assert_ok();
+	TEST_ASSERT_TRUE(wait_done());
+	TEST_ASSERT_EQUAL_STRING("0", dest_service);
+	TEST_ASSERT_BITS(AI_PDNSERV | ZSOCK_AI_NUMERICSERV, AI_PDNSERV, dest_flags);
+	TEST_ASSERT_EQUAL_INT(-1, bound_pdn);
+}
+
+void test_unknown_pdn_is_rejected(void)
+{
+	/* The modem does not know the cid. Nothing must be resolved or sent */
+	test_pdn_id_response = NULL;
+	run_ping("AT#XPING=\"example.com\",32,1000,1,0,5\r\n");
+	assert_error();
+	TEST_ASSERT_EQUAL_INT(0, dest_gai_calls);
 	TEST_ASSERT_EQUAL_INT(0, socket_calls);
 }
 
