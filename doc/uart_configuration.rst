@@ -553,3 +553,53 @@ When the peer that initiates the wake-up receives a flag character, it can conti
 Either end of the CMUX channel can initiate the wake-up procedure.
 
 See the :ref:`sm_ppp_shell_sample` for an example of how to configure the CMUX module to automatically power on and off the UART device based on the data traffic on the DLCI channels.
+
+.. nrf91m1_uart_security_models_start
+
+.. _uart_security_models:
+
+UART security considerations
+****************************
+
+UART is a plain serial link with no built-in encryption or authentication, so the data on the UART between the host and the |SM| is not protected.
+You can reduce the exposure by keeping the UART lines hidden inside the physical security boundary of your product, and by terminating secure protocols on the host instead of in the modem when stronger confidentiality is needed.
+
+The following data is sent over the UART in cleartext:
+
+* Application data sent and received over modem-terminated TLS or DTLS sockets.
+* AT commands, responses, and notifications exchanged with the |SM| that may contain sensitive information.
+
+Choose one of the following security models based on the physical security of your product.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 40 40
+
+   * - Aspect
+     - Model A: Trusted UART
+     - Model B: Untrusted UART
+   * - When to use
+     - The UART lines are inside the physical security boundary of the product.
+     - The UART lines are accessible outside the physical security boundary of the product, or the product requires stronger confidentiality.
+   * - Credential storage
+     - Credentials are stored in the modem with ``AT%CMNG``.
+       Provision them in a controlled environment, such as the production line.
+     - Credentials are stored on the host.
+       No credentials for internet services are written to the modem.
+   * - Secure channel
+     - Secure protocols, such as TLS, DTLS, MQTT, and HTTP, are terminated in the modem and controlled with AT commands.
+     - All internet protocols, such as TLS, DTLS, MQTT, HTTP, and CoAP, are terminated on the host.
+       The host uses :ref:`PPP <SM_AT_PPP>` over :ref:`CMUX <SM_AT_CMUX>` and the modem only forwards IP packets.
+   * - Data on the UART
+     - Application data and AT commands are in cleartext.
+     - Application data is encrypted by the host.
+       AT commands are still in cleartext.
+       Commands that configure the modem, such as the SIM PIN, PDN authentication credentials, and SMS content, can carry sensitive data.
+       Apply these settings in a controlled environment where possible.
+       Commands that are needed in the field remain visible on the UART.
+
+.. note::
+   Firmware integrity does not depend on the UART.
+   Firmware updates are signature-verified on the device, regardless of the security model.
+
+.. nrf91m1_uart_security_models_end
