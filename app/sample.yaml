@@ -11,6 +11,17 @@ tests:
       - CONFIG_SM_DFU_MODEM_FULL=y
     platform_allow:
       - nrf9151dk/nrf9151/ns
+  serial_modem.t91x_alternate:
+    sysbuild: true
+    build_only: true
+    extra_args:
+      - EXTRA_CONF_FILE="cmux.conf;ppp.conf;trace-backend-uart.conf;nrf-device-provisioning.conf"
+      - EXTRA_DTC_OVERLAY_FILE="t91x-alternate-mode.overlay;trace-backend-nrf9151.overlay"
+    extra_configs:
+      - CONFIG_SM_DFU_MODEM_FULL=y
+    platform_allow:
+      - nrf9151dk/nrf9151/ns
+    tags: exclude_integration
   serial_modem.default:
     sysbuild: true
     build_only: true
