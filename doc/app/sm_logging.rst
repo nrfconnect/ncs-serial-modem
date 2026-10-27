@@ -29,7 +29,7 @@ See :ref:`SM_AT_trace` for the full command reference.
    The |SM| enables asynchronous reception on the AT command UART and cannot suspend it.
    The build fails if both nodes point to the same UART.
 
-   TF-M logging must use the same UART as the application. For more details, see `shared TF-M logging`_.
+   TF-M logging must use the same UART as the application. For more details, see :ref:`nrf:tfm_enable_share_uart`.
 
 .. note::
    The negative error codes that are visible in logs are *errno* codes defined in `nrf_errno.h`_.
@@ -115,7 +115,7 @@ To switch from UART1 back to SEGGER RTT, add the following to your :file:`prj.co
    CONFIG_SEGGER_RTT_BUFFER_SIZE_UP=2048
 
 You can view the RTT logs with an RTT client such as ``J-Link RTT Viewer``.
-See `Testing and optimization`_ for instructions.
+See :ref:`Testing and optimization <nrf:test_and_optimize>` for instructions.
 
 
 .. note::

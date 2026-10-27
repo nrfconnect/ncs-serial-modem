@@ -69,7 +69,7 @@ The parameters and their defined values are the following:
 
      .. only:: not nrf91m1
 
-       The provisioning client waits until the modem reports offline functional mode before continuing or times out after ``CONFIG_NRF_PROVISIONING_MODEM_STATE_WAIT_TIMEOUT_SECONDS`` seconds.
+       The provisioning client waits until the modem reports offline functional mode before continuing or times out after :kconfig:option:`CONFIG_NRF_PROVISIONING_MODEM_STATE_WAIT_TIMEOUT_SECONDS` seconds.
 
      .. only:: nrf91m1
 
@@ -80,7 +80,7 @@ The parameters and their defined values are the following:
 
      .. only:: not nrf91m1
 
-       The provisioning client waits until the modem reports LTE registration before continuing or times out after ``CONFIG_NRF_PROVISIONING_MODEM_STATE_WAIT_TIMEOUT_SECONDS`` seconds.
+       The provisioning client waits until the modem reports LTE registration before continuing or times out after :kconfig:option:`CONFIG_NRF_PROVISIONING_MODEM_STATE_WAIT_TIMEOUT_SECONDS` seconds.
 
      .. only:: nrf91m1
 
@@ -99,7 +99,7 @@ The parameters and their defined values are the following:
    .. only:: not nrf91m1
 
      * ``-5`` - Too many commands received from the server.
-       Increase ``CONFIG_NRF_PROVISIONING_CBOR_RECORDS``.
+       Increase :kconfig:option:`CONFIG_NRF_PROVISIONING_CBOR_RECORDS`.
 
    .. only:: nrf91m1
 
