@@ -36,3 +36,9 @@ manifest:
       url: https://github.com/memfault/memfault-firmware-sdk
       path: modules/lib/memfault-firmware-sdk
       revision: 1.45.0
+
+    - name: onomondo-softsim
+      url: https://github.com/onomondo/nrf-softsim.git
+      path: modules/lib/onomondo-softsim
+      submodules: true
+      revision: master

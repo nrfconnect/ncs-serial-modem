@@ -408,6 +408,13 @@ config SM_HTTPC_RESPONSE_TIMEOUT_MS
 
 endif # SM_HTTPC
 
+config SM_SOFTSIM
+	bool "SoftSIM support"
+	depends on SOFTSIM
+	help
+	  Enable the AT#XSOFTSIMPROVISION AT command for provisioning an Onomondo
+	  SoftSIM profile at runtime.
+
 if NRF_MODEM_LIB_TRACE
 
 choice NRF_MODEM_LIB_TRACE_BACKEND

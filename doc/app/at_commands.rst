@@ -23,5 +23,6 @@
    at_ppp
    at_sms
    at_socket
+   at_softsim
    at_trace
    at_data_mode

@@ -1,0 +1,137 @@
+/*
+ * Copyright (c) 2026 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+ */
+
+/*
+ * Flash partition layout for nRF9151 DK with SoftSIM (same with MCUboot and application).
+ * The application SRAM layout for SoftSIM is in softsim-sram-nrf9151.overlay.
+ *
+ * 0x0000_0000  b0 (NSIB)                    ( 32 kB)
+ * 0x0000_8000  s0 (MCUboot image, slot 0)   ( 48 kB)
+ * 0x0001_4000  s1 (MCUboot image, slot 1)   ( 48 kB)
+ * 0x0002_0000  slot0 (primary app)          (408 kB)
+ *   0x0002_0000  TF-M secure                ( 96 kB)
+ *   0x0003_8000  Application (non-secure)   (312 kB - (MCUboot swap sector + MCUboot trailer))
+ * 0x0008_6000  slot1 (secondary app)        (404 kB)
+ * 0x000e_b000  storage (container)          ( 52 kB)
+ *   0x000e_b000  SoftSIM NVS storage        ( 32 kB)
+ *   0x000f_3000  Memfault core dump         ( 12 kB)
+ *   0x000f_6000  Settings storage           (  8 kB)
+ * 0x000f_8000  TF-M ITS                     (  8 kB)
+ * 0x000f_a000  TF-M OTP / NV counters       (  8 kB)
+ * 0x000f_c000  Unused                       ( 16 kB)
+ *
+ * The SPU configures flash security in 32 kB regions. TF-M configures the storage
+ * container as non-secure, so the TF-M ITS and OTP partitions start in a separate region.
+ */
+
+&flash0 {
+	/delete-node/ partitions;
+
+	partitions {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		b0_partition: partition@0 {
+			compatible = "zephyr,mapped-partition";
+			label = "b0";
+			reg = <0x0 0x8000>;
+		};
+
+		s0_partition: boot_partition: partition@8000 {
+			compatible = "zephyr,mapped-partition";
+			label = "mcuboot-0";
+			reg = <0x8000 0xc000>;
+		};
+
+		s1_partition: partition@14000 {
+			compatible = "zephyr,mapped-partition";
+			label = "mcuboot-1";
+			reg = <0x14000 0xc000>;
+		};
+
+		slot0_partition: partition@20000 {
+			compatible = "zephyr,mapped-partition";
+			label = "image-0";
+			reg = <0x20000 0x66000>;
+			ranges = <0x0 0x20000 0x66000>;
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			slot0_s_partition: partition@0 {
+				compatible = "zephyr,mapped-partition";
+				label = "image-0-secure";
+				reg = <0x0 0x18000>;
+			};
+
+			slot0_ns_partition: partition@18000 {
+				compatible = "zephyr,mapped-partition";
+				label = "image-0-nonsecure";
+				reg = <0x18000 0x4e000>;
+			};
+		};
+
+		slot1_partition: partition@86000 {
+			compatible = "zephyr,mapped-partition";
+			label = "image-1";
+			reg = <0x86000 0x65000>;
+			ranges = <0x0 0x86000 0x65000>;
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			slot1_s_partition: partition@0 {
+				compatible = "zephyr,mapped-partition";
+				label = "image-1-secure";
+				reg = <0x0 0x18000>;
+			};
+
+			slot1_ns_partition: partition@18000 {
+				compatible = "zephyr,mapped-partition";
+				label = "image-1-nonsecure";
+				reg = <0x18000 0x4d000>;
+			};
+		};
+
+		storage_partition: partition@eb000 {
+			compatible = "zephyr,mapped-partition";
+			label = "nonsecure-storage";
+			reg = <0xeb000 0xd000>;
+			ranges = <0x0 0xeb000 0xd000>;
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			nvs_storage: partition@0 {
+				compatible = "zephyr,mapped-partition";
+				label = "nvs-storage";
+				reg = <0x0 0x8000>;
+			};
+
+			memfault_coredump_partition: partition@8000 {
+				compatible = "zephyr,mapped-partition";
+				label = "memfault_coredump_partition";
+				reg = <0x8000 0x3000>;
+			};
+
+			settings_storage_partition: partition@b000 {
+				compatible = "zephyr,mapped-partition";
+				label = "settings-storage";
+				reg = <0xb000 0x2000>;
+			};
+		};
+
+		tfm_its_partition: partition@f8000 {
+			compatible = "zephyr,mapped-partition";
+			label = "tfm-its";
+			reg = <0xf8000 0x2000>;
+		};
+
+		tfm_otp_partition: partition@fa000 {
+			compatible = "zephyr,mapped-partition";
+			label = "tfm-otp";
+			reg = <0xfa000 0x2000>;
+		};
+	};
+};

@@ -34,6 +34,7 @@ target_sources_ifdef(CONFIG_SM_NRF_CLOUD_FOTA app PRIVATE src/sm_at_nrfcloud_fot
 target_sources_ifdef(CONFIG_SM_MQTTC app PRIVATE src/sm_at_mqtt.c)
 target_sources_ifdef(CONFIG_SM_COAPC app PRIVATE src/sm_at_coap.c)
 target_sources_ifdef(CONFIG_SM_HTTPC app PRIVATE src/sm_at_httpc.c)
+target_sources_ifdef(CONFIG_SM_SOFTSIM app PRIVATE src/sm_at_softsim.c)
 target_sources_ifdef(CONFIG_SM_MODEM_TRACE_BACKEND_CMUX app PRIVATE src/sm_trace_backend_cmux.c)
 target_sources_ifdef(CONFIG_SM_MODEM_TRACE_BACKEND_UART app PRIVATE src/sm_trace_backend_uart.c)
 target_sources_ifdef(CONFIG_NRF_PROVISIONING app PRIVATE src/sm_at_provisioning.c)

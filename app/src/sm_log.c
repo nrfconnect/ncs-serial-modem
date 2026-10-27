@@ -141,6 +141,7 @@ const char *sm_log_cmd_sensitive_prefix(const char *cmd, size_t len)
 		"AT#XNRFCLOUDOBSAUTO",    /* nRF Cloud Obs auto-upload: project_key override */
 		"AT#XNRFCLOUDOBSUPLOAD",  /* nRF Cloud Obs upload: project_key override */
 		"AT#XNRFCLOUDOBSFORWARD", /* nRF Cloud Obs forward: chunk + project_key override */
+		"AT#XSOFTSIMPROVISION",   /* SoftSIM profile: IMSI, ICCID and keys */
 		NULL,
 	};
 

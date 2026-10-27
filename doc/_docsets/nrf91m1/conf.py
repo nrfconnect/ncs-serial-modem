@@ -40,6 +40,7 @@ exclude_patterns = docset_exclude_patterns(DOCSET) + [
     # Pages that do not apply to the nRF91M1 go here.
     "app/at_carrier.rst",
     "app/at_commands.rst",
+    "app/at_softsim.rst",
     "app/README.rst",
     "app/sm_*.rst",
     "gsg_guide.rst",

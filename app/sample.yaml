@@ -228,6 +228,21 @@ tests:
       - SB_CONFIG_SECURE_BOOT_APPCORE=n
     platform_allow:
       - nrf9151dk/nrf9151/ns
+  serial_modem.softsim:
+    sysbuild: true
+    build_only: true
+    extra_args:
+      - EXTRA_CONF_FILE="${ZEPHYR_SOFTSIM_MODULE_DIR}/overlay-softsim.conf;softsim.conf"
+      - EXTRA_DTC_OVERLAY_FILE="softsim-nrf9151.overlay;softsim-sram-nrf9151.overlay"
+      - mcuboot_EXTRA_DTC_OVERLAY_FILE="${APP_DIR}/softsim-nrf9151.overlay"
+      - SB_CONFIG_SOFTSIM_BUNDLE_TEMPLATE_HEX=y
+    extra_configs:
+      - CONFIG_SM_NRF_CLOUD=n
+    modules:
+      - softsim
+    platform_allow:
+      - nrf9151dk/nrf9151/ns
+    tags: exclude_integration
   serial_modem.debug_stats_stacks:
     sysbuild: true
     build_only: true
