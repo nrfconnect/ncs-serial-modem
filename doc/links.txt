@@ -73,10 +73,10 @@
 
 .. ### nRF Cloud
 
-.. _`nRF Cloud Location Services`: https://docs.memfault.com/docs/platform/location-services
-.. _`nRF Cloud Provisioning Service`: https://docs.memfault.com/docs/nrfcloud/provisioning-overview
-.. _`nRF Cloud Preconnect onboarding`: https://docs.memfault.com/docs/nrfcloud/onboarding#preconnect-onboarding
-.. _`Memfault Project Keys`: https://docs.memfault.com/docs/platform/data-routes
+.. _`nRF Cloud Location Services`: https://docs.nrfcloud.com/docs/platform/location-services
+.. _`nRF Cloud Provisioning Service`: https://docs.nrfcloud.com/docs/nrfcloud/provisioning-overview
+.. _`nRF Cloud Preconnect onboarding`: https://docs.nrfcloud.com/docs/nrfcloud/onboarding#preconnect-onboarding
+.. _`Memfault Project Keys`: https://docs.nrfcloud.com/docs/platform/data-routes
 .. _`Memfault Project Settings`: https://app.memfault.com/organizations/-/projects/-/settings/data-routes
 .. _`Memfault release management`: https://mflt.io/release-mgmt
 
