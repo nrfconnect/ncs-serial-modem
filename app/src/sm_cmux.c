@@ -144,6 +144,8 @@ static void cmux_event_handler(struct modem_cmux *, enum modem_cmux_event event,
 	case MODEM_CMUX_EVENT_CONNECTED:
 		break;
 	case MODEM_CMUX_EVENT_DISCONNECTED:
+		/* Wake up a writer waiting for tx idle, which never comes after close down. */
+		k_sem_give(&cmux.tx_sem);
 		/* Return to AT command mode */
 		k_work_reschedule_for_queue(&sm_work_q, &cmux.stop_work, STOP_DELAY);
 		break;
@@ -174,6 +176,13 @@ static int cmux_write_at_channel_block(const uint8_t *data, size_t *len)
 	int ret;
 
 	while (sent < *len) {
+		if (cmux.instance.state == MODEM_CMUX_STATE_DISCONNECTED ||
+		    cmux.instance.state == MODEM_CMUX_STATE_DISCONNECTING ||
+		    cmux.dlcis[cmux.at_channel].instance.state != MODEM_CMUX_DLCI_STATE_OPEN) {
+			/* Drop data when the multiplexer or the pipe is closed */
+			return 0;
+		}
+
 		ret = modem_pipe_transmit(cmux.dlcis[cmux.at_channel].pipe, data + sent,
 					  *len - sent);
 		if (ret < 0) {
@@ -181,11 +190,6 @@ static int cmux_write_at_channel_block(const uint8_t *data, size_t *len)
 				INDEX_TO_DLCI(cmux.at_channel), ret);
 			return ret;
 		} else if (ret == 0) {
-			if (cmux.dlcis[cmux.at_channel].instance.state !=
-			    MODEM_CMUX_DLCI_STATE_OPEN) {
-				/* Drop URC when pipe is closed */
-				return 0;
-			}
 			/* Pipe TX buffer full. Wait for transmit idle event. */
 			k_sem_take(&cmux.tx_sem, K_FOREVER);
 		} else {
