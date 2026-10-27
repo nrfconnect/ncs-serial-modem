@@ -8,13 +8,11 @@ menu "Nordic Serial Modem"
 
 config HEAP_MEM_POOL_ADD_SIZE_SERIAL_MODEM
 	int "Additional heap memory pool size for Serial Modem"
-	default 3072 if NRF_PROVISIONING
 	default 1700 if SM_NRF_CLOUD
 	default 0
 	help
 	  modem_jwt library used by nrf_cloud libraries, uses kernel heap for querying UUID.
 	  2x CONFIG_MODEM_JWT_MAX_LEN is the maximum it can use.
-	  nrf_provisioning uses over 2kB of heap.
 
 config SM_BLOCKING_WORK_Q
 	bool
