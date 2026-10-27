@@ -29,3 +29,7 @@ See :ref:`nrf91m1_uart_pin_assignment` for the ``UART1`` pins.
 .. include:: ../app/sm_logging.rst
    :start-after: analyzing_traces_start
    :end-before: analyzing_traces_end
+
+.. include:: ../app/sm_logging.rst
+   :start-after: observability_start
+   :end-before: observability_end
