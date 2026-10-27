@@ -310,3 +310,68 @@ You can analyze the captured trace file in the `Cellular Monitor app`_ to inspec
 If you suspect a modem failure, or if the modem crashes and the trace collection was enabled, you can send the trace file to `Nordic Semiconductor support <DevZone_>`_ for further analysis.
 
 .. analyzing_traces_end
+
+.. observability_start
+
+.. _sm_logging_observability:
+
+nRF Cloud observability
+***********************
+
+The |SM| collects diagnostic data about its operation.
+The host can ask the |SM| to upload the data to nRF Cloud, so you can use it to investigate crashes of devices in the field.
+
+The |SM| collects the following data:
+
+* Events, such as the reset reason after a restart and a modem fault with its reason and program counter.
+* Metrics, which the |SM| collects into a heartbeat every hour.
+  The metrics include the LTE metrics and connection statistics.
+  See :ref:`#XNRFCLOUDOBSHEARTBEAT <SM_AT_NRFCLOUDOBSHEARTBEAT>` for more information.
+* Logs, which are the most recent information, warning, and error messages, with sensitive payloads redacted.
+  The |SM| captures logs at these levels even when ``AT#XLOG=0`` disables UART logging.
+  With ``AT#XLOG=2``, the |SM| logs AT traffic only as debug-level hex dumps and does not include it in the observability logs.
+  After a crash, the logs from before the crash are part of the core dump.
+* A core dump, which the |SM| stores in flash when it crashes.
+
+The data does not leave the device on its own.
+The host controls when it is sent, and the data reaches the cloud as follows:
+
+1. The |SM| records the data on the device.
+   When the |SM| crashes, it stores a core dump in flash and restarts.
+   The core dump stays in flash over the restart until it is uploaded.
+   The |SM| keeps the other data in RAM, so the data is lost on reset or power loss.
+#. The host connects the |SM| to nRF Cloud with the :ref:`#XNRFCLOUD <SM_AT_NRFCLOUD>` command.
+   You must onboard and claim the device first.
+   See :ref:`SM_AT_PROVISIONING`.
+#. The host uploads the buffered data with one of the following commands:
+
+   * :ref:`#XNRFCLOUDOBSUPLOAD <SM_AT_NRFCLOUDOBSUPLOAD>` uploads the data when you issue it.
+   * :ref:`#XNRFCLOUDOBSAUTO <SM_AT_NRFCLOUDOBSAUTO>` uploads the data periodically.
+     It is disabled by default.
+
+   The upload includes the buffered events, metrics, and logs.
+   A stored core dump is included only when core dump upload is enabled with :ref:`#XNRFCLOUDOBSCOREDUMP <SM_AT_NRFCLOUDOBSCOREDUMP>`, which is the default.
+#. nRF Cloud receives the data.
+   By default, the data goes to the project that nRF Cloud associates with your device.
+   To send the data to a specific project, specify the project key of that project in the upload command.
+   You can analyze the events, metrics, logs, and core dumps in nRF Cloud.
+
+.. note::
+   The core dump storage holds one core dump.
+   While a core dump is stored, subsequent crashes do not capture a new one until the stored one has been uploaded.
+
+The core dump covers the crashes of the Serial Modem.
+The |SM| records a modem fault only as an event.
+The modem fault also drops the network connection, so the host cannot upload the event until the |SM| is connected to nRF Cloud again.
+If the host resets the |SM| before the upload, the event is lost.
+To investigate a modem fault, collect the modem traces as described in :ref:`sm_logging_modem_traces`.
+
+.. only:: not nrf91m1
+
+   The nRF Cloud observability AT commands require the :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY <CONFIG_SM_NRF_CLOUD_OBSERVABILITY>` Kconfig option, which is enabled by default.
+   The ``CONFIG_MEMFAULT_METRICS_HEARTBEAT_INTERVAL_SECS`` Kconfig option sets the heartbeat interval.
+   The default build stores the core dump in flash.
+
+See :ref:`SM_AT_NRFCLOUDOBS` for the full command reference.
+
+.. observability_end

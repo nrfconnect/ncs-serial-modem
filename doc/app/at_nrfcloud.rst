@@ -21,6 +21,7 @@ The page describes the following nRF Cloud-related AT commands:
 .. rubric:: Observability #XNRFCLOUDOBS*
 
 The ``#XNRFCLOUDOBS*`` commands control the Memfault data that the device collects (metrics, events, logs, and, in builds that include it, a coredump) and its upload to nRF Cloud over the CoAP transport.
+See :ref:`sm_logging_observability` for how the data is collected and how it ends up in nRF Cloud.
 
 To use the ``#XNRFCLOUDOBS*`` commands that access the network (``#XNRFCLOUDOBSUPLOAD`` and ``#XNRFCLOUDOBSFORWARD``), the device must be connected to nRF Cloud. See :ref:`SM_AT_NRFCLOUD`.
 
