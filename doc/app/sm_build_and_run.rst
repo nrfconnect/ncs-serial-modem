@@ -9,12 +9,12 @@ Building and running
 
 The |SM| application can be found under :file:`app` in the |SM| folder structure.
 
-For more security, it is recommended to use the ``*/ns`` `variant <app_boards_names_>`_ of the board target (see the Requirements section above.)
-When built for this variant, the sample is configured to compile and run as a non-secure application using `security by separation <ug_tfm_security_by_separation_>`_.
-Therefore, it automatically includes `Trusted Firmware-M <ug_tfm_>`_ that prepares the required peripherals and secure services to be available for the application.
+For more security, it is recommended to use the ``*/ns`` :ref:`variant <nrf:app_boards_names>` of the board target (see the Requirements section above.)
+When built for this variant, the sample is configured to compile and run as a non-secure application using :ref:`security by separation <nrf:ug_tfm_security_by_separation>`.
+Therefore, it automatically includes :ref:`Trusted Firmware-M <nrf:ug_tfm>` that prepares the required peripherals and secure services to be available for the application.
 
-To build the sample, follow the instructions in `Building an application`_ for your preferred building environment.
-See also `Programming an application`_ for programming steps and `Testing and optimization`_ for general information about testing and debugging in the |NCS|.
+To build the sample, follow the instructions in :ref:`Building an application <nrf:building>` for your preferred building environment.
+See also :ref:`Programming an application <nrf:programming>` for programming steps and :ref:`Testing and optimization <nrf:test_and_optimize>` for general information about testing and debugging in the |NCS|.
 
 .. note::
    |sysbuild_autoenabled_ncs|
@@ -40,12 +40,12 @@ To connect to an nRF91 Series DK with a PC:
    It is defined in the default configuration.
 
 2. Use the `Serial Terminal app`_ to connect to the development kit.
-   See `Testing and optimization`_ for instructions.
+   See :ref:`Testing and optimization <nrf:test_and_optimize>` for instructions.
    You can also use the :guilabel:`Open Serial Terminal` option of the `Cellular Monitor app`_ to open the Serial Terminal app.
    Using the Cellular Monitor app in combination with the Serial Terminal app shows how the modem responds to the different modem commands.
    You can then use this connection to send or receive AT commands over UART, and to see the log output of the development kit.
 
-   Instead of using the Serial Terminal app, you can use PuTTY to establish a terminal connection to the development kit, using the `default serial port connection settings <Testing and optimization_>`_.
+   Instead of using the Serial Terminal app, you can use PuTTY to establish a terminal connection to the development kit, using the :ref:`default serial port connection settings <nrf:test_and_optimize>`.
 
    .. note::
 
@@ -177,10 +177,10 @@ You can use a PC as a client.
 Connecting with a PC
 ====================
 
-The nRF5340 SoC of Thingy:91 X is pre-programmed with the `Connectivity bridge`_ application.
-To update the Connectivity bridge application, see the `Updating the Thingy:91 X firmware using nRF Util <Thingy91x_firmware_update_>`_  documentation.
+The nRF5340 SoC of Thingy:91 X is pre-programmed with the :ref:`Connectivity bridge <nrf:connectivity_bridge>` application.
+To update the Connectivity bridge application, see the :ref:`Updating the Thingy:91 X firmware using nRF Util <nrf:updating_firmware_nrf5340>`  documentation.
 The Connectivity bridge application routes ``UART_0`` to ``USB_CDC0`` on Thingy:91 X.
-By enabling the ``CONFIG_BRIDGE_BLE_ENABLE`` Kconfig option in the Connectivity bridge application, you can also use |SM| over `Nordic UART Service (NUS) <Nordic UART Service_>`_.
+By enabling the ``CONFIG_BRIDGE_BLE_ENABLE`` Kconfig option in the Connectivity bridge application, you can also use |SM| over :ref:`Nordic UART Service (NUS) <nrf:nus_service_readme>`.
 
 To connect to a Thingy:91 X with a PC:
 
@@ -198,7 +198,7 @@ The following testing instructions focus on testing the application with a PC cl
 |test_sample|
 
 1. |connect_kit|
-#. `Connect to the kit with the Serial Terminal app <Testing and optimization_>`_.
+#. :ref:`Connect to the kit with the Serial Terminal app <nrf:test_and_optimize>`.
    You can also use the :guilabel:`Open Serial Terminal` option of the `Cellular Monitor app`_ to open the Serial Terminal app.
    If you want to use a different terminal emulator, see :ref:`sm_connecting_91dk_pc`.
 #. Reset the kit.
@@ -218,7 +218,7 @@ See :ref:`sm_testing` for typical test cases.
 Using the LwM2M carrier library
 *******************************
 
-The application supports the |NCS| `LwM2M carrier`_ library that you can use to connect to the operator's device management platform.
+The application supports the |NCS| :ref:`LwM2M carrier <nrf:liblwm2m_carrier_readme>` library that you can use to connect to the operator's device management platform.
 See the library's documentation for more information and configuration options.
 
 To enable the LwM2M carrier library, add the following parameters to your build command:
@@ -229,8 +229,8 @@ To enable the LwM2M carrier library, add the following parameters to your build 
    -DEXTRA_DTC_OVERLAY_FILE=carrier-nrf9151.overlay
 
 The CA root certificates that are needed for modem FOTA are not provisioned in the |SM| application.
-You can flash the `Cellular: LwM2M carrier`_ sample to write the certificates to modem before flashing the |SM| application, or use the `Cellular: AT Client`_ sample as explained in `preparing the Cellular: LwM2M Client sample for production <lwm2m_client_provisioning_>`_.
-It is also possible to modify the |SM| application project itself to include the certificate provisioning, as demonstrated in the `Cellular: LwM2M carrier`_ sample.
+You can flash the :ref:`Cellular: LwM2M carrier <nrf:lwm2m_carrier>` sample to write the certificates to modem before flashing the |SM| application, or use the :ref:`Cellular: AT Client <nrf:at_client_sample>` sample as explained in :ref:`preparing the Cellular: LwM2M Client sample for production <nrf:lwm2m_client_provisioning>`.
+It is also possible to modify the |SM| application project itself to include the certificate provisioning, as demonstrated in the :ref:`Cellular: LwM2M carrier <nrf:lwm2m_carrier>` sample.
 
 .. code-block:: c
 
@@ -242,10 +242,10 @@ It is also possible to modify the |SM| application project itself to include the
            ...
 
 
-The certificate provisioning can also be done directly in the |SM| application by using the same AT commands as described for the `Cellular: AT Client`_ sample.
+The certificate provisioning can also be done directly in the |SM| application by using the same AT commands as described for the :ref:`Cellular: AT Client <nrf:at_client_sample>` sample.
 
-When the `LwM2M carrier`_ library is in use, by default the application will auto-connect to the network on startup.
-This behavior can be changed by disabling the :ref:`CONFIG_SM_AUTO_CONNECT <CONFIG_SM_AUTO_CONNECT>` option.
+When the :ref:`LwM2M carrier <nrf:liblwm2m_carrier_readme>` library is in use, by default the application will auto-connect to the network on startup.
+This behavior can be changed by disabling the :option:`CONFIG_SM_AUTO_CONNECT` option.
 
 .. _sm_build_disable_b0:
 

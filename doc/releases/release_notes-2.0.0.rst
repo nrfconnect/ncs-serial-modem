@@ -7,7 +7,7 @@ Changelog
 *********
 
 This release is based on the |NCS| v3.4.1 release.
-It is also based on the `Memfault`_ SDK v1.45.0 release, which is updated from the v1.40.1 in the |NCS| v3.4.1 release.
+It is also based on the :ref:`Memfault <nrf:mod_memfault>` SDK v1.45.0 release, which is updated from the v1.40.1 in the |NCS| v3.4.1 release.
 
 * Added:
 

@@ -53,7 +53,7 @@ The Data Terminal Ready (DTR) and Ring Indicator (RI) signals are the control si
 
 .. important::
    The |SM| has hardware flow control (RTS and CTS) permanently enabled.
-   Using the |SM| without connecting RTS and CTS to the host is `experimental <Software maturity levels_>`_ and strongly not recommended.
+   Using the |SM| without connecting RTS and CTS to the host is is :ref:`experimental <nrf:software_maturity>` and strongly not recommended.
    See :ref:`uart_without_flow_control` for more information.
 
 .. _nrf91m1_uart_pin_assignment:
@@ -116,7 +116,7 @@ If the host runs Zephyr, you can automate the UART power management with Zephyr'
 
 .. only:: html
 
-   See :external+main:ref:`uart_zephyr_cellular_modem_driver` for more information.
+   See :ref:`Automatic UART power management <main:uart_zephyr_cellular_modem_driver>` for more information.
 
 .. only:: latex
 
@@ -128,7 +128,7 @@ Operating without hardware flow control
 ***************************************
 
 .. important::
-   The use of the |SM| without hardware flow control (RTS/CTS) is `experimental <Software maturity levels_>`_ and strongly not recommended.
+   The use of the |SM| without hardware flow control (RTS/CTS) is :ref:`experimental <nrf:software_maturity>` and strongly not recommended.
    Hardware flow control ensures reliable communication and prevents timing-related issues.
    Without hardware flow control, there is a risk of data loss in UART communication, especially in high-throughput scenarios.
 
@@ -160,7 +160,7 @@ The UART receive buffer of the |SM| is fixed to 532 bytes and cannot be configur
 Operating with the nRF9151 DK
 *****************************
 
-You can flash the nRF91M1 firmware to the `nrf9151dk`_ board for development and testing purposes.
+You can flash the nRF91M1 firmware to the :doc:`nrf9151dk <zephyr:boards/nordic/nrf9151dk/doc/index>` board for development and testing purposes.
 
 .. important::
    The UART stays disabled until the **DTR** pin is asserted.
@@ -189,22 +189,22 @@ On the DK, the SiP is an nRF9151, and the UART pins follow the pin mapping of th
    * - UART1 TX
      - P0.29
 
-By default on the `nrf9151dk`_ board, UART0 is routed to VCOM0 on the interface chip, and UART1 is routed to VCOM1 on the interface chip.
-This allows you to use the `nrf9151dk`_ board with a PC host for development and testing.
+By default on the :doc:`nrf9151dk <zephyr:boards/nordic/nrf9151dk/doc/index>` board, UART0 is routed to VCOM0 on the interface chip, and UART1 is routed to VCOM1 on the interface chip.
+This allows you to use the :doc:`nrf9151dk <zephyr:boards/nordic/nrf9151dk/doc/index>` board with a PC host for development and testing.
 
 .. _nrf91m1_uart_nrf9151dk:
 
 Run the application firmware on the nRF9151 DK
 ==============================================
 
-To test the nRF91M1 application firmware on the `nrf9151dk`_ board, complete the following steps:
+To test the nRF91M1 application firmware on the :doc:`nrf9151dk <zephyr:boards/nordic/nrf9151dk/doc/index>` board, complete the following steps:
 
 1. Download the modem firmware and the application firmware from the `nRF91M1 Downloads`_ page.
 #. Install the `Programmer app`_ in nRF Connect for Desktop.
-#. Program the modem firmware to the `nrf9151dk`_ board using the Programmer app.
+#. Program the modem firmware to the :doc:`nrf9151dk <zephyr:boards/nordic/nrf9151dk/doc/index>` board using the Programmer app.
    Follow the instructions for the modem firmware in `Programming nRF91x1 DK firmware`_.
 #. Unzip the application firmware package.
-   Program the :file:`.hex` file to the `nrf9151dk`_ board using the Programmer app.
+   Program the :file:`.hex` file to the :doc:`nrf9151dk <zephyr:boards/nordic/nrf9151dk/doc/index>` board using the Programmer app.
    Follow the instructions for the application firmware in `Programming nRF91x1 DK firmware`_, which differ from the instructions for the modem firmware.
 #. Connect **P0.31** (DTR) to **GND** using a jumper wire.
    Currently, you must use a physical jumper wire, but in the future, you can use the `Board Configurator app`_ in nRF Connect for Desktop.
@@ -218,7 +218,7 @@ To test the nRF91M1 application firmware on the `nrf9151dk`_ board, complete the
 PC host
 =======
 
-When you use the `nrf9151dk`_ board with a PC host, you must connect the **DTR** pin to **GND** to enable UART0, as described in :ref:`nrf91m1_uart_nrf9151dk`.
+When you use the :doc:`nrf9151dk <zephyr:boards/nordic/nrf9151dk/doc/index>` board with a PC host, you must connect the **DTR** pin to **GND** to enable UART0, as described in :ref:`nrf91m1_uart_nrf9151dk`.
 
 When you use a PC serial terminal application (for example, PuTTY, Tera Term, minicom) to send AT commands, configure the terminal as follows:
 
@@ -239,7 +239,7 @@ See :ref:`SM_AT_syntax` for the AT command syntax.
 External MCU host
 =================
 
-When you use the `nrf9151dk`_ board with an external MCU host, you must disable VCOM0 in the `Board Configurator app`_ to release the UART pins for external use.
+When you use the :doc:`nrf9151dk <zephyr:boards/nordic/nrf9151dk/doc/index>` board with an external MCU host, you must disable VCOM0 in the `Board Configurator app`_ to release the UART pins for external use.
 
 .. _nrf91m1_uart_cellular_ppp_modem:
 
@@ -247,7 +247,7 @@ Cellular PPP modem
 ==================
 
 For information on how the |SM| works as a cellular PPP modem, see :ref:`nrf91m1_cellular_modem`.
-For information on how to configure a Linux host with the `nrf9151dk`_ board running nRF91M1 firmware, see `Serial Modem PPP Linux host`_.
+For information on how to configure a Linux host with the :doc:`nrf9151dk <zephyr:boards/nordic/nrf9151dk/doc/index>` board running nRF91M1 firmware, see `Serial Modem PPP Linux host`_.
 For a Zephyr host, see `Serial Modem PPP Zephyr host`_.
 
 .. include:: ../uart_configuration.rst

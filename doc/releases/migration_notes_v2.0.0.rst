@@ -80,7 +80,7 @@ Custom static partition layout migration
 All flash and SRAM partitions are now defined in devicetree overlays instead of ``pm_static_*.yml`` files.
 
 If you maintained a custom ``pm_static_*.yml`` file, recreate the partition layout as a devicetree overlay, using the files in :file:`app/boards/` and :file:`app/*.overlay` as a reference.
-For a general guide on migrating from Partition Manager to DTS, see the |NCS| `PM to DTS migration <migration_partitions_>`_ page.
+For a general guide on migrating from Partition Manager to DTS, see the |NCS| :ref:`PM to DTS migration <nrf:migration_partitions>` page.
 
 If you are planning to upgrade the applications in field from v1.x.x to v2.0.0 and were using the default partition layout, see :ref:`sm_build_disable_b0` for how to disable the B0 partition, which is used by default in v2.0.0.
 
