@@ -13,7 +13,7 @@ Add the pages that do not apply to the nRF91M1 to ``exclude_patterns`` below.
 Excluded pages are never read, so an ``:ref:`` or ``:doc:`` link from an
 included page to an excluded one becomes a warning. Turn such links into
 intersphinx references to the main docset instead, for example
-``:external+main:doc:`app/at_carrier```.
+``:doc:`main:app/at_carrier```.
 """
 
 import sys
@@ -57,10 +57,11 @@ latex_elements = docset_latex_elements(
 html_theme_options["docset"] = DOCSET
 html_context = docset_html_context(DOCSET)
 
-# Lets this docset link into the main docset with :external+main:. The mapping
-# is only available once the main docset has been built, which is why
+# Lets this docset link into the main docset with the ``main:`` prefix, on top
+# of the |NCS| inventories that conf_common sets up. The mapping is only
+# available once the main docset has been built, which is why
 # _scripts/build_docsets.py builds the docsets in order.
-intersphinx_mapping = {}
+intersphinx_mapping = dict(intersphinx_mapping)
 
 _main_mapping = docsets.get_intersphinx_mapping("main")
 if _main_mapping:

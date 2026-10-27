@@ -50,7 +50,7 @@ if exist "%BUILDDIR%" rmdir /s /q "%BUILDDIR%"
 goto end
 
 :help
-echo.Run 'doxygen' first, then one of:
+echo.Targets:
 echo.  html       Build all docsets into %BUILDDIR%\html (same as docsets)
 echo.  docsets    Build all docsets into %BUILDDIR%\html
 echo.  main       Build only the main docset

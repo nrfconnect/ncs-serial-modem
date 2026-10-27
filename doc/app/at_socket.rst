@@ -547,7 +547,7 @@ The parameters and their defined values are the following:
      * ``<value>`` is an integer that indicates whether delayed IPv6 address refresh is enabled.
        It is ``0`` for disabled or ``1`` for enabled.
 
-See `nRF socket options <nrfxlib_nrf_sockets_>`_ for explanation of the supported options.
+See :ref:`nRF socket options <nrfxlib:socket_options_func>` for explanation of the supported options.
 
 Examples
 ~~~~~~~~
@@ -691,7 +691,7 @@ The parameters and their defined values are the following:
        * ``1`` - ``DTLS_FRAG_EXT_512_ENABLED``.
        * ``2`` - ``DTLS_FRAG_EXT_1024_ENABLED``.
 
-See `nRF socket options <nrfxlib_nrf_sockets_>`_ for explanation of the supported options.
+See :ref:`nRF socket options <nrfxlib:socket_options_func>` for explanation of the supported options.
 
 
 Example
@@ -933,7 +933,7 @@ The parameters and their defined values are the following:
 
    .. only:: not nrf91m1
 
-      The termination command :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` is not used in this case.
+      The termination command :option:`CONFIG_SM_DATAMODE_TERMINATOR` is not used in this case.
 
    .. only:: nrf91m1
 
@@ -1218,7 +1218,7 @@ The parameters and their defined values are the following:
 
    .. only:: not nrf91m1
 
-      The termination command :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` is not used in this case.
+      The termination command :option:`CONFIG_SM_DATAMODE_TERMINATOR` is not used in this case.
 
    .. only:: nrf91m1
 

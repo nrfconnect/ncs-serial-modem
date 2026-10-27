@@ -29,13 +29,19 @@ config SM_BLOCKING_WORK_Q_STACK_SIZE
 config SM_CUSTOMER_VERSION
 	string "Customer version string"
 	help
-	   This version is reported together with baseline versions by AT command "#XSMVER".
+	  Version string defined by the customer after customizing the application.
+	  When defined, this version is reported together with the baseline versions by the
+	  ``AT#XSMVER`` AT command.
 
 #
 # external XTAL for UART
 #
 config SM_EXTERNAL_XTAL
 	bool "Use external XTAL for UARTE"
+	help
+	  Configures the application to use an external XTAL for UARTE.
+	  For more information, see the UARTE - Universal asynchronous receiver/transmitter with
+	  EasyDMA section of the `nRF9151 Product Specification`_ documentation.
 
 #
 # AT command terminator
@@ -52,12 +58,23 @@ choice
 
 config SM_CR_TERMINATION
 	bool "CR termination"
+	help
+	  Configures the application to accept AT commands ending with a carriage return.
+	  This is the default AT command terminator.
+
+	  Select this option if you want to connect to the development kit using PuTTY.
+	  See :ref:`Testing and optimization <nrf:test_and_optimize>` for instructions.
 
 config SM_LF_TERMINATION
 	bool "LF termination"
+	help
+	  Configures the application to accept AT commands ending with a line feed.
 
 config SM_CR_LF_TERMINATION
 	bool "CR+LF termination"
+	help
+	  Configures the application to accept AT commands ending with a carriage return
+	  followed by a line feed.
 
 endchoice
 
@@ -72,6 +89,7 @@ config SM_UART_RX_BUF_COUNT
 	  Amount of buffers for receiving (RX) UART traffic.
 	  If the buffers are full, UART RX will be disabled until the buffers are processed.
 	  These buffers are not used when CMUX is in use.
+	  The default value is 3.
 
 config SM_UART_RX_BUF_SIZE
 	int "Receive buffer size for UART"
@@ -85,6 +103,7 @@ config SM_UART_RX_BUF_SIZE
 	help
 	  Amount of received (RX), unprocessed, UART traffic that can be held by single buffer.
 	  Increase buffer space if UART0 or UART2 lacks hardware flow control.
+	  The default value is 256.
 
 config SM_UART_TX_BUF_SIZE
 	int "Send buffer size for UART"
@@ -94,6 +113,7 @@ config SM_UART_TX_BUF_SIZE
 	help
 	  Amount of UART traffic waiting to be sent (TX), that can be held.
 	  If the buffers are full, will send synchronously.
+	  The default value is 256.
 
 config SM_URC_BUFFER_SIZE
 	int "TX buffer size for unsolicited result codes (URC)"
@@ -111,6 +131,7 @@ config SM_URC_BUFFER_SIZE
 	  Note: %NCELLMEAS notifications can be nearly 4kB in size,
 	  which explains the default value.
 	  The maximum value is the size of the buffer that the result codes are formatted in.
+	  The default and maximum value is 4096.
 
 config SM_AT_ECHO_MAX_LEN
 	int "Maximum length of AT command echo"
@@ -138,7 +159,32 @@ config SM_URC_DELAY_WITH_INCOMPLETE_ECHO_MS
 config SM_AUTO_CONNECT
 	bool "Automatically connect to the network on start-up or after a reset"
 	help
-	  Enables automatic connection to the network using the PDN configuration.
+	  Enables connecting to the network at start-up or reset using a defined PDN
+	  configuration.
+	  This option is enabled by the LwM2M Carrier overlay, but is otherwise disabled by
+	  default.
+
+	  Example configuration overlay for NB-IoT with Non-IP PDN:
+
+	  ::
+
+	     CONFIG_SM_AUTO_CONNECT=y
+	     CONFIG_SM_AUTO_CONNECT_SYSTEM_MODE="0,1,0,0"
+	     CONFIG_SM_AUTO_CONNECT_PDN_CONFIG=y
+	     CONFIG_SM_AUTO_CONNECT_PDN_FAMILY_NON_IP=y
+
+	  Example configuration overlay for LTE-M with custom APN and PAP authentication:
+
+	  ::
+
+	     CONFIG_SM_AUTO_CONNECT=y
+	     CONFIG_SM_AUTO_CONNECT_SYSTEM_MODE="1,0,0,0"
+	     CONFIG_SM_AUTO_CONNECT_PDN_CONFIG=y
+	     CONFIG_SM_AUTO_CONNECT_PDN_APN="internet"
+	     CONFIG_SM_AUTO_CONNECT_PDN_FAMILY_IPV4V6=y
+	     CONFIG_SM_AUTO_CONNECT_PDN_AUTH=1
+	     CONFIG_SM_AUTO_CONNECT_PDN_USERNAME="myuser"
+	     CONFIG_SM_AUTO_CONNECT_PDN_PASSWORD="mypass"
 
 if SM_AUTO_CONNECT
 
@@ -146,14 +192,28 @@ config SM_AUTO_CONNECT_SYSTEM_MODE
 	string "System mode for automatic network attach"
 	default "1,1,1,0"
 	help
-	  Defines the default system mode using '%XSYSTEMMODE' AT command for automatic network attach.
-	  The format is a comma-separated list of four integers. See the AT command reference for +XSYSTEMMODE for more details.
-	  Default value enables LTE-M, NB-IoT, and GNSS, with no LTE preference.
+	  Defines the system mode to use for automatic network attach, applied with the
+	  %XSYSTEMMODE AT command.
+	  The format is a comma-separated string of four single-digit integers: ``"X,Y,Z,W"``
+
+	  Where:
+
+	  * ``X`` = LTE-M support (0=disabled, 1=enabled)
+	  * ``Y`` = NB-IoT support (0=disabled, 1=enabled)
+	  * ``Z`` = GNSS support (0=disabled, 1=enabled)
+	  * ``W`` = LTE preference (0=no preference, 1=LTE-M, 2=NB-IoT, 3=network selection,
+	    4=LTE-M then NB-IoT)
+
+	  See the `%XSYSTEMMODE`_ command in the AT command Reference Guide for more details.
+	  The default value is ``"1,1,1,0"`` (enable LTE-M, NB-IoT, and GNSS with no
+	  preference).
 
 config SM_AUTO_CONNECT_PDN_CONFIG
 	bool "PDN configuration for automatic network attach"
 	help
-	  Enables sending of PDN configuration during automatic network attach.
+	  Enables sending of PDN configuration commands during automatic network attach.
+	  For the PDN family (IP type) options, see the `+CGDCONT`_ command in the AT command
+	  Reference Guide.
 
 if SM_AUTO_CONNECT_PDN_CONFIG
 
@@ -185,6 +245,7 @@ config SM_AUTO_CONNECT_PDN_FAMILY_IPV4V6
 	bool "IPv4 and IPv6"
 	help
 	  Use both IPv4 and IPv6 for the PDN connection (dual stack).
+	  This is the default.
 
 config SM_AUTO_CONNECT_PDN_FAMILY_NON_IP
 	bool "Non-IP"
@@ -208,10 +269,14 @@ config SM_AUTO_CONNECT_PDN_AUTH
 	default 0
 	range 0 2
 	help
-	  PDN authentication type to use for automatic network attach.
-	  0 = None
-	  1 = PAP
-	  2 = CHAP
+	  PDN authentication protocol to use for automatic network attach.
+	  See the `+CGAUTH`_ command in the AT command Reference Guide for more details.
+
+	  Valid values:
+
+	  * ``0`` - None (no authentication, default)
+	  * ``1`` - PAP (Password Authentication Protocol)
+	  * ``2`` - CHAP (Challenge Handshake Authentication Protocol)
 
 config SM_AUTO_CONNECT_PDN_USERNAME
 	string "PDN username for automatic network attach"
@@ -219,6 +284,8 @@ config SM_AUTO_CONNECT_PDN_USERNAME
 	help
 	  PDN username to use for automatic network attach.
 	  Leave empty if no username is required.
+	  Use only when :option:`CONFIG_SM_AUTO_CONNECT_PDN_AUTH` is set to 1 (PAP) or
+	  2 (CHAP).
 
 config SM_AUTO_CONNECT_PDN_PASSWORD
 	string "PDN password for automatic network attach"
@@ -226,6 +293,8 @@ config SM_AUTO_CONNECT_PDN_PASSWORD
 	help
 	  PDN password to use for automatic network attach.
 	  Leave empty if no password is required.
+	  Use only when :option:`CONFIG_SM_AUTO_CONNECT_PDN_AUTH` is set to 1 (PAP) or
+	  2 (CHAP).
 
 endif # SM_AUTO_CONNECT_PDN_CONFIG
 endif # SM_AUTO_CONNECT
@@ -237,7 +306,8 @@ config SM_DATAMODE_TERMINATOR
 	string "Pattern string to terminate data mode"
 	default "+++"
 	help
-	  Use a pattern to terminate data mode
+	  Pattern string to terminate data mode.
+	  The default pattern string is ``+++``.
 
 config SM_DATAMODE_BUF_SIZE
 	int "Buffer size for data mode"
@@ -245,6 +315,7 @@ config SM_DATAMODE_BUF_SIZE
 	default 4096
 	help
 	  Size of the buffer for data received in data mode.
+	  The default value is 4096.
 
 #
 # Configurable services
@@ -254,11 +325,14 @@ config SM_SMS
 	default y
 	select SMS
 	help
-	  Support SMS send/receive in plain text
+	  Enables additional AT commands for using the SMS service.
+	  Supports SMS send/receive in plain text.
 
 config SM_GNSS
 	bool "GNSS support"
 	default y
+	help
+	  Enables additional AT commands for using the GNSS service.
 
 config SM_ICMP
 	bool "ICMP ping support"
@@ -274,12 +348,15 @@ config SM_COAPC
 	select COAP_CLIENT
 	help
 	  Enable CoAP client AT commands for making CoAP requests.
+	  See :ref:`SM_AT_COAPC` for more information.
 
 config SM_MQTTC
 	bool "MQTT client support"
 	default y
 	select MQTT_LIB
 	select MQTT_LIB_TLS
+	help
+	  Enables additional AT commands for using the MQTT client service.
 
 configdefault MQTT_CLEAN_SESSION
 	default y if SM_MQTTC
@@ -289,12 +366,27 @@ config SM_FULL_FOTA
 
 config SM_DFU_MODEM_FULL
 	bool "Full modem DFU support"
+	help
+	  Enables support for full modem firmware updates using the ``AT#XDFUINIT``,
+	  ``AT#XDFUWRITE``, and ``AT#XDFUAPPLY`` commands.
+	  See the :ref:`DFU_AT_commands` for more information.
 
 config SM_PPP
 	bool "PPP support"
+	help
+	  Adds support for PPP.
+	  This option is enabled by the PPP overlay.
+	  PPP can be used in conjunction with :option:`CMUX <CONFIG_SM_CMUX>` in order to use a
+	  single UART for both AT data and PPP.
+	  When CMUX is also enabled, PPP is usable only through a CMUX channel.
+	  See :ref:`SM_AT_PPP` for more information.
 
 config SM_CMUX
 	bool "CMUX support"
+	help
+	  Adds support for CMUX.
+	  This option is enabled by the CMUX overlay.
+	  See :ref:`SM_AT_CMUX` for more information.
 
 config SM_CMUX_CHANNEL_COUNT
 	int "Number of CMUX channels" if SM_CMUX
@@ -312,6 +404,7 @@ config SM_DEBUG_STATS_HEAP
 	help
 	  Enable heap usage statistics for debugging purposes through AT#XDBGSTATSMEM command.
 	  The statistics are printed to the log so use AT#XLOG=1 to enable logging.
+	  See the :ref:`SM_AT_DBGSTATSMEM` for more information.
 
 config SM_DEBUG_STATS_THREAD_STACK
 	bool "Enable threads' stack usage statistics"
@@ -325,6 +418,7 @@ config SM_DEBUG_STATS_THREAD_STACK
 	  With default logging configurations, some of the stack usage metrics are dropped.
 	  You need to increase CONFIG_LOG_BUFFER_SIZE to 2048 or more to make it work.
 	  This feature will use 4-5 kB of FLASH.
+	  See the :ref:`SM_AT_DBGSTATSMEM` for more information.
 
 if SM_PPP
 
@@ -332,9 +426,11 @@ config SM_PPP_FALLBACK_MTU
 	int "Fallback MTU to be used by PPP"
 	default 1280
 	help
-	  PPP tries to retrieve the cellular link MTU from the modem (using `AT+CGCONTRDP`).
+	  Controls the MTU used by PPP.
+	  PPP tries to retrieve the cellular link MTU from the modem (using ``AT+CGCONTRDP``).
 	  If no MTU is returned by the modem, this value will be used as a fallback.
 	  The MTU will be used for sending and receiving of data on both the PPP and cellular links.
+	  The default value is 1280.
 
 endif # SM_PPP
 
@@ -354,6 +450,7 @@ config SM_MQTTC_MESSAGE_BUFFER_LEN
 	help
 	  Specifies maximum message size that can be transmitted/received through
 	  MQTT (excluding MQTT PUBLISH payload).
+	  The default value is 512, meaning 512 bytes for TX and RX, respectively.
 
 endif # SM_MQTTC
 
@@ -381,6 +478,7 @@ config SM_PGPS_INJECT_FIX_DATA
 	  This can be detrimental to short TTFF if the device is expected to move
 	  distances longer than a few dozen kilometers between fix attempts.
 	  In that case this option should be disabled.
+	  The default value is ``y``.
 
 endif # SM_GNSS
 
@@ -391,6 +489,7 @@ config SM_HTTPC
 	  Enable HTTP client AT commands for making HTTP/HTTPS requests.
 	  Uses non-blocking socket API with XAPOLL for asynchronous
 	  event-driven I/O.
+	  See :ref:`SM_AT_HTTPC` for more information.
 
 if SM_HTTPC
 
@@ -399,12 +498,14 @@ config SM_HTTPC_RESPONSE_TIMEOUT_MS
 	range 1000 300000
 	default 30000
 	help
+	  Idle timeout for an active HTTP request in milliseconds.
 	  The timer is a sliding window: it resets each time data is sent or
 	  received (request headers, body upload chunks, response body chunks).
 	  If no activity occurs within this window the request is aborted and
 	  ``#XHTTPCSTAT: <fd>,-1,<bytes>`` is reported.
 	  A periodic background scan enforces the deadline even when the
 	  server stalls silently without closing the TCP connection.
+	  The default value is 30000 (30 seconds).
 
 endif # SM_HTTPC
 

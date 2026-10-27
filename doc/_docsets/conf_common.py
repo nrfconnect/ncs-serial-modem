@@ -21,6 +21,8 @@ import sys
 
 from docutils import nodes
 from sphinx.transforms.post_transforms import SphinxPostTransform
+import west.manifest
+import west.util
 
 DOC_BASE = Path(__file__).absolute().parents[1]
 
@@ -29,12 +31,53 @@ sys.path.insert(0, str(DOC_BASE / "_utils"))
 
 import docsets  # noqa: E402
 
+# The Kconfig tree of the application and the Sphinx extensions of sdk-nrf and
+# Zephyr are all needed to build these docs, and only the west workspace knows
+# where they are.
+try:
+    manifest = west.manifest.Manifest.from_topdir()
+except west.util.WestNotFound as err:
+    raise RuntimeError(
+        "The documentation build needs a west workspace in which this "
+        "repository is the manifest repository."
+    ) from err
+
+SM_BASE = Path(manifest.repo_abspath)
+NRF_BASE = Path(manifest.get_projects(["nrf"])[0].abspath)
+ZEPHYR_BASE = Path(manifest.get_projects(["zephyr"])[0].abspath)
+
+# options-from-kconfig comes from sdk-nrf, and the Kconfig domain that the
+# :kconfig:option: role belongs to comes from Zephyr.
+sys.path.insert(0, str(NRF_BASE / "doc" / "_extensions"))
+sys.path.insert(0, str(ZEPHYR_BASE / "doc" / "_extensions"))
+
+# Needed by options_from_kconfig extension which is not self contained
+sys.path.insert(0, str(ZEPHYR_BASE / 'scripts'))
+
+from sm_project_info import (
+    get_manifest_revision,
+    get_version_string,
+    strip_v,
+    build_rst_epilog,
+)
+
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 copyright = "2026, Nordic Semiconductor"
 author = "Nordic Semiconductor"
 version = release = os.environ.get("VERSION", "latest")
+
+# -- Version information from west manifest ---------------------------------
+
+NCS_VERSION              = get_manifest_revision(manifest, "nrf")
+NCS_VERSION_NUMBER       = strip_v(NCS_VERSION)
+TOOLCHAIN_NCS_ID         = NCS_VERSION
+ADDON_RELEASE            = release
+
+# Zephyr version — read from zephyr/VERSION (same format as sm/VERSION).
+ZEPHYR_VERSION_NUMBER    = get_version_string(ZEPHYR_BASE / "VERSION")
+ZEPHYR_VERSION           = f"v{ZEPHYR_VERSION_NUMBER}"
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
@@ -44,16 +87,18 @@ version = release = os.environ.get("VERSION", "latest")
 highlight_language = "none"
 
 extensions = [
-    "breathe",
-    "sphinx_tabs.tabs",
-    "sphinx_togglebutton",
-    "sphinxcontrib.jquery",
-    "sphinx_copybutton",
-    "sphinx.ext.intersphinx",
-    # Converts the SVG figures to PDF for the LaTeX builder, which cannot embed
-    # SVG. Comes from sphinxcontrib-svg2pdfconverter and shells out to Inkscape.
-    # It does nothing in an HTML build, so Inkscape is only needed for the PDF.
-    "sphinxcontrib.inkscapeconverter",
+    'sphinx.ext.intersphinx',
+    'sphinx_tabs.tabs',
+    'sphinx_togglebutton',
+    'sphinxcontrib.jquery',
+    'sphinx_copybutton',
+    'options_from_kconfig',
+    'zephyr.doxyrunner',
+    'zephyr.doxybridge',
+    'zephyr.external_content',
+    'zephyr.kconfig',
+    'sphinxcontrib.inkscapeconverter',
+    'sm_project_info',
 ]
 
 templates_path = [str(DOC_BASE / "_templates")]
@@ -71,6 +116,58 @@ COMMON_EXCLUDE_PATTERNS = [
     "Thumbs.db",
     ".DS_Store",
 ]
+
+# Options for external_content -------------------------------------------------
+
+external_content_contents = [
+    (SM_BASE / "doc", "[!_]*"),
+    (SM_BASE, "applications/**/*.rst"),
+    (SM_BASE, "scripts/**/README.rst"),
+    (SM_BASE, "samples/**/*.rst"),
+    (SM_BASE, "tests/**/*.rst"),
+    (SM_BASE, "lib/**/Kconfig"),
+]
+
+# -- Options for doxyrunner plugin ---------------------------------------------
+
+# The Doxygen output has to land inside the HTML of the docset, so the build
+# directory has to come from the script that drives sphinx-build. It cannot be
+# read off sys.argv, because the HTML and the PDF build pass their arguments in
+# a different order.
+try:
+    build_dir = os.environ["SM_DOC_BUILD_DIR"]
+except KeyError as err:
+    raise RuntimeError(
+        "Build the documentation with doc/_scripts/build_docsets.py, which "
+        "sets SM_DOC_BUILD_DIR."
+    ) from err
+
+_doxyrunner_outdir = Path(build_dir) / "html" / "doxygen"
+doxyrunner_doxygen = os.environ.get("DOXYGEN_EXECUTABLE", "doxygen")
+doxyrunner_projects = {
+    "sm": {
+        "doxyfile": SM_BASE / "doc" / "doxyfile.in",
+        "outdir": _doxyrunner_outdir,
+        "fmt": True,
+        "fmt_vars": {
+            "NRF_BASE": str(NRF_BASE),
+            "SM_BASE": str(SM_BASE),
+            "DOCSET_SOURCE_BASE": str(SM_BASE),
+            "DOCSET_BUILD_DIR": str(_doxyrunner_outdir),
+            "DOCSET_VERSION": release,
+        },
+    }
+}
+
+# -- Options for zephyr.doxybridge plugin ---------------------------------
+
+doxybridge_projects = {"sm": doxyrunner_projects["sm"]["outdir"]}
+
+# Options for options_from_kconfig ---------------------------------------------
+
+options_from_kconfig_base_dir = SM_BASE
+options_from_kconfig_zephyr_dir = ZEPHYR_BASE
+
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
@@ -95,15 +192,59 @@ html_css_files = ['css/custom.css']
 # docset directories, so html_extra_path cannot deliver it. It is copied there
 # by _scripts/build_docsets.py instead.
 
-## -- Options for Breathe ----------------------------------------------------
-# https://breathe.readthedocs.io/en/latest/index.html
+# -- Project-wide string substitutions ---------------------------------------
 #
-# WARNING: please, check breathe maintainership status before using this
-# extension in production!
+# Single source of truth for project-wide string substitutions (the tokens
+# referenced in RST source as ``|name|``).
+#
+# Each entry is a ``(name, value)`` pair consumed by the
+# ``sm_project_info`` extension, which:
+#
+#   1. Validates uniqueness of names at builder-init time.
+#
+#   2. Pre-expands ``|name|`` markers in raw RST source *before* docutils
+#      parses it (via a ``source-read`` hook).  This makes substitutions
+#      work uniformly everywhere, including inside ``code-block`` and
+#      ``literalinclude`` bodies.
+#
+#   3. Is used here via ``build_rst_epilog`` to pre-expand the same
+#      markers inside ``links.txt`` / ``shortcuts.txt`` URI targets before
+#      the text is handed to Sphinx as ``rst_epilog``.  (Docutils does not
+#      expand substitution references inside hyperlink target URIs.)
+#
+# List longer names before any name that is a substring of another to
+# ensure the longer match is applied first (the surrounding ``|``
+# delimiters already prevent overlap today, but the convention keeps the
+# file robust against future marker-syntax changes).
+#
+# Add new substitutions here only — do not redefine them elsewhere.
 
-breathe_projects = {"ncs-serial-modem": str(DOC_BASE / "_build_doxygen" / "xml")}
-breathe_default_project = "ncs-serial-modem"
-breathe_default_members = ("members",)
+SUBSTITUTIONS = [
+    ("release_version",             ADDON_RELEASE),
+    ("ncs_version_number",          NCS_VERSION_NUMBER),
+    ("ncs_version",                 NCS_VERSION),
+    ("toolchain_ncs_id",            TOOLCHAIN_NCS_ID),
+    ("zephyr_version_number",       ZEPHYR_VERSION_NUMBER),
+    ("zephyr_version",              ZEPHYR_VERSION),
+]
+
+# Consumed by the sm_project_info extension (source-read handler).
+sm_substitutions = SUBSTITUTIONS
+
+# -- Options for intersphinx --------------------------------------------------
+#
+# Hosted NCS inventories are published at nrfconnectdocs.nordicsemi.com.
+# See https://www.sphinx-doc.org/en/master/usage/extensions/intersphinx.html
+
+_NCS_DOCS_BASE = f"https://nrfconnectdocs.nordicsemi.com/ncs/{NCS_VERSION_NUMBER}"
+_NCS_DOCS_STORAGE = f"https://ncsdoc.z6.web.core.windows.net/ncs/{NCS_VERSION_NUMBER}"
+
+intersphinx_mapping = {
+    docset: (f"{_NCS_DOCS_BASE}/{docset}/", f"{_NCS_DOCS_STORAGE}/{docset}/objects.inv")
+    for docset in ("nrf", "nrfxlib", "zephyr", "kconfig", "mcuboot")
+}
+
+# -- rst_epilog: pre-expanded links.txt + shortcuts.txt ----------------------
 
 def docset_rst_epilog(docset: str) -> str:
     """Return the ``rst_epilog`` for a docset.
@@ -124,7 +265,6 @@ def docset_rst_epilog(docset: str) -> str:
 .. include:: /shortcuts_common.txt
 .. include:: /shortcuts_{docset}.txt
 """
-
 
 # -- Options for LaTeX output -------------------------------------------------
 #
