@@ -26,7 +26,8 @@ installation, Latexmk and Inkscape, so it is normally left to the doc-build
 workflow. Building both formats also copies each PDF into the HTML of its
 docset, which is where the "Download PDF" link of the pages points.
 
-Run :program:`doxygen` before this script; Breathe reads its XML output.
+Doxygen is run by the ``zephyr.doxyrunner`` extension as part of each Sphinx
+run, from the :file:`doc/doxyfile.in` template, so it needs no separate step.
 
 Usage
 *****
@@ -118,6 +119,11 @@ def build_docset(docset: str, fmt: str, build_dir: Path, sphinx_opts: list[str])
     # which refuses to load 5.30 modules. Strip those variables so that
     # latexmk finds the correct libraries.
     env = {k: v for k, v in os.environ.items() if k not in ("PERL5LIB", "PERLLIB")}
+
+    # conf_common.py places the Doxygen output below this directory. The HTML
+    # and the PDF form of the command order their arguments differently, so it
+    # cannot work the directory out for itself.
+    env["SM_DOC_BUILD_DIR"] = str(build_dir)
 
     print(f"Building the {fmt} of the {docset} docset:", " ".join(cmd), flush=True)
     subprocess.run(cmd, check=True, cwd=DOC_BASE, env=env)

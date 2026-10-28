@@ -1,5 +1,5 @@
-Sphinx>=8.1,<8.2
-breathe==4.36.0
+doxmlparser
+sphinx>=7.2,<8.2
 sphinx-ncs-theme<2.1
 sphinx-tabs>=3.4
 sphinx-togglebutton>=0.3.2
@@ -7,3 +7,7 @@ Pillow>=9.0.1
 sphinxcontrib.jquery
 sphinxcontrib-svg2pdfconverter
 sphinx-copybutton
+west
+kconfiglib
+python-dotenv
+PyYAML

@@ -12,9 +12,14 @@ on:
       - 'v*-branch'
     paths:
       - '.github/workflows/doc-build.yml'
-      - '.github/workflows/doc-publish.yml'
-      - '**.rst'
+      - '**/*.rst'
+      - '**/*.h'
+      - '**/Kconfig'
+      - '**/Kconfig.*'
+      - '**/sample.yaml'
       - 'doc/**'
+      - 'west.yml'
+      - 'VERSION'
       - "include/**"
   push:
     branches:
@@ -60,6 +65,12 @@ jobs:
           cache-dependency-path: doc/requirements.txt
           pip-install: |
             -r doc/requirements.txt
+            -r doc/requirements_ci.txt
+
+      - name: West update
+        run: |
+          west init -l .
+          west update -o=--depth=1 -n
 
       - name: Check version
         run: |
@@ -84,7 +95,6 @@ jobs:
       - name: Build
         working-directory: doc
         run: |
-          doxygen
           python _scripts/build_docsets.py -b build --format html --format pdf -W --keep-going
 
       - name: Prepare Azure upload

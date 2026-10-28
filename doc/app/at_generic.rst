@@ -198,7 +198,7 @@ The parameters and their defined values are the following:
    Hosts can use that ``major.minor.patch`` prefix to verify that application DFU moved to a newer image (compare ``AT#XSMVER`` before and after update).
    MCUboot applies the same ordering using the sign version from :file:`app/VERSION` (``major.minor.patch+tweak``).
    The Git suffix is not part of that check.
-   See :ref:`sm_releasing` for release version updates.
+   See :ref:`Releasing the Serial Modem <main:sm_releasing>` for release version updates.
 
 <ncs_version>
    String.
@@ -208,7 +208,7 @@ The parameters and their defined values are the following:
 
    <customer_version>
       String.
-      The :ref:`CONFIG_SM_CUSTOMER_VERSION <CONFIG_SM_CUSTOMER_VERSION>` string, if defined.
+      The :option:`CONFIG_SM_CUSTOMER_VERSION` string, if defined.
 
 .. only:: nrf91m1
 
@@ -328,7 +328,7 @@ The ``#XSLEEP`` command makes the |SM| to enter idle or sleep mode.
    The ``#XSLEEP`` command is intended for experimentation and power consumption measurements and must not be used in production.
 
    You can use the DTR (Data Terminal Ready) and RI (Ring Indicator) signals to control the power state of the UART between the |SM| and the host.
-   See the :ref:`uart_configuration` section for more information about DTR and RI.
+   See the :ref:`UART configuration <main:uart_configuration>` section for more information about DTR and RI.
 
 .. note::
 
@@ -656,7 +656,7 @@ The parameters and their defined values are the following:
 
      .. only:: not nrf91m1
 
-        The firmware version is set at build time using ``CONFIG_FW_INFO_FIRMWARE_VERSION``.
+        The firmware version is set at build time using :kconfig:option:`CONFIG_FW_INFO_FIRMWARE_VERSION`.
 
    * When ``<op>`` is ``1``, it is ``0`` if slot ``s0`` is active and ``1`` if slot ``s1`` is active.
 
@@ -769,7 +769,7 @@ Memory statistics #XDBGSTATSMEM
 
 .. note::
 
-   This AT command is `Experimental <Software maturity levels_>`_.
+   This AT command is :ref:`Experimental <nrf:software_maturity>`.
 
 Print heap and thread stack memory statistics to the log at the ``INF`` level.
 Since this is using the logging as an output, you must enable logging first by issuing the ``AT#XLOG=1`` command.
@@ -781,14 +781,14 @@ The following statistics are printed:
 
 .. only:: not nrf91m1
 
-   * Kernel heap block information - This is only available when the ``CONFIG_SYS_HEAP_INFO`` Kconfig option is enabled.
+   * Kernel heap block information - This is only available when the :kconfig:option:`CONFIG_SYS_HEAP_INFO` Kconfig option is enabled.
    * Thread stack usage statistics:
 
-     * This is only available when the :ref:`CONFIG_SM_DEBUG_STATS_THREAD_STACK <CONFIG_SM_DEBUG_STATS_THREAD_STACK>` Kconfig option is enabled.
-     * Setting the ``CONFIG_LOG_BUFFER_SIZE`` Kconfig option to 2048 or more is required to avoid dropping some of the log entries showing stack usage statistics.
+     * This is only available when the :option:`CONFIG_SM_DEBUG_STATS_THREAD_STACK` Kconfig option is enabled.
+     * Setting the :kconfig:option:`CONFIG_LOG_BUFFER_SIZE` Kconfig option to 2048 or more is required to avoid dropping some of the log entries showing stack usage statistics.
 
-   This command is available when the firmware is built with the :ref:`CONFIG_SM_DEBUG_STATS_HEAP <CONFIG_SM_DEBUG_STATS_HEAP>` Kconfig option enabled.
-   In addition, the ``CONFIG_LOG`` Kconfig option and the ``CONFIG_SM_LOG_LEVEL_DBG`` or ``CONFIG_SM_LOG_LEVEL_INF`` Kconfig option must be enabled.
+   This command is available when the firmware is built with the :option:`CONFIG_SM_DEBUG_STATS_HEAP` Kconfig option enabled.
+   In addition, the :kconfig:option:`CONFIG_LOG` Kconfig option and the ``CONFIG_SM_LOG_LEVEL_DBG`` or ``CONFIG_SM_LOG_LEVEL_INF`` Kconfig option must be enabled.
 
 Set command
 -----------
@@ -835,7 +835,7 @@ These commands will print the following output in the log:
 
 .. only:: not nrf91m1
 
-   The output appears as follows when :ref:`CONFIG_SM_DEBUG_STATS_THREAD_STACK <CONFIG_SM_DEBUG_STATS_THREAD_STACK>` and ``CONFIG_SYS_HEAP_INFO`` Kconfig options are enabled.
+   The output appears as follows when :option:`CONFIG_SM_DEBUG_STATS_THREAD_STACK` and :kconfig:option:`CONFIG_SYS_HEAP_INFO` Kconfig options are enabled.
 
    ::
 

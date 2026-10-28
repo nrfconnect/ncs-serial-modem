@@ -26,7 +26,7 @@ To use the ``#XNRFCLOUDOBS*`` commands that access the network (``#XNRFCLOUDOBSU
 
 .. only:: not nrf91m1
 
-   ``#XNRFCLOUDOBSDEVINFO``, ``#XNRFCLOUDOBSCRASH``, and ``#XNRFCLOUDOBSEXPORT`` additionally require the :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG <CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG>` Kconfig option, which is disabled by default.
+   ``#XNRFCLOUDOBSDEVINFO``, ``#XNRFCLOUDOBSCRASH``, and ``#XNRFCLOUDOBSEXPORT`` additionally require the :option:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG` Kconfig option, which is disabled by default.
 
 Upload is host-driven.
 Automatic uploads are disabled by default.
@@ -53,7 +53,7 @@ The ``#XNRFCLOUD`` command controls the access to the nRF Cloud service.
 
    .. only:: not nrf91m1
 
-      * The :ref:`CONFIG_SM_NRF_CLOUD <CONFIG_SM_NRF_CLOUD>` Kconfig option must be enabled.
+      * The :option:`CONFIG_SM_NRF_CLOUD` Kconfig option must be enabled.
 
    * The device must have access to nRF Cloud through the LTE network.
 
@@ -233,7 +233,7 @@ The request uses information from the cellular network, Wi-Fi® access points, o
 
    .. only:: not nrf91m1
 
-      Also, the :ref:`CONFIG_SM_NRF_CLOUD_LOCATION <CONFIG_SM_NRF_CLOUD_LOCATION>` Kconfig option must be enabled.
+      Also, the :option:`CONFIG_SM_NRF_CLOUD_LOCATION` Kconfig option must be enabled.
 
 Set command
 -----------
@@ -380,7 +380,7 @@ The ``#XNRFCLOUDFOTA`` command checks for and downloads an application or modem 
 
 .. only:: not nrf91m1
 
-   Requires the :ref:`CONFIG_SM_NRF_CLOUD_FOTA <CONFIG_SM_NRF_CLOUD_FOTA>` Kconfig option.
+   Requires the :option:`CONFIG_SM_NRF_CLOUD_FOTA` Kconfig option.
 
 An application update is staged the same way as ``AT#XFOTA=1``, that is, the host activates it with the ``AT#XRESET`` AT command.
 A modem update is staged the same way as ``AT#XFOTA=2``, that is, the host activates it with the ``AT#XMODEMRESET`` AT command.
@@ -614,7 +614,7 @@ The heartbeat carries the LTE metrics that the modem reports, such as the modem 
 
 .. only:: not nrf91m1
 
-   When :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_LTE_METRICS <CONFIG_SM_NRF_CLOUD_OBSERVABILITY_LTE_METRICS>` is enabled, the heartbeat also carries the cell ID, the tracking area code, the LTE mode, the PSM active time and periodic TAU, and the eDRX interval and paging time window.
+   When :option:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_LTE_METRICS` is enabled, the heartbeat also carries the cell ID, the tracking area code, the LTE mode, the PSM active time and periodic TAU, and the eDRX interval and paging time window.
 
 .. only:: nrf91m1
 
@@ -842,7 +842,7 @@ The parameters and their defined values are the following:
 
    .. only:: not nrf91m1
 
-      The initial value is set by the :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_AUTO_INTERVAL_SECONDS <CONFIG_SM_NRF_CLOUD_OBSERVABILITY_AUTO_INTERVAL_SECONDS>` Kconfig option.
+      The initial value is set by the :option:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_AUTO_INTERVAL_SECONDS` Kconfig option.
 
    .. only:: nrf91m1
 
@@ -923,7 +923,7 @@ Response
 
    The ``#XNRFCLOUDOBSDEVINFO`` command returns the Memfault device information, which identifies the device and the firmware in the Memfault project.
 
-   This command requires the :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG <CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG>` Kconfig option.
+   This command requires the :option:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG` Kconfig option.
 
    Set command
    -----------
@@ -990,7 +990,7 @@ Response
 
    The ``#XNRFCLOUDOBSCRASH`` command forces a crash, so that the coredump capture and upload can be tested.
 
-   This command requires the :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG <CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG>` Kconfig option.
+   This command requires the :option:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG` Kconfig option.
 
    Set command
    -----------
@@ -1044,7 +1044,7 @@ Response
 
    The ``#XNRFCLOUDOBSEXPORT`` command prints the buffered Memfault chunks to the AT interface instead of uploading them in the Memfault chunk export format, which the Memfault tooling can parse.
 
-   This command requires the :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG <CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG>` Kconfig option.
+   This command requires the :option:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG` Kconfig option.
 
    .. note::
       The command consumes the chunks.

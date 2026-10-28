@@ -589,8 +589,8 @@ The parameters and their defined values are the following:
 
    .. only:: not nrf91m1
 
-      The termination command :ref:`CONFIG_SM_DATAMODE_TERMINATOR <CONFIG_SM_DATAMODE_TERMINATOR>` is not used in this case.
-      The value must not exceed the value configured in the :ref:`CONFIG_SM_DATAMODE_BUF_SIZE <CONFIG_SM_DATAMODE_BUF_SIZE>` Kconfig option, as the payload must fit within the data mode buffer to be published as a single message.
+      The termination command :option:`CONFIG_SM_DATAMODE_TERMINATOR` is not used in this case.
+      The value must not exceed the value configured in the :option:`CONFIG_SM_DATAMODE_BUF_SIZE` Kconfig option, as the payload must fit within the data mode buffer to be published as a single message.
 
    .. only:: nrf91m1
 

@@ -116,7 +116,7 @@ If the host runs Zephyr, you can automate the UART power management with Zephyr'
 
 .. only:: html
 
-   See :external+main:ref:`uart_zephyr_cellular_modem_driver` for more information.
+   See :ref:`Automatic UART power management <main:uart_zephyr_cellular_modem_driver>` for more information.
 
 .. only:: latex
 

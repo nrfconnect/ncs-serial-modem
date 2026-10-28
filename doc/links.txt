@@ -3,71 +3,13 @@
        Links not separated by blank line are related to one another.
 
 .. ### nrfconnectdocs.nordicsemi.com (NCS doc)
+       Pages covered by the intersphinx inventories are referenced with :ref: or :doc: instead.
+       Only the pages without an inventory entry are listed here.
 
 .. _`nRF Connect SDK`: https://www.nordicsemi.com/Products/Development-software/nRF-Connect-SDK
 
-.. _`Getting started guide`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/installation.html
-.. _`nRF54L15 DK`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/app_dev/device_guides/nrf54l/index.html#ug-nrf54l
-.. _`nrf54l15dk`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/zephyr/boards/nordic/nrf54l15dk/doc/index.html#nrf54l15dk
-.. _`Thingy91X`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/app_dev/device_guides/thingy91x/index.html#ug-thingy91x
-.. _`nRF91 DK`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/app_dev/device_guides/nrf91/index.html#ug-nrf91
-.. _`nrf9151dk`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/zephyr/boards/nordic/nrf9151dk/doc/index.html#nrf9151dk
-.. _`Thingy91x_firmware_update`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/app_dev/device_guides/thingy91x/thingy91x_updating_fw_programmer.html#updating_the_firmware_on_the_nrf5340_soc
-.. _`shared TF-M logging`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/app_dev/device_guides/nrf91/nrf91_snippet.html#tfm-enable-share-uart
-.. _`app_boards_names`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/app_dev/board_names.html#app-boards-names
-.. _`Configuring and building`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/security/tfm/index.html#ug-tfm
-.. _`Testing and optimization`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/test_and_optimize.html
-.. _`Build and configuration system`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/app_dev/config_and_build/config_and_build_system.html
-.. _`Building an application`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/app_dev/config_and_build/building.html#building
-.. _`Programming an application`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/app_dev/programming.html#programming
-.. _`repository applications`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/app_dev/create_application.html#create-application-types-repository
-.. _`SDK repositories`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/dev_model_and_contributions/code_base.html#dm-repo-types
-.. _`sysbuild_enabled_ncs`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/app_dev/config_and_build/config_and_build_system.html#sysbuild-enabled-ncs
-.. _`create_application_types_freestanding`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/app_dev/create_application.html#create-application-types-freestanding
-.. _`sysbuild_enabled_ncs_configuring`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/app_dev/config_and_build/sysbuild/sysbuild_configuring_west.html#sysbuild-enabled-ncs-configuring
-.. _`cmake_options`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/app_dev/config_and_build/cmake/index.html#cmake-options
-.. _`build output files`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/app_dev/config_and_build/output_build_files.html
-.. _`Software maturity levels`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/releases_and_maturity/software_maturity.html
-.. _`migration_partitions`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/releases_and_maturity/migration/migration_partitions.html
-
-.. _`ug_tfm_security_by_separation`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/security/tfm/processing_environments.html#ug-tfm-security-by-separation
-.. _`ug_tfm`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/security/tfm/index.html#ug-tfm
-.. _`TF-M`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/security/tfm/processing_environments.html#app-boards-spe-nspe
-
-.. _`LwM2M carrier`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/libraries/bin/lwm2m_carrier/index.html#liblwm2m-carrier-readme
-.. _`lwm2m_configuration`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/libraries/bin/lwm2m_carrier/app_integration.html#configuration
-.. _`general_options_lwm2m`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/libraries/bin/lwm2m_carrier/app_integration.html#general_options
-.. _`device_options_lwm2m`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/libraries/bin/lwm2m_carrier/app_integration.html#device-options-lwm2m
-.. _`lwm2m_client_provisioning`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/samples/cellular/lwm2m_client/provisioning.html#lwm2m-client-provisioning
-.. _`Cellular: LwM2M carrier`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/samples/cellular/lwm2m_carrier/README.html#lwm2m-carrier
-.. _`Carrier-specific dependencies`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/libraries/bin/lwm2m_carrier/requirements.html#lwm2m-carrier-dependent
-.. _`Connectivity bridge`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/applications/connectivity_bridge/README.html#connectivity-bridge
-.. _`Cellular: AT Client`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/samples/cellular/at_client/README.html
-.. _`Nordic UART Service`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/libraries/bluetooth/services/nus.html#nus-service-readme
-.. _`AT parser`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/libraries/modem/at_parser.html
-.. _`AT Host`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/libraries/modem/at_host.html
-.. _`AT monitor`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/libraries/modem/at_monitor.html
-.. _`AT shell`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/libraries/modem/at_shell.html
-.. _`Modem library integration layer`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/libraries/modem/nrf_modem_lib/index.html
-.. _`Modem JWT`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/libraries/modem/modem_jwt.html
-.. _`SMS`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/libraries/modem/sms.html
-.. _`FOTA download`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/libraries/networking/fota_download.html
-.. _`Downloader`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/libraries/networking/downloader.html
-.. _`nRF Cloud`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/libraries/networking/nrf_cloud.html
-.. _`nRF Cloud A-GNSS`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/libraries/networking/nrf_cloud_agnss.html
-.. _`nRF Cloud P-GPS`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/libraries/networking/nrf_cloud_pgps.html
-.. _`nRF Cloud location`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/libraries/networking/nrf_cloud_location.html
-.. _`nRF Cloud device provisioning`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/libraries/networking/nrf_provisioning.html
-.. _`Modem library`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrfxlib/nrf_modem/README.html
-.. _`Trusted Firmware-M`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/security/tfm/index.html
-.. _`Zephyr’s Cellular modem`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/zephyr/samples/net/cellular_modem/README.html
-.. _`Custom AT commands`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/libraries/modem/at_cmd_custom.html
-.. _`nrfxlib_nrf_sockets`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrfxlib/nrf_modem/doc/sockets/socket_options_func.html
 .. _`nrfxlib_dtls_cid_settings`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrfxlib/doxygen/html/group__nrf__so__sec__dtls__cid__settings.html
 .. _`nrfxlib_dtls_cid_status`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrfxlib/doxygen/html/group__nrf__so__sec__dtls__cid__statuses.html
-.. _`Memfault library`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/libraries/debug/memfault_ncs.html#mod-memfault
-.. _`modem trace UART snippet`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/app_dev/device_guides/nrf91/nrf91_snippet.html#nrf91-modem-trace-uart-snippet
-.. _`Memfault`: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/libraries/debug/memfault_ncs.html#mod-memfault
 
 .. _`Serial LTE modem`: https://nrfconnectdocs.nordicsemi.com/ncs/3.1.1/nrf/applications/serial_lte_modem/README.html
 

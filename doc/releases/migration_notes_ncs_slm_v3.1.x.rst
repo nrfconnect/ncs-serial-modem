@@ -55,7 +55,7 @@ This section gives instructions on how to migrate from the |NCS| v3.1.x `SLM <Se
   See :ref:`SM_AT_trace` for the full command reference.
   If you cannot move to UART logs, see :ref:`sm_logging_rtt` for how to re-enable RTT logs.
 
-* Replaced the use of ``CONFIG_NRF_CLOUD_LOCATION`` to |SM|-specific new Kconfig option :ref:`CONFIG_SM_NRF_CLOUD_LOCATION <CONFIG_SM_NRF_CLOUD_LOCATION>`.
+* Replaced the use of ``CONFIG_NRF_CLOUD_LOCATION`` to |SM|-specific new Kconfig option :option:`CONFIG_SM_NRF_CLOUD_LOCATION`.
   You can now use this option to enable the `nRF Cloud Location Services <nRF Cloud Location Services_>`_ for cloud-assisted geolocation, which supports cellular and Wi-Fi positioning.
 
 * Rename the following AT commands:
@@ -93,7 +93,7 @@ Custom static partition layout migration
 All flash and SRAM partitions are now defined in devicetree overlays instead of ``pm_static_*.yml`` files.
 
 If you maintained a custom ``pm_static_*.yml`` file, recreate the partition layout as a devicetree overlay, using the files in :file:`app/boards/` and :file:`app/*.overlay` as a reference.
-For a general guide on migrating from Partition Manager to DTS, see the |NCS| `PM to DTS migration <migration_partitions_>`_ page.
+For a general guide on migrating from Partition Manager to DTS, see the |NCS| :ref:`PM to DTS migration <nrf:migration_partitions>` page.
 
 Merged hex generation
 ~~~~~~~~~~~~~~~~~~~~~

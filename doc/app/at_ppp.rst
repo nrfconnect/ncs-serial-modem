@@ -10,7 +10,7 @@ PPP AT commands
 This page describes AT commands related to the Point-to-Point Protocol (PPP).
 
 PPP is enabled in |SM| by compiling it with the appropriate configuration files, depending on your use case (with or without CMUX).
-See the :ref:`sm_config_files` section for more information.
+See the :ref:`Configuration files <main:sm_config_files>` section for more information.
 
 Enter data state +CGDATA
 ========================

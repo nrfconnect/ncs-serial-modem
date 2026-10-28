@@ -7,7 +7,7 @@
 
 .. ### Config shortcuts
 
-.. |config| replace:: See `Configuring and building`_ in the |NCS| documentation for information about how to permanently or temporarily change the configuration.
+.. |config| replace:: See :ref:`Configuring and building <nrf:ug_tfm>` in the |NCS| documentation for information about how to permanently or temporarily change the configuration.
 
 .. |connect_kit| replace:: Connect the kit to the computer using a USB cable.
    The kit is assigned a serial port.
@@ -19,8 +19,8 @@
 
 .. ### Other shortcuts
 
-.. |sysbuild_autoenabled_ncs| replace:: When building `repository applications`_ in the `SDK repositories`_, building with sysbuild is `enabled by default <sysbuild_enabled_ncs_>`_.
-   If you work with out-of-tree `freestanding applications <create_application_types_freestanding_>`_, you need to manually pass the ``--sysbuild`` parameter to every build command or `configure west to always use it <sysbuild_enabled_ncs_configuring_>`_.
+.. |sysbuild_autoenabled_ncs| replace:: When building :ref:`repository applications <nrf:create_application_types_repository>` in the :ref:`SDK repositories <nrf:dm_repo_types>`, building with sysbuild is :ref:`enabled by default <nrf:sysbuild_enabled_ncs>`.
+   If you work with out-of-tree :ref:`freestanding applications <nrf:create_application_types_freestanding>`, you need to manually pass the ``--sysbuild`` parameter to every build command or :ref:`configure west to always use it <nrf:sysbuild_enabled_ncs_configuring>`.
 
 .. |public_ip_address_req| replace:: the nRF91 Series DK must have a public IP address and the radio network must be configured to route incoming IP packets to the nRF91 Series DK.
    These depend on the network and SIM card used.
