@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from conf_common import *  # noqa: F401,F403
 from conf_common import author, docsets, docset_exclude_patterns, docset_rst_epilog, \
     html_theme_options, docset_latex_documents, docset_html_context, \
-    docset_latex_elements, release
+    docset_latex_elements, docset_intersphinx_mapping, release
 
 DOCSET = Path(__file__).resolve().parent.name
 
@@ -38,3 +38,7 @@ latex_elements = docset_latex_elements(
 
 html_theme_options["docset"] = DOCSET
 html_context = docset_html_context(DOCSET)
+
+# Lets this docset reference the other docsets with the "<docset>:" prefix, the
+# same way "nrf:" and "zephyr:" reference the |NCS| documentation.
+intersphinx_mapping = docset_intersphinx_mapping(DOCSET)

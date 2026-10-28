@@ -356,7 +356,7 @@ The ``#XSLEEP`` command makes the |SM| to enter idle or sleep mode.
    The ``#XSLEEP`` command is intended for experimentation and power consumption measurements and must not be used in production.
 
    You can use the DTR (Data Terminal Ready) and RI (Ring Indicator) signals to control the power state of the UART between the |SM| and the host.
-   See the :ref:`uart_configuration` section for more information about DTR and RI.
+   See the :ref:`UART configuration <main:uart_configuration>` section for more information about DTR and RI.
 
 .. note::
 
