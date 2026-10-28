@@ -244,6 +244,43 @@ intersphinx_mapping = {
     for docset in ("nrf", "nrfxlib", "zephyr", "kconfig", "mcuboot")
 }
 
+
+def docset_intersphinx_mapping(docset: str) -> dict[str, tuple[str, str]]:
+    """Return the ``intersphinx_mapping`` for a docset.
+
+    Extends the hosted |NCS| inventories with one entry per sibling docset, so
+    that a page references another docset through the same ``<name>:`` prefix
+    that ``nrf:`` and ``zephyr:`` use::
+
+        :ref:`Configuration files <main:sm_config_files>`
+
+    The same reference also has to work while the docset it points at is the
+    one being built, which happens whenever a page is shared by several
+    docsets. An inventory never describes the document it is generated from, so
+    intersphinx cannot resolve that case and :func:`_resolve_own_docset` takes
+    it over. This mapping therefore leaves out ``docset`` itself.
+
+    Args:
+        docset: Docset name.
+
+    Returns:
+        Value for the ``intersphinx_mapping`` configuration option.
+    """
+
+    mapping = dict(intersphinx_mapping)
+
+    for name in docsets.ALL_DOCSETS:
+        if name == docset:
+            continue
+        sibling = docsets.get_intersphinx_mapping(name)
+        # A docset that has not been built yet has no objects.inv, so only the
+        # docsets that come earlier in ALL_DOCSETS can be referenced. That is
+        # the order _scripts/build_docsets.py builds them in.
+        if sibling:
+            mapping[name] = sibling
+
+    return mapping
+
 # -- rst_epilog: pre-expanded links.txt + shortcuts.txt ----------------------
 
 def docset_rst_epilog(docset: str) -> str:
@@ -785,8 +822,52 @@ class RemoveLocalContents(SphinxPostTransform):
                 node.parent.remove(node)
 
 
+def _resolve_own_docset(app, env, node, contnode):
+    """Resolve a cross-docset reference that names the docset being built.
+
+    Pages shared by several docsets reference the other docsets by prefix, for
+    example ``:ref:`Configuration files <main:sm_config_files>```. Such a page
+    is also read by the docset it points at, and there the target is part of
+    the document being built. Intersphinx cannot resolve that, because an
+    inventory never describes the document it is generated from, so the prefix
+    is dropped here and the reference handed to the domain that owns it.
+
+    Args:
+        app: Sphinx application.
+        env: Build environment.
+        node: The ``pending_xref`` that no domain could resolve.
+        contnode: Node holding the link text.
+
+    Returns:
+        Resolved reference node, or ``None`` to leave the target to the
+        remaining ``missing-reference`` handlers.
+    """
+
+    docset = app.config.html_theme_options.get("docset")
+    if not docset:
+        return None
+
+    prefix = f"{docset}:"
+    target = node.get("reftarget", "")
+    if not target.startswith(prefix):
+        return None
+
+    node = node.deepcopy()
+    node["reftarget"] = target.removeprefix(prefix)
+
+    domain = env.get_domain(node.get("refdomain") or "std")
+    return domain.resolve_xref(
+        env, node.get("refdoc", ""), app.builder,
+        node["reftype"], node["reftarget"], node, contnode,
+    )
+
+
 def setup(app):
     app.add_post_transform(RemoveLocalContents)
+    # Lower priority than the intersphinx handler, which defaults to 500, so
+    # that the prefix is stripped before intersphinx looks for an inventory of
+    # the docset being built. There is none, by construction.
+    app.connect("missing-reference", _resolve_own_docset, priority=400)
 
 def docset_exclude_patterns(docset: str) -> list[str]:
     """Return the exclude patterns for a docset.

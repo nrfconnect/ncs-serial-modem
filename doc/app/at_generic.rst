@@ -198,7 +198,7 @@ The parameters and their defined values are the following:
    Hosts can use that ``major.minor.patch`` prefix to verify that application DFU moved to a newer image (compare ``AT#XSMVER`` before and after update).
    MCUboot applies the same ordering using the sign version from :file:`app/VERSION` (``major.minor.patch+tweak``).
    The Git suffix is not part of that check.
-   See :ref:`sm_releasing` for release version updates.
+   See :ref:`Releasing the Serial Modem <main:sm_releasing>` for release version updates.
 
 <ncs_version>
    String.
@@ -328,7 +328,7 @@ The ``#XSLEEP`` command makes the |SM| to enter idle or sleep mode.
    The ``#XSLEEP`` command is intended for experimentation and power consumption measurements and must not be used in production.
 
    You can use the DTR (Data Terminal Ready) and RI (Ring Indicator) signals to control the power state of the UART between the |SM| and the host.
-   See the :ref:`uart_configuration` section for more information about DTR and RI.
+   See the :ref:`UART configuration <main:uart_configuration>` section for more information about DTR and RI.
 
 .. note::
 
