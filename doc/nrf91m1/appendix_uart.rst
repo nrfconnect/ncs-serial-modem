@@ -160,6 +160,7 @@ Operating with the nRF9151 DK
 *****************************
 
 You can flash the nRF91M1 firmware to the `nrf9151dk`_ board for development and testing purposes.
+See :ref:`nrf91m1_update_dk` for how to program the nRF91M1 package to the DK.
 On the DK, the SiP is an nRF9151, and the UART pins follow the pin mapping of the nRF91M1 as listed in the following table:
 
 .. list-table::
