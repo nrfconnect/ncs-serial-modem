@@ -28,6 +28,9 @@ target_compile_options(app PRIVATE
   # Not a Kconfig symbol: shorten the wait for a chunk response so that the timeout path is
   # testable. The observability symbols are declared in Kconfig and set in prj.conf.
   -DOBS_COAP_RESPONSE_TIMEOUT_MS=50
+  # The Memfault choice symbol depends on DATE_TIME, which cannot be enabled here, so it is
+  # set directly to build the forwarding of date_time events to Memfault.
+  -DCONFIG_MEMFAULT_SYSTEM_TIME_SOURCE_DATETIME=1
 )
 
 # Generate CMock mocks

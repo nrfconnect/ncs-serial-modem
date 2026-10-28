@@ -16,6 +16,9 @@
 #include "sm_util.h"
 #include "sm_at_host.h"
 #include "sm_at_nrfcloud.h"
+#if defined(CONFIG_MEMFAULT_SYSTEM_TIME_SOURCE_DATETIME)
+#include <memfault/ports/ncs/date_time_callback.h>
+#endif
 
 LOG_MODULE_REGISTER(sm_nrfcloud, CONFIG_SM_LOG_LEVEL);
 
@@ -138,6 +141,11 @@ static void on_cloud_disconnected(void)
 
 static void date_time_event_handler(const struct date_time_evt *evt)
 {
+#if defined(CONFIG_MEMFAULT_SYSTEM_TIME_SOURCE_DATETIME)
+	/* date_time has a single handler, and registering this one replaces Memfault's. */
+	memfault_zephyr_date_time_evt_handler(evt);
+#endif
+
 	switch (evt->type) {
 	case DATE_TIME_OBTAINED_MODEM:
 	case DATE_TIME_OBTAINED_NTP:
