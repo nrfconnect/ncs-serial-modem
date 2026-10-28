@@ -23,10 +23,10 @@ For example, it can be used to exchange AT data and have a :option:`Point-to-Poi
 
 .. note::
 
-   To use the nRF91 Series SiP as a cellular dial-up PPP modem, see :ref:`sm_cellular_modem`.
+   To use the nRF91 Series SiP as a cellular dial-up PPP modem, see :ref:`Cellular PPP modem <main:sm_cellular_modem>`.
 
 CMUX is enabled in |SM| by compiling it with the appropriate configuration files, depending on your use case.
-See the :ref:`sm_config_files` section for more information.
+See the :ref:`Configuration files <main:sm_config_files>` section for more information.
 
 .. note::
 

@@ -880,8 +880,52 @@ def _resolve_own_docset(app, env, node, contnode):
         node["reftype"], node["reftarget"], node, contnode,
     )
 
+def _resolve_own_docset(app, env, node, contnode):
+    """Resolve a cross-docset reference that names the docset being built.
+
+    Pages shared by several docsets reference the other docsets by prefix, for
+    example ``:ref:`Configuration files <main:sm_config_files>```. Such a page
+    is also read by the docset it points at, and there the target is part of
+    the document being built. Intersphinx cannot resolve that, because an
+    inventory never describes the document it is generated from, so the prefix
+    is dropped here and the reference handed to the domain that owns it.
+
+    Args:
+        app: Sphinx application.
+        env: Build environment.
+        node: The ``pending_xref`` that no domain could resolve.
+        contnode: Node holding the link text.
+
+    Returns:
+        Resolved reference node, or ``None`` to leave the target to the
+        remaining ``missing-reference`` handlers.
+    """
+
+    docset = app.config.html_theme_options.get("docset")
+    if not docset:
+        return None
+
+    prefix = f"{docset}:"
+    target = node.get("reftarget", "")
+    if not target.startswith(prefix):
+        return None
+
+    node = node.deepcopy()
+    node["reftarget"] = target.removeprefix(prefix)
+
+    domain = env.get_domain(node.get("refdomain") or "std")
+    return domain.resolve_xref(
+        env, node.get("refdoc", ""), app.builder,
+        node["reftype"], node["reftarget"], node, contnode,
+    )
+
+
 def setup(app):
     app.add_post_transform(RemoveLocalContents)
+    # Lower priority than the intersphinx handler, which defaults to 500, so
+    # that the prefix is stripped before intersphinx looks for an inventory of
+    # the docset being built. There is none, by construction.
+    app.connect("missing-reference", _resolve_own_docset, priority=400)
 
     from kapa import add_kapa_search
 
