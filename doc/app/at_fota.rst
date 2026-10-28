@@ -261,6 +261,8 @@ The parameters and their defined values are the following:
       MCUboot bootloader update
          * A negative error code - Reading the active MCUboot version after the update failed.
          * ``1`` - The MCUboot version did not change.
+           This is also reported when you update the same version to slot ``s0`` while slot ``s1`` is active, even though the update has succeeded.
+           Verify the result with the ``AT#XBOOTINFO`` command.
 
       .. sm_nrf_cloud_fota_urc_params_end
 
