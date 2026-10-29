@@ -62,6 +62,7 @@ The parameters and their defined values are the following:
 
 <status>
    * ``0`` - Provisioning successful, or no pending commands on the server.
+     The two cases are not distinguished.
 
    * ``1`` - Host action required: deactivate LTE.
      The host must take the modem offline (for example ``AT+CFUN=4``) so that credentials can be written safely.
