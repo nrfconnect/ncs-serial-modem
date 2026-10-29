@@ -21,3 +21,14 @@
   color: #00a9ce;
   text-decoration: none;
 }
+
+/* Docutils marks compact lists as ``simple``; the NCS theme hides their bullets.
+   Revision history (and similar tables) need visible list markers in HTML. */
+table#nrf91m1-revision-history-table td ul.simple {
+  list-style-type: disc !important;
+  padding-left: 1.5em;
+}
+
+table#nrf91m1-revision-history-table td ul.simple > li {
+  list-style-type: disc !important;
+}
