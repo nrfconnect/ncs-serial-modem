@@ -12,8 +12,8 @@ Release notes
 
 For detailed list on changes for a specific nRF91M1 module application firmware release, refer to the following:
 
-Release notes for |SM| v2.0.0
-*****************************
+Release notes for Serial Modem v2.0.0
+*************************************
 
 This is the first official application firmware release for the nRF91M1 module.
 
