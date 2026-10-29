@@ -7,7 +7,7 @@ nRF91M1 AT Commands
    :maxdepth: 2
    :caption: Contents
 
-   nrf91m1/revision_history
+   nrf91m1/doc_revision_history
    nrf91m1/intro
    app/at_syntax
    app/at_generic
