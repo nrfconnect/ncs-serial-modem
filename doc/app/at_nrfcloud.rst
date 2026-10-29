@@ -145,9 +145,9 @@ Example
   #XNRFCLOUD: 1,1
   AT#XNRFCLOUD=0
 
-  #XNRFCLOUD: 0,1
-
   OK
+
+  #XNRFCLOUD: 0,1
 
 Read command
 ------------
@@ -288,6 +288,8 @@ Unsolicited notification
 
    #XNRFCLOUDPOS: <status>[,<type>,<latitude>,<longitude>,<uncertainty>]
 
+The notification is sent when the location request completes.
+
 The parameters and their defined values are the following:
 
 <status>
@@ -295,8 +297,6 @@ The parameters and their defined values are the following:
      Other parameters are also present.
    * ``-1`` - Location request failed.
    * ``<positive integer>`` - Requesting location from the cloud failed with cloud error as defined in :c:enum:`nrf_cloud_error` values.
-
-This is emitted when a successful response to a sent location request is received.
 
 <type>
    The service used to fulfill the location request.
@@ -314,7 +314,7 @@ This is emitted when a successful response to a sent location request is receive
    The longitude in degrees.
 
 <uncertainty>
-   Float.
+   Integer.
    The radius of the uncertainty circle around the location in meters, also known as Horizontal Positioning Error (HPE).
 
 Example
@@ -749,7 +749,7 @@ Core dump upload is enabled by default, and the setting is persisted.
 .. note::
 
    Core dump storage holds a single core dump.
-   While a new core dump is stored, subsequent crashes do not capture a new core dump until the stored one has been uploaded.
+   While a core dump is stored, subsequent crashes do not capture a new core dump until the stored one has been uploaded.
    Keeping the upload disabled prevents new core dumps from being captured.
 
 Set command
@@ -969,7 +969,7 @@ Response
 
      AT#XNRFCLOUDOBSDEVINFO
 
-     #XNRFCLOUDOBSDEVINFO: "50344654-3037-409f-802d-2206917f23d2","serial_modem","3.4.0","nrf9151dk"
+     #XNRFCLOUDOBSDEVINFO: "50344654-3037-409f-802d-2206917f23d2","app","2.0.0+0","nrf9151dk"
 
      OK
 
