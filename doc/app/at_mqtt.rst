@@ -15,6 +15,50 @@ This page describes the AT commands used to operate the MQTT client.
    It will not retransmit packets or guarantee packet delivery according to QoS classes.
    This deviates from MQTT v3.1.1.
 
+.. _SM_AT_MQTT_XMQTTEVT:
+
+MQTT event notification #XMQTTEVT
+=================================
+
+MQTT client AT commands report protocol events as unsolicited notifications:
+
+Unsolicited notification
+------------------------
+
+::
+
+   #XMQTTEVT: <evt_type>,<result>
+
+The parameters and their defined values are the following:
+
+<evt_type>
+   Integer.
+   The MQTT event type:
+
+   * ``0`` - Connection acknowledgment (CONNACK).
+   * ``1`` - Disconnection (DISCONNECT).
+     The MQTT client is disconnected from the MQTT broker when the |SM| sends this event.
+     If the host receives this event without a preceding ``AT#XMQTTCON=0`` command, the host must issue ``AT#XMQTTCON=0`` before connecting again.
+   * ``2`` - Incoming publish (PUBLISH).
+     A subscribed topic received a message.
+     The |SM| delivers the payload in a separate ``#XMQTTMSG`` notification.
+     See :ref:`SM_AT_MQTT_XMQTTMSG`.
+   * ``3`` - Publish acknowledgment (PUBACK), QoS 1.
+   * ``4`` - Publish received (PUBREC), QoS 2.
+   * ``5`` - Publish release (PUBREL), QoS 2.
+   * ``6`` - Publish complete (PUBCOMP), QoS 2.
+   * ``7`` - Subscribe acknowledgment (SUBACK).
+   * ``8`` - Unsubscribe acknowledgment (UNSUBACK).
+   * ``9`` - Ping response (PINGRESP).
+     The |SM| can send this event at any time while connected, when the keep alive interval expires and the client pings the broker.
+
+<result>
+   * ``0`` - Success.
+   * *Negative value* - Error code indicating the reason for the failure.
+
+The commands describe which ``<evt_type>`` values each command can trigger.
+All notifications use the syntax documented in this section.
+
 MQTT configure #XMQTTCFG
 ========================
 
@@ -134,6 +178,14 @@ MQTT connect #XMQTTCON
 
 The ``#XMQTTCON`` command allows you to connect to and disconnect from the MQTT broker.
 
+This command can send ``#XMQTTEVT`` with the following ``<evt_type>`` values:
+
+* ``0`` - After a successful connect request (``<op>`` ``1`` or ``2``).
+* ``1`` - After a disconnect request (``<op>`` ``0``), when the broker closes the connection, or when the client disconnects for other reasons.
+* ``9`` - While connected, when the broker responds to a keep alive ping.
+
+See :ref:`SM_AT_MQTT_XMQTTEVT` for the notification syntax and parameter descriptions.
+
 Set command
 -----------
 
@@ -178,49 +230,6 @@ The parameters and their defined values are the following:
 <sec_tag>
    Integer.
    The credential of the security tag used for establishing a secure connection.
-
-Response syntax
-~~~~~~~~~~~~~~~
-
-::
-
-   #XMQTTEVT: <evt_type>,<result>
-
-The parameters and their defined values are the following:
-
-<evt_type>
-   Integer.
-   The type of the event.
-   It can return the following values for the ``#XMQTTCON`` command:
-
-   * ``0`` - Acknowledgment of connection request (CONNACK).
-   * ``1`` - Disconnection notification (DISCONNECT).
-     The MQTT client is disconnected from the MQTT broker once this event is notified.
-     If this event is received without a preceding ``AT#XMQTTCON=0`` command, the host must issue ``AT#XMQTTCON=0`` before connecting again.
-
-<result>
-   * ``0`` - Success.
-   * *Negative value* - Error code indicating the reason for the failure.
-
-
-Unsolicited notification
-------------------------
-
-::
-
-   #XMQTTEVT=<evt_type>,<result>
-
-The parameters and their defined values are the following:
-
-<evt_type>
-   Integer.
-   The type of the event.
-   After the connection is established, it can return ``9`` to indicate a ping response from the MQTT broker (PINGRESP).
-   This is received when pinging (PINGREQ) the broker after the keep alive is reached.
-
-<result>
-   * ``0`` - Success.
-   * *Negative value* - Error code indicating the reason for the failure.
 
 Examples
 ~~~~~~~~
@@ -333,10 +342,54 @@ Examples
    #XMQTTCON: (0,1,2),<username>,<password>,<url>,<port>,<sec_tag>
    OK
 
+.. _SM_AT_MQTT_XMQTTMSG:
+
+Incoming message notification #XMQTTMSG
+=======================================
+
+When the MQTT client has successfully subscribed to a topic using :ref:`SM_AT_MQTT_XMQTTSUB` and a message is published on that topic, the |SM| sends ``#XMQTTMSG`` unsolicited notification.
+
+Unsolicited notification
+------------------------
+
+::
+
+   #XMQTTMSG: <topic_length>,<message_length>
+   <topic_received>
+   <message>
+
+The parameters and their defined values are the following:
+
+<topic_length>
+   Integer.
+   The length of the ``<topic_received>`` field.
+
+<message_length>
+   Integer.
+   The length of the ``<message>`` field.
+
+<topic_received>
+   String.
+   The topic that received the message.
+
+<message>
+   Raw payload bytes.
+   The message received from the topic, forwarded without conversion or escaping.
+   Read exactly ``<message_length>`` bytes, as the payload can contain NUL bytes and line breaks.
+
+.. _SM_AT_MQTT_XMQTTSUB:
+
 MQTT subscribe #XMQTTSUB
 ========================
 
 The ``#XMQTTSUB`` command allows you to subscribe to an MQTT topic.
+
+On successful subscription, the |SM| sends ``#XMQTTEVT`` with ``<evt_type>`` ``7`` (SUBACK).
+
+When a message is published on a subscribed topic, the |SM| sends ``#XMQTTMSG`` and ``#XMQTTEVT`` with ``<evt_type>`` ``2`` (PUBLISH).
+For incoming QoS 2 messages, the |SM| also sends ``#XMQTTEVT`` with ``<evt_type>`` ``5`` (PUBREL).
+
+See :ref:`SM_AT_MQTT_XMQTTEVT` and :ref:`SM_AT_MQTT_XMQTTMSG` for the notification syntax and parameter descriptions.
 
 Set command
 -----------
@@ -365,66 +418,6 @@ The parameters and their defined values are the following:
      If the acknowledgment of the reception is expected for the published message, publishing duplicate messages is permitted.
    * ``2`` - Highest Quality of Service.
      The acknowledgment of the reception is expected and the message should be published only once.
-
-Response syntax
-~~~~~~~~~~~~~~~
-
-::
-
-   #XMQTTEVT: <evt_type>,<result>
-
-The parameters and their defined values are the following:
-
-<evt_type>
-   * ``7`` - Acknowledgment of the subscribe request (SUBACK).
-
-<result>
-   * ``0`` - Success.
-   * *Negative value* - Error code indicating the reason for the failure.
-
-Unsolicited notifications
-~~~~~~~~~~~~~~~~~~~~~~~~~
-
-When the MQTT client has successfully subscribed to a topic and a message is published with the topic, the following unsolicited notifications are received:
-
-::
-
-   #XMQTTMSG: <topic_length>,<message_length>
-   <topic_received>
-   <message>
-
-The parameters and their defined values are the following:
-
-<topic_length>
-   Integer.
-   The length of the ``<topic_received>`` field.
-
-<message_length>
-   Integer.
-   The length of the ``<message>`` field.
-
-<topic_received>
-   String.
-   The topic that received the message.
-
-<message>
-   String or HEX.
-   The message received from the topic.
-
-::
-
-   #XMQTTEVT: <evt_type>,<result>
-
-The parameters and their defined values are the following:
-
-<evt_type>
-   * ``2`` - Message received on a topic the client is subscribed to (PUBLISH).
-   * ``5`` - Release of a published message with QoS 2 (PUBREL).
-
-<result>
-   * ``0`` - Success.
-   * *Negative value* - Error code indicating the reason for the failure.
-
 
 Examples
 ~~~~~~~~
@@ -484,6 +477,10 @@ MQTT unsubscribe #XMQTTUNSUB
 
 The ``#XMQTTUNSUB`` command allows you to unsubscribe from an MQTT topic.
 
+On successful unsubscription, the |SM| sends ``#XMQTTEVT`` with ``<evt_type>`` ``8`` (UNSUBACK).
+
+See :ref:`SM_AT_MQTT_XMQTTEVT` for the notification syntax and parameter descriptions.
+
 Set command
 -----------
 
@@ -502,23 +499,6 @@ The parameters and their defined values are the following:
 <topic>
    String.
    The topic to unsubscribe from.
-
-Response syntax
-~~~~~~~~~~~~~~~
-
-::
-
-   #XMQTTEVT: <evt_type>,<result>
-
-The parameters and their defined values are the following:
-
-<evt_type>
-   Integer.
-   It can return ``8`` for the ``#XMQTTUNSUB`` command to indicate an acknowledgment of the unsubscription request (UNSUBACK).
-
-<result>
-   * ``0`` - Success.
-   * *Negative value* - Error code indicating the reason for the failure.
 
 Examples
 ~~~~~~~~
@@ -543,6 +523,15 @@ MQTT publish #XMQTTPUB
 ======================
 
 The ``#XMQTTPUB`` command allows you to publish messages on MQTT topics.
+
+Depending on the QoS level, this command can send ``#XMQTTEVT`` with the following ``<evt_type>`` values:
+
+* ``3`` - QoS 1 (PUBACK).
+* ``4`` and ``6`` - QoS 2 (PUBREC, then PUBCOMP).
+
+QoS ``0`` does not produce an ``#XMQTTEVT`` notification.
+
+See :ref:`SM_AT_MQTT_XMQTTEVT` for the notification syntax and parameter descriptions.
 
 Set command
 -----------
@@ -599,24 +588,6 @@ The parameters and their defined values are the following:
 
    The value ``0`` is equivalent to omitting the parameter.
    Specifying a non-zero ``<data_len>`` together with a non-empty ``<msg>`` results in an error.
-
-Response syntax
-~~~~~~~~~~~~~~~
-
-::
-
-   #XMQTTEVT: <evt_type>,<result>
-
-The parameters and their defined values are the following:
-
-<evt_type>
-   * ``3`` - Acknowledgment for the published message with QoS 1 (PUBACK).
-   * ``4`` - Reception confirmation for the published message with QoS 2 (PUBREC).
-   * ``6`` - Confirmation to a publish release message with QoS 2 (PUBCOMP).
-
-<result>
-   * ``0`` - Success.
-   * *Negative value* - Error code indicating the reason for the failure.
 
 Examples
 ~~~~~~~~
