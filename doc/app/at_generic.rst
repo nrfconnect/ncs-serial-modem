@@ -169,7 +169,7 @@ The ``#XSMVER`` command returns the versions of the Serial Modem application fir
 Set command
 -----------
 
-The set command returns the versions of the |SM| and |NCS|.
+The set command returns the versions of the Serial Modem application firmware and |NCS|.
 
 Syntax
 ~~~~~~
@@ -189,20 +189,36 @@ The parameters and their defined values are the following:
 
 <sm_version>
    String.
-   The version of the |SM| in Git-describe style.
-   The ``major.minor.patch`` prefix comes from :file:`app/VERSION`.
-   The optional ``-N-g<hash>`` suffix (and ``-dirty``) comes from ``git describe`` in the application tree.
 
-   Example: ``"v1.99.0-68-gb2d3dde4dfa2"`` uses ``1.99.0`` from :file:`app/VERSION` and ``-68-gb2d3dde4dfa2`` from Git.
+   .. only:: nrf91m1
 
-   Hosts can use that ``major.minor.patch`` prefix to verify that application DFU moved to a newer image (compare ``AT#XSMVER`` before and after update).
-   MCUboot applies the same ordering using the sign version from :file:`app/VERSION` (``major.minor.patch+tweak``).
-   The Git suffix is not part of that check.
-   See :ref:`sm_releasing` for release version updates.
+      The version of the Serial Modem application firmware in ``v<major>.<minor>.<patch>`` format.
+
+      Hosts can use the version to verify that application DFU or FOTA moved to a newer image.
+      To check, compare the ``AT#XSMVER`` response before and after the update.
+
+   .. only:: not nrf91m1
+
+      The version of the |SM| application firmware in ``v<major>.<minor>.<patch>[<git-describe-style>]`` format.
+
+      The ``v<major>.<minor>.<patch>`` prefix comes from :file:`app/VERSION`.
+
+      The optional ``<git-describe-style>`` suffix in ``-N-g<hash>`` format (and ``-dirty``) comes from ``git describe`` in the application tree.
+
+      Example: ``"v2.99.0-68-gb2d3dde4dfa2-dirty"`` uses ``v2.99.0`` from :file:`app/VERSION` and ``-68-gb2d3dde4dfa2`` from ``git describe``.
+
+      Hosts can use the ``v<major>.<minor>.<patch>`` prefix to verify that application DFU or FOTA moved to a newer image.
+      To check, compare the ``AT#XSMVER`` response before and after the update.
+
+      Application downgrade prevention uses the same ``major.minor.patch`` version.
+      An application update with a lower version than the running application is rejected.
+      The Git suffix and the ``VERSION_TWEAK`` value in :file:`app/VERSION` are not taken into account.
+
+      See :ref:`sm_releasing` for release version updates.
 
 <ncs_version>
    String.
-   The version of the |NCS|.
+   The version of the |NCS| in ``<major>.<minor>.<patch>`` format.
 
 .. only:: not nrf91m1
 
@@ -213,39 +229,51 @@ The parameters and their defined values are the following:
 .. only:: nrf91m1
 
    <customer_version>
-      String. This parameter is missing on official builds.
+      String.
+      This parameter is missing on official release builds.
+      It is used in special cases such as FOTA-TEST builds.
 
 Example
 ~~~~~~~
 
-The following command example reads the versions:
+The following command examples read the versions:
 
 ::
 
-   // First v2.0.0 pre-release
-   AT#XSMVER
-   #XSMVER: "v1.99.0","3.3.99"
-   OK
-
-   // Development build
-   AT#XSMVER
-   #XSMVER: "v1.99.0-67-ga9e396bc3d58","3.3.99"
-   OK
-
-   // Second v2.0.0 pre-release (VERSION 1.99.1)
-   AT#XSMVER
-   #XSMVER: "v1.99.1","3.3.99"
-   OK
-
    // v2.0.0 release
    AT#XSMVER
-   #XSMVER: "v2.0.0","3.4.0"
+   #XSMVER: "v2.0.0","3.4.1"
    OK
 
-   // Pre-release with customer version
+::
+
+   // FOTA test package for v2.0.0 release
    AT#XSMVER
-   #XSMVER: "v1.99.0","3.3.99","Onomondo 2.1.0"
+   #XSMVER: "v2.0.0","3.4.1","FOTA-TEST"
    OK
+
+.. only:: not nrf91m1
+
+   ::
+
+      // First v3.0.0 pre-release
+      AT#XSMVER
+      #XSMVER: "v2.99.1","3.4.99"
+      OK
+
+   ::
+
+      // Pre-release with customer version
+      AT#XSMVER
+      #XSMVER: "v2.99.1","3.4.99","SomeCustomer_5.0"
+      OK
+
+   ::
+
+      // Development build
+      AT#XSMVER
+      #XSMVER: "v2.99.0-67-ga9e396bc3d58","3.4.99"
+      OK
 
 Read command
 ------------
