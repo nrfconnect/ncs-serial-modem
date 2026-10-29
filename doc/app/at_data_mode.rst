@@ -138,34 +138,10 @@ If the data mode buffer fills, the data are transmitted to the LTE network.
 
    The data mode buffer size is 4096 bytes.
 
-.. only:: not nrf91m1
-
-   Configuration options
-   *********************
-
-   Check and configure the following configuration options for data mode:
-
-   .. _CONFIG_SM_DATAMODE_TERMINATOR:
-
-   CONFIG_SM_DATAMODE_TERMINATOR - Pattern string to terminate data mode
-      This option specifies a pattern string to terminate data mode.
-      The default pattern string is ``+++``.
-
-   .. _CONFIG_SM_DATAMODE_BUF_SIZE:
-
-   CONFIG_SM_DATAMODE_BUF_SIZE - Buffer size for data mode
-      This option defines the buffer size for the data mode.
-      The default value is 4096.
-
-Data mode AT commands
-*********************
-
-The following command list describes data mode-related AT commands.
-
 .. _sm_data_mode_ctrl:
 
 Data mode control #XDATACTRL
-============================
+****************************
 
 The ``#XDATACTRL`` command allows you to configure the time limit used to trigger data transmissions.
 It can be applied only after entering data mode.
@@ -173,12 +149,12 @@ It can be applied only after entering data mode.
 When the time limit is configured, small-size packets will be sent only after the timeout.
 
 Set command
------------
+===========
 
 The set command allows you to configure the time limit for the data mode.
 
 Syntax
-~~~~~~
+------
 
 ::
 
@@ -200,45 +176,45 @@ The parameters and their defined values are the following:
       This value must be long enough to allow for a DMA transmission of an UART receive (RX) buffer (532 bytes).
 
 Read command
-------------
+============
 
 The read command allows you to check the current time limit configuration and the minimum value required, based on the configured UART baud rate.
 
 Syntax
-~~~~~~
+------
 
 ::
 
    AT#XDATACTRL?
 
 Response syntax
-~~~~~~~~~~~~~~~
+---------------
 
 ::
 
    #XDATACTRL: <current_time_limit>,<minimal_time_limit>
 
 Test command
-------------
+============
 
 The test command tests the existence of the command and provides information about the type of its subparameters.
 
 Syntax
-~~~~~~
+------
 
 ::
 
    AT#XDATACTRL=?
 
 Response syntax
-~~~~~~~~~~~~~~~
+---------------
 
 ::
 
    #XDATACTRL=<time_limit>
 
-Exit data mode #XDATAMODE
-=========================
+Exit data mode notification #XDATAMODE
+**************************************
 
 .. only:: not nrf91m1
 
@@ -249,7 +225,7 @@ Exit data mode #XDATAMODE
    When the application receives the termination command ``+++`` in data mode, it sends the ``#XDATAMODE`` unsolicited notification.
 
 Unsolicited notification
-------------------------
+========================
 
 ::
 
@@ -262,7 +238,7 @@ The parameters and their defined values are the following:
    * ``-1`` - Failure.
 
 Example
-~~~~~~~
+-------
 
 ::
 
@@ -272,3 +248,22 @@ Example
    Test datamode
    +++
    #XDATAMODE: 0
+
+.. only:: not nrf91m1
+
+   Configuration options
+   *********************
+
+   Check and configure the following configuration options for data mode:
+
+   .. _CONFIG_SM_DATAMODE_TERMINATOR:
+
+   CONFIG_SM_DATAMODE_TERMINATOR - Pattern string to terminate data mode
+      This option specifies a pattern string to terminate data mode.
+      The default pattern string is ``+++``.
+
+   .. _CONFIG_SM_DATAMODE_BUF_SIZE:
+
+   CONFIG_SM_DATAMODE_BUF_SIZE - Buffer size for data mode
+      This option defines the buffer size for the data mode.
+      The default value is 4096.
