@@ -26,7 +26,7 @@ jobs:
         id: unzip
         working-directory: docs
         run: |
-          OUTDIR=$(awk 'NR==1 { if ($3 ~ /^(latest|PR-[0-9]+|[0-9]+\.[0-9a-zA-Z\.\-]+)$/) print $3 }' monitor_*.txt)
+          OUTDIR=$(awk 'NR==1 { if ($3 ~ /^(latest|PR-[0-9]+|[0-9]+\.[0-9a-zA-Z\.\-]+|[0-9]+-branch)$/) print $3 }' monitor_*.txt)
           if [ -z "$OUTDIR" ]; then
             echo "::warning::Monitor file holds no publishable version. Nothing to publish."
             exit 0
