@@ -33,10 +33,7 @@ LOG_MODULE_REGISTER(sm_nrfcloud_fota, CONFIG_SM_LOG_LEVEL);
 #define FOTA_PARAM_OP		1
 #define FOTA_PARAM_KEY		2
 
-/* Default CoAP block size of the NCS downloader, used for nRF Cloud CoAP proxy downloads. */
-#define FOTA_COAP_BLOCK_SIZE	1024
-
-/* Poll interval, in seconds, when waiting for the modem to finish erasing a partial image. */
+/* Poll interval, in seconds, when waiting for the modem to finish erasing an image. */
 #define FOTA_ERASE_POLL_TIME	1
 
 /* <op> values for AT#XNRFCLOUDFOTA. */
@@ -82,36 +79,22 @@ static void nrfcloud_fota_check_failed(int rv)
 	urc_send_to(fota_pipe, "\r\n#XNRFCLOUDFOTA: 0,1,%d\r\n", rv);
 }
 
-/* The NCS downloader's CoAP transport cannot resume from an offset inside a block, and the
- * modem stores a partial delta image at an arbitrary offset. Erase such an image so that the
- * download starts from 0 instead of failing.
- *
- * The erase is asynchronous in the modem and can take a long time. It must be complete before
- * the download starts: while it is pending the modem is not usable for the download (network
- * connection attempts time out) and the modem DFU write session cannot be closed (error 17,
- * ERASE_PENDING).
+/* An erase left in progress by an interrupted operation must complete before the download
+ * starts: while pending, the modem is not usable for the download and the modem DFU write
+ * session cannot be closed.
  */
-static int nrfcloud_fota_modem_discard_unaligned(void)
+static int nrfcloud_fota_modem_wait_for_erase(void)
 {
 	size_t offset;
 	int err;
 	int time_elapsed = 0;
 
 	err = nrf_modem_delta_dfu_offset(&offset);
-	if (err == NRF_MODEM_DELTA_DFU_ERASE_PENDING) {
-		LOG_INF("Modem image erase already in progress");
-	} else if (err != 0 || offset % FOTA_COAP_BLOCK_SIZE == 0) {
+	if (err != NRF_MODEM_DELTA_DFU_ERASE_PENDING) {
 		return 0;
-	} else {
-		LOG_INF("Discarding partial modem image, offset %zu", offset);
-		err = nrf_modem_delta_dfu_erase();
-		if (err != 0 && err != NRF_MODEM_DELTA_DFU_ERASE_PENDING) {
-			LOG_ERR("Partial modem image erase failed: %d", err);
-			/* Positive values are modem DFU status codes, not errnos. */
-			return err < 0 ? err : -EIO;
-		}
 	}
 
+	LOG_INF("Modem image erase already in progress");
 	sm_fota_stage = FOTA_STAGE_DOWNLOAD_ERASE_PENDING;
 	urc_send_to(fota_pipe, "\r\n#XNRFCLOUDFOTA: %d,%d\r\n", sm_fota_stage, FOTA_STATUS_OK);
 
@@ -125,16 +108,16 @@ static int nrfcloud_fota_modem_discard_unaligned(void)
 		}
 		if (err != NRF_MODEM_DELTA_DFU_ERASE_PENDING &&
 		    err != NRF_MODEM_DELTA_DFU_INVALID_DATA) {
-			LOG_ERR("Partial modem image erase failed: %d", err);
+			LOG_ERR("Modem image erase failed: %d", err);
 			return err < 0 ? err : -EIO;
 		}
 		if (time_elapsed >= CONFIG_DFU_TARGET_MODEM_TIMEOUT) {
-			LOG_ERR("Partial modem image erase timeout");
+			LOG_ERR("Modem image erase timeout");
 			return -ETIME;
 		}
 	}
 
-	LOG_INF("Partial modem image discarded");
+	LOG_INF("Modem image erase complete");
 	urc_send_to(fota_pipe, "\r\n#XNRFCLOUDFOTA: %d,%d\r\n", FOTA_STAGE_DOWNLOAD_ERASED,
 		    FOTA_STATUS_OK);
 	/* Back to the download stage; the busy gate must stay held for the check. */
@@ -157,7 +140,7 @@ static void nrfcloud_fota_check(void)
 		rv = memfault_zephyr_fota_app_start();
 		g_mflt_http_client_config.api_key = saved_key;
 	} else {
-		rv = nrfcloud_fota_modem_discard_unaligned();
+		rv = nrfcloud_fota_modem_wait_for_erase();
 		if (rv == 0) {
 			memfault_zephyr_fota_modem_project_key_set(
 				fota_project_key[0] != '\0' ? fota_project_key : NULL);
@@ -255,9 +238,7 @@ void memfault_fota_download_callback(const struct fota_download_evt *evt)
 {
 	switch (evt->id) {
 	case FOTA_DOWNLOAD_EVT_PROGRESS:
-		/* Re-establish the stage/status: an earlier ERASE_DONE resets the stage to
-		 * FOTA_STAGE_INIT, and the download continues afterwards.
-		 */
+		/* Progress is always reported in the download stage. */
 		sm_fota_stage = FOTA_STAGE_DOWNLOAD;
 		sm_fota_status = FOTA_STATUS_OK;
 		sm_fota_info = evt->progress;
@@ -287,11 +268,11 @@ void memfault_fota_download_callback(const struct fota_download_evt *evt)
 	case FOTA_DOWNLOAD_EVT_ERASE_DONE:
 		urc_send_to(fota_pipe, "\r\n#XNRFCLOUDFOTA: %d,%d\r\n", FOTA_STAGE_DOWNLOAD_ERASED,
 			   sm_fota_status);
-		/* Back to init now that the erasure is complete so that potential pre-start
-		 * error codes are printed with the same stage than if there had been no
-		 * erasure.
+		/* Back to the download stage: the session continues, so the shared busy gate
+		 * must stay held. Pre-start errors are then reported with the same stage as
+		 * without an erase.
 		 */
-		sm_fota_stage = FOTA_STAGE_INIT;
+		sm_fota_stage = FOTA_STAGE_DOWNLOAD;
 		break;
 	case FOTA_DOWNLOAD_EVT_ERROR:
 		sm_fota_status = FOTA_STATUS_ERROR;
