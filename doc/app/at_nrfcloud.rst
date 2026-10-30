@@ -431,6 +431,7 @@ The parameters and their defined values are the following:
      This is effective only after a download has started, that is, after the first ``#XNRFCLOUDFOTA`` progress notification.
    * ``1`` - Check for and download an application update.
    * ``2`` - Check for and download a modem firmware update.
+     If an interrupted download is detected, it is continued.
    * ``4`` - Check for an application update, without downloading it.
    * ``6`` - Check for a modem firmware update, without downloading it.
 

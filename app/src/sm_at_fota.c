@@ -24,6 +24,7 @@
 #include "sm_settings.h"
 #include "sm_at_host.h"
 #include "sm_at_fota.h"
+#include "sm_at_dfu.h"
 #include "sm_defines.h"
 #include "sm_log.h"
 #include "sm_uart_handler.h"
@@ -325,10 +326,11 @@ static void fota_dl_handler(const struct fota_download_evt *evt)
 	case FOTA_DOWNLOAD_EVT_ERASE_DONE:
 		urc_send_to(fota_pipe, "\r\n#XFOTA: %d,%d\r\n", FOTA_STAGE_DOWNLOAD_ERASED,
 			    sm_fota_status);
-		/* Back to init now that the erasure is complete so that potential pre-start
-		 * error codes are printed with the same stage than if there had been no erasure.
+		/* Back to the download stage: the session continues, so the shared busy gate
+		 * must stay held. Pre-start errors are then reported with the same stage as
+		 * without an erase.
 		 */
-		sm_fota_stage = FOTA_STAGE_INIT;
+		sm_fota_stage = FOTA_STAGE_DOWNLOAD;
 		break;
 	case FOTA_DOWNLOAD_EVT_ERROR:
 		/* fota_download is done; release the URI buffers. */
@@ -393,6 +395,10 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 			 * mutually exclusive.
 			 */
 			if (sm_fota_stage != FOTA_STAGE_INIT) {
+				err = -EBUSY;
+				break;
+			}
+			if (op == SM_FOTA_START_MFW && sm_at_dfu_delta_mfw_busy()) {
 				err = -EBUSY;
 				break;
 			}
@@ -469,7 +475,7 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 			err = do_fota_mfw_read();
 			break;
 		case SM_FOTA_ERASE_MFW:
-			if (sm_fota_stage != FOTA_STAGE_INIT) {
+			if (sm_fota_stage != FOTA_STAGE_INIT || sm_at_dfu_delta_mfw_busy()) {
 				err = -EBUSY;
 				break;
 			}
