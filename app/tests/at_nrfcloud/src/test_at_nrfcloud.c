@@ -78,6 +78,7 @@ extern void at_monitor_dispatch(const char *at_notif);
 
 /* Memfault stubs (memfault_stubs.c) */
 #include <sys/types.h>
+#include "date_time.h"
 #include "memfault/core/data_packetizer.h"
 #include "memfault/http/http_client.h"
 extern bool test_memfault_periodic_upload_enabled;
@@ -90,6 +91,8 @@ extern const char *test_memfault_upload_seen_api_key;
 extern char test_memfault_crash_type[];
 extern int test_memfault_crash_call_count;
 extern int test_memfault_crash_return;
+extern int test_memfault_date_time_evt_count;
+extern enum date_time_evt_type test_memfault_date_time_evt_type;
 extern void test_memfault_set_chunks(const char * const chunks[], size_t count);
 extern void test_memfault_stubs_reset(void);
 
@@ -216,6 +219,23 @@ void test_xnrfcloud_connect_ok(void)
 	k_sleep(K_MSEC(1));
 	resp = get_captured_response();
 	TEST_ASSERT_NOT_NULL(strstr(resp, "#XNRFCLOUD: 1,0,16842753,\"\"\r\n\r\nOK\r\n"));
+
+	clear_captured_response();
+	helper_xnrfcloud_disconnect_ok();
+}
+
+/*
+ * Tests that connect forwards date_time events to Memfault, whose own handler is replaced by
+ * date_time_update_async().
+ */
+void test_xnrfcloud_connect_forwards_date_time_to_memfault(void)
+{
+	sm_nrf_cloud_ready = false;
+
+	helper_xnrfcloud_connect_ok();
+
+	TEST_ASSERT_EQUAL(1, test_memfault_date_time_evt_count);
+	TEST_ASSERT_EQUAL(DATE_TIME_OBTAINED_NTP, test_memfault_date_time_evt_type);
 
 	clear_captured_response();
 	helper_xnrfcloud_disconnect_ok();
