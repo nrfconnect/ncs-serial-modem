@@ -15,6 +15,7 @@
  *   - the number of heartbeat triggers,
  *   - the crash type forwarded to the Memfault demo CLI,
  *   - the chunks handed out by the packetizer (for the dump operation),
+ *   - the date_time events forwarded to Memfault,
  * and let the tests inject the upload return value.
  */
 
@@ -30,6 +31,7 @@
 #include "memfault/core/platform/device_info.h"
 #include "memfault/http/http_client.h"
 #include "memfault/metrics/metrics.h"
+#include "memfault/ports/ncs/date_time_callback.h"
 #include "memfault/ports/zephyr/http.h"
 #include "memfault/util/base64.h"
 
@@ -53,6 +55,10 @@ char test_memfault_crash_type[12];
 int test_memfault_crash_call_count;
 /* Injected: return value of memfault_demo_cli_cmd_crash() (non-zero = invalid type) */
 int test_memfault_crash_return;
+
+/* date_time events forwarded to memfault_zephyr_date_time_evt_handler() */
+int test_memfault_date_time_evt_count;
+enum date_time_evt_type test_memfault_date_time_evt_type;
 
 /* Packetizer: chunks handed out by memfault_packetizer_get_chunk() */
 #define TEST_MAX_CHUNKS 4
@@ -111,6 +117,12 @@ int memfault_demo_cli_cmd_crash(int argc, char *argv[])
 
 	/* Unlike the real one, this stub returns instead of crashing. */
 	return test_memfault_crash_return;
+}
+
+void memfault_zephyr_date_time_evt_handler(const struct date_time_evt *evt)
+{
+	test_memfault_date_time_evt_count++;
+	test_memfault_date_time_evt_type = evt->type;
 }
 
 bool memfault_packetizer_get_chunk(void *buf, size_t *buf_len)
@@ -189,6 +201,8 @@ void test_memfault_stubs_reset(void)
 	memset(test_memfault_crash_type, 0, sizeof(test_memfault_crash_type));
 	test_memfault_crash_call_count = 0;
 	test_memfault_crash_return = 0;
+	test_memfault_date_time_evt_count = 0;
+	test_memfault_date_time_evt_type = DATE_TIME_NOT_OBTAINED;
 	test_chunk_count = 0;
 	test_chunk_index = 0;
 	g_mflt_http_client_config.api_key = "";
