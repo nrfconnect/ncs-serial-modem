@@ -75,6 +75,15 @@ The parameters and their defined values are the following:
 
 For full modem firmware (type ``2``), the command triggers an immediate reboot into bootloader mode.
 
+The ``#XDFUINIT``, ``#XDFUWRITE``, and ``#XDFUAPPLY`` commands use the same modem DFU area as the ``#XFOTA`` and ``#XNRFCLOUDFOTA`` commands.
+For delta modem firmware (type ``1``), they return ``ERROR`` in one of the following cases:
+
+* A FOTA update started with the ``#XFOTA`` or ``#XNRFCLOUDFOTA`` command is in progress.
+* Such an update is downloaded, but not yet activated.
+
+When one of these commands succeeds, it reserves the modem DFU area for direct DFU until the modem is reset, for example with the ``#XMODEMRESET`` or ``#XRESET`` command.
+While the area is reserved, the ``#XFOTA`` and ``#XNRFCLOUDFOTA`` commands cannot start a modem firmware update or erase the modem DFU area.
+
 Example
 ~~~~~~~
 
@@ -156,6 +165,7 @@ The parameters and their defined values are the following:
 
 After the command returns ``OK``, the |SM| enters data mode to receive exactly ``<len>`` bytes of firmware data.
 When the data has been received and written, the |SM| sends a ``#XDFU`` unsolicited notification with the status.
+For delta modem firmware (type ``1``), the command returns ``ERROR`` under the same conditions as the ``#XDFUINIT`` command.
 
 Example
 ~~~~~~~
@@ -228,6 +238,7 @@ The parameters and their defined values are the following:
 
 For application (type ``0``), delta modem firmware (type ``1``), and MCUboot bootloader (type ``3``), the update is scheduled and will be activated on the next reset, which can be done with the ``AT#XRESET`` command.
 For full modem firmware (type ``2``), the command applies the current segment (bootloader or firmware) and triggers a reboot if needed.
+For delta modem firmware (type ``1``), the command returns ``ERROR`` under the same conditions as the ``#XDFUINIT`` command.
 
 Example
 ~~~~~~~
