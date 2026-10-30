@@ -68,6 +68,9 @@ jobs:
             VERSION=${BASH_REMATCH[1]}
           elif [[ ${GITHUB_REF#refs/heads/} == "main" ]]; then
             VERSION="latest"
+          elif [[ ${GITHUB_REF#refs/heads/} == "v2-branch" ]]; then
+            # drop the 'v' so that versions.json doesn't need to list it
+            VERSION="2-branch"
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
             VERSION="pr-${{ github.event.number }}"
           fi
