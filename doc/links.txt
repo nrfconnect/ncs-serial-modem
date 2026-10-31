@@ -79,6 +79,7 @@
 .. _`Memfault Project Keys`: https://docs.nrfcloud.com/docs/platform/data-routes
 .. _`Memfault Project Settings`: https://app.memfault.com/organizations/-/projects/-/settings/data-routes
 .. _`Memfault release management`: https://mflt.io/release-mgmt
+.. _`nRF Cloud over-the-air updates`: https://docs.nrfcloud.com/docs/platform/ota
 
 .. ### nRF Connect for Desktop
 
@@ -96,6 +97,9 @@
 .. _`nRF9151 Hardware Design Guidelines — VDD_GPIO`: https://docs.nordicsemi.com/r/bundle/nwp_056/page/wp/nwp_054/vdd_gpio.html
 .. _`nRF9151 Hardware Integration`: https://docs.nordicsemi.com/r/bundle/nwp_056/page/wp/nwp_054/hardware_integration.html
 .. _`nRF9151 anomaly 36`: https://docs.nordicsemi.com/bundle/errata_nRF9151_Rev2/page/ERR/nRF9151/Rev2/latest/anomaly_151_36.html
+.. _`nRF9151 Downloads`: https://www.nordicsemi.com/Products/nRF9151/Download?lang=en#infotabs
+.. TBD: replace with the location of the nRF91M1 downloads.
+.. _`nRF91M1 Downloads`: https://www.nordicsemi.com
 
 .. ### AT command specifications
 
@@ -125,6 +129,8 @@
 .. ### github.com
 
 .. _`github_release`: https://github.com/nrfconnect/ncs-serial-modem/releases
+.. _`sm_dfu_host.py`: https://github.com/nrfconnect/ncs-serial-modem/blob/main/app/scripts/sm_dfu_host.py
+.. _`sm_dfu_host.py requirements`: https://github.com/nrfconnect/ncs-serial-modem/blob/main/app/scripts/requirements.txt
 .. _`sdk-nrfxlib`: https://github.com/nrfconnect/sdk-nrfxlib
 .. _`nrf_errno.h` : https://github.com/nrfconnect/sdk-nrfxlib/blob/main/nrf_modem/include/nrf_errno.h
 .. _`cbor2 bug` : https://github.com/agronholm/cbor2/issues/272

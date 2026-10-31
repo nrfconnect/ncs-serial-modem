@@ -557,6 +557,8 @@ The following example shows a complete MCUboot firmware update:
    OK
 
 
+.. _sm_dfu_host_example:
+
 DFU host example
 ================
 

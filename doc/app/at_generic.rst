@@ -501,6 +501,8 @@ Test command
 
 The test command is not supported.
 
+.. _SM_AT_XRESET:
+
 Reset #XRESET
 =============
 
@@ -536,6 +538,8 @@ Test command
 ------------
 
 The test command is not supported.
+
+.. _SM_AT_XMODEMRESET:
 
 Modem reset #XMODEMRESET
 ========================
@@ -647,6 +651,8 @@ Test command
 ------------
 
 The test command is not supported.
+
+.. _SM_AT_XBOOTINFO:
 
 MCUboot bootloader info #XBOOTINFO
 ==================================

@@ -28,5 +28,6 @@ nRF91M1 AT Commands
    app/at_data_mode
    nrf91m1/appendix_uart
    nrf91m1/logging
+   nrf91m1/appendix_update
    nrf91m1/cellular_modem
    nrf91m1/release_notes
