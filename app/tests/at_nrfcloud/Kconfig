@@ -86,6 +86,15 @@ config SM_NRF_CLOUD_OBSERVABILITY_DEBUG
 	bool "Debug nRF Cloud observability AT commands"
 	depends on SM_NRF_CLOUD_OBSERVABILITY
 
+choice MEMFAULT_SYSTEM_TIME_SOURCE
+	bool "Memfault system time from date_time (test stub)"
+	default MEMFAULT_SYSTEM_TIME_SOURCE_DATETIME
+
+config MEMFAULT_SYSTEM_TIME_SOURCE_DATETIME
+	bool "Datetime"
+
+endchoice
+
 menu "Zephyr Kernel"
 source "Kconfig.zephyr"
 endmenu
