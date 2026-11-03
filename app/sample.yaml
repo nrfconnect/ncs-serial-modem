@@ -113,7 +113,7 @@ tests:
     platform_allow:
       - nrf9151dk/nrf9151/ns
     tags: exclude_integration
-  serial_modem.no_nrfcloud_memfault:
+  serial_modem.no_nrfcloud_observability_and_fota:
     sysbuild: true
     build_only: true
     extra_configs:
