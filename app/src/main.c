@@ -13,9 +13,10 @@
 #include <zephyr/sys/reboot.h>
 #include <zephyr/logging/log_ctrl.h>
 #include <net/fota_download.h>
-#if defined(CONFIG_MEMFAULT)
+#include <date_time.h>
+#if defined(CONFIG_SM_NRF_CLOUD_OBSERVABILITY)
 #include <memfault/core/trace_event.h>
-#endif /* CONFIG_MEMFAULT */
+#endif /* CONFIG_SM_NRF_CLOUD_OBSERVABILITY */
 #include "sm_at_host.h"
 #include "sm_at_dfu.h"
 #include "sm_at_fota.h"
@@ -59,11 +60,38 @@ static void on_modem_failure(struct k_work *)
 	int ret;
 	struct modem_pipe *pipe = sm_at_host_get_urc_pipe();
 
-#if defined(CONFIG_MEMFAULT)
-	/* Record the modem fault as a Memfault trace event */
-	MEMFAULT_TRACE_EVENT_WITH_LOG(modem_fault, "Modem fault: reason=0x%x pc=0x%x",
-				      modem_fault_info.reason, modem_fault_info.program_counter);
-#endif /* CONFIG_MEMFAULT */
+#if defined(CONFIG_SM_NRF_CLOUD_OBSERVABILITY)
+	struct sm_modem_fault fault = {
+		.reason = modem_fault_info.reason,
+		.program_counter = modem_fault_info.program_counter,
+	};
+	bool record_fault;
+	int64_t utc_ms;
+
+	ret = date_time_now(&utc_ms);
+	if (!ret) {
+		int64_t utc_seconds = utc_ms / MSEC_PER_SEC;
+
+		if (utc_seconds > 0 && utc_seconds <= UINT32_MAX) {
+			fault.occurred_at = (uint32_t)utc_seconds;
+		} else {
+			LOG_WRN("Modem fault timestamp %s", "out of range");
+		}
+	} else {
+		LOG_DBG("Modem fault timestamp %s: %d", "unavailable", ret);
+	}
+	ret = sm_settings_modem_fault_save(&fault);
+	if (ret && ret != -EALREADY) {
+		LOG_ERR("Modem fault save failed: %d", ret);
+	}
+	/* Capture the saved fault at upload time; avoid an additional RAM event. */
+	record_fault = (ret != 0 && ret != -EALREADY);
+	if (record_fault) {
+		MEMFAULT_TRACE_EVENT_WITH_LOG(modem_fault, "Modem fault: reason=0x%x pc=0x%x",
+					     modem_fault_info.reason,
+					     modem_fault_info.program_counter);
+	}
+#endif /* CONFIG_SM_NRF_CLOUD_OBSERVABILITY */
 	urc_send_to(pipe, "\r\n#XMODEM: FAULT,0x%x,0x%x\r\n", modem_fault_info.reason,
 		    modem_fault_info.program_counter);
 
