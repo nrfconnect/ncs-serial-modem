@@ -24,6 +24,7 @@ typedef enum {
 } eMfltDataSourceMask;
 
 bool memfault_packetizer_get_chunk(void *buf, size_t *buf_len);
+bool memfault_packetizer_data_available(void);
 void memfault_packetizer_set_active_sources(uint32_t mask);
 
 #endif /* STUB_MEMFAULT_CORE_DATA_PACKETIZER_H_ */

@@ -25,6 +25,8 @@ zephyr_include_directories(${ZEPHYR_NRFXLIB_MODULE_DIR}/nrf_modem/include/)
 # Compiler options to set configuration values
 target_compile_options(app PRIVATE
   -D__ELASTERROR=2000
+  # Use the real trace-event declarations with SDK defaults; no Memfault port runs here.
+  -DMEMFAULT_PLATFORM_CONFIG_DISABLED
   # Not a Kconfig symbol: shorten the wait for a chunk response so that the timeout path is
   # testable. The observability symbols are declared in Kconfig and set in prj.conf.
   -DOBS_COAP_RESPONSE_TIMEOUT_MS=50
@@ -57,6 +59,7 @@ target_sources(app PRIVATE
   src/nrf_modem_at_wrapper.c
   src/nrf_cloud_stubs.c          # date_time_update_async + nrf_cloud_client_id_get only
   src/memfault_stubs.c           # Memfault symbols (AT#XNRFCLOUDOBS*)
+  src/settings_stubs.c
   ../stubs/uart_stubs.c
   ../stubs/sm_at_host_stubs.c
   ../stubs/control_pin_stubs.c
@@ -68,6 +71,7 @@ target_sources(app PRIVATE
   ../../src/sm_util.c
   ../../src/sm_at_nrfcloud.c
   ../../src/sm_at_nrfcloud_obs.c
+  ../../src/sm_settings.c
   ../../src/sm_at_host.c
   ../../src/sm_at_commands.c
   ${ZEPHYR_BASE}/subsys/modem/modem_pipe.c
@@ -87,6 +91,8 @@ set(includes
   "${ZEPHYR_BASE}/include"
   "${ZEPHYR_BASE}/lib/libc/common/include"
   "${PROJECT_SOURCE_DIR}/../stubs"
+  "${PROJECT_SOURCE_DIR}/../../memfault"
+  "${ZEPHYR_BASE}/../modules/lib/memfault-firmware-sdk/components/include"
 )
 
 target_include_directories(app PRIVATE ${includes})

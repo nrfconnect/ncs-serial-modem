@@ -4,9 +4,11 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
+#define _POSIX_C_SOURCE 200809L /* for gmtime_r() */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/settings/settings.h>
@@ -16,6 +18,7 @@
 #include "nrf_cloud_coap_transport.h"
 #include <modem/at_parser.h>
 #include <memfault/core/log.h>
+#include <memfault/core/trace_event.h>
 #include <memfault/core/platform/device_info.h>
 #include <memfault/http/http_client.h>
 #include <memfault/metrics/metrics.h>
@@ -29,6 +32,7 @@
 #include "sm_util.h"
 #include "sm_at_host.h"
 #include "sm_at_nrfcloud.h"
+#include "sm_settings.h"
 
 LOG_MODULE_REGISTER(sm_nrfcloud_obs, CONFIG_SM_LOG_LEVEL);
 
@@ -61,6 +65,11 @@ BUILD_ASSERT(!IS_ENABLED(CONFIG_MEMFAULT_NCS_POST_COREDUMP_ON_NETWORK_CONNECTED)
  */
 #define OBS_AUTO_INTERVAL_MIN 60
 #define OBS_AUTO_INTERVAL_MAX 86400
+
+/* Bound the event-only phase even if other threads keep producing events. */
+#define OBS_EVENT_DRAIN_MAX_PASSES 4
+#define OBS_FAULT_TIME_SIZE sizeof("2026-11-05T12:38:35Z")
+#define OBS_MODEM_FAULT_LOG "Modem fault: reason=0x%x pc=0x%x occurred_at=%s"
 
 /* Parameter indices. Index 0 is the command itself. */
 #define OBS_AUTO_PARAM_ENABLE		1
@@ -130,15 +139,104 @@ static const char *obs_project_key_install(const char *key)
 	return previous;
 }
 
-/* Drain the buffered Memfault data into nRF Cloud. Returns the number of bytes uploaded,
- * or a negative error code. The Memfault CoAP port returns 0 without opening a socket
- * when there is nothing buffered.
+/* The CoAP port can return success after its per-call message limit while events remain
+ * buffered. Keep calling it until the event source is empty; then every event, including
+ * the retained fault, has received a successful response.
  */
+static int obs_drain_events(ssize_t *bytes)
+{
+	for (int i = 0; i < OBS_EVENT_DRAIN_MAX_PASSES; i++) {
+		ssize_t ret = memfault_zephyr_port_post_data_return_size();
+
+		if (ret < 0) {
+			return (int)ret;
+		}
+		*bytes += ret;
+		if (!memfault_packetizer_data_available()) {
+			return 0;
+		}
+	}
+
+	LOG_WRN("Event upload incomplete: %d", -EAGAIN);
+	return -EAGAIN;
+}
+
+/* Re-create the retained modem fault as a Memfault trace event.
+ * The saved observation time belongs in the log; Memfault timestamps capture here.
+ */
+static int obs_capture_modem_fault(const struct sm_modem_fault *fault)
+{
+	char occurred_at[OBS_FAULT_TIME_SIZE] = "unknown";
+	void *lr;
+
+	if (fault->occurred_at != 0) {
+		time_t seconds = (time_t)fault->occurred_at;
+		struct tm utc;
+
+		if ((int64_t)seconds != (int64_t)fault->occurred_at) {
+			LOG_ERR("Modem fault timestamp out of range");
+			return -ERANGE;
+		}
+		if (gmtime_r(&seconds, &utc) == NULL) {
+			LOG_ERR("Modem fault timestamp conversion failed");
+			return -ERANGE;
+		}
+		if (strftime(occurred_at, sizeof(occurred_at), "%Y-%m-%dT%H:%M:%SZ", &utc) == 0) {
+			LOG_ERR("Modem fault timestamp formatting failed");
+			return -ENOSPC;
+		}
+	}
+
+	MEMFAULT_GET_LR(lr);
+	void *pc;
+
+	MEMFAULT_GET_PC(pc);
+	return memfault_trace_event_with_log_capture(MEMFAULT_TRACE_REASON(modem_fault), pc, lr,
+						    OBS_MODEM_FAULT_LOG, fault->reason,
+						    fault->program_counter, occurred_at);
+}
+
+/* Drain buffered data, including any retained fault, and return bytes sent or an error. */
 static ssize_t obs_upload(void)
 {
+	struct sm_modem_fault fault;
+	ssize_t bytes = 0;
+	ssize_t ret = 0;
+	int err;
+
 	/* Freeze the captured logs so that they are drained as well. */
 	memfault_log_trigger_collection();
 
+	if (sm_settings_modem_fault_get(&fault)) {
+		memfault_packetizer_set_active_sources(kMfltDataSourceMask_Event);
+		/* Free event storage before replay, including remnants of failed attempts. */
+		err = obs_drain_events(&bytes);
+		if (err) {
+			ret = err;
+			goto restore_sources;
+		}
+		err = obs_capture_modem_fault(&fault);
+		if (err) {
+			LOG_ERR("Modem fault event capture failed: %d", err);
+			ret = -ENOSPC;
+			goto restore_sources;
+		}
+		err = obs_drain_events(&bytes);
+		if (err) {
+			ret = err;
+			goto restore_sources;
+		}
+		/* Clear only after endpoint acknowledgment, not final Memfault processing.
+		 * Reset or deletion failure here can cause replay on a later upload.
+		 */
+		err = sm_settings_modem_fault_clear();
+		if (err) {
+			LOG_ERR("Modem fault clear failed: %d", err);
+			ret = err;
+		}
+	}
+
+restore_sources:
 	/* Leave the core dump buffered when its upload is disabled. */
 	memfault_packetizer_set_active_sources(
 		obs_coredump_enabled
@@ -146,7 +244,11 @@ static ssize_t obs_upload(void)
 			: (kMfltDataSourceMask_Event | kMfltDataSourceMask_Log |
 			   kMfltDataSourceMask_Cdr));
 
-	return memfault_zephyr_port_post_data_return_size();
+	if (ret < 0) {
+		return ret;
+	}
+	ret = memfault_zephyr_port_post_data_return_size();
+	return ret < 0 ? ret : bytes + ret;
 }
 
 /*************************************************/
