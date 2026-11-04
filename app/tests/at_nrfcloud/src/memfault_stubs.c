@@ -23,11 +23,14 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdarg.h>
+#include <stdio.h>
 #include <sys/types.h>
 
 #include "memfault/core/data_export.h"
 #include "memfault/core/data_packetizer.h"
 #include "memfault/core/log.h"
+#include "memfault/core/trace_event.h"
 #include "memfault/core/platform/device_info.h"
 #include "memfault/http/http_client.h"
 #include "memfault/metrics/metrics.h"
@@ -49,6 +52,15 @@ int test_memfault_log_trigger_count;
 /* True when the log collection was triggered before the upload ran. */
 bool test_memfault_log_triggered_before_upload;
 const char *test_memfault_upload_seen_api_key;
+int test_memfault_upload_count;
+int test_memfault_event_upload_error;
+int test_memfault_event_batches;
+int test_memfault_capture_batches;
+int test_memfault_capture_return;
+int test_memfault_capture_count;
+char test_memfault_fault_log[100];
+uint32_t test_memfault_source_mask;
+static bool test_event_available;
 
 /* Crash: type string forwarded to memfault_demo_cli_cmd_crash() */
 char test_memfault_crash_type[12];
@@ -98,8 +110,51 @@ ssize_t memfault_zephyr_port_post_data_return_size(void)
 	/* Capture what the handler installed for this upload. */
 	test_memfault_upload_seen_api_key = g_mflt_http_client_config.api_key;
 	test_memfault_log_triggered_before_upload = (test_memfault_log_trigger_count > 0);
+	test_memfault_upload_count++;
+	if (test_memfault_source_mask == kMfltDataSourceMask_Event) {
+		if (test_memfault_event_upload_error &&
+		    (test_event_available || test_memfault_event_batches > 0)) {
+			/* Model consumption before acknowledgment, even on failure. */
+			test_event_available = false;
+			return test_memfault_event_upload_error;
+		}
+		if (test_memfault_event_batches > 0) {
+			test_memfault_event_batches--;
+			test_event_available = (test_memfault_event_batches > 0);
+			return 10;
+		}
+		if (test_event_available) {
+			test_event_available = false;
+			return 10;
+		}
+		return 0;
+	}
 
 	return test_memfault_upload_return;
+}
+
+int memfault_trace_event_with_log_capture(eMfltTraceReasonUser reason, void *pc, void *lr,
+					 const char *fmt, ...)
+{
+	va_list args;
+
+	(void)reason;
+	(void)pc;
+	(void)lr;
+	test_memfault_capture_count++;
+	va_start(args, fmt);
+	vsnprintf(test_memfault_fault_log, sizeof(test_memfault_fault_log), fmt, args);
+	va_end(args);
+	if (!test_memfault_capture_return) {
+		test_event_available = true;
+		test_memfault_event_batches = test_memfault_capture_batches;
+	}
+	return test_memfault_capture_return;
+}
+
+bool memfault_packetizer_data_available(void)
+{
+	return test_event_available || test_memfault_event_batches > 0;
 }
 
 void memfault_platform_get_device_info(sMemfaultDeviceInfo *info)
@@ -146,7 +201,7 @@ bool memfault_packetizer_get_chunk(void *buf, size_t *buf_len)
 
 void memfault_packetizer_set_active_sources(uint32_t mask)
 {
-	(void)mask;
+	test_memfault_source_mask = mask;
 }
 
 /* Minimal base64 encoder; the real one is part of the Memfault SDK. */
@@ -198,6 +253,15 @@ void test_memfault_stubs_reset(void)
 	test_memfault_log_trigger_count = 0;
 	test_memfault_log_triggered_before_upload = false;
 	test_memfault_upload_seen_api_key = NULL;
+	test_memfault_upload_count = 0;
+	test_memfault_event_upload_error = 0;
+	test_memfault_event_batches = 0;
+	test_memfault_capture_batches = 0;
+	test_memfault_capture_return = 0;
+	test_memfault_capture_count = 0;
+	test_memfault_fault_log[0] = '\0';
+	test_memfault_source_mask = kMfltDataSourceMask_All;
+	test_event_available = false;
 	memset(test_memfault_crash_type, 0, sizeof(test_memfault_crash_type));
 	test_memfault_crash_call_count = 0;
 	test_memfault_crash_return = 0;

@@ -538,6 +538,17 @@ The ``#XNRFCLOUDOBSUPLOAD`` command uploads the buffered observability data to n
 
 The captured logs are collected before the upload so that they are included.
 
+|SM| retains the first pending modem fault in flash until nRF Cloud acknowledges its upload.
+After |SM| saves the fault, it survives resets and power loss.
+|SM| can upload it after modem recovery or reboot.
+Further modem faults do not overwrite it or create additional modem-fault events while it is pending.
+Both on-demand and automatic uploads include the retained fault.
+Retries can produce duplicate reports.
+
+The fault log includes the reason, program counter, and UTC observation time as ``occurred_at=YYYY-MM-DDTHH:MM:SSZ``.
+If the time is unavailable, the fault log includes ``occurred_at=unknown`` instead.
+The Memfault ``captured_date`` field records when the event is captured during upload, not the original observation time.
+
 Set command
 -----------
 
