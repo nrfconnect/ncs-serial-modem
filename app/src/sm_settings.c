@@ -14,11 +14,34 @@
 #include "sm_at_dfu.h"
 #include "sm_settings.h"
 #include "sm_defines.h"
+#include "sm_at_host.h"
 
 LOG_MODULE_REGISTER(sm_settings, CONFIG_SM_LOG_LEVEL);
 
-static int settings_set(const char *name, size_t len, settings_read_cb read_cb, void *cb_arg)
+#define MODEM_FAULT_KEY "sm/modem_fault"
+
+static struct sm_modem_fault pending_modem_fault;
+static bool modem_fault_pending;
+
+STATIC int sm_settings_set(const char *name, size_t len, settings_read_cb read_cb, void *cb_arg)
 {
+	if (!strcmp(name, "modem_fault")) {
+		struct sm_modem_fault record;
+		ssize_t ret;
+
+		if (len != sizeof(record)) {
+			LOG_ERR("Invalid modem fault record length: %zu", len);
+			return -EINVAL;
+		}
+		ret = read_cb(cb_arg, &record, len);
+		if (ret != (ssize_t)len) {
+			LOG_ERR("Modem fault record read failed: %zd", ret);
+			return ret < 0 ? (int)ret : -EIO;
+		}
+		pending_modem_fault = record;
+		modem_fault_pending = true;
+		return 0;
+	}
 	if (!strcmp(name, "bootloader_mode_requested")) {
 		if (len != sizeof(sm_bootloader_mode_requested))
 			return -EINVAL;
@@ -63,7 +86,7 @@ static int settings_set(const char *name, size_t len, settings_read_cb read_cb, 
 
 static struct settings_handler sm_settings_conf = {
 	.name = "sm",
-	.h_set = settings_set
+	.h_set = sm_settings_set
 };
 
 static int sm_settings_init(void)
@@ -128,4 +151,46 @@ int sm_settings_modem_eio_retried_save(void)
 {
 	return settings_save_one("sm/modem_eio_retried",
 		&sm_modem_init_eio_retry_count, sizeof(sm_modem_init_eio_retry_count));
+}
+
+int sm_settings_modem_fault_save(const struct sm_modem_fault *fault)
+{
+	int err;
+
+	if (modem_fault_pending) {
+		return -EALREADY;
+	}
+
+	pending_modem_fault = *fault;
+	err = settings_save_one(MODEM_FAULT_KEY, &pending_modem_fault,
+				sizeof(pending_modem_fault));
+	if (err) {
+		return err;
+	}
+	modem_fault_pending = true;
+	return 0;
+}
+
+bool sm_settings_modem_fault_get(struct sm_modem_fault *fault)
+{
+	if (modem_fault_pending) {
+		*fault = pending_modem_fault;
+		return true;
+	}
+	return false;
+}
+
+int sm_settings_modem_fault_clear(void)
+{
+	int err;
+
+	if (!modem_fault_pending) {
+		return 0;
+	}
+	err = settings_delete(MODEM_FAULT_KEY);
+	if (err) {
+		return err;
+	}
+	modem_fault_pending = false;
+	return 0;
 }

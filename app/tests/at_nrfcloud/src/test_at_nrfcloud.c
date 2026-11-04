@@ -45,6 +45,7 @@
 
 #include "sm_at_host.h"
 #include "sm_at_nrfcloud.h"
+#include "sm_settings.h"
 #include "uart_stub.h"
 
 /* CMock-generated mocks */
@@ -95,6 +96,21 @@ extern int test_memfault_date_time_evt_count;
 extern enum date_time_evt_type test_memfault_date_time_evt_type;
 extern void test_memfault_set_chunks(const char * const chunks[], size_t count);
 extern void test_memfault_stubs_reset(void);
+extern void test_fault_settings_reset(void);
+extern int test_fault_save_error;
+extern int test_fault_delete_error;
+extern int test_fault_save_count;
+extern int test_fault_delete_count;
+extern uint8_t test_fault_record[sizeof(struct sm_modem_fault)];
+extern int test_memfault_upload_count;
+extern int test_memfault_event_upload_error;
+extern int test_memfault_event_batches;
+extern int test_memfault_capture_batches;
+extern int test_memfault_capture_return;
+extern int test_memfault_capture_count;
+extern char test_memfault_fault_log[100];
+extern uint32_t test_memfault_source_mask;
+extern int sm_settings_set(const char *name, size_t len, settings_read_cb read_cb, void *cb_arg);
 
 /* Strings for cellular positioning */
 static const char ncellmeas_resp_pci1[] =
@@ -130,6 +146,7 @@ void setUp(void)
 	cmock_nrf_modem_at_Init();
 	cmock_nrf_cloud_coap_Init();
 	test_memfault_stubs_reset();
+	test_fault_settings_reset();
 	strcpy(test_at_nrfcloud_ncellmeas_resp, "\r\nOK\r\n");
 	test_at_nrfcloud_ncellmeas_resp_ret = 0;
 }
@@ -2018,6 +2035,296 @@ void test_xnrfcloudobs_read_not_supported(void)
  * Main and sys init
  * ---------------------------------------------------------------------------
  */
+
+static const struct sm_modem_fault fault_fixture = {
+	.reason = 0x1234,
+	.program_counter = 0xabcdef,
+	.occurred_at = 1735689600,
+};
+
+static void fault_upload(void)
+{
+	send_at_command("AT#XNRFCLOUDOBSUPLOAD\r\n");
+	k_sleep(K_MSEC(10));
+}
+
+void test_modem_fault_keeps_first_without_repeated_writes(void)
+{
+	struct sm_modem_fault other = {.reason = 2, .program_counter = 3};
+	struct sm_modem_fault loaded;
+
+	TEST_ASSERT_EQUAL(0, sm_settings_modem_fault_save(&fault_fixture));
+	for (int i = 0; i < 100; i++) {
+		TEST_ASSERT_EQUAL(-EALREADY, sm_settings_modem_fault_save(&other));
+	}
+	TEST_ASSERT_EQUAL(1, test_fault_save_count);
+	TEST_ASSERT_EQUAL(0, test_fault_delete_count);
+	TEST_ASSERT_TRUE(sm_settings_modem_fault_get(&loaded));
+	TEST_ASSERT_EQUAL_HEX32(fault_fixture.reason, loaded.reason);
+	TEST_ASSERT_EQUAL_HEX32(fault_fixture.program_counter, loaded.program_counter);
+	TEST_ASSERT_EQUAL_UINT32(fault_fixture.occurred_at, loaded.occurred_at);
+}
+
+void test_modem_fault_save_failure_can_retry(void)
+{
+	struct sm_modem_fault loaded;
+
+	test_fault_save_error = -EIO;
+	TEST_ASSERT_EQUAL(-EIO, sm_settings_modem_fault_save(&fault_fixture));
+	TEST_ASSERT_FALSE(sm_settings_modem_fault_get(&loaded));
+	test_fault_save_error = 0;
+	TEST_ASSERT_EQUAL(0, sm_settings_modem_fault_save(&fault_fixture));
+	TEST_ASSERT_TRUE(sm_settings_modem_fault_get(&loaded));
+}
+
+void test_modem_fault_load_after_reset(void)
+{
+	struct sm_modem_fault loaded;
+	uint8_t stored[sizeof(test_fault_record)];
+	struct obs_settings_blob blob = {stored, sizeof(stored)};
+
+	TEST_ASSERT_EQUAL(0, sm_settings_modem_fault_save(&fault_fixture));
+	memcpy(stored, test_fault_record, sizeof(stored));
+	TEST_ASSERT_EQUAL(0, sm_settings_modem_fault_clear());
+	TEST_ASSERT_FALSE(sm_settings_modem_fault_get(&loaded));
+	TEST_ASSERT_EQUAL(0, sm_settings_set("modem_fault", sizeof(stored),
+					   obs_settings_read_fake, &blob));
+	TEST_ASSERT_TRUE(sm_settings_modem_fault_get(&loaded));
+	TEST_ASSERT_EQUAL_HEX32(fault_fixture.reason, loaded.reason);
+	TEST_ASSERT_EQUAL_HEX32(fault_fixture.program_counter, loaded.program_counter);
+	TEST_ASSERT_EQUAL_UINT32(fault_fixture.occurred_at, loaded.occurred_at);
+	TEST_ASSERT_EQUAL(-EALREADY, sm_settings_modem_fault_save(&fault_fixture));
+	TEST_ASSERT_EQUAL(1, test_fault_save_count);
+
+	helper_xnrfcloud_connect_ok();
+	fault_upload();
+	TEST_ASSERT_FALSE(sm_settings_modem_fault_get(&loaded));
+	TEST_ASSERT_EQUAL(1, test_memfault_capture_count);
+	TEST_ASSERT_EQUAL_STRING(
+		"Modem fault: reason=0x1234 pc=0xabcdef occurred_at=2025-01-01T00:00:00Z",
+		test_memfault_fault_log);
+	TEST_ASSERT_EQUAL(2, test_fault_delete_count);
+	clear_captured_response();
+	helper_xnrfcloud_disconnect_ok();
+}
+
+static ssize_t fault_settings_read_error(void *cb_arg, void *data, size_t len)
+{
+	ARG_UNUSED(cb_arg);
+	ARG_UNUSED(data);
+	ARG_UNUSED(len);
+	return -EIO;
+}
+
+void test_modem_fault_invalid_settings_are_rejected(void)
+{
+	struct sm_modem_fault loaded;
+	struct sm_modem_fault stored = {.reason = 2, .program_counter = 3};
+	struct obs_settings_blob blob = {&stored, sizeof(stored)};
+
+	TEST_ASSERT_EQUAL(-EINVAL, sm_settings_set("modem_fault", 1,
+						 obs_settings_read_fake, &blob));
+	blob.len--;
+	TEST_ASSERT_EQUAL(-EIO, sm_settings_set("modem_fault", sizeof(stored),
+					      obs_settings_read_fake, &blob));
+	TEST_ASSERT_EQUAL(-EIO, sm_settings_set("modem_fault", sizeof(stored),
+					      fault_settings_read_error, NULL));
+	TEST_ASSERT_FALSE(sm_settings_modem_fault_get(&loaded));
+}
+
+void test_modem_fault_upload_acknowledged_and_counted(void)
+{
+	struct sm_modem_fault loaded;
+
+	helper_xnrfcloud_connect_ok();
+	clear_captured_response();
+	TEST_ASSERT_EQUAL(0, sm_settings_modem_fault_save(&fault_fixture));
+	TEST_ASSERT_TRUE(sm_settings_modem_fault_get(&loaded));
+	test_memfault_upload_return = 20;
+	fault_upload();
+
+	TEST_ASSERT_FALSE(sm_settings_modem_fault_get(&loaded));
+	TEST_ASSERT_EQUAL(1, test_fault_delete_count);
+	TEST_ASSERT_EQUAL(1, test_memfault_capture_count);
+	TEST_ASSERT_EQUAL_STRING(
+		"Modem fault: reason=0x1234 pc=0xabcdef occurred_at=2025-01-01T00:00:00Z",
+		test_memfault_fault_log);
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "#XNRFCLOUDOBSUPLOAD: 0,30"));
+	TEST_ASSERT_EQUAL(kMfltDataSourceMask_All, test_memfault_source_mask);
+	clear_captured_response();
+	helper_xnrfcloud_disconnect_ok();
+}
+
+void test_modem_fault_upload_with_unknown_time(void)
+{
+	struct sm_modem_fault fault = fault_fixture;
+
+	fault.occurred_at = 0;
+	helper_xnrfcloud_connect_ok();
+	clear_captured_response();
+	TEST_ASSERT_EQUAL(0, sm_settings_modem_fault_save(&fault));
+	fault_upload();
+	TEST_ASSERT_EQUAL_STRING("Modem fault: reason=0x1234 pc=0xabcdef occurred_at=unknown",
+				 test_memfault_fault_log);
+	TEST_ASSERT_EQUAL(1, test_fault_delete_count);
+	clear_captured_response();
+	helper_xnrfcloud_disconnect_ok();
+}
+
+void test_modem_fault_upload_without_reboot_does_not_repeat(void)
+{
+	struct sm_modem_fault loaded;
+
+	helper_xnrfcloud_connect_ok();
+	clear_captured_response();
+	TEST_ASSERT_EQUAL(0, sm_settings_modem_fault_save(&fault_fixture));
+	test_memfault_upload_return = 20;
+	fault_upload();
+
+	TEST_ASSERT_FALSE(sm_settings_modem_fault_get(&loaded));
+	TEST_ASSERT_EQUAL(1, test_memfault_capture_count);
+	TEST_ASSERT_EQUAL(1, test_fault_delete_count);
+	TEST_ASSERT_EQUAL(1, test_fault_save_count);
+
+	fault_upload();
+	TEST_ASSERT_FALSE(sm_settings_modem_fault_get(&loaded));
+	TEST_ASSERT_EQUAL(1, test_memfault_capture_count);
+	TEST_ASSERT_EQUAL(1, test_fault_delete_count);
+	clear_captured_response();
+	helper_xnrfcloud_disconnect_ok();
+}
+
+void test_modem_fault_failed_upload_recreates_consumed_event(void)
+{
+	struct sm_modem_fault loaded;
+
+	helper_xnrfcloud_connect_ok();
+	TEST_ASSERT_EQUAL(0, sm_settings_modem_fault_save(&fault_fixture));
+	test_memfault_event_upload_error = -ETIMEDOUT;
+	fault_upload();
+	TEST_ASSERT_TRUE(sm_settings_modem_fault_get(&loaded));
+	TEST_ASSERT_EQUAL(0, test_fault_delete_count);
+	TEST_ASSERT_EQUAL(1, test_memfault_capture_count);
+	TEST_ASSERT_EQUAL(kMfltDataSourceMask_All, test_memfault_source_mask);
+
+	test_memfault_event_upload_error = 0;
+	fault_upload();
+	TEST_ASSERT_FALSE(sm_settings_modem_fault_get(&loaded));
+	TEST_ASSERT_EQUAL(2, test_memfault_capture_count);
+	TEST_ASSERT_EQUAL(1, test_fault_save_count);
+	clear_captured_response();
+	helper_xnrfcloud_disconnect_ok();
+}
+
+void test_modem_fault_partial_upload_is_bounded_and_retained(void)
+{
+	struct sm_modem_fault loaded;
+
+	helper_xnrfcloud_connect_ok();
+	TEST_ASSERT_EQUAL(0, sm_settings_modem_fault_save(&fault_fixture));
+	test_memfault_event_batches = 5;
+	fault_upload();
+	TEST_ASSERT_TRUE(sm_settings_modem_fault_get(&loaded));
+	TEST_ASSERT_EQUAL(4, test_memfault_upload_count);
+	TEST_ASSERT_EQUAL(0, test_fault_delete_count);
+	TEST_ASSERT_EQUAL(0, test_memfault_capture_count);
+	fault_upload();
+	TEST_ASSERT_FALSE(sm_settings_modem_fault_get(&loaded));
+	clear_captured_response();
+	helper_xnrfcloud_disconnect_ok();
+}
+
+void test_modem_fault_partial_replay_upload_is_retained(void)
+{
+	struct sm_modem_fault loaded;
+
+	helper_xnrfcloud_connect_ok();
+	TEST_ASSERT_EQUAL(0, sm_settings_modem_fault_save(&fault_fixture));
+	test_memfault_capture_batches = 5;
+	fault_upload();
+	TEST_ASSERT_TRUE(sm_settings_modem_fault_get(&loaded));
+	TEST_ASSERT_EQUAL(1, test_memfault_capture_count);
+	TEST_ASSERT_EQUAL(0, test_fault_delete_count);
+	TEST_ASSERT_EQUAL(5, test_memfault_upload_count);
+	test_memfault_capture_batches = 0;
+	fault_upload();
+	TEST_ASSERT_FALSE(sm_settings_modem_fault_get(&loaded));
+	clear_captured_response();
+	helper_xnrfcloud_disconnect_ok();
+}
+
+void test_modem_fault_capture_failure_is_retained(void)
+{
+	struct sm_modem_fault loaded;
+
+	helper_xnrfcloud_connect_ok();
+	TEST_ASSERT_EQUAL(0, sm_settings_modem_fault_save(&fault_fixture));
+	test_memfault_capture_return = -1;
+	fault_upload();
+	TEST_ASSERT_TRUE(sm_settings_modem_fault_get(&loaded));
+	TEST_ASSERT_EQUAL(0, test_fault_delete_count);
+	test_memfault_capture_return = 0;
+	fault_upload();
+	TEST_ASSERT_FALSE(sm_settings_modem_fault_get(&loaded));
+	clear_captured_response();
+	helper_xnrfcloud_disconnect_ok();
+}
+
+void test_modem_fault_delete_failure_is_retained(void)
+{
+	struct sm_modem_fault loaded;
+
+	helper_xnrfcloud_connect_ok();
+	TEST_ASSERT_EQUAL(0, sm_settings_modem_fault_save(&fault_fixture));
+	test_fault_delete_error = -EIO;
+	fault_upload();
+	TEST_ASSERT_TRUE(sm_settings_modem_fault_get(&loaded));
+	TEST_ASSERT_EQUAL(1, test_fault_delete_count);
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "#XNRFCLOUDOBSUPLOAD: -1"));
+	test_fault_delete_error = 0;
+	fault_upload();
+	TEST_ASSERT_FALSE(sm_settings_modem_fault_get(&loaded));
+	TEST_ASSERT_EQUAL(2, test_memfault_capture_count);
+	clear_captured_response();
+	helper_xnrfcloud_disconnect_ok();
+}
+
+void test_modem_fault_export_does_not_clear_record(void)
+{
+	struct sm_modem_fault loaded;
+
+	TEST_ASSERT_EQUAL(0, sm_settings_modem_fault_save(&fault_fixture));
+	send_at_command("AT#XNRFCLOUDOBSEXPORT\r\n");
+	TEST_ASSERT_TRUE(sm_settings_modem_fault_get(&loaded));
+	TEST_ASSERT_EQUAL(0, test_fault_delete_count);
+	TEST_ASSERT_EQUAL(0, test_memfault_capture_count);
+}
+
+void test_modem_fault_auto_upload_preserves_coredump_filter(void)
+{
+	struct sm_modem_fault loaded;
+	bool enabled = false;
+	struct obs_settings_blob blob = {&enabled, sizeof(enabled)};
+
+	obs_auto_reset();
+	helper_xnrfcloud_connect_ok();
+	TEST_ASSERT_EQUAL(0, obs_settings_set("coredump", sizeof(enabled),
+					    obs_settings_read_fake, &blob));
+	TEST_ASSERT_EQUAL(0, sm_settings_modem_fault_save(&fault_fixture));
+	send_at_command("AT#XNRFCLOUDOBSAUTO=1,60,\"prj_FAULT\"\r\n");
+	k_sleep(K_SECONDS(61));
+	TEST_ASSERT_FALSE(sm_settings_modem_fault_get(&loaded));
+	TEST_ASSERT_EQUAL(1, test_memfault_capture_count);
+	TEST_ASSERT_EQUAL_STRING("prj_FAULT", test_memfault_upload_seen_api_key);
+	TEST_ASSERT_EQUAL(kMfltDataSourceMask_Event | kMfltDataSourceMask_Log |
+				  kMfltDataSourceMask_Cdr,
+			  test_memfault_source_mask);
+	enabled = true;
+	TEST_ASSERT_EQUAL(0, obs_settings_set("coredump", sizeof(enabled),
+					    obs_settings_read_fake, &blob));
+	obs_auto_reset();
+	helper_xnrfcloud_disconnect_ok();
+}
 
 /* This is needed because AT Monitor library is initialized in SYS_INIT. */
 static int test_at_nrfcloud_sys_init(void)
