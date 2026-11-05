@@ -169,41 +169,18 @@ You can use the `nrf9151dk`_ board to try the update procedures without the one-
 The nRF91M1 firmware does not set APPROTECT or ERASEPROTECT, and the modem does not have ``AT%XPRODDONE`` set.
 This means that you can always program the DK again with any firmware, including any modem firmware, and return to an earlier version that way.
 The rollback protection of the application and MCUboot in the nRF91M1 firmware still applies on the DK while the firmware is running, so the updates themselves cannot go backwards.
-The modem firmware images are listed in :ref:`nrf91m1_update_images`.
-To program a modem firmware package to the DK, use ``nrfutil``:
 
-.. code-block:: none
+To set up the DK, follow the instructions in :ref:`nrf91m1_uart_nrf9151dk` with the following packages:
 
-   nrfutil device program --firmware mfw_nrf91x1_2.0.4.zip
+* Modem firmware: :file:`mfw_nrf91x1_2.0.4.zip`
+* Application firmware: :file:`serial_modem_nrf91m1_2.0.0.zip`, which contains the :file:`serial_modem_nrf91m1_2.0.0_nrf9151dk.hex` image that you program to the DK
 
-To use the nRF91M1 firmware on the `nrf9151dk`_ board, do the following:
-
-#. Program the :file:`serial_modem_nrf91m1_2.0.0_nrf9151dk.hex` image to the DK:
-
-   .. code-block:: none
-
-      nrfutil device program --firmware serial_modem_nrf91m1_2.0.0_nrf9151dk.hex
-      nrfutil device reset
-
-#. Connect to the DK as described in :ref:`nrf91m1_uart_dk`.
-   When you use the DK with a PC host, wire the **DTR** pin (**P0.31**) to **GND** to power on UART0.
-   Then verify that the application runs:
-
-   .. code-block:: none
-
-      AT#XSMVER
-      #XSMVER: "v2.0.0","3.4.1"
-      OK
+See :ref:`nrf91m1_update_images` for the contents of the packages.
 
 The update procedures in this section work the same way on the DK as on the |SM|.
 To repeat a procedure, or to start from an earlier firmware version, program the :file:`serial_modem_nrf91m1_2.0.0_nrf9151dk.hex` image to the DK again.
-If the DK does not respond to the programming command, add the ``nrfutil device recover`` step before you program the image:
-
-.. code-block:: none
-
-   nrfutil device recover
-   nrfutil device program --firmware serial_modem_nrf91m1_2.0.0_nrf9151dk.hex
-   nrfutil device reset
+To return to an earlier modem firmware version, program the modem firmware package again.
+If programming fails, erase the DK using the Programmer app and try again.
 
 .. _nrf91m1_update_dfu_host:
 
