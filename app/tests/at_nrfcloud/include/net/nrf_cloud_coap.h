@@ -110,6 +110,7 @@ struct nrf_cloud_coap_location_request {
 int nrf_cloud_coap_init(void);
 int nrf_cloud_coap_connect(const char *const app_ver);
 int nrf_cloud_coap_disconnect(void);
+bool nrf_cloud_coap_is_connected(void);
 int nrf_cloud_coap_location_get(struct nrf_cloud_coap_location_request const *const request,
 				struct nrf_cloud_location_result *const result);
 int nrf_cloud_coap_post(const char *resource, const char *query,

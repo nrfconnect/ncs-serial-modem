@@ -175,6 +175,12 @@ The parameters and their defined values are the following:
    Integer.
    Indicates whether the connection to nRF Cloud is established or not.
 
+   .. note::
+      This value reflects only the connection requested with ``AT#XNRFCLOUD=1``.
+      The nRF Cloud CoAP connection can also be opened by other features, such as :ref:`#XNRFCLOUDFOTA <SM_AT_NRFCLOUDFOTA>`, when it is not already open.
+      In that case, ``<ready>`` stays ``0``, and the automatic upload of :ref:`#XNRFCLOUDOBSAUTO <SM_AT_NRFCLOUDOBSAUTO>` is not performed.
+      When you then issue ``AT#XNRFCLOUD=1``, the existing connection is reused and ``<ready>`` changes to ``1``.
+
 <send_location>
    Integer.
    Indicates whether the device location will be sent to nRF Cloud or not.

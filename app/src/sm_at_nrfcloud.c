@@ -192,11 +192,19 @@ static void nrfcloud_conn_work_fn(struct k_work *work)
 
 	if (nrfcloud_connect) {
 		LOG_DBG("Connecting to nRF Cloud");
-		err = nrf_cloud_coap_connect(NULL);
-		if (err) {
-			LOG_ERR("Cloud connection failed: %d", err);
-			nrfcloud_send_state_urc(nrfcloud_pipe, false, nrfcloud_conn_send_location);
-			return;
+		/* Another module (e.g. the FOTA check) may have already opened the connection.
+		 * nrf_cloud_coap_connect() would discard it and redo the DTLS handshake.
+		 */
+		if (nrf_cloud_coap_is_connected()) {
+			LOG_DBG("Reusing existing connection");
+		} else {
+			err = nrf_cloud_coap_connect(NULL);
+			if (err) {
+				LOG_ERR("Cloud connection failed: %d", err);
+				nrfcloud_send_state_urc(nrfcloud_pipe, false,
+							nrfcloud_conn_send_location);
+				return;
+			}
 		}
 		sm_nrf_cloud_send_location = nrfcloud_conn_send_location;
 		/* A-GNSS & P-GPS needs date_time, trigger to update current time */
