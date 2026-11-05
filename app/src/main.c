@@ -370,6 +370,7 @@ static int sm_main(void)
 	lte_auto_connect();
 
 	LOG_INF("Serial Modem");
+	sm_ctrl_pin_dtr_check();
 
 	return ret;
 
