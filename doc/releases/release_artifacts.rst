@@ -12,6 +12,8 @@ The following release artifacts are available:
      - Description
    * - ``serial_modem_{VERSION}_nrf9151dk_nrf91m1``
      - nRF91M1 content for nRF9151 DK.
+       You must connect the **DTR** pin to **GND**.
+       See `Run the application firmware on the nRF9151 DK`_ in the nRF91M1 AT Commands documentation.
    * - ``sm_at_client_shell_{VERSION}_nrf54l15dk``
      - AT client shell build for nRF54L15 DK host that can be used as an external MCU.
        See :ref:`uart_configuration` for pin wiring.
