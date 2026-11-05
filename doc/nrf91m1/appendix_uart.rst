@@ -160,6 +160,12 @@ Operating with the nRF9151 DK
 *****************************
 
 You can flash the nRF91M1 firmware to the `nrf9151dk`_ board for development and testing purposes.
+
+.. important::
+   The UART stays disabled until the **DTR** pin is asserted.
+   On the `nrf9151dk`_ board, you must connect **P0.31** (DTR) to **GND**.
+   Otherwise, the |SM| does not respond to AT commands.
+
 On the DK, the SiP is an nRF9151, and the UART pins follow the pin mapping of the nRF91M1 as listed in the following table:
 
 .. list-table::
@@ -185,12 +191,46 @@ On the DK, the SiP is an nRF9151, and the UART pins follow the pin mapping of th
 By default on the `nrf9151dk`_ board, UART0 is routed to VCOM0 on the interface chip, and UART1 is routed to VCOM1 on the interface chip.
 This allows you to use the `nrf9151dk`_ board with a PC host for development and testing.
 
+.. _nrf91m1_uart_dk_quick_start:
+
+Quick start
+===========
+
+To try out the nRF91M1 application firmware on the `nrf9151dk`_ board, complete the following steps:
+
+1. Download the modem firmware and the application firmware from the nRF91M1 downloads (*location to be added*).
+#. Install nRF Util and the ``device`` command as described in `nRF Util installation`_.
+#. Connect the `nrf9151dk`_ board to your computer and list the connected devices to find the serial number of the board:
+
+   .. code-block:: console
+
+      nrfutil device list
+
+#. Flash the modem firmware to the `nrf9151dk`_ board using nRF Util:
+
+   .. code-block:: console
+
+      nrfutil device program --firmware <modem_firmware>.zip
+
+#. Flash the application firmware to the `nrf9151dk`_ board using nRF Util:
+
+   .. code-block:: console
+
+      nrfutil device program --firmware <application_firmware>.hex
+
+#. Connect **P0.31** (DTR) to **GND** using a jumper wire.
+   Currently, you must use a physical jumper wire, but in the future, the `Board Configurator app`_ can be used.
+#. Open a serial terminal on VCOM0 using the settings listed in :ref:`nrf91m1_uart_dk_pc_host`.
+#. Press the **RESET** button on the board and wait for the ``Ready`` message.
+#. Send ``AT``.
+   The |SM| responds with ``OK``.
+
+.. _nrf91m1_uart_dk_pc_host:
+
 PC host
 =======
 
-.. important::
-   When you use the `nrf9151dk`_ board with a PC host, you must wire the **DTR** pin to **GND** to power on UART0.
-   Currently, you must use a physical jumper wire, but in the future, the `Board Configurator app`_ can be used.
+When you use the `nrf9151dk`_ board with a PC host, you must connect the **DTR** pin to **GND** to enable UART0, as described in :ref:`nrf91m1_uart_dk_quick_start`.
 
 When you use a PC serial terminal application (for example, PuTTY, Tera Term, minicom) to send AT commands, configure the terminal as follows:
 

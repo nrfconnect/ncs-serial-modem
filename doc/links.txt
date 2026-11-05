@@ -86,6 +86,10 @@
 .. _`Serial Terminal app`: https://docs.nordicsemi.com/bundle/nrf-connect-serial-terminal/page/index.html
 .. _`Board Configurator app`: https://docs.nordicsemi.com/bundle/nrf-connect-board-configurator/page/index.html
 
+.. ### nRF Util
+
+.. _`nRF Util installation`: https://docs.nordicsemi.com/bundle/nrfutil/page/guides/installing.html
+
 .. ### Product specifications and HW documents
 
 .. _`nRF9151 Product Specification`: https://docs.nordicsemi.com/bundle/ps_nrf9151/page/nRF9151_html5_keyfeatures.html
