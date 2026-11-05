@@ -86,6 +86,8 @@
 .. _`Cellular Monitor app`: https://docs.nordicsemi.com/bundle/nrf-connect-cellularmonitor/page/index.html
 .. _`Serial Terminal app`: https://docs.nordicsemi.com/bundle/nrf-connect-serial-terminal/page/index.html
 .. _`Board Configurator app`: https://docs.nordicsemi.com/bundle/nrf-connect-board-configurator/page/index.html
+.. _`Programmer app`: https://docs.nordicsemi.com/r/bundle/nrf-connect-for-desktop/page/programmer-app
+.. _`Programming nRF91x1 DK firmware`: https://docs.nordicsemi.com/r/bundle/nrf-connect-for-desktop/page/app/pc-nrfconnect-programmer/programming_91dk.html/nrf91x1-dk
 
 .. ### Product specifications and HW documents
 
@@ -142,6 +144,7 @@
 .. _`Serial Modem PPP Zephyr host`: https://nrfconnectdocs.nordicsemi.com/addons/addon-serial_modem/latest/main/app/sm_cellular_modem.html#use-case-zephyr-host
 .. _`nRF91M1 AT Commands Reference Guide`: https://nrfconnectdocs.nordicsemi.com/addons/addon-nrf91m1/latest/index_nrf91m1.html
 .. _`nRF91M1 UART configuration`: https://nrfconnectdocs.nordicsemi.com/addons/addon-nrf91m1/latest/nrf91m1/appendix_uart.html#nrf91m1-uart-configuration
+.. _`Run the application firmware on the nRF9151 DK`: https://nrfconnectdocs.nordicsemi.com/addons/addon-nrf91m1/latest/nrf91m1/appendix_uart.html#nrf91m1-uart-nrf9151dk
 
 .. _`DevZone`: https://devzone.nordicsemi.com/
 
