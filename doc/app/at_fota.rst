@@ -70,6 +70,11 @@ The parameters and their defined values are the following:
 
    .. note::
 
+      For historical reasons, this is the PDN ID and not the ``cid`` of the ``+CGDCONT`` command, which most other commands use.
+      You can get the PDN ID of a ``cid`` with the ``AT%XGETPDNID=<cid>`` command.
+
+   .. note::
+
       Raw sockets must not use the PDN connection at the same time.
       See :ref:`SM_AT_SOCKET_RAW_SOCKET_LIMITATION` for more information.
 
