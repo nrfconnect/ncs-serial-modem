@@ -160,6 +160,20 @@ void sm_ctrl_pin_enter_shutdown(void)
 	assert(false);
 }
 
+void sm_ctrl_pin_dtr_check(void)
+{
+#if SM_DTR_GPIOS
+	const bool active_low = dtr_gpio.dt_flags & GPIO_ACTIVE_LOW;
+
+	if (!gpio_is_ready_dt(&dtr_gpio) || gpio_pin_get_dt(&dtr_gpio) == 1) {
+		return;
+	}
+
+	LOG_DBG("DTR deasserted: Pull P0.%02u %s to enable UART", dtr_gpio.pin,
+		active_low ? "low" : "high");
+#endif
+}
+
 static int sm_ctrl_pin_init_gpios(void)
 {
 #if SM_DTR_GPIOS
