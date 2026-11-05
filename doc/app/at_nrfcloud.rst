@@ -80,7 +80,9 @@ The parameters and their defined values are the following:
 
 <op>
    * ``0`` - Disconnect from the nRF Cloud service.
+     This also closes a connection that another command, such as :ref:`#XNRFCLOUDFOTA <SM_AT_NRFCLOUDFOTA>`, has opened, and resets ``<send_location>`` to ``0``.
    * ``1`` - Connect to the nRF Cloud service.
+     If the connection is already open, for example by :ref:`#XNRFCLOUDFOTA <SM_AT_NRFCLOUDFOTA>`, it is used as is.
    * ``2`` - Send a message in the JSON format to the nRF Cloud service.
 
    When ``<op>`` is ``2``, |SM| enters :ref:`sm_data_mode`.
@@ -91,6 +93,8 @@ The parameters and their defined values are the following:
    * ``0`` - The device location is not sent to nRF Cloud.
      This is the default behavior if the parameter is omitted.
    * ``1`` - The device location is sent to nRF Cloud.
+
+   The value stays in effect until the next ``AT#XNRFCLOUD=0`` or ``AT#XNRFCLOUD=1`` command.
 
    .. note::
       The location is sent to the nRF Cloud whenever a fix is produced by the GNSS module.
@@ -103,6 +107,10 @@ Unsolicited notification
 ::
 
    #XNRFCLOUD: <ready>,<send_location>
+
+The notification is sent as a result of ``AT#XNRFCLOUD=0`` and ``AT#XNRFCLOUD=1``.
+It is also sent as ``#XNRFCLOUD: 1,<send_location>`` when :ref:`#XNRFCLOUDFOTA <SM_AT_NRFCLOUDFOTA>` opens the connection.
+Losing the connection does not send a notification.
 
 The parameters and their defined values are the following:
 
@@ -148,7 +156,7 @@ Example
 
   OK
 
-  #XNRFCLOUD: 0,1
+  #XNRFCLOUD: 0,0
 
 Read command
 ------------
@@ -176,10 +184,10 @@ The parameters and their defined values are the following:
    Indicates whether the connection to nRF Cloud is established or not.
 
    .. note::
-      This value reflects only the connection requested with ``AT#XNRFCLOUD=1``.
-      The nRF Cloud CoAP connection can also be opened by other features, such as :ref:`#XNRFCLOUDFOTA <SM_AT_NRFCLOUDFOTA>`, when it is not already open.
-      In that case, ``<ready>`` stays ``0``, and the automatic upload of :ref:`#XNRFCLOUDOBSAUTO <SM_AT_NRFCLOUDOBSAUTO>` is not performed.
-      When you then issue ``AT#XNRFCLOUD=1``, the existing connection is reused and ``<ready>`` changes to ``1``.
+      This value reflects the connection to nRF Cloud, regardless of which command opened it.
+      :ref:`#XNRFCLOUDFOTA <SM_AT_NRFCLOUDFOTA>` opens the connection if it is not open, and leaves it open.
+      While the connection is open, the commands and features that require it are available, including the automatic upload of :ref:`#XNRFCLOUDOBSAUTO <SM_AT_NRFCLOUDOBSAUTO>`.
+      Use ``AT#XNRFCLOUD=0`` to close the connection.
 
 <send_location>
    Integer.
@@ -236,7 +244,7 @@ The ``#XNRFCLOUDPOS`` command sends a request to nRF Cloud to determine the devi
 The request uses information from the cellular network, Wi-Fi® access points, or both.
 
 .. note::
-   To use ``#XNRFCLOUDPOS``, the device must be connected to nRF Cloud using :ref:`#XNRFCLOUD <SM_AT_NRFCLOUD>`.
+   To use ``#XNRFCLOUDPOS``, the device must be connected to nRF Cloud (see :ref:`#XNRFCLOUD <SM_AT_NRFCLOUD>`).
 
    .. only:: not nrf91m1
 
@@ -393,6 +401,12 @@ An application update is staged the same way as ``AT#XFOTA=1``, that is, the hos
 A modem update is staged the same way as ``AT#XFOTA=2``, that is, the host activates it with the ``AT#XMODEMRESET`` AT command.
 Both share their FOTA session with ``#XFOTA``, but progress and completion are reported over the ``#XNRFCLOUDFOTA`` notification instead, using the same ``<fota_stage>``, ``<fota_status>`` and ``<fota_info>`` tuple as ``#XFOTA`` (see :ref:`SM_AT_FOTA` for download and activation semantics).
 Only one FOTA session can be ongoing at a time, regardless of which command initiated it.
+
+``#XNRFCLOUDFOTA`` connects to nRF Cloud if the device is not connected, and reports it with the ``#XNRFCLOUD: 1,<send_location>`` notification.
+The connection stays open after the command completes, the same way as after ``AT#XNRFCLOUD=1``.
+The commands and features that require the connection use it, including the automatic upload of :ref:`#XNRFCLOUDOBSAUTO <SM_AT_NRFCLOUDOBSAUTO>`.
+Use ``AT#XNRFCLOUD=0`` to close the connection.
+See :ref:`SM_AT_NRFCLOUD`.
 
 .. note::
    Unlike ``AT#XFOTA``, ``#XNRFCLOUDFOTA`` does not support MCUboot bootloader updates.
@@ -861,6 +875,7 @@ The parameters and their defined values are the following:
 
 The first upload runs when the interval expires, not when the automatic upload is enabled.
 An upload that falls while there is no connection to nRF Cloud is skipped, and the next one is scheduled as usual.
+The automatic upload does not open the connection, but uses it whenever it is open, also when :ref:`#XNRFCLOUDFOTA <SM_AT_NRFCLOUDFOTA>` opened it.
 
 The automatic upload is silent and does not send any unsolicited notifications.
 

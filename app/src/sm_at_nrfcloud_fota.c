@@ -17,6 +17,7 @@
 #include "sm_util.h"
 #include "sm_at_host.h"
 #include "sm_at_fota.h"
+#include "sm_at_nrfcloud.h"
 #include "sm_settings.h"
 
 LOG_MODULE_REGISTER(sm_nrfcloud_fota, CONFIG_SM_LOG_LEVEL);
@@ -73,6 +74,16 @@ static const char *nrfcloud_fota_app_key_swap(void)
 		g_mflt_http_client_config.api_key = fota_project_key;
 	}
 	return saved_key;
+}
+
+/* The Memfault calls open the nRF Cloud connection if it is not open, and leave it open.
+ * Report that over the #XNRFCLOUD URC, as AT#XNRFCLOUD=1 would.
+ */
+static void nrfcloud_fota_notify_if_connected(bool was_ready)
+{
+	if (!was_ready && sm_nrf_cloud_is_ready()) {
+		sm_nrf_cloud_notify_connected(fota_pipe);
+	}
 }
 
 /* Reports a failed check or pre-download setup, logs it and sends #XNRFCLOUDFOTA: 0,1,<error>. */
@@ -149,6 +160,7 @@ static int nrfcloud_fota_modem_discard_unaligned(void)
  */
 static void nrfcloud_fota_check(void)
 {
+	bool was_ready = sm_nrf_cloud_is_ready();
 	int rv;
 
 	if (sm_fota_type == SM_FOTA_TYPE_APP) {
@@ -165,6 +177,8 @@ static void nrfcloud_fota_check(void)
 			memfault_zephyr_fota_modem_project_key_set(NULL);
 		}
 	}
+
+	nrfcloud_fota_notify_if_connected(was_ready);
 
 	if (rv < 0) {
 		nrfcloud_fota_check_failed(rv);
@@ -191,6 +205,7 @@ K_WORK_DEFINE(nrfcloud_fota_check_work, nrfcloud_fota_check_work_fn);
  */
 static void nrfcloud_fota_check_only(void)
 {
+	bool was_ready = sm_nrf_cloud_is_ready();
 	char *url = NULL;
 	int rv;
 
@@ -206,6 +221,8 @@ static void nrfcloud_fota_check_only(void)
 		g_mflt_http_client_config.api_key = saved_key;
 	}
 	memfault_zephyr_port_coap_release_download_url(&url);
+
+	nrfcloud_fota_notify_if_connected(was_ready);
 
 	if (rv < 0) {
 		nrfcloud_fota_check_failed(rv);

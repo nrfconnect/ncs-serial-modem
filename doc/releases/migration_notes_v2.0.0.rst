@@ -121,6 +121,12 @@ The following changes are listed for informational purposes, and many hosts will
   After the Serial Modem has enabled UART, RI will be deasserted.
 * HTTP client has been added and it's enabled by default. Use CONFIG_SM_HTTPC=n if you do not need it and want to save flash.
 * nRF Cloud transport has been changed from MQTT to CoAP.
+* ``AT#XNRFCLOUD``:
+
+  * ``AT#XNRFCLOUD=0`` resets ``<send_location>`` to ``0``, so the resulting notification is ``#XNRFCLOUD: 0,0``.
+  * ``<ready>`` in the ``AT#XNRFCLOUD?`` response reflects the connection to nRF Cloud, regardless of which command opened it.
+    ``AT#XNRFCLOUDFOTA`` opens the connection if it is not open, reports it with the ``#XNRFCLOUD: 1,<send_location>`` notification, and leaves it open.
+    See :ref:`SM_AT_NRFCLOUD`.
 * ``CONFIG_SM_NRF_CLOUD_LOCATION`` is enabled by default whenever ``CONFIG_SM_NRF_CLOUD`` is enabled. Use ``CONFIG_SM_NRF_CLOUD_LOCATION=n`` if you do not need it and want to save flash.
 * The ``sm_ppp_shell`` sample no longer supports the ``nrf54l15dk/nrf54l15/cpuapp/ns`` (TF-M) board target.
   Use ``nrf54l15dk/nrf54l15/cpuapp`` instead.

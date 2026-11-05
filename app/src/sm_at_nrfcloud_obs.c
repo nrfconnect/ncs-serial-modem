@@ -262,7 +262,7 @@ static void obs_auto_work_fn(struct k_work *work)
 	 */
 	k_work_reschedule_for_queue(&sm_work_q, &obs_auto_work, K_SECONDS(obs_auto_interval));
 
-	if (!sm_nrf_cloud_ready) {
+	if (!sm_nrf_cloud_is_ready()) {
 		LOG_DBG("Not connected to nRF Cloud, skipping upload");
 		return;
 	}
@@ -470,7 +470,7 @@ static int obs_parse_chunk(struct at_parser *parser)
  */
 static int obs_check_ready(void)
 {
-	if (!sm_nrf_cloud_ready) {
+	if (!sm_nrf_cloud_is_ready()) {
 		LOG_ERR("Not connected to nRF Cloud");
 		return -ENOTCONN;
 	}

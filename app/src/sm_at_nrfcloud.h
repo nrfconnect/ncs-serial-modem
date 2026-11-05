@@ -15,10 +15,26 @@
 #include <stdbool.h>
 #include <modem/lte_lc.h>
 
-/* Whether the connection to nRF Cloud is ready. */
-extern bool sm_nrf_cloud_ready;
+struct modem_pipe;
 
-/* Whether to send the device's location to nRF Cloud. */
+/**
+ * @brief Whether the connection to nRF Cloud is ready.
+ *
+ * Reflects the nRF Cloud CoAP connection, regardless of whether AT#XNRFCLOUD or another
+ * command, such as AT#XNRFCLOUDFOTA, opened it.
+ */
+bool sm_nrf_cloud_is_ready(void);
+
+/**
+ * @brief Send the #XNRFCLOUD URC reporting that the connection to nRF Cloud is ready.
+ *
+ * For commands other than AT#XNRFCLOUD that open the connection.
+ *
+ * @param[in] pipe Pipe to send the URC to.
+ */
+void sm_nrf_cloud_notify_connected(struct modem_pipe *pipe);
+
+/* Whether to send the device's location to nRF Cloud. Reset by AT#XNRFCLOUD=0. */
 extern bool sm_nrf_cloud_send_location;
 
 /**

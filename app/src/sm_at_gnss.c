@@ -673,7 +673,7 @@ static void gnss_fix_sender(struct k_work *)
 
 #if defined(CONFIG_SM_NRF_CLOUD)
 
-	if (sm_nrf_cloud_send_location && sm_nrf_cloud_ready) {
+	if (sm_nrf_cloud_send_location && sm_nrf_cloud_is_ready()) {
 		/* Report to nRF Cloud by best-effort */
 		send_location(&pvt);
 	}
@@ -803,7 +803,7 @@ static int handle_at_gnss(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 
 			if (gnss_cloud_assistance
 #if defined(CONFIG_SM_NRF_CLOUD)
-			&& !sm_nrf_cloud_ready
+			&& !sm_nrf_cloud_is_ready()
 #endif
 			) {
 				LOG_ERR(

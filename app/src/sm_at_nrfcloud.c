@@ -27,7 +27,6 @@ static struct modem_pipe *nrfcloud_pipe;
 
 static char nrfcloud_device_id[NRF_CLOUD_CLIENT_ID_MAX_LEN];
 
-bool sm_nrf_cloud_ready;
 bool sm_nrf_cloud_send_location;
 /* Parameters saved before submitting connection work. */
 static bool nrfcloud_connect;
@@ -127,16 +126,25 @@ static void nrfcloud_send_state_urc(struct modem_pipe *pipe, bool ready, bool se
 	urc_send_to(pipe, "\r\n#XNRFCLOUD: %d,%d\r\n", ready, send_location);
 }
 
+bool sm_nrf_cloud_is_ready(void)
+{
+	return nrf_cloud_coap_is_connected();
+}
+
+void sm_nrf_cloud_notify_connected(struct modem_pipe *pipe)
+{
+	nrfcloud_send_state_urc(pipe, true, sm_nrf_cloud_send_location);
+}
+
 static void on_cloud_ready(void)
 {
-	sm_nrf_cloud_ready = true;
-	nrfcloud_send_state_urc(nrfcloud_pipe, sm_nrf_cloud_ready, sm_nrf_cloud_send_location);
+	nrfcloud_send_state_urc(nrfcloud_pipe, true, sm_nrf_cloud_send_location);
 }
 
 static void on_cloud_disconnected(void)
 {
-	sm_nrf_cloud_ready = false;
-	nrfcloud_send_state_urc(nrfcloud_pipe, sm_nrf_cloud_ready, sm_nrf_cloud_send_location);
+	sm_nrf_cloud_send_location = false;
+	nrfcloud_send_state_urc(nrfcloud_pipe, false, sm_nrf_cloud_send_location);
 }
 
 static void date_time_event_handler(const struct date_time_evt *evt)
@@ -217,8 +225,8 @@ static void nrfcloud_conn_work_fn(struct k_work *work)
 		LOG_DBG("Disconnecting from nRF Cloud");
 		err = nrf_cloud_coap_disconnect();
 		if (err && err != -ENOTCONN) {
-			/* The socket fd is freed even when close() fails, so treat the
-			 * connection as down to keep sm_nrf_cloud_ready in sync.
+			/* The socket fd is freed even when close() fails, so the connection
+			 * is down either way.
 			 */
 			LOG_WRN("Cloud disconnection failed: %d", err);
 		}
@@ -262,10 +270,9 @@ STATIC int handle_at_nrf_cloud(enum at_parser_cmd_type cmd_type, struct at_parse
 				return -EBUSY;
 			}
 			nrfcloud_pipe = sm_at_host_get_current_pipe();
-			if (sm_nrf_cloud_ready) {
+			if (sm_nrf_cloud_is_ready()) {
 				sm_nrf_cloud_send_location = send_location;
-				nrfcloud_send_state_urc(nrfcloud_pipe, sm_nrf_cloud_ready,
-						       sm_nrf_cloud_send_location);
+				on_cloud_ready();
 				return 0;
 			}
 
@@ -280,7 +287,7 @@ STATIC int handle_at_nrf_cloud(enum at_parser_cmd_type cmd_type, struct at_parse
 			if (k_work_busy_get(&nrfcloud_conn_work)) {
 				return -EBUSY;
 			}
-			if (!sm_nrf_cloud_ready) {
+			if (!sm_nrf_cloud_is_ready()) {
 				return -ENOTCONN;
 			}
 			nrfcloud_pipe = sm_at_host_get_current_pipe();
@@ -299,9 +306,8 @@ STATIC int handle_at_nrf_cloud(enum at_parser_cmd_type cmd_type, struct at_parse
 			}
 #endif
 			nrfcloud_pipe = sm_at_host_get_current_pipe();
-			if (!sm_nrf_cloud_ready) {
-				nrfcloud_send_state_urc(nrfcloud_pipe, sm_nrf_cloud_ready,
-						       sm_nrf_cloud_send_location);
+			if (!sm_nrf_cloud_is_ready()) {
+				on_cloud_disconnected();
 				return 0;
 			}
 			nrfcloud_connect = false;
@@ -312,7 +318,7 @@ STATIC int handle_at_nrf_cloud(enum at_parser_cmd_type cmd_type, struct at_parse
 		} break;
 
 	case AT_PARSER_CMD_TYPE_READ: {
-		rsp_send("\r\n#XNRFCLOUD: %d,%d,%d,\"%s\"\r\n", sm_nrf_cloud_ready,
+		rsp_send("\r\n#XNRFCLOUD: %d,%d,%d,\"%s\"\r\n", sm_nrf_cloud_is_ready(),
 			sm_nrf_cloud_send_location, CONFIG_NRF_CLOUD_SEC_TAG, nrfcloud_device_id);
 		err = 0;
 	} break;
@@ -385,7 +391,7 @@ STATIC int handle_at_nrf_cloud_pos(enum at_parser_cmd_type cmd_type,
 		return -EBUSY;
 	}
 
-	if (!sm_nrf_cloud_ready) {
+	if (!sm_nrf_cloud_is_ready()) {
 		LOG_ERR("Not connected to nRF Cloud");
 		return -ENOTCONN;
 	}
