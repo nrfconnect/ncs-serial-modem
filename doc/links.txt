@@ -85,6 +85,8 @@
 .. _`Cellular Monitor app`: https://docs.nordicsemi.com/bundle/nrf-connect-cellularmonitor/page/index.html
 .. _`Serial Terminal app`: https://docs.nordicsemi.com/bundle/nrf-connect-serial-terminal/page/index.html
 .. _`Board Configurator app`: https://docs.nordicsemi.com/bundle/nrf-connect-board-configurator/page/index.html
+.. _`Programmer app`: https://docs.nordicsemi.com/r/bundle/nrf-connect-for-desktop/page/programmer-app
+.. _`Programming nRF91x1 DK firmware`: https://docs.nordicsemi.com/r/bundle/nrf-connect-for-desktop/page/app/pc-nrfconnect-programmer/programming_91dk.html/nrf91x1-dk
 
 .. ### Product specifications and HW documents
 
@@ -96,6 +98,7 @@
 .. _`nRF9151 Hardware Design Guidelines — VDD_GPIO`: https://docs.nordicsemi.com/r/bundle/nwp_056/page/wp/nwp_054/vdd_gpio.html
 .. _`nRF9151 Hardware Integration`: https://docs.nordicsemi.com/r/bundle/nwp_056/page/wp/nwp_054/hardware_integration.html
 .. _`nRF9151 anomaly 36`: https://docs.nordicsemi.com/bundle/errata_nRF9151_Rev2/page/ERR/nRF9151/Rev2/latest/anomaly_151_36.html
+.. _`nRF91M1 Downloads`: https://www.nordicsemi.com/Products/nRF91M1/Download
 
 .. ### AT command specifications
 
@@ -136,6 +139,7 @@
 .. _`Serial Modem PPP Linux host`: https://nrfconnectdocs.nordicsemi.com/addons/addon-serial_modem/latest/main/app/sm_cellular_modem.html#use-case-linux-host
 .. _`Serial Modem PPP Zephyr host`: https://nrfconnectdocs.nordicsemi.com/addons/addon-serial_modem/latest/main/app/sm_cellular_modem.html#use-case-zephyr-host
 .. _`nRF91M1 UART configuration`: https://nrfconnectdocs.nordicsemi.com/addons/addon-serial_modem/latest/nrf91m1/nrf91m1/appendix_uart.html#nrf91m1-uart-configuration
+.. _`Run the application firmware on the nRF9151 DK`: https://nrfconnectdocs.nordicsemi.com/addons/addon-serial_modem/latest/nrf91m1/nrf91m1/appendix_uart.html#nrf91m1_uart_nrf9151dk
 
 .. _`DevZone`: https://devzone.nordicsemi.com/
 
