@@ -462,8 +462,8 @@ Unsolicited notification
 The ``<fota_stage>``, ``<fota_status>``, and ``<fota_info>`` parameters use the same values as the ``#XFOTA`` notification:
 
 .. include:: at_fota.rst
-   :start-after: sm_fota_urc_params_start
-   :end-before: sm_fota_urc_params_end
+   :start-after: sm_nrf_cloud_fota_urc_params_start
+   :end-before: sm_nrf_cloud_fota_urc_params_end
 
 When the FOTA check finishes without starting a download, ``<fota_stage>`` is ``0`` (*Init*) and ``<fota_info>`` indicates the result.
 This form is used by ``#XNRFCLOUDFOTA`` only (not ``#XFOTA``) and specified as follows:
