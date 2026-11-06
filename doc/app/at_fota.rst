@@ -199,7 +199,6 @@ The parameters and their defined values are the following:
    * ``0`` - OK.
    * ``1`` - Error.
    * ``2`` - Cancelled.
-   * ``3`` - Reverted (application FOTA only).
 
 <fota_info>
    Integer.
@@ -212,26 +211,51 @@ The parameters and their defined values are the following:
    +=========================+============================+====================================================+
    |``1`` (namely *Download*)| ``0`` (namely *OK*)        | Percentage of the download                         |
    +-------------------------+----------------------------+----------------------------------------------------+
-   |``1`` (namely *Download*)| ``1`` (namely *ERROR*)     | Error Code                                         |
+   |``1`` (namely *Download*)| ``1`` (namely *ERROR*)     | Error code, see the download error codes           |
    +-------------------------+----------------------------+----------------------------------------------------+
    |``1`` (namely *Download*)| ``2`` (namely *CANCELLED*) | ``0`` - Downloading is cancelled before completion |
    +-------------------------+----------------------------+----------------------------------------------------+
-   |``5`` (namely *Complete*)| ``1`` (namely *ERROR*)     | Error Code                                         |
-   +-------------------------+------------------------+---+----------------------------------------------------+
+   |``4`` (namely *Activate*)| ``1`` (namely *ERROR*)     | ``71303173`` - Low voltage, retry on reboot        |
+   +-------------------------+----------------------------+----------------------------------------------------+
+   |``5`` (namely *Complete*)| ``1`` (namely *ERROR*)     | Error code, see the activation error codes         |
+   +-------------------------+----------------------------+----------------------------------------------------+
 
-  The error codes can be the following:
+   The download error codes are common to all FOTA types and correspond to the ``fota_download_error_cause`` enumeration of the `FOTA download`_ library:
 
-  * ``1`` - Download failed
-  * ``2`` - Update image rejected (for example modem firmware version error)
-  * ``3`` - Update image mismatch (for example ``<op>`` is ``1`` but ``<file_url>`` points to a modem image)
+   * ``1`` - Connecting to the server failed (for example, because of wrong TLS credentials).
+   * ``2`` - Download failed.
+   * ``3`` - Update image rejected.
+   * ``4`` - Update image type mismatch.
+   * ``5`` - Internal error on the device.
+   * ``6`` - Error in the DFU library.
+   * ``7`` - Protocol not supported.
+   * ``8`` - Invalid URL or configuration.
 
-  For modem FOTA, the error codes can be the following:
+   The activation error codes depend on the FOTA type.
 
-  * ``71303169`` (``NRF_MODEM_DFU_RESULT_INTERNAL_ERROR``) - The modem encountered a fatal internal error during firmware update.
-  * ``71303170`` (``NRF_MODEM_DFU_RESULT_HARDWARE_ERROR``) - The modem encountered a fatal hardware error during firmware update.
-  * ``71303171`` (``NRF_MODEM_DFU_RESULT_AUTH_ERROR``) - Modem firmware update failed due to an authentication error.
-  * ``71303172`` (``NRF_MODEM_DFU_RESULT_UUID_ERROR``) - Modem firmware update failed due to UUID mismatch.
-  * ``71303173`` (``NRF_MODEM_DFU_RESULT_VOLTAGE_LOW``) - Modem firmware update not executed due to low voltage. The modem will retry the update on reboot.
+   For application updates, the error codes can be the following:
+
+   * A negative error code - Confirming the new image after the first boot failed.
+   * A positive error code - The swap type reported by MCUboot was not the one expected for a new image that is pending confirmation.
+     For example, ``5`` (``BOOT_SWAP_TYPE_FAIL``) means that the swap failed because the new image is not valid, and ``255`` (``BOOT_SWAP_TYPE_PANIC``) means that MCUboot failed to read the swap state from flash.
+
+   For modem delta updates, the error codes are the ``NRF_MODEM_DFU_RESULT_*`` results reported by the modem and can be the following:
+
+   * ``71303169`` (``NRF_MODEM_DFU_RESULT_INTERNAL_ERROR``) - The modem encountered a fatal internal error during firmware update.
+   * ``71303170`` (``NRF_MODEM_DFU_RESULT_HARDWARE_ERROR``) - The modem encountered a fatal hardware error during firmware update.
+   * ``71303171`` (``NRF_MODEM_DFU_RESULT_AUTH_ERROR``) - Modem firmware update failed due to an authentication error.
+   * ``71303172`` (``NRF_MODEM_DFU_RESULT_UUID_ERROR``) - Modem firmware update failed due to UUID mismatch.
+   * ``71303173`` (``NRF_MODEM_DFU_RESULT_VOLTAGE_LOW``) - Modem firmware update not executed due to low voltage. The modem will retry the update on reboot.
+
+   For full modem updates, the error code can be the following:
+
+   * A negative error code - Activating the update failed, for example when loading the modem firmware from the update storage.
+     The update storage is erased and the device reboots.
+
+   For MCUboot bootloader updates, the error codes can be the following:
+
+   * A negative error code - Reading the active MCUboot version after the update failed.
+   * ``1`` - The MCUboot version did not change.
 
 .. sm_fota_urc_params_end
 
