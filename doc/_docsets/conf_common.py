@@ -673,7 +673,11 @@ def docset_html_context(docset: str) -> dict:
 
     Exposes the per-docset PDF filename so that Jinja2 templates can link to
     the correct PDF without hardcoding a name that is only valid for one
-    docset.
+    docset, and the two views of :data:`docsets.DOCSET_VERSIONS` that
+    :file:`_templates/layout.html` needs: the version of the docset being
+    built, which is the only one its version dropdown offers, and the version
+    and home page of every pinned docset, which is what identifies an entry of
+    the docset switcher that has to be redirected.
 
     Args:
         docset: Docset name.
@@ -682,7 +686,14 @@ def docset_html_context(docset: str) -> dict:
         Dictionary to merge into the ``html_context`` configuration option.
     """
 
-    return {"pdf_filename": f"{docsets.pdf_stem(docset)}.pdf"}
+    return {
+        "pdf_filename": f"{docsets.pdf_stem(docset)}.pdf",
+        "docset_version": docsets.DOCSET_VERSIONS.get(docset, ""),
+        "pinned_docsets": {
+            name: {"version": version, "page": f"{docsets.ALL_DOCSETS[name][1]}.html"}
+            for name, version in docsets.DOCSET_VERSIONS.items()
+        },
+    }
 
 
 def docset_latex_documents(docset: str) -> list[tuple[str, str, str, str, str]]:
