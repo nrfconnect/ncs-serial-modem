@@ -123,12 +123,22 @@ static const char ncellmeas_resp_no_neighbors[] =
  * ---------------------------------------------------------------------------
  */
 
+/* State of the fake nRF Cloud CoAP connection, reported by nrf_cloud_coap_is_connected(). */
+static bool test_coap_connected;
+
+static bool test_coap_is_connected(int num_calls)
+{
+	return test_coap_connected;
+}
+
 void setUp(void)
 {
 	clear_captured_response();
 
 	cmock_nrf_modem_at_Init();
 	cmock_nrf_cloud_coap_Init();
+	test_coap_connected = false;
+	__cmock_nrf_cloud_coap_is_connected_Stub(test_coap_is_connected);
 	test_memfault_stubs_reset();
 	strcpy(test_at_nrfcloud_ncellmeas_resp, "\r\nOK\r\n");
 	test_at_nrfcloud_ncellmeas_resp_ret = 0;
@@ -150,10 +160,11 @@ void tearDown(void)
 
 void helper_xnrfcloud_connect_ok(void)
 {
-	/* nrfcloud_conn_work_fn calls nrf_cloud_coap_connect(NULL). */
+	/* nrfcloud_conn_work_fn calls nrf_cloud_coap_connect(NULL) if not already connected. */
 	__cmock_nrf_cloud_coap_connect_ExpectAnyArgsAndReturn(0);
 	send_at_command("AT#XNRFCLOUD=1\r\n");
 	k_sleep(K_MSEC(1));
+	test_coap_connected = true;
 
 	resp = get_captured_response();
 	TEST_ASSERT_NOT_NULL(strstr(resp, "OK"));
@@ -169,6 +180,7 @@ void helper_xnrfcloud_disconnect_ok(void)
 
 	send_at_command("AT#XNRFCLOUD=0\r\n");
 	k_sleep(K_MSEC(1));
+	test_coap_connected = false;
 
 	resp = get_captured_response();
 
@@ -209,7 +221,7 @@ void test_xnrfcloud_read_disconnected(void)
  */
 void test_xnrfcloud_connect_ok(void)
 {
-	sm_nrf_cloud_ready = false;
+	test_coap_connected = false;
 
 	helper_xnrfcloud_connect_ok();
 
@@ -230,12 +242,35 @@ void test_xnrfcloud_connect_ok(void)
  */
 void test_xnrfcloud_connect_forwards_date_time_to_memfault(void)
 {
-	sm_nrf_cloud_ready = false;
+	test_coap_connected = false;
 
 	helper_xnrfcloud_connect_ok();
 
 	TEST_ASSERT_EQUAL(1, test_memfault_date_time_evt_count);
 	TEST_ASSERT_EQUAL(DATE_TIME_OBTAINED_NTP, test_memfault_date_time_evt_type);
+
+	clear_captured_response();
+	helper_xnrfcloud_disconnect_ok();
+}
+
+/*
+ * Tests that connect reuses a connection opened by another module (e.g. the FOTA check)
+ * instead of calling nrf_cloud_coap_connect(), which would redo the DTLS handshake.
+ */
+void test_xnrfcloud_connect_reuses_existing_connection(void)
+{
+	/* No nrf_cloud_coap_connect() expectation: CMock fails the test if it is called. */
+	test_coap_connected = true;
+
+	send_at_command("AT#XNRFCLOUD=1\r\n");
+	k_sleep(K_MSEC(1));
+
+	resp = get_captured_response();
+	TEST_ASSERT_NOT_NULL(strstr(resp, "OK"));
+	TEST_ASSERT_NULL(strstr(resp, "ERROR"));
+	result = strstr(resp, "#XNRFCLOUD");
+	TEST_ASSERT_EQUAL_STRING("#XNRFCLOUD: 1,0\r\n", result);
+	TEST_ASSERT_TRUE(sm_nrf_cloud_is_ready());
 
 	clear_captured_response();
 	helper_xnrfcloud_disconnect_ok();
@@ -252,6 +287,7 @@ void test_xnrfcloud_connect_with_send_location(void)
 	resp = get_captured_response();
 	TEST_ASSERT_NOT_NULL(strstr(resp, "OK"));
 	k_sleep(K_MSEC(1));
+	test_coap_connected = true;
 
 	clear_captured_response();
 	send_at_command("AT#XNRFCLOUD?\r\n");
@@ -270,8 +306,9 @@ void test_xnrfcloud_connect_with_send_location(void)
 	TEST_ASSERT_NOT_NULL(strstr(resp, "OK"));
 	TEST_ASSERT_NULL(strstr(resp, "ERROR"));
 
+	/* AT#XNRFCLOUD=0 resets <send_location>. */
 	result = strstr(resp, "#XNRFCLOUD");
-	TEST_ASSERT_EQUAL_STRING("#XNRFCLOUD: 0,1\r\n", result);
+	TEST_ASSERT_EQUAL_STRING("#XNRFCLOUD: 0,0\r\n", result);
 }
 
 /*
@@ -353,6 +390,7 @@ static int blocking_coap_connect(const char *const app_ver, int num_calls)
 	k_sem_give(&conn_work_entered);
 	/* Bounded so that a failed assertion cannot wedge sm_work_q for later tests. */
 	k_sem_take(&conn_work_release, K_SECONDS(2));
+	test_coap_connected = true;
 	return 0;
 }
 
@@ -360,6 +398,7 @@ static int blocking_coap_disconnect(int num_calls)
 {
 	k_sem_give(&conn_work_entered);
 	k_sem_take(&conn_work_release, K_SECONDS(2));
+	test_coap_connected = false;
 	return 0;
 }
 
@@ -381,7 +420,6 @@ static int call_xnrfcloud_set(const char *cmd)
  */
 void test_xnrfcloud_busy_rejects_and_keeps_pending_request(void)
 {
-	sm_nrf_cloud_ready = false;
 	k_sem_reset(&conn_work_entered);
 	k_sem_reset(&conn_work_release);
 
@@ -400,7 +438,7 @@ void test_xnrfcloud_busy_rejects_and_keeps_pending_request(void)
 
 	resp = get_captured_response();
 	TEST_ASSERT_NOT_NULL(strstr(resp, "#XNRFCLOUD: 1,1\r\n"));
-	TEST_ASSERT_TRUE(sm_nrf_cloud_ready);
+	TEST_ASSERT_TRUE(sm_nrf_cloud_is_ready());
 	TEST_ASSERT_TRUE(sm_nrf_cloud_send_location);
 
 	/* Hold a disconnect request in the worker. */
@@ -418,8 +456,8 @@ void test_xnrfcloud_busy_rejects_and_keeps_pending_request(void)
 	uart_stub_tx_done_drain();
 
 	resp = get_captured_response();
-	TEST_ASSERT_NOT_NULL(strstr(resp, "#XNRFCLOUD: 0,1\r\n"));
-	TEST_ASSERT_FALSE(sm_nrf_cloud_ready);
+	TEST_ASSERT_NOT_NULL(strstr(resp, "#XNRFCLOUD: 0,0\r\n"));
+	TEST_ASSERT_FALSE(sm_nrf_cloud_is_ready());
 }
 
 /*
@@ -1318,7 +1356,7 @@ void test_xnrfcloudobsauto_uploads_on_interval(void)
 void test_xnrfcloudobsauto_skipped_when_disconnected(void)
 {
 	obs_auto_reset();
-	sm_nrf_cloud_ready = false;
+	test_coap_connected = false;
 
 	send_at_command("AT#XNRFCLOUDOBSAUTO=1,60\r\n");
 	k_sleep(K_MSEC(10));
@@ -1405,7 +1443,7 @@ void test_xnrfcloudobsauto_unknown_setting_is_ignored(void)
  */
 void test_xnrfcloudobsupload_not_connected(void)
 {
-	sm_nrf_cloud_ready = false;
+	test_coap_connected = false;
 
 	send_at_command("AT#XNRFCLOUDOBSUPLOAD\r\n");
 	k_sleep(K_MSEC(10));
@@ -1507,7 +1545,7 @@ void test_xnrfcloudobsupload_with_project_key(void)
  */
 void test_xnrfcloudobsheartbeat(void)
 {
-	sm_nrf_cloud_ready = false;
+	test_coap_connected = false;
 
 	send_at_command("AT#XNRFCLOUDOBSHEARTBEAT\r\n");
 	k_sleep(K_MSEC(10));
@@ -1561,7 +1599,7 @@ void test_xnrfcloudobsforward_bad_base64(void)
  */
 void test_xnrfcloudobsforward_not_connected(void)
 {
-	sm_nrf_cloud_ready = false;
+	test_coap_connected = false;
 
 	send_at_command("AT#XNRFCLOUDOBSFORWARD=\"" OBS_CHUNK_B64 "\"\r\n");
 	k_sleep(K_MSEC(10));

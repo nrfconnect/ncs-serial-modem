@@ -26,7 +26,7 @@ The `nRF Cloud A-GNSS`_ service can be used with the module to reduce the time i
    Both the `nRF Cloud A-GNSS`_ service and the `nRF Cloud P-GPS`_ service can be used with the module, either together or independently of each other.
    Using them reduces the time it takes for the GNSS module to estimate device position.
 
-   To use either of them, the device must be connected to nRF Cloud (using the :ref:`#XNRFCLOUD <SM_AT_NRFCLOUD>` AT command) when starting the GNSS module.
+   To use either of them, the device must be connected to nRF Cloud (see the :ref:`#XNRFCLOUD <SM_AT_NRFCLOUD>` AT command) when starting the GNSS module.
    In addition, the following Kconfig options must be enabled:
 
    * ``CONFIG_NRF_CLOUD_AGNSS`` to use A-GNSS.
