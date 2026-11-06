@@ -67,6 +67,17 @@ int sm_at_handle_xdfu_write(char *buf, size_t len, char *at_cmd);
  */
 int sm_at_handle_xdfu_apply(char *buf, size_t len, char *at_cmd);
 
+/**
+ * @brief Check whether direct delta modem DFU has claimed the modem DFU area.
+ *
+ * The area is claimed by AT#XDFUINIT, AT#XDFUWRITE, and AT#XDFUAPPLY for delta modem firmware
+ * until the modem library is shut down. While it is claimed, AT#XFOTA and AT#XNRFCLOUDFOTA must
+ * not start a modem update or erase the area.
+ *
+ * @return true if the modem DFU area is claimed, false otherwise.
+ */
+bool sm_at_dfu_delta_mfw_busy(void);
+
 /** @} */
 
 #endif /* SM_AT_DFU_H */
