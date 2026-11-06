@@ -284,13 +284,27 @@ static int do_fota_start(const char *file_uri, size_t file_uri_len, int sec_tag,
 		fota_path = NULL;
 	}
 
-	/* Send an URC if failed to start */
-	if (ret) {
-		rsp_send("\r\n#XFOTA: %d,%d,%d\r\n", FOTA_STAGE_DOWNLOAD,
-			FOTA_STATUS_ERROR, ret);
-	}
-
 	return ret;
+}
+
+/* The error causes are sent to the host as <fota_info> and documented in the AT command docs.
+ * No default case: -Wswitch warns when fota_download adds a new cause.
+ * Never called, so not compiled into the image.
+ */
+static inline void fota_error_cause_check(enum fota_download_error_cause cause)
+{
+	switch (cause) {
+	case FOTA_DOWNLOAD_ERROR_CAUSE_NO_ERROR:
+	case FOTA_DOWNLOAD_ERROR_CAUSE_CONNECT_FAILED:
+	case FOTA_DOWNLOAD_ERROR_CAUSE_DOWNLOAD_FAILED:
+	case FOTA_DOWNLOAD_ERROR_CAUSE_INVALID_UPDATE:
+	case FOTA_DOWNLOAD_ERROR_CAUSE_TYPE_MISMATCH:
+	case FOTA_DOWNLOAD_ERROR_CAUSE_INTERNAL:
+	case FOTA_DOWNLOAD_ERROR_CAUSE_DFU:
+	case FOTA_DOWNLOAD_ERROR_CAUSE_PROTO_NOT_SUPPORTED:
+	case FOTA_DOWNLOAD_ERROR_CAUSE_INVALID_CONFIGURATION:
+		break;
+	}
 }
 
 static void fota_dl_handler(const struct fota_download_evt *evt)
