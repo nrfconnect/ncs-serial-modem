@@ -70,6 +70,7 @@ config SM_NRF_CLOUD_FOTA
 	bool "nRF Cloud FOTA AT commands"
 	default y
 	depends on SM_NRF_CLOUD
+	select SM_FOTA_SESSION
 	help
 	  Enable the AT#XNRFCLOUDFOTA* commands, which check for and download
 	  application and modem firmware updates via Memfault release
