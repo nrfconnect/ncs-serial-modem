@@ -81,6 +81,7 @@ void nrf_modem_fault_handler(struct nrf_modem_fault_info *fault_info)
 }
 #endif /* CONFIG_NRF_MODEM_LIB_ON_FAULT_APPLICATION_SPECIFIC */
 
+#if defined(CONFIG_SM_DFU)
 static int bootloader_mode_init(void)
 {
 	int ret;
@@ -98,6 +99,7 @@ static int bootloader_mode_init(void)
 
 	return 0;
 }
+#endif /* CONFIG_SM_DFU */
 
 void lte_auto_connect(void)
 {
@@ -186,6 +188,7 @@ static int sm_main(void)
 	nrf_power_resetreas_clear(NRF_POWER_NS, 0x70017);
 	LOG_INF("Reset reason: 0x%08x", rr);
 
+#if defined(CONFIG_SM_DFU)
 	if (sm_bootloader_mode_requested) {
 		/* Clear bootloader mode flag */
 		ret = bootloader_mode_request(false);
@@ -200,6 +203,7 @@ static int sm_main(void)
 			return ret;
 		}
 	}
+#endif /* CONFIG_SM_DFU */
 
 #if defined(CONFIG_SM_FULL_FOTA)
 	if (sm_fota_type == SM_FOTA_TYPE_FULL_MFW) {
@@ -230,8 +234,11 @@ static int sm_main(void)
 			(void)sm_settings_modem_eio_retried_save();
 
 			LOG_ERR("Full modem firmware update required");
-			(void)bootloader_mode_request(true);
-			goto exit_reboot;
+			if (IS_ENABLED(CONFIG_SM_DFU)) {
+				(void)bootloader_mode_request(true);
+				goto exit_reboot;
+			}
+			return ret;
 		}
 	} else if (sm_modem_init_eio_retry_count != 0) {
 		/* Recovered on its own after the reboot(s) above: clear the retry count so a
@@ -241,9 +248,13 @@ static int sm_main(void)
 		(void)sm_settings_modem_eio_retried_save();
 	}
 
-	sm_fota_mcuboot_bl_boot_check();
+	if (IS_ENABLED(CONFIG_SM_FOTA)) {
+		sm_fota_mcuboot_bl_boot_check();
+	}
 
-	sm_fw_update_boot_check();
+	if (IS_ENABLED(CONFIG_SM_FW_UPDATE)) {
+		sm_fw_update_boot_check();
+	}
 
 	if (sm_init_failed) {
 		urc_send(SM_SYNC_ERR_STR);
@@ -254,7 +265,9 @@ static int sm_main(void)
 	/* This is here and not earlier because in case of firmware
 	 * update it will send an AT response so the UART must be up.
 	 */
-	sm_fota_post_process();
+	if (IS_ENABLED(CONFIG_SM_FOTA_SESSION)) {
+		sm_fota_post_process();
+	}
 
 	lte_auto_connect();
 

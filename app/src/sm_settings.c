@@ -20,6 +20,7 @@ LOG_MODULE_REGISTER(sm_settings, CONFIG_SM_LOG_LEVEL);
 
 static int settings_set(const char *name, size_t len, settings_read_cb read_cb, void *cb_arg)
 {
+#if defined(CONFIG_SM_DFU)
 	if (!strcmp(name, "bootloader_mode_requested")) {
 		if (len != sizeof(sm_bootloader_mode_requested))
 			return -EINVAL;
@@ -32,28 +33,33 @@ static int settings_set(const char *name, size_t len, settings_read_cb read_cb, 
 		if (read_cb(cb_arg, &full_mfw_dfu_segment_type, len) > 0)
 			return 0;
 	}
+#endif /* CONFIG_SM_DFU */
+#if defined(CONFIG_SM_FOTA)
 	if (!strcmp(name, "bl_fota_ver")) {
 		if (len != sizeof(sm_fota_bl_version_before))
 			return -EINVAL;
 		if (read_cb(cb_arg, &sm_fota_bl_version_before, len) > 0)
 			return 0;
 	}
+#endif /* CONFIG_SM_FOTA */
+#if defined(CONFIG_SM_FOTA_SESSION)
 	if (!strcmp(name, "fota_type")) {
 		if (len != sizeof(sm_fota_type))
 			return -EINVAL;
 		if (read_cb(cb_arg, &sm_fota_type, len) > 0)
 			return 0;
 	}
-	if (!strcmp(name, "modem_eio_retried")) {
-		if (len != sizeof(sm_modem_init_eio_retry_count))
-			return -EINVAL;
-		if (read_cb(cb_arg, &sm_modem_init_eio_retry_count, len) > 0)
-			return 0;
-	}
 	if (!strcmp(name, "fota_nrfcloud")) {
 		if (len != sizeof(sm_fota_nrfcloud))
 			return -EINVAL;
 		if (read_cb(cb_arg, &sm_fota_nrfcloud, len) > 0)
+			return 0;
+	}
+#endif /* CONFIG_SM_FOTA_SESSION */
+	if (!strcmp(name, "modem_eio_retried")) {
+		if (len != sizeof(sm_modem_init_eio_retry_count))
+			return -EINVAL;
+		if (read_cb(cb_arg, &sm_modem_init_eio_retry_count, len) > 0)
 			return 0;
 	}
 	/* Simply ignore obsolete settings that are not in use anymore.
@@ -96,6 +102,7 @@ static int sm_settings_init(void)
  */
 SYS_INIT(sm_settings_init, POST_KERNEL, CONFIG_APPLICATION_INIT_PRIORITY);
 
+#if defined(CONFIG_SM_FOTA_SESSION)
 int sm_settings_fota_save(void)
 {
 	int err;
@@ -107,13 +114,17 @@ int sm_settings_fota_save(void)
 	return settings_save_one("sm/fota_nrfcloud", &sm_fota_nrfcloud,
 				 sizeof(sm_fota_nrfcloud));
 }
+#endif /* CONFIG_SM_FOTA_SESSION */
 
+#if defined(CONFIG_SM_FOTA)
 int sm_settings_fota_bl_version_save(void)
 {
 	return settings_save_one("sm/bl_fota_ver", &sm_fota_bl_version_before,
 				 sizeof(sm_fota_bl_version_before));
 }
+#endif /* CONFIG_SM_FOTA */
 
+#if defined(CONFIG_SM_DFU)
 int sm_settings_bootloader_mode_save(void)
 {
 	return settings_save_one("sm/bootloader_mode_requested",
@@ -125,6 +136,7 @@ int sm_settings_full_mfw_dfu_segment_type_save(void)
 	return settings_save_one("sm/full_mfw_dfu_segment_type",
 		&full_mfw_dfu_segment_type, sizeof(full_mfw_dfu_segment_type));
 }
+#endif /* CONFIG_SM_DFU */
 
 int sm_settings_modem_eio_retried_save(void)
 {

@@ -60,4 +60,7 @@ config SM_CMUX_CHANNEL_COUNT
 	int "CMUX channel count"
 	default 1
 
+config SM_FW_UPDATE
+	def_bool y
+
 source "Kconfig.zephyr"

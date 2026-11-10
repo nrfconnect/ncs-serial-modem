@@ -93,12 +93,6 @@ int __wrap_sm_at_send(const uint8_t *data, size_t len)
 	return ret;
 }
 
-/* Stub for sm_fota_post_process - needed by sm_at_host_init */
-void sm_fota_post_process(void)
-{
-	/* Stub - no-op for tests */
-}
-
 /* Stub for sm_at_fota_init - needed by sm_at_init */
 int sm_at_fota_init(void)
 {
@@ -108,28 +102,6 @@ int sm_at_fota_init(void)
 
 /* Stub for sm_at_fota_uninit - needed by sm_at_uninit */
 int sm_at_fota_uninit(void)
-{
-	/* Stub - return success */
-	return 0;
-}
-
-/* Bootloader mode flag - needed by sm_at_host.c after rebase */
-bool sm_bootloader_mode_enabled;
-
-/* Stubs for DFU/bootloader functions - needed after rebase */
-int sm_at_handle_xdfu_init(char *buf, size_t len, char *at_cmd)
-{
-	/* Stub - return success */
-	return 0;
-}
-
-int sm_at_handle_xdfu_write(char *buf, size_t len, char *at_cmd)
-{
-	/* Stub - return success */
-	return 0;
-}
-
-int sm_at_handle_xdfu_apply(char *buf, size_t len, char *at_cmd)
 {
 	/* Stub - return success */
 	return 0;

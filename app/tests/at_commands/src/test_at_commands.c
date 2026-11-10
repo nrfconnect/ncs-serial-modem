@@ -14,7 +14,6 @@
 #include <stdint.h>
 #include <zephyr/kernel.h>
 #include <zephyr/sys/reboot.h>
-#include <dfu/dfu_target.h>
 
 #include "sm_at_host.h"
 #include "uart_stub.h"
@@ -22,9 +21,6 @@
 /* CMock-generated mocks */
 #include "cmock_nrf_modem_at.h"
 #include "cmock_modem_jwt.h"
-
-/* FOTA type - needed by sm_at_commands.c */
-uint8_t sm_fota_type = DFU_TARGET_IMAGE_TYPE_NONE;
 
 /* Custom AT command list symbols - needed by AT+CLAC handler */
 extern int _nrf_modem_at_cmd_custom_list_start;
