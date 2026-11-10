@@ -14,6 +14,7 @@ MQTT v3.1.1 is the default.
 Select MQTT v5.0 with the ``<version>`` parameter of ``#XMQTTCFG``.
 The AT interface supports the MQTT v5.0 Session Expiry Interval property, Session Present flag, and acknowledgment reason codes.
 It does not expose other MQTT v5.0 properties, subscription options, or enhanced authentication.
+The client also applies the Server Keep Alive property received in CONNACK.
 Examples use MQTT v3.1.1 unless stated otherwise.
 
 .. only:: not nrf91m1
@@ -187,6 +188,10 @@ The parameters and their defined values are the following:
    Integer.
    The maximum Keep Alive time in seconds for MQTT.
    The default Keep Alive time is 60 seconds.
+   With MQTT v5.0, a successful CONNACK can override this interval with the Server Keep Alive property.
+   A server value of ``0`` disables keep-alive pings for that connection.
+   If the property is absent, the configured interval applies.
+   The read command continues to report the configured interval, and each new connection starts with that interval.
 
 <clean_session>
    * ``0`` - Resume an existing session for this client ID, if one exists.
