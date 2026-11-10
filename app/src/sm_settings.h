@@ -19,11 +19,18 @@
 extern uint8_t sm_modem_init_eio_retry_count;
 
 /**
- * @brief Saves the FOTA settings to NVM.
+ * @brief Saves the FOTA session settings to NVM.
  *
  * @retval 0 on success, nonzero otherwise.
  */
 int sm_settings_fota_save(void);
+
+/**
+ * @brief Saves the MCUboot bootloader version recorded before a bootloader FOTA to NVM.
+ *
+ * @retval 0 on success, nonzero otherwise.
+ */
+int sm_settings_fota_bl_version_save(void);
 
 /**
  * @brief Saves the bootloader mode settings to NVM.

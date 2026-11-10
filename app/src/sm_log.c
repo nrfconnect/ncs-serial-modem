@@ -390,7 +390,7 @@ extern bool sm_bootloader_mode_enabled;
 
 static int sm_log_init(void)
 {
-	if (sm_bootloader_mode_enabled) {
+	if (IS_ENABLED(CONFIG_SM_DFU) && sm_bootloader_mode_enabled) {
 		/* Keep the logging (and logging UART) enabled in bootloader mode */
 		log_active = true;
 		log_mode = SM_LOG_MODE_REDACTED;

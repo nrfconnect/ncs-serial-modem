@@ -1,0 +1,97 @@
+#
+# Copyright (c) 2026 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+# Firmware update features, together with the Kconfig defaults they pull in.
+#
+# SM_FOTA enables the AT#XFOTA command (firmware download over HTTP/HTTPS).
+# SM_DFU  enables the AT#XDFU* commands (local firmware upload).
+#
+# Features that update the firmware, including SM_NRF_CLOUD_FOTA and the LwM2M carrier library,
+# share the code that is behind the hidden symbols below:
+# - SM_FOTA_SESSION: the state of a FOTA session and the reporting of its result.
+# - SM_FW_UPDATE: the functionality common to all firmware updates, like the confirmation
+#   of a new application image.
+#
+# This file must be sourced before Kconfig.zephyr, see Kconfig.nrf_cloud for the reason why.
+
+config SM_FOTA
+	bool "FOTA (Firmware Over-The-Air) support"
+	default y
+	select HTTP_PARSER_URL
+	help
+	  Enable FOTA support via the AT#XFOTA command.
+
+config SM_FULL_FOTA
+	bool "Full modem FOTA support"
+	depends on SM_FOTA
+
+config SM_DFU
+	bool "DFU (Device Firmware Update) support"
+	default y
+	help
+	  Enable DFU support via the AT#XDFUINIT, AT#XDFUWRITE and AT#XDFUAPPLY commands.
+
+config SM_DFU_MODEM_FULL
+	bool "Full modem DFU support"
+	depends on SM_DFU
+
+config SM_FOTA_SESSION
+	bool
+	default y if SM_FOTA || SM_NRF_CLOUD_FOTA
+
+config SM_FW_UPDATE
+	bool
+	default y if SM_FOTA_SESSION || SM_DFU
+
+# The LwM2M carrier library depends on DOWNLOADER and DFU_TARGET, so the hidden symbols cannot
+# depend on it, as that would make a dependency loop. SM_CARRIER depends on SM_FOTA_SESSION instead.
+
+if SM_FOTA_SESSION
+
+# FOTA download library: handles OTA download and DFU target selection.
+configdefault FOTA_DOWNLOAD
+	default y
+
+configdefault FOTA_DOWNLOAD_PROGRESS_EVT
+	default y
+
+# Downloader library used by fota_download.
+configdefault DOWNLOADER
+	default y
+
+configdefault DOWNLOADER_STACK_SIZE
+	default 4096
+
+configdefault DOWNLOADER_MAX_FILENAME_SIZE
+	default 2048
+
+# Progressive slot erase during FOTA download.
+configdefault IMG_ERASE_PROGRESSIVELY
+	default y
+
+endif # SM_FOTA_SESSION
+
+if SM_FW_UPDATE
+
+# DFU target library: used by FOTA (streaming download targets) and DFU
+# (direct write targets: MCUboot, modem delta, full modem).
+configdefault DFU_TARGET
+	default y
+
+# Stream flash: required internally by the DFU target library for all targets
+# that write to flash in chunks.
+configdefault STREAM_FLASH
+	default y
+
+# MCUboot image manager: required for confirming and scheduling MCUboot updates.
+configdefault IMG_MANAGER
+	default y
+
+# MCUboot bootloader FOTA requires fw_info to validate the update after reboot.
+configdefault FW_INFO
+	default y
+
+endif # SM_FW_UPDATE

@@ -33,7 +33,7 @@ configdefault NRF_CLOUD
 configdefault NRF_CLOUD_COAP
 	default y
 
-# Disable nRF Cloud FOTA: FOTA is handled by the SM FOTA subsystem (AT#XFOTA) and
+# Disable nRF Cloud FOTA: FOTA is handled by the SM FOTA subsystem (AT#XFOTA, if enabled) and
 # Memfault FOTA (AT#XNRFCLOUDFOTA). Memfault FOTA is different to old CONFIG_NRF_CLOUD_FOTA.
 configdefault NRF_CLOUD_FOTA
 	default n

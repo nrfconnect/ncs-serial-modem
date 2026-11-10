@@ -24,7 +24,8 @@
 #include "sm_settings.h"
 #include "sm_at_host.h"
 #include "sm_at_fota.h"
-#include "sm_at_dfu.h"
+#include "sm_fota_session.h"
+#include "sm_fw_update.h"
 #include "sm_defines.h"
 #include "sm_log.h"
 #include "sm_uart_handler.h"
@@ -49,14 +50,6 @@ enum sm_fota_operation {
 };
 
 uint32_t sm_fota_bl_version_before;
-
-enum sm_fota_image_type sm_fota_type = SM_FOTA_TYPE_NONE;
-enum fota_stage sm_fota_stage = FOTA_STAGE_INIT;
-enum fota_status sm_fota_status;
-int32_t sm_fota_info;
-bool sm_fota_nrfcloud;
-
-static struct modem_pipe *fota_pipe;
 
 /* Heap buffers for the current FOTA hostname and path.
  * fota_download stores raw pointers to these, so they must
@@ -301,7 +294,7 @@ static void fota_dl_handler(const struct fota_download_evt *evt)
 		sm_fota_stage = FOTA_STAGE_DOWNLOAD;
 		sm_fota_status = FOTA_STATUS_OK;
 		sm_fota_info = evt->progress;
-		urc_send_to(fota_pipe, "\r\n#XFOTA: %d,%d,%d\r\n",
+		urc_send_to(sm_fota_pipe, "\r\n#XFOTA: %d,%d,%d\r\n",
 			sm_fota_stage, sm_fota_status, sm_fota_info);
 		break;
 	case FOTA_DOWNLOAD_EVT_FINISHED:
@@ -314,17 +307,17 @@ static void fota_dl_handler(const struct fota_download_evt *evt)
 		sm_fota_info = 0;
 		/* Save, in case reboot by reset */
 		sm_settings_fota_save();
-		urc_send_to(fota_pipe, "\r\n#XFOTA: %d,%d\r\n", sm_fota_stage, sm_fota_status);
+		urc_send_to(sm_fota_pipe, "\r\n#XFOTA: %d,%d\r\n", sm_fota_stage, sm_fota_status);
 		break;
 	case FOTA_DOWNLOAD_EVT_ERASE_TIMEOUT:
 		LOG_INF("Erase timeout, continuing");
 		break;
 	case FOTA_DOWNLOAD_EVT_ERASE_PENDING:
 		sm_fota_stage = FOTA_STAGE_DOWNLOAD_ERASE_PENDING;
-		urc_send_to(fota_pipe, "\r\n#XFOTA: %d,%d\r\n", sm_fota_stage, sm_fota_status);
+		urc_send_to(sm_fota_pipe, "\r\n#XFOTA: %d,%d\r\n", sm_fota_stage, sm_fota_status);
 		break;
 	case FOTA_DOWNLOAD_EVT_ERASE_DONE:
-		urc_send_to(fota_pipe, "\r\n#XFOTA: %d,%d\r\n", FOTA_STAGE_DOWNLOAD_ERASED,
+		urc_send_to(sm_fota_pipe, "\r\n#XFOTA: %d,%d\r\n", FOTA_STAGE_DOWNLOAD_ERASED,
 			    sm_fota_status);
 		/* Back to the download stage: the session continues, so the shared busy gate
 		 * must stay held. Pre-start errors are then reported with the same stage as
@@ -340,7 +333,7 @@ static void fota_dl_handler(const struct fota_download_evt *evt)
 		fota_path = NULL;
 		sm_fota_status = FOTA_STATUS_ERROR;
 		sm_fota_info = evt->cause;
-		urc_send_to(fota_pipe, "\r\n#XFOTA: %d,%d,%d\r\n",
+		urc_send_to(sm_fota_pipe, "\r\n#XFOTA: %d,%d,%d\r\n",
 			sm_fota_stage, sm_fota_status, sm_fota_info);
 		/* FOTA session terminated */
 		sm_fota_init_state();
@@ -353,7 +346,7 @@ static void fota_dl_handler(const struct fota_download_evt *evt)
 		fota_path = NULL;
 		sm_fota_status = FOTA_STATUS_CANCELLED;
 		sm_fota_info = 0;
-		urc_send_to(fota_pipe, "\r\n#XFOTA: %d,%d\r\n", sm_fota_stage, sm_fota_status);
+		urc_send_to(sm_fota_pipe, "\r\n#XFOTA: %d,%d\r\n", sm_fota_stage, sm_fota_status);
 		/* FOTA session terminated */
 		sm_fota_init_state();
 		break;
@@ -372,7 +365,7 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 
 	switch (cmd_type) {
 	case AT_PARSER_CMD_TYPE_SET:
-		fota_pipe = sm_at_host_get_current_pipe();
+		sm_fota_pipe = sm_at_host_get_current_pipe();
 		err = at_parser_num_get(parser, 1, &op);
 		if (err < 0) {
 			return err;
@@ -398,7 +391,7 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 				err = -EBUSY;
 				break;
 			}
-			if (op == SM_FOTA_START_MFW && sm_at_dfu_delta_mfw_busy()) {
+			if (op == SM_FOTA_START_MFW && sm_fw_update_modem_dfu_busy()) {
 				err = -EBUSY;
 				break;
 			}
@@ -462,6 +455,7 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 
 					/* Save the MCUboot version before FOTA. */
 					sm_util_mcuboot_active_version(&sm_fota_bl_version_before);
+					sm_settings_fota_bl_version_save();
 					sm_settings_fota_save();
 				}
 #endif
@@ -475,7 +469,7 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 			err = do_fota_mfw_read();
 			break;
 		case SM_FOTA_ERASE_MFW:
-			if (sm_fota_stage != FOTA_STAGE_INIT || sm_at_dfu_delta_mfw_busy()) {
+			if (sm_fota_stage != FOTA_STAGE_INIT || sm_fw_update_modem_dfu_busy()) {
 				err = -EBUSY;
 				break;
 			}
@@ -536,15 +530,6 @@ static int sm_at_fota_init(void)
 }
 SYS_INIT(sm_at_fota_init, APPLICATION, 0);
 
-void sm_fota_init_state(void)
-{
-	sm_fota_type = SM_FOTA_TYPE_NONE;
-	sm_fota_stage = FOTA_STAGE_INIT;
-	sm_fota_status = FOTA_STATUS_OK;
-	sm_fota_info = 0;
-	sm_fota_nrfcloud = false;
-}
-
 void sm_fota_mcuboot_bl_boot_check(void)
 {
 #if defined(SM_FOTA_BL_SUPPORTED)
@@ -572,54 +557,6 @@ void sm_fota_mcuboot_bl_boot_check(void)
 	sm_fota_type = SM_FOTA_TYPE_MCUBOOT_BL;
 	sm_fota_stage = FOTA_STAGE_COMPLETE;
 #endif
-}
-
-#if defined(CONFIG_LWM2M_CARRIER)
-static K_SEM_DEFINE(carrier_app_fota_status, 0, 1);
-static bool carrier_app_fota_success;
-
-bool lwm2m_os_dfu_application_update_validate(void)
-{
-	/* Wait for the application FOTA status to be checked by the main thread. This can
-	 * trigger an AT notification, so the UART backend must also be initialized.
-	 */
-	if (k_sem_take(&carrier_app_fota_status, K_SECONDS(10)) != 0) {
-		return false;
-	}
-
-	return carrier_app_fota_success;
-}
-#endif /* CONFIG_LWM2M_CARRIER */
-
-void sm_fota_post_process(void)
-{
-#if defined(CONFIG_LWM2M_CARRIER)
-	if ((sm_fota_type == SM_FOTA_TYPE_APP || sm_fota_type == SM_FOTA_TYPE_MCUBOOT_BL) &&
-	    (sm_fota_status == FOTA_STATUS_OK) &&
-	    (sm_fota_stage == FOTA_STAGE_COMPLETE)) {
-		carrier_app_fota_success = true;
-	}
-
-	k_sem_give(&carrier_app_fota_status);
-#endif /* CONFIG_LWM2M_CARRIER */
-	if (sm_fota_stage != FOTA_STAGE_COMPLETE && sm_fota_stage != FOTA_STAGE_ACTIVATE) {
-		return;
-	}
-	LOG_INF("FOTA result stage=%d status=%d info=%d", sm_fota_stage, sm_fota_status,
-		sm_fota_info);
-
-	struct modem_pipe *pipe = fota_pipe ? fota_pipe : sm_at_host_get_urc_pipe();
-	const char *urc_name = sm_fota_nrfcloud ? "XNRFCLOUDFOTA" : "XFOTA";
-
-	if (sm_fota_status == FOTA_STATUS_OK) {
-		urc_send_to(pipe, "\r\n#%s: %d,%d\r\n", urc_name, sm_fota_stage, sm_fota_status);
-	} else {
-		urc_send_to(pipe, "\r\n#%s: %d,%d,%d\r\n", urc_name, sm_fota_stage, sm_fota_status,
-			sm_fota_info);
-	}
-
-	sm_fota_init_state();
-	sm_settings_fota_save();
 }
 
 #if defined(CONFIG_SM_FULL_FOTA)
