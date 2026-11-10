@@ -9,11 +9,22 @@ MQTT client AT commands
 
 This page describes the AT commands used to operate the MQTT client.
 
+The MQTT client supports MQTT v3.1.1 and experimental MQTT v5.0.
+MQTT v3.1.1 is the default.
+Select MQTT v5.0 with the ``<version>`` parameter of ``#XMQTTCFG``.
+The AT interface supports the MQTT v5.0 Session Expiry Interval property and acknowledgment reason codes.
+It does not expose other MQTT v5.0 properties, subscription options, or enhanced authentication.
+Examples use MQTT v3.1.1 unless stated otherwise.
+
+.. only:: not nrf91m1
+
+   MQTT v5.0 requires :ref:`CONFIG_SM_MQTTC_VERSION_5_0`, which is enabled by default.
+
 .. note::
 
    The MQTT client holds no internal state information for publish and subscript.
    It will not retransmit packets or guarantee packet delivery according to QoS classes.
-   This deviates from MQTT v3.1.1.
+   This deviates from MQTT v3.1.1 and MQTT v5.0.
 
 .. _SM_AT_MQTT_XMQTTEVT:
 
@@ -27,7 +38,7 @@ Unsolicited notification
 
 ::
 
-   #XMQTTEVT: <evt_type>,<result>
+   #XMQTTEVT: <evt_type>,<result>[,<reason_code>]
 
 The parameters and their defined values are the following:
 
@@ -53,11 +64,59 @@ The parameters and their defined values are the following:
      The |SM| can send this event at any time while connected, when the keep alive interval expires and the client pings the broker.
 
 <result>
-   * ``0`` - Success.
-   * *Negative value* - Error code indicating the reason for the failure.
+   * ``0`` - The event was processed without a local error.
+     For acknowledgment events with a ``<reason_code>`` field, check that field for the broker's outcome.
+   * *Positive value* - A broker-supplied code for CONNACK or DISCONNECT.
+     For CONNACK, this is the MQTT v3.1.1 return code or the MQTT v5.0 reason code.
+     For a broker-initiated MQTT v5.0 DISCONNECT, this is the reason code.
+   * *Negative value* - A local error code.
+     For PUBREC and PUBREL, this can also indicate a failure to send the next QoS 2 acknowledgment.
+
+<reason_code>
+   Integer.
+   The MQTT v5.0 reason code from the received acknowledgment.
+   Present for successfully decoded PUBACK, PUBREC, PUBREL, PUBCOMP, SUBACK, and UNSUBACK events.
+   It is absent for MQTT v3.1.1 and for the other event types.
+   For CONNACK and DISCONNECT, the broker's code is reported in ``<result>`` instead.
+
+   Reason codes below ``128`` indicate success, and codes ``128`` or higher indicate failure.
+   For SUBACK, ``0``, ``1``, and ``2`` indicate the granted QoS level.
+   For example, ``#XMQTTEVT: 7,0,135`` reports a decoded SUBACK that rejects the subscription as not authorized.
+   A ``<result>`` of ``0`` alone does not mean that the broker accepted the request.
+
+   If PUBREC contains a failure reason code, the client does not send PUBREL, and the QoS 2 exchange ends without PUBCOMP.
 
 The commands describe which ``<evt_type>`` values each command can trigger.
 All notifications use the syntax documented in this section.
+
+Examples
+~~~~~~~~
+
+The following examples use MQTT v5.0.
+
+::
+
+   AT#XMQTTSUB="nrf91/sm/mqtt/topic1",1
+   OK
+   #XMQTTEVT: 7,0,1
+
+A broker can acknowledge a publication with reason code ``16`` (No matching subscribers).
+It can also return ``0`` (Success) when no subscriptions match.
+
+::
+
+   AT#XMQTTPUB="nrf91/sm/mqtt/nobody","Test message",1,0
+   OK
+   #XMQTTEVT: 3,0,16
+
+A rejected connection reports the CONNACK reason code in ``<result>``.
+For example, ``137`` means Server busy.
+The subsequent DISCONNECT reports the local connection refusal error.
+
+::
+
+   #XMQTTEVT: 0,137
+   #XMQTTEVT: 1,-111
 
 MQTT configure #XMQTTCFG
 ========================
@@ -74,7 +133,9 @@ Syntax
 
 ::
 
-   AT#XMQTTCFG=<client_id>[,<keep_alive>[,<clean_session>]]
+   AT#XMQTTCFG=<client_id>[,<keep_alive>[,<clean_session>[,<version>[,<session_expiry>]]]]
+
+Omitted parameters use their defaults, not the values from the previous configuration.
 
 The parameters and their defined values are the following:
 
@@ -89,10 +150,35 @@ The parameters and their defined values are the following:
    The default Keep Alive time is 60 seconds.
 
 <clean_session>
-   * ``0`` - Connect to a MQTT broker using a persistent session.
-   * ``1`` - Connect to a MQTT broker using a clean session.
+   * ``0`` - Resume an existing session for this client ID, if one exists.
+   * ``1`` - Discard any existing session and start a new session.
 
-   The default is using a persistent session.
+   The default is ``1``.
+   With MQTT v3.1.1, this parameter sets the Clean Session flag.
+   A value of ``0`` also keeps the broker-side session after disconnection.
+   With MQTT v5.0, it sets the Clean Start flag.
+   For MQTT v5.0, ``0`` alone does not keep the session after disconnection.
+   Set a nonzero ``<session_expiry>`` to keep the broker-side session.
+
+<version>
+   Integer.
+   The MQTT protocol version.
+
+   * ``4`` - MQTT v3.1.1 (default).
+   * ``5`` - MQTT v5.0.
+     Returns ``ERROR`` if MQTT v5.0 support is not built into the firmware.
+
+<session_expiry>
+   Integer.
+   The MQTT v5.0 Session Expiry Interval in seconds, from ``0`` to ``4294967295``.
+   It controls how long the broker keeps the session after the network connection closes.
+
+   * ``0`` - End the session when the network connection closes (default).
+   * ``4294967295`` - The session does not expire.
+
+   A nonzero value requires ``<version>`` to be ``5``.
+   To resume a stored session, reconnect with the same client ID and ``<clean_session>`` set to ``0`` before the session expires.
+   Broker-side session storage does not add client-side retransmission or delivery guarantees.
 
 Examples
 ~~~~~~~~
@@ -100,6 +186,20 @@ Examples
 ::
 
    AT#XMQTTCFG="MyMQTT-Client-ID",300,1
+   OK
+
+Configure MQTT v5.0 with a new session that ends on disconnection:
+
+::
+
+   AT#XMQTTCFG="MyMQTT-Client-ID",300,1,5
+   OK
+
+Configure MQTT v5.0 to resume a session and keep it for one hour after disconnection:
+
+::
+
+   AT#XMQTTCFG="MyMQTT-Client-ID",300,0,5,3600
    OK
 
 Read command
@@ -119,7 +219,7 @@ Response syntax
 
 ::
 
-   #XMQTTCFG: <client_id>,<keep_alive>,<clean_session>
+   #XMQTTCFG: <client_id>,<keep_alive>,<clean_session>,<version>,<session_expiry>
 
 The parameters and their defined values are the following:
 
@@ -132,8 +232,16 @@ The parameters and their defined values are the following:
    The maximum Keep Alive time in seconds for MQTT.
 
 <clean_session>
-   * ``0`` - Connect to a MQTT broker using a persistent session.
-   * ``1`` - Connect to a MQTT broker using a clean session.
+   The configured Clean Session (MQTT v3.1.1) or Clean Start (MQTT v5.0) flag.
+
+<version>
+   * ``4`` - MQTT v3.1.1.
+   * ``5`` - MQTT v5.0.
+
+<session_expiry>
+   Integer.
+   The configured MQTT v5.0 Session Expiry Interval in seconds.
+   The value is ``0`` with MQTT v3.1.1.
 
 Examples
 ~~~~~~~~
@@ -141,7 +249,7 @@ Examples
 ::
 
    AT#XMQTTCFG?
-   #XMQTTCFG: "MyMQTT-Client-ID",60,0
+   #XMQTTCFG: "MyMQTT-Client-ID",300,0,5,3600
    OK
 
 Test command
@@ -161,7 +269,7 @@ Response syntax
 
 ::
 
-   #XMQTTCFG: <client_id>,<keep_alive>,<clean_session>
+   #XMQTTCFG: <client_id>,<keep_alive>,<clean_session>,<version>,<session_expiry>
 
 Examples
 ~~~~~~~~
@@ -169,7 +277,7 @@ Examples
 ::
 
    AT#XMQTTCFG=?
-   #XMQTTCFG: <client_id>,,<keep_alive>,<clean_session>
+   #XMQTTCFG: <client_id>,<keep_alive>,<clean_session>,<version>,<session_expiry>
    OK
 
 
@@ -180,7 +288,7 @@ The ``#XMQTTCON`` command allows you to connect to and disconnect from the MQTT 
 
 This command can send ``#XMQTTEVT`` with the following ``<evt_type>`` values:
 
-* ``0`` - After a successful connect request (``<op>`` ``1`` or ``2``).
+* ``0`` - When the broker acknowledges or rejects a connect request (``<op>`` ``1`` or ``2``).
 * ``1`` - After a disconnect request (``<op>`` ``0``), when the broker closes the connection, or when the client disconnects for other reasons.
 * ``9`` - While connected, when the broker responds to a keep alive ping.
 
@@ -384,7 +492,8 @@ MQTT subscribe #XMQTTSUB
 
 The ``#XMQTTSUB`` command allows you to subscribe to an MQTT topic.
 
-On successful subscription, the |SM| sends ``#XMQTTEVT`` with ``<evt_type>`` ``7`` (SUBACK).
+When the broker acknowledges a subscribe request, the |SM| sends ``#XMQTTEVT`` with ``<evt_type>`` ``7`` (SUBACK).
+With MQTT v5.0, check ``<reason_code>`` for the granted QoS or the reason for rejection.
 
 When a message is published on a subscribed topic, the |SM| sends ``#XMQTTMSG`` and ``#XMQTTEVT`` with ``<evt_type>`` ``2`` (PUBLISH).
 For incoming QoS 2 messages, the |SM| also sends ``#XMQTTEVT`` with ``<evt_type>`` ``5`` (PUBREL).
@@ -477,7 +586,8 @@ MQTT unsubscribe #XMQTTUNSUB
 
 The ``#XMQTTUNSUB`` command allows you to unsubscribe from an MQTT topic.
 
-On successful unsubscription, the |SM| sends ``#XMQTTEVT`` with ``<evt_type>`` ``8`` (UNSUBACK).
+When the broker acknowledges an unsubscribe request, the |SM| sends ``#XMQTTEVT`` with ``<evt_type>`` ``8`` (UNSUBACK).
+With MQTT v5.0, check ``<reason_code>`` for the result.
 
 See :ref:`SM_AT_MQTT_XMQTTEVT` for the notification syntax and parameter descriptions.
 
@@ -527,7 +637,7 @@ The ``#XMQTTPUB`` command allows you to publish messages on MQTT topics.
 Depending on the QoS level, this command can send ``#XMQTTEVT`` with the following ``<evt_type>`` values:
 
 * ``3`` - QoS 1 (PUBACK).
-* ``4`` and ``6`` - QoS 2 (PUBREC, then PUBCOMP).
+* ``4`` and ``6`` - QoS 2 (PUBREC, then PUBCOMP unless PUBREC contains a failure reason code).
 
 QoS ``0`` does not produce an ``#XMQTTEVT`` notification.
 
