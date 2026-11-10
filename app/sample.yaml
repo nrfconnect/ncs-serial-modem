@@ -33,6 +33,9 @@ tests:
       - CONFIG_SM_MQTTC=n
       - CONFIG_SM_DEBUG_STATS_HEAP=n
       - CONFIG_SM_HTTPC=n
+      - CONFIG_SM_ICMP=n
+      - CONFIG_SM_FOTA=n
+      - CONFIG_SM_DFU=n
     tags: exclude_integration
   serial_modem.extmcu:
     sysbuild: true
@@ -130,11 +133,33 @@ tests:
     platform_allow:
       - nrf9151dk/nrf9151/ns
     tags: exclude_integration
-  serial_modem.no_nrfcloud_fota:
+  serial_modem.no_nrfcloud_fota_or_dfu:
     sysbuild: true
     build_only: true
     extra_configs:
       - CONFIG_SM_NRF_CLOUD_FOTA=n
+      - CONFIG_SM_DFU=n
+      - CONFIG_SM_FOTA=y
+    platform_allow:
+      - nrf9151dk/nrf9151/ns
+    tags: exclude_integration
+  serial_modem.no_fota_or_dfu:
+    sysbuild: true
+    build_only: true
+    extra_configs:
+      - CONFIG_SM_FOTA=n
+      - CONFIG_SM_DFU=n
+      - CONFIG_SM_NRF_CLOUD_FOTA=y
+    platform_allow:
+      - nrf9151dk/nrf9151/ns
+    tags: exclude_integration
+  serial_modem.no_dfu:
+    sysbuild: true
+    build_only: true
+    extra_configs:
+      - CONFIG_SM_DFU=n
+      - CONFIG_SM_FOTA=y
+      - CONFIG_SM_NRF_CLOUD_FOTA=y
     platform_allow:
       - nrf9151dk/nrf9151/ns
     tags: exclude_integration

@@ -43,7 +43,7 @@ static void on_modem_dfu_res(int dfu_res, void *ctx)
 	/* Update FOTA state only if a modem delta FOTA was in progress.
 	 * sm_fota_type is loaded from NVS; NONE means DFU or no update.
 	 */
-	if (sm_fota_type != SM_FOTA_TYPE_MFW) {
+	if (!IS_ENABLED(CONFIG_SM_FOTA_SESSION) || sm_fota_type != SM_FOTA_TYPE_MFW) {
 		return;
 	}
 
@@ -91,7 +91,7 @@ void sm_fw_update_boot_check(void)
 	/* Only report FOTA completion if an app FOTA was in progress.
 	 * sm_fota_type is loaded from NVS; NONE means DFU or no update.
 	 */
-	if (sm_fota_type != SM_FOTA_TYPE_APP) {
+	if (!IS_ENABLED(CONFIG_SM_FOTA_SESSION) || sm_fota_type != SM_FOTA_TYPE_APP) {
 		return;
 	}
 	sm_fota_status = (type == BOOT_SWAP_TYPE_REVERT && ret == 0)
@@ -102,7 +102,7 @@ void sm_fw_update_boot_check(void)
 
 int sm_fw_update_modem_dfu_claim(void)
 {
-	if (sm_fota_stage != FOTA_STAGE_INIT) {
+	if (IS_ENABLED(CONFIG_SM_FOTA_SESSION) && sm_fota_stage != FOTA_STAGE_INIT) {
 		LOG_ERR("FOTA in progress");
 		return -EBUSY;
 	}
