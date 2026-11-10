@@ -66,6 +66,7 @@ static struct sm_mqtt_ctx {
 } ctx;
 
 static uint16_t mqtt_broker_port;
+static uint16_t mqtt_configured_keepalive;
 static char mqtt_clientid[MQTT_MAX_CID_LEN + 1];
 
 struct mqtt_conn {
@@ -190,6 +191,13 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 		if (evt->result != 0) {
 			ctx.connected = false;
 		}
+#if defined(CONFIG_MQTT_VERSION_5_0)
+		else if (client.protocol_version == MQTT_VERSION_5_0 &&
+			 evt->param.connack.prop.rx.has_server_keep_alive) {
+			client.keepalive = evt->param.connack.prop.server_keep_alive;
+			LOG_INF("MQTT server keep alive: %u", client.keepalive);
+		}
+#endif
 		break;
 
 	case MQTT_EVT_DISCONNECT:
@@ -307,6 +315,17 @@ static atomic_t mqtt_poll_revents;
 static K_WORK_DEFINE(mqtt_poll_work, mqtt_poll_work_handler);
 static K_WORK_DELAYABLE_DEFINE(mqtt_keepalive_work, mqtt_keepalive_work_handler);
 
+static void mqtt_keepalive_reschedule(void)
+{
+	if (client.keepalive == 0) {
+		k_work_cancel_delayable(&mqtt_keepalive_work);
+		return;
+	}
+
+	k_work_reschedule_for_queue(&sm_work_q, &mqtt_keepalive_work,
+				    K_MSEC(mqtt_keepalive_time_left(&client)));
+}
+
 static void mqtt_connection_abort(int err)
 {
 	LOG_ERR("MQTT connection aborted: %d", err);
@@ -401,8 +420,7 @@ static void mqtt_poll_work_handler(struct k_work *work)
 		}
 
 		/* Reschedule keepalive from now after receiving data. */
-		k_work_reschedule_for_queue(&sm_work_q, &mqtt_keepalive_work,
-					    K_MSEC(mqtt_keepalive_time_left(&client)));
+		mqtt_keepalive_reschedule();
 	}
 
 	/* MQTT v3.1.1: Note that a Server is permitted to disconnect a Client that it
@@ -441,7 +459,7 @@ static void mqtt_keepalive_work_handler(struct k_work *work)
 {
 	ARG_UNUSED(work);
 
-	if (!ctx.connected) {
+	if (!ctx.connected || client.keepalive == 0) {
 		return;
 	}
 
@@ -463,8 +481,7 @@ static void mqtt_keepalive_work_handler(struct k_work *work)
 		return;
 	}
 
-	k_work_reschedule_for_queue(&sm_work_q, &mqtt_keepalive_work,
-				    K_MSEC(mqtt_keepalive_time_left(&client)));
+	mqtt_keepalive_reschedule();
 }
 
 /**@brief Resolves the configured hostname and
@@ -531,6 +548,7 @@ static int do_mqtt_config(uint16_t keep_alive, uint8_t clean_session, uint16_t v
 
 	/* MQTT Keep Alive configuration */
 	client.keepalive = keep_alive;
+	mqtt_configured_keepalive = keep_alive;
 	/* MQTT Clean Session configuration */
 	client.clean_session = clean_session;
 #if defined(CONFIG_MQTT_VERSION_5_0)
@@ -593,6 +611,7 @@ static int do_mqtt_connect(void)
 #endif
 
 	/* Connect to MQTT broker */
+	client.keepalive = mqtt_configured_keepalive;
 	err = mqtt_connect(&client);
 	if (err != 0) {
 		LOG_ERR("MQTT connect failed: %d", err);
@@ -609,8 +628,7 @@ static int do_mqtt_connect(void)
 		goto fail;
 	}
 
-	k_work_reschedule_for_queue(&sm_work_q, &mqtt_keepalive_work,
-				    K_MSEC(mqtt_keepalive_time_left(&client)));
+	mqtt_keepalive_reschedule();
 
 	return 0;
 
@@ -750,8 +768,9 @@ STATIC int handle_at_mqtt_config(enum at_parser_cmd_type cmd_type, struct at_par
 #if defined(CONFIG_MQTT_VERSION_5_0)
 		session_expiry = client.prop.session_expiry_interval;
 #endif
-		rsp_send("\r\n#XMQTTCFG: \"%s\",%d,%d,%d,%u\r\n", mqtt_clientid, client.keepalive,
-			 client.clean_session, client.protocol_version, session_expiry);
+		rsp_send("\r\n#XMQTTCFG: \"%s\",%d,%d,%d,%u\r\n", mqtt_clientid,
+			 mqtt_configured_keepalive, client.clean_session, client.protocol_version,
+			 session_expiry);
 		err = 0;
 		break;
 

@@ -248,12 +248,14 @@ void test_mqtt_basic(void)
 }
 
 static uint8_t connect_protocol_version;
+static struct mqtt_client *connected_client;
 
 static int mqtt_connect_version_stub(struct mqtt_client *client, int num_calls)
 {
 	ARG_UNUSED(num_calls);
 
 	connect_protocol_version = client->protocol_version;
+	connected_client = client;
 	return 0;
 }
 
@@ -481,6 +483,62 @@ void test_mqtt_connack_session_present_5_0(void)
 	evt.result = -EINVAL;
 	resp = inject_mqtt_evt(&evt);
 	TEST_ASSERT_NOT_NULL(strstr(resp, "#XMQTTEVT: 0,-22\r\n"));
+#else
+	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
+#endif
+}
+
+void test_mqtt_server_keep_alive(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	struct mqtt_evt evt = {.type = MQTT_EVT_CONNACK};
+	const char *resp;
+
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,5\r\n", MQTT_VERSION_5_0);
+
+	evt.param.connack.prop.server_keep_alive = 10;
+	inject_mqtt_evt(&evt);
+	TEST_ASSERT_EQUAL_UINT16(60, connected_client->keepalive);
+
+	evt.param.connack.prop.rx.has_server_keep_alive = true;
+	inject_mqtt_evt(&evt);
+	TEST_ASSERT_EQUAL_UINT16(10, connected_client->keepalive);
+
+	clear_captured_response();
+	send_at_command("AT#XMQTTCFG?\r\n");
+	resp = get_captured_response();
+	TEST_ASSERT_NOT_NULL(strstr(resp, "#XMQTTCFG: \"test_client\",60,1,5,0\r\n"));
+
+	evt.param.connack.prop.server_keep_alive = 120;
+	inject_mqtt_evt(&evt);
+	TEST_ASSERT_EQUAL_UINT16(120, connected_client->keepalive);
+
+	evt.param.connack.prop.server_keep_alive = 0;
+	inject_mqtt_evt(&evt);
+	TEST_ASSERT_EQUAL_UINT16(0, connected_client->keepalive);
+	mqtt_disconnect_ok();
+
+	clear_captured_response();
+	__cmock_zsock_getaddrinfo_Stub(getaddrinfo_stub);
+	__cmock_zsock_freeaddrinfo_Ignore();
+	__cmock_mqtt_connect_Stub(mqtt_connect_version_stub);
+	send_at_command("AT#XMQTTCON=1,\"user\",\"pass\",\"broker.example.com\",1883\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "OK"));
+	TEST_ASSERT_EQUAL_UINT16(60, connected_client->keepalive);
+	__cmock_mqtt_connect_Stub(NULL);
+	mqtt_disconnect_ok();
+
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,5\r\n", MQTT_VERSION_5_0);
+	evt.result = 0x89;
+	evt.param.connack.prop.server_keep_alive = 10;
+	inject_mqtt_evt(&evt);
+	TEST_ASSERT_EQUAL_UINT16(60, connected_client->keepalive);
+
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,4\r\n", MQTT_VERSION_3_1_1);
+	evt.result = 0;
+	inject_mqtt_evt(&evt);
+	TEST_ASSERT_EQUAL_UINT16(60, connected_client->keepalive);
+	mqtt_disconnect_ok();
 #else
 	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
 #endif
