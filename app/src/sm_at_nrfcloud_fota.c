@@ -23,12 +23,13 @@
 
 LOG_MODULE_REGISTER(sm_nrfcloud_fota, CONFIG_SM_LOG_LEVEL);
 
-/* AT#XNRFCLOUDFOTA shares the FOTA session state (sm_fota_type, sm_fota_stage, ...) with
- * AT#XFOTA: an application update is staged the same way as AT#XFOTA=1 and activated by the
- * host with AT#XRESET, and a modem update is staged the same way as AT#XFOTA=2 and activated
- * with AT#XMODEMRESET. Only the source of the download URL differs: Memfault release
- * management instead of a host-supplied URL. Progress and completion are reported over the
- * #XNRFCLOUDFOTA URC (same <stage>,<status>[,<info>] format as #XFOTA's).
+/* AT#XNRFCLOUDFOTA uses the FOTA session state (sm_fota_type, sm_fota_stage, ...), which it
+ * shares with AT#XFOTA when AT#XFOTA is enabled. It works without AT#XFOTA. An application
+ * update is staged the same way as AT#XFOTA=1 and activated by the host with AT#XRESET, and
+ * a modem update is staged the same way as AT#XFOTA=2 and activated with AT#XMODEMRESET. Only
+ * the source of the download URL differs: Memfault release management instead of a
+ * host-supplied URL. Progress and completion are reported over the #XNRFCLOUDFOTA URC (same
+ * <stage>,<status>[,<info>] format as #XFOTA's).
  */
 
 #define FOTA_KEY_MAX_LEN	32
@@ -218,7 +219,7 @@ K_WORK_DEFINE(nrfcloud_fota_check_only_work, nrfcloud_fota_check_only_work_fn);
  * AT#XFOTA's fota_download callback, which nrf_cloud_download_start() overwrote for the
  * session. Without this, a subsequent AT#XNRFCLOUDFOTA would get -EBUSY, and a subsequent
  * AT#XFOTA download would misroute its events to this file's callback instead of
- * sm_at_fota.c's fota_dl_handler().
+ * sm_at_fota.c's fota_dl_handler(). There is nothing to restore if AT#XFOTA is not enabled.
  */
 static void nrfcloud_fota_session_end(void)
 {
@@ -226,9 +227,11 @@ static void nrfcloud_fota_session_end(void)
 
 	nrf_cloud_download_end();
 
-	err = sm_at_fota_register_callback();
-	if (err) {
-		LOG_ERR("FOTA callback restore failed: %d", err);
+	if (IS_ENABLED(CONFIG_SM_FOTA)) {
+		err = sm_at_fota_register_callback();
+		if (err) {
+			LOG_ERR("FOTA callback restore failed: %d", err);
+		}
 	}
 }
 
