@@ -8,7 +8,7 @@
 #include <errno.h>
 #include <zephyr/kernel.h>
 #include <zephyr/settings/settings.h>
-#include "sm_at_fota.h"
+#include "sm_fota_session.h"
 #include "sm_settings.h"
 
 bool sm_init_failed;
