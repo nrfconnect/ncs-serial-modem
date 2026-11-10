@@ -10,6 +10,10 @@ DFU AT commands
 This page describes AT commands related to Device Firmware Update (DFU) operations.
 These commands allow you to update the application firmware, delta modem firmware, full modem firmware, or the MCUboot second-stage bootloader through UART.
 
+.. only:: not nrf91m1
+
+   The commands are available when the :ref:`CONFIG_SM_DFU <CONFIG_SM_DFU>` Kconfig option is enabled.
+
 .. note::
 
    The DFU commands use data mode to receive firmware data.

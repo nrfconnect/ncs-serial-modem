@@ -653,7 +653,9 @@ MCUboot bootloader info #XBOOTINFO
 
 Query information about the MCUboot second-stage bootloader.
 
-This command is only available when the firmware is built with the NSIB (B0) and MCUboot as a second-stage bootloader.
+.. only:: not nrf91m1
+
+   This command is only available when the firmware is built with the NSIB (B0) and MCUboot as a second-stage bootloader, and at least one of the :ref:`CONFIG_SM_FOTA <CONFIG_SM_FOTA>`, :ref:`CONFIG_SM_DFU <CONFIG_SM_DFU>` and :ref:`CONFIG_SM_NRF_CLOUD_FOTA <CONFIG_SM_NRF_CLOUD_FOTA>` Kconfig options is enabled.
 
 Set command
 -----------

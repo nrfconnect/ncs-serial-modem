@@ -306,10 +306,35 @@ CONFIG_SM_PGPS_INJECT_FIX_DATA - Injects the data obtained when acquiring a fix.
    In that case, this option should be disabled.
    The default value is ``y``.
 
+.. _CONFIG_SM_FOTA:
+
+CONFIG_SM_FOTA - FOTA (Firmware Over-The-Air) support
+   This option enables the ``AT#XFOTA`` command for over-the-air firmware downloads over HTTP/HTTPS.
+   When this option is disabled, the code of the command is not built.
+   The default value is ``y``.
+   See :ref:`SM_AT_FOTA` for more information.
+
+.. _CONFIG_SM_FULL_FOTA:
+
+CONFIG_SM_FULL_FOTA - Full modem FOTA support
+   This option enables full modem firmware FOTA using the ``AT#XFOTA`` command with ``<op>`` parameter value ``3``.
+   This requires :ref:`CONFIG_SM_FOTA <CONFIG_SM_FOTA>`.
+   See :ref:`SM_AT_FOTA` for more information.
+
+.. _CONFIG_SM_DFU:
+
+CONFIG_SM_DFU - DFU (Device Firmware Update) support
+   This option enables the ``AT#XDFUINIT``, ``AT#XDFUWRITE``, and ``AT#XDFUAPPLY`` commands for uploading firmware to the device through UART.
+   When this option is disabled, the code of the commands is not built.
+   The default value is ``y``.
+   See the :ref:`DFU_AT_commands` for more information.
+
 .. _CONFIG_SM_DFU_MODEM_FULL:
 
 CONFIG_SM_DFU_MODEM_FULL - Enable full modem DFU
    This option enables support for full modem firmware updates using the ``AT#XDFUINIT``, ``AT#XDFUWRITE``, and ``AT#XDFUAPPLY`` commands.
+   The update is done in the bootloader mode, which the device enters for the update.
+   This requires :ref:`CONFIG_SM_DFU <CONFIG_SM_DFU>`.
    See the :ref:`DFU_AT_commands` for more information.
 
 .. _CONFIG_SM_DEBUG_STATS_HEAP:
