@@ -20,7 +20,7 @@
 #include "sm_util.h"
 #include "sm_at_host.h"
 #include "sm_at_dfu.h"
-#include "sm_at_fota.h"
+#include "sm_fw_update.h"
 #include "sm_settings.h"
 #include "sm_uart_handler.h"
 #include "sm_log.h"
@@ -75,12 +75,6 @@ int full_mfw_dfu_segment_type = DFU_FULL_MFW_SEGMENT_BOOTLOADER;
 
 static uint8_t app_dfu_buffer[APP_DFU_BUFFER_SIZE] __aligned(4);
 static bool app_dfu_buffer_initialized;
-
-/* Reserves the modem DFU area for direct delta modem DFU, so that AT#XFOTA and AT#XNRFCLOUDFOTA
- * cannot erase or overwrite a partly written or scheduled image. Released when the modem
- * library is shut down, which closes the modem write session and activates a scheduled update.
- */
-static atomic_t xdfu_delta_mfw_claimed;
 
 static enum xdfu_image_type xdfu_current_image_type;
 static uint32_t xdfu_bytes_written;
@@ -252,33 +246,6 @@ static int xdfu_datamode_callback(uint8_t op, const uint8_t *data, int len, uint
 	}
 }
 
-/* AT#XFOTA and AT#XNRFCLOUDFOTA use the same modem DFU area, and the modem is not usable for a
- * download while a modem DFU area erase is pending. So direct delta modem DFU is refused while
- * one of them is in progress or waiting for activation. Otherwise, it claims the area.
- */
-static int xdfu_delta_mfw_claim(void)
-{
-	if (sm_fota_stage != FOTA_STAGE_INIT) {
-		LOG_ERR("FOTA in progress");
-		return -EBUSY;
-	}
-	atomic_set(&xdfu_delta_mfw_claimed, 1);
-	return 0;
-}
-
-bool sm_at_dfu_delta_mfw_busy(void)
-{
-	return atomic_get(&xdfu_delta_mfw_claimed) != 0;
-}
-
-static void xdfu_delta_mfw_release(void *ctx)
-{
-	ARG_UNUSED(ctx);
-
-	atomic_set(&xdfu_delta_mfw_claimed, 0);
-}
-NRF_MODEM_LIB_ON_SHUTDOWN(xdfu_delta_mfw_shutdown, xdfu_delta_mfw_release, NULL);
-
 SM_AT_CMD_CUSTOM(xdfu_init, "AT#XDFUINIT", handle_at_xdfu_init);
 static int handle_at_xdfu_init(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 				  uint32_t param_count)
@@ -345,7 +312,7 @@ static int handle_at_xdfu_init(enum at_parser_cmd_type cmd_type, struct at_parse
 				return err;
 			}
 
-			err = xdfu_delta_mfw_claim();
+			err = sm_fw_update_modem_dfu_claim();
 			if (err) {
 				return err;
 			}
@@ -488,7 +455,7 @@ static int handle_at_xdfu_write(enum at_parser_cmd_type cmd_type, struct at_pars
 				return -EINVAL;
 			}
 
-			err = xdfu_delta_mfw_claim();
+			err = sm_fw_update_modem_dfu_claim();
 			if (err) {
 				return err;
 			}
@@ -636,7 +603,7 @@ static int handle_at_xdfu_apply(enum at_parser_cmd_type cmd_type, struct at_pars
 
 			return 0;
 		case DFU_TYPE_DELTA_MFW:
-			err = xdfu_delta_mfw_claim();
+			err = sm_fw_update_modem_dfu_claim();
 			if (err) {
 				return err;
 			}

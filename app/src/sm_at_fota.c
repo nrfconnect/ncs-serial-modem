@@ -24,7 +24,7 @@
 #include "sm_settings.h"
 #include "sm_at_host.h"
 #include "sm_at_fota.h"
-#include "sm_at_dfu.h"
+#include "sm_fw_update.h"
 #include "sm_defines.h"
 #include "sm_log.h"
 #include "sm_uart_handler.h"
@@ -398,7 +398,7 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 				err = -EBUSY;
 				break;
 			}
-			if (op == SM_FOTA_START_MFW && sm_at_dfu_delta_mfw_busy()) {
+			if (op == SM_FOTA_START_MFW && sm_fw_update_modem_dfu_busy()) {
 				err = -EBUSY;
 				break;
 			}
@@ -475,7 +475,7 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 			err = do_fota_mfw_read();
 			break;
 		case SM_FOTA_ERASE_MFW:
-			if (sm_fota_stage != FOTA_STAGE_INIT || sm_at_dfu_delta_mfw_busy()) {
+			if (sm_fota_stage != FOTA_STAGE_INIT || sm_fw_update_modem_dfu_busy()) {
 				err = -EBUSY;
 				break;
 			}

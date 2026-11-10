@@ -8,17 +8,15 @@
 #include <nrf_modem.h>
 #include <hal/nrf_power.h>
 #include <modem/nrf_modem_lib.h>
-#include <zephyr/dfu/mcuboot.h>
-#include <dfu/dfu_target.h>
 #include <zephyr/sys/reboot.h>
 #include <zephyr/logging/log_ctrl.h>
-#include <net/fota_download.h>
 #if defined(CONFIG_MEMFAULT)
 #include <memfault/core/trace_event.h>
 #endif /* CONFIG_MEMFAULT */
 #include "sm_at_host.h"
 #include "sm_at_dfu.h"
 #include "sm_at_fota.h"
+#include "sm_fw_update.h"
 #include "sm_settings.h"
 #include "sm_util.h"
 #include "sm_ctrl_pin.h"
@@ -39,7 +37,6 @@ uint8_t sm_modem_init_eio_retry_count;
 #define SM_MODEM_INIT_EIO_MAX_RETRIES 1
 
 NRF_MODEM_LIB_ON_INIT(lwm2m_init_hook, on_modem_lib_init, NULL);
-NRF_MODEM_LIB_ON_DFU_RES(main_dfu_hook, on_modem_dfu_res, NULL);
 
 static void on_modem_lib_init(int ret, void *ctx)
 {
@@ -82,87 +79,6 @@ void nrf_modem_fault_handler(struct nrf_modem_fault_info *fault_info)
 	k_work_submit_to_queue(&sm_work_q, &modem_failure_work);
 }
 #endif /* CONFIG_NRF_MODEM_LIB_ON_FAULT_APPLICATION_SPECIFIC */
-
-static void on_modem_dfu_res(int dfu_res, void *ctx)
-{
-	switch (dfu_res) {
-	case NRF_MODEM_DFU_RESULT_OK:
-		LOG_INF("Modem update OK, running new firmware");
-		break;
-	case NRF_MODEM_DFU_RESULT_UUID_ERROR:
-	case NRF_MODEM_DFU_RESULT_AUTH_ERROR:
-		LOG_ERR("Modem update failed: 0x%x, running old firmware", dfu_res);
-		break;
-	case NRF_MODEM_DFU_RESULT_HARDWARE_ERROR:
-	case NRF_MODEM_DFU_RESULT_INTERNAL_ERROR:
-		LOG_ERR("Fatal modem update error: 0x%x", dfu_res);
-		break;
-	case NRF_MODEM_DFU_RESULT_VOLTAGE_LOW:
-		LOG_ERR("Modem update postponed, low voltage");
-		break;
-	default:
-		LOG_ERR("Unhandled DFU result: 0x%x", dfu_res);
-		break;
-	}
-
-	/* Update FOTA state only if a modem delta FOTA was in progress.
-	 * sm_fota_type is loaded from NVS; NONE means DFU or no update.
-	 */
-	if (sm_fota_type != SM_FOTA_TYPE_MFW) {
-		return;
-	}
-
-	sm_fota_stage  = (dfu_res == NRF_MODEM_DFU_RESULT_VOLTAGE_LOW)
-			? FOTA_STAGE_ACTIVATE : FOTA_STAGE_COMPLETE;
-	sm_fota_status = (dfu_res == NRF_MODEM_DFU_RESULT_OK)
-			? FOTA_STATUS_OK : FOTA_STATUS_ERROR;
-	sm_fota_info   = (dfu_res == NRF_MODEM_DFU_RESULT_OK) ? 0 : dfu_res;
-}
-
-static void check_app_fota_status(void)
-{
-	/** When a TEST image is swapped to primary partition and booted by MCUBOOT,
-	 * the API mcuboot_swap_type() will return BOOT_SWAP_TYPE_REVERT. By this type
-	 * MCUBOOT means that the TEST image is booted OK and, if it's not confirmed
-	 * next, it'll be swapped back to secondary partition and original application
-	 * image will be restored to the primary partition (so-called Revert).
-	 */
-	const int type = mcuboot_swap_type();
-	int ret = 0;
-
-	switch (type) {
-	/** Attempt to boot the contents of slot 0. */
-	case BOOT_SWAP_TYPE_NONE:
-		/* Normal boot, nothing happened, do nothing. */
-		return;
-	/** Swap to slot 1. Absent a confirm command, revert back on next boot. */
-	case BOOT_SWAP_TYPE_TEST:
-	/** Swap to slot 1, and permanently switch to booting its contents. */
-	case BOOT_SWAP_TYPE_PERM:
-	/** Swap failed because image to be run is not valid. */
-	case BOOT_SWAP_TYPE_FAIL:
-		break;
-	/** Swap back to alternate slot. A confirm changes this state to NONE. */
-	case BOOT_SWAP_TYPE_REVERT:
-		/* Happens on a successful application FOTA.
-		 * boot_write_img_confirmed() resolves the flash area via
-		 * slot_0_partition. It writes image_ok where MCUboot expects it.
-		 */
-		ret = boot_write_img_confirmed_multi(0);
-		LOG_INF("Image confirmed: %d", ret);
-		break;
-	}
-	/* Only report FOTA completion if an app FOTA was in progress.
-	 * sm_fota_type is loaded from NVS; NONE means DFU or no update.
-	 */
-	if (sm_fota_type != SM_FOTA_TYPE_APP) {
-		return;
-	}
-	sm_fota_status = (type == BOOT_SWAP_TYPE_REVERT && ret == 0)
-			? FOTA_STATUS_OK : FOTA_STATUS_ERROR;
-	sm_fota_info   = (type == BOOT_SWAP_TYPE_REVERT) ? ret : type;
-	sm_fota_stage  = FOTA_STAGE_COMPLETE;
-}
 
 static int bootloader_mode_init(void)
 {
@@ -326,7 +242,7 @@ static int sm_main(void)
 
 	sm_fota_mcuboot_bl_boot_check();
 
-	check_app_fota_status();
+	sm_fw_update_boot_check();
 
 	if (sm_init_failed) {
 		urc_send(SM_SYNC_ERR_STR);
