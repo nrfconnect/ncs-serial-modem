@@ -12,7 +12,7 @@ This page describes the AT commands used to operate the MQTT client.
 The MQTT client supports MQTT v3.1.1 and experimental MQTT v5.0.
 MQTT v3.1.1 is the default.
 Select MQTT v5.0 with the ``<version>`` parameter of ``#XMQTTCFG``.
-The AT interface supports the MQTT v5.0 Session Expiry Interval property and acknowledgment reason codes.
+The AT interface supports the MQTT v5.0 Session Expiry Interval property, Session Present flag, and acknowledgment reason codes.
 It does not expose other MQTT v5.0 properties, subscription options, or enhanced authentication.
 Examples use MQTT v3.1.1 unless stated otherwise.
 
@@ -38,7 +38,12 @@ Unsolicited notification
 
 ::
 
-   #XMQTTEVT: <evt_type>,<result>[,<reason_code>]
+   #XMQTTEVT: <evt_type>,<result>[,<detail>]
+
+The optional third field depends on the event type.
+For a successful MQTT v5.0 CONNACK, ``<detail>`` is ``<session_present>``.
+For MQTT v5.0 acknowledgment events ``3`` to ``8``, it is ``<reason_code>``.
+MQTT v3.1.1 notifications retain the two-field format.
 
 The parameters and their defined values are the following:
 
@@ -72,7 +77,29 @@ The parameters and their defined values are the following:
    * *Negative value* - A local error code.
      For PUBREC and PUBREL, this can also indicate a failure to send the next QoS 2 acknowledgment.
 
-<reason_code>
+<detail>
+   Integer.
+   The event-specific value described below.
+
+   For CONNACK (``<evt_type>`` ``0``), this value is ``<session_present>``.
+   It is present only with MQTT v5.0 and when ``<result>`` is ``0``.
+
+   * ``0`` - The broker starts a new session.
+     The host must subscribe to the required topics.
+   * ``1`` - The broker resumes a stored session for this client ID.
+     Existing subscriptions are restored without subscribing again.
+
+   Clean Start ``1`` always starts a new session.
+   Clean Start ``0`` can also start a new session if no stored session exists or the previous session has expired.
+   A failed CONNACK has no third field.
+
+   For acknowledgment events ``3`` to ``8``, this value is ``<reason_code>``.
+   The following description applies to that value.
+
+Reason codes
+~~~~~~~~~~~~
+
+``<reason_code>``
    Integer.
    The MQTT v5.0 reason code from the received acknowledgment.
    Present for successfully decoded PUBACK, PUBREC, PUBREL, PUBCOMP, SUBACK, and UNSUBACK events.
@@ -93,6 +120,18 @@ Examples
 ~~~~~~~~
 
 The following examples use MQTT v5.0.
+
+After a successful connection with a new session:
+
+::
+
+   #XMQTTEVT: 0,0,0
+
+After reconnecting with Clean Start ``0`` while the broker still has the stored session:
+
+::
+
+   #XMQTTEVT: 0,0,1
 
 ::
 
@@ -178,6 +217,7 @@ The parameters and their defined values are the following:
 
    A nonzero value requires ``<version>`` to be ``5``.
    To resume a stored session, reconnect with the same client ID and ``<clean_session>`` set to ``0`` before the session expires.
+   Check the Session Present flag in :ref:`SM_AT_MQTT_XMQTTEVT` to determine whether the broker resumes the session.
    Broker-side session storage does not add client-side retransmission or delivery guarantees.
 
 Examples

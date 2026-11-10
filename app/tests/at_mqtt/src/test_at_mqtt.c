@@ -444,7 +444,46 @@ void test_mqtt_evt_no_reason_code_3_1_1(void)
 	snprintf(expected, sizeof(expected), "#XMQTTEVT: %d,0\r\n", MQTT_EVT_PUBACK);
 	TEST_ASSERT_NOT_NULL(strstr(resp, expected));
 
+	evt = (struct mqtt_evt){
+		.type = MQTT_EVT_CONNACK,
+		.param.connack.session_present_flag = 1,
+	};
+	resp = inject_mqtt_evt(&evt);
+	TEST_ASSERT_NOT_NULL(strstr(resp, "#XMQTTEVT: 0,0\r\n"));
+	evt.param.connack.session_present_flag = 0;
+	resp = inject_mqtt_evt(&evt);
+	TEST_ASSERT_NOT_NULL(strstr(resp, "#XMQTTEVT: 0,0\r\n"));
+
 	mqtt_disconnect_ok();
+}
+
+void test_mqtt_connack_session_present_5_0(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	const char *resp;
+	struct mqtt_evt evt = {.type = MQTT_EVT_CONNACK};
+
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,0,5,300\r\n", MQTT_VERSION_5_0);
+
+	resp = inject_mqtt_evt(&evt);
+	TEST_ASSERT_NOT_NULL(strstr(resp, "#XMQTTEVT: 0,0,0\r\n"));
+
+	evt.param.connack.session_present_flag = 1;
+	resp = inject_mqtt_evt(&evt);
+	TEST_ASSERT_NOT_NULL(strstr(resp, "#XMQTTEVT: 0,0,1\r\n"));
+
+	mqtt_disconnect_ok();
+
+	evt.result = 0x89;
+	resp = inject_mqtt_evt(&evt);
+	TEST_ASSERT_NOT_NULL(strstr(resp, "#XMQTTEVT: 0,137\r\n"));
+
+	evt.result = -EINVAL;
+	resp = inject_mqtt_evt(&evt);
+	TEST_ASSERT_NOT_NULL(strstr(resp, "#XMQTTEVT: 0,-22\r\n"));
+#else
+	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
+#endif
 }
 
 /*
