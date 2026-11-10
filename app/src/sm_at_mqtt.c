@@ -138,8 +138,8 @@ static int drain_publish_payload(struct mqtt_client *const c)
 	return 0;
 }
 
-/* Reason code of an MQTT 5.0 acknowledgment, or -1 when there is none to report. */
-static int mqtt_evt_reason_code(const struct mqtt_evt *evt)
+/* Event-specific MQTT 5.0 detail, or -1 when there is none to report. */
+static int mqtt_evt_detail(const struct mqtt_evt *evt)
 {
 #if defined(CONFIG_MQTT_VERSION_5_0)
 	if (client.protocol_version != MQTT_VERSION_5_0 || evt->result != 0) {
@@ -147,6 +147,8 @@ static int mqtt_evt_reason_code(const struct mqtt_evt *evt)
 	}
 
 	switch (evt->type) {
+	case MQTT_EVT_CONNACK:
+		return evt->param.connack.session_present_flag != 0;
 	case MQTT_EVT_PUBACK:
 		return evt->param.puback.reason_code;
 	case MQTT_EVT_PUBREC:
@@ -180,7 +182,7 @@ static int mqtt_evt_reason_code(const struct mqtt_evt *evt)
 void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 {
 	int ret;
-	int reason;
+	int detail;
 
 	ret = evt->result;
 	switch (evt->type) {
@@ -270,10 +272,10 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 	 * which would place it ahead of the #XMQTTMSG header and payload.
 	 */
 	if (evt->type != MQTT_EVT_PUBLISH) {
-		reason = mqtt_evt_reason_code(evt);
-		if (reason >= 0) {
+		detail = mqtt_evt_detail(evt);
+		if (detail >= 0) {
 			urc_send_to(ctx.pipe, "\r\n#XMQTTEVT: %d,%d,%d\r\n", evt->type, ret,
-				    reason);
+				    detail);
 		} else {
 			urc_send_to(ctx.pipe, "\r\n#XMQTTEVT: %d,%d\r\n", evt->type, ret);
 		}
