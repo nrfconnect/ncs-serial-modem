@@ -16,6 +16,7 @@
 #include "sm_at_host.h"
 #include "sm_at_dfu.h"
 #include "sm_at_fota.h"
+#include "sm_fota_session.h"
 #include "sm_fw_update.h"
 #include "sm_settings.h"
 #include "sm_util.h"

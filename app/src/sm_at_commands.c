@@ -31,6 +31,7 @@
 #include "sm_settings.h"
 #include "sm_at_host.h"
 #include "sm_at_fota.h"
+#include "sm_fota_session.h"
 #include "sm_version.h"
 #include "sm_at_nrfcloud.h"
 #include "sm_log.h"

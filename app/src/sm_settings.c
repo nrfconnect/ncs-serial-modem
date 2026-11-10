@@ -11,6 +11,7 @@
 #include <dfu/dfu_target.h>
 #include <errno.h>
 #include "sm_at_fota.h"
+#include "sm_fota_session.h"
 #include "sm_at_dfu.h"
 #include "sm_settings.h"
 #include "sm_defines.h"
@@ -99,17 +100,18 @@ int sm_settings_fota_save(void)
 {
 	int err;
 
-	err = settings_save_one("sm/bl_fota_ver", &sm_fota_bl_version_before,
-				 sizeof(sm_fota_bl_version_before));
-	if (err) {
-		return err;
-	}
 	err = settings_save_one("sm/fota_type", &sm_fota_type, sizeof(sm_fota_type));
 	if (err) {
 		return err;
 	}
 	return settings_save_one("sm/fota_nrfcloud", &sm_fota_nrfcloud,
 				 sizeof(sm_fota_nrfcloud));
+}
+
+int sm_settings_fota_bl_version_save(void)
+{
+	return settings_save_one("sm/bl_fota_ver", &sm_fota_bl_version_before,
+				 sizeof(sm_fota_bl_version_before));
 }
 
 int sm_settings_bootloader_mode_save(void)

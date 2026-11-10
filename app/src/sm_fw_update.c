@@ -8,7 +8,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/dfu/mcuboot.h>
 #include <modem/nrf_modem_lib.h>
-#include "sm_at_fota.h"
+#include "sm_fota_session.h"
 #include "sm_fw_update.h"
 
 LOG_MODULE_REGISTER(sm_fw_update, CONFIG_SM_LOG_LEVEL);
