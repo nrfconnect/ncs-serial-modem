@@ -9,6 +9,10 @@ FOTA AT commands
 
 This page describes AT commands related to Firmware Over-The-Air (FOTA) updates.
 
+.. only:: not nrf91m1
+
+   The commands are available when the :ref:`CONFIG_SM_FOTA <CONFIG_SM_FOTA>` Kconfig option is enabled.
+
 FOTA request #XFOTA
 ===================
 
