@@ -17,7 +17,7 @@
 #include "sm_util.h"
 #include "sm_at_host.h"
 #include "sm_at_fota.h"
-#include "sm_at_dfu.h"
+#include "sm_fw_update.h"
 #include "sm_settings.h"
 
 LOG_MODULE_REGISTER(sm_nrfcloud_fota, CONFIG_SM_LOG_LEVEL);
@@ -330,7 +330,7 @@ STATIC int handle_at_nrf_cloud_fota(enum at_parser_cmd_type cmd_type, struct at_
 			return -EBUSY;
 		}
 		/* AT#XDFUWRITE is writing to the modem DFU area. */
-		if (op == FOTA_MODEM && sm_at_dfu_delta_mfw_busy()) {
+		if (op == FOTA_MODEM && sm_fw_update_modem_dfu_busy()) {
 			return -EBUSY;
 		}
 
