@@ -1171,7 +1171,7 @@ static void cmd_send(struct sm_at_host_ctx *ctx, uint8_t *buf, size_t cmd_length
 	}
 
 	/* If bootloader mode is enabled, handle custom AT commands. */
-	if (sm_bootloader_mode_enabled) {
+	if (IS_ENABLED(CONFIG_SM_DFU) && sm_bootloader_mode_enabled) {
 		handle_bootloader_at_cmd(response_buf, sizeof(response_buf), at_cmd);
 		return;
 	}

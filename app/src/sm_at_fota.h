@@ -40,9 +40,7 @@ int sm_at_fota_register_callback(void);
  * This is to be called after the application or modem
  * has been rebooted and a full modem firmware update is ongoing.
  */
-#if defined(CONFIG_SM_FULL_FOTA)
 void sm_finish_modem_full_fota(void);
-#endif
 
 /** @} */
 #endif /* SM_AT_FOTA_ */
