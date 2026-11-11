@@ -67,6 +67,10 @@ static struct sm_mqtt_ctx {
 	int packet_size_error;
 #if defined(CONFIG_MQTT_VERSION_5_0)
 	uint32_t maximum_packet_size;
+	uint8_t maximum_qos;
+	bool retain_available;
+	bool wildcard_sub_available;
+	bool shared_sub_available;
 #endif
 } ctx;
 
@@ -88,6 +92,16 @@ static struct mqtt_conn *mqtt_conn;
 
 /* The mqtt client struct */
 static struct mqtt_client client;
+
+#if defined(CONFIG_MQTT_VERSION_5_0)
+static void mqtt_capabilities_reset(void)
+{
+	ctx.maximum_qos = MQTT_QOS_2_EXACTLY_ONCE;
+	ctx.retain_available = true;
+	ctx.wildcard_sub_available = true;
+	ctx.shared_sub_available = true;
+}
+#endif
 
 /* Remaining Length excludes the control byte and its own variable-width encoding. */
 STATIC int mqtt_check_packet_size(size_t remaining)
@@ -235,6 +249,22 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 		}
 #if defined(CONFIG_MQTT_VERSION_5_0)
 		if (evt->result == 0 && client.protocol_version == MQTT_VERSION_5_0) {
+			mqtt_capabilities_reset();
+			if (evt->param.connack.prop.rx.has_maximum_qos) {
+				ctx.maximum_qos = evt->param.connack.prop.maximum_qos;
+			}
+			if (evt->param.connack.prop.rx.has_retain_available) {
+				ctx.retain_available =
+					evt->param.connack.prop.retain_available != 0;
+			}
+			if (evt->param.connack.prop.rx.has_wildcard_sub_available) {
+				ctx.wildcard_sub_available =
+					evt->param.connack.prop.wildcard_sub_available != 0;
+			}
+			if (evt->param.connack.prop.rx.has_shared_sub_available) {
+				ctx.shared_sub_available =
+					evt->param.connack.prop.shared_sub_available != 0;
+			}
 			ctx.maximum_packet_size = UINT32_MAX;
 			if (evt->param.connack.prop.rx.has_maximum_packet_size) {
 				ctx.maximum_packet_size =
@@ -686,6 +716,7 @@ static int do_mqtt_connect(void)
 	ctx.packet_size_error = 0;
 #if defined(CONFIG_MQTT_VERSION_5_0)
 	ctx.maximum_packet_size = UINT32_MAX;
+	mqtt_capabilities_reset();
 #endif
 	err = mqtt_connect(&client);
 	if (err != 0) {
@@ -745,8 +776,20 @@ static int do_mqtt_disconnect(void)
 	return 0;
 }
 
-static int mqtt_check_publish_size(size_t msg_len)
+static int mqtt_check_publish(size_t msg_len)
 {
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	if (client.protocol_version == MQTT_VERSION_5_0) {
+		if (mqtt_conn->pub_param.message.topic.qos > ctx.maximum_qos) {
+			LOG_ERR("MQTT publish QoS exceeds server maximum: %u", ctx.maximum_qos);
+			return -ENOTSUP;
+		}
+		if (mqtt_conn->pub_param.retain_flag && !ctx.retain_available) {
+			LOG_ERR("MQTT server does not support retained publications");
+			return -ENOTSUP;
+		}
+	}
+#endif
 	/* No outgoing properties are exposed by the AT API; MQTT 5 adds a zero
 	 * Property Length byte. QoS 1/2 also include a two-byte packet identifier.
 	 */
@@ -769,7 +812,7 @@ static int do_mqtt_publish(uint8_t *msg, size_t msg_len)
 		return -ENOTCONN;
 	}
 
-	err = mqtt_check_publish_size(msg_len);
+	err = mqtt_check_publish(msg_len);
 	if (err != 0) {
 		return err;
 	}
@@ -810,6 +853,21 @@ static int do_mqtt_subscribe(uint16_t op,
 	}
 	subscribe_topic.topic.utf8 = topic_buf;
 	subscribe_topic.topic.size = topic_len;
+
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	if (client.protocol_version == MQTT_VERSION_5_0 && op == AT_MQTTSUB_SUB) {
+		if (!ctx.shared_sub_available && topic_len >= sizeof("$share/") - 1 &&
+		    memcmp(topic_buf, "$share/", sizeof("$share/") - 1) == 0) {
+			LOG_ERR("MQTT server does not support shared subscriptions");
+			return -ENOTSUP;
+		}
+		if (!ctx.wildcard_sub_available && (memchr(topic_buf, '+', topic_len) != NULL ||
+						    memchr(topic_buf, '#', topic_len) != NULL)) {
+			LOG_ERR("MQTT server does not support wildcard subscriptions");
+			return -ENOTSUP;
+		}
+	}
+#endif
 
 	size_t remaining = 2 + 2 + topic_len + (op == AT_MQTTSUB_SUB ? 1 : 0);
 
@@ -1107,7 +1165,7 @@ STATIC int handle_at_mqtt_publish(enum at_parser_cmd_type cmd_type, struct at_pa
 		}
 		if (pub_msg_ptr == NULL || msg_sz == 0) {
 			/* Publish payload in data mode */
-			err = mqtt_check_publish_size(data_len);
+			err = mqtt_check_publish(data_len);
 			if (err != 0) {
 				return err;
 			}

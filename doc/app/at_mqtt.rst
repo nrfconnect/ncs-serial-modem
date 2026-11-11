@@ -22,6 +22,14 @@ If an oversized publish is detected after entering data mode, the client uses th
 If a required acknowledgment does not fit, the client closes the connection instead of sending it.
 Each new connection resets the limit until CONNACK supplies a new value.
 If the property is absent, only the protocol and local buffer limits apply.
+The client also enforces Maximum QoS, Retain Available, Wildcard Subscription Available, and Shared Subscription Available from a successful MQTT v5.0 CONNACK.
+Unsupported publish or subscribe requests return ``ERROR`` without sending a packet.
+Publish checks apply before entering data mode and again before sending its payload.
+Maximum QoS limits outgoing publications, not the requested subscription QoS.
+Unsubscribe requests remain allowed even when the broker disables the corresponding subscription capability.
+Absent properties default to maximum QoS 2 and support for retained publications, wildcard subscriptions, and shared subscriptions.
+Each new connection resets these capabilities before applying the broker's CONNACK.
+The AT interface does not send Subscription Identifiers, so Subscription Identifiers Available requires no additional restriction.
 Examples use MQTT v3.1.1 unless stated otherwise.
 
 .. note::
