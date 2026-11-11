@@ -337,8 +337,20 @@ The data does not leave the device on its own.
 The host controls when it is sent, and the data reaches the cloud as follows:
 
 1. The |SM| records the data on the device.
-   Core dumps and the first pending modem fault are retained in flash for later upload.
-   Other buffered data is stored in RAM and lost on reset or power loss.
+
+   .. TODO: REMOVE FILTERING WHEN NRF91M1 IS RELEASED
+   .. only:: nrf91m1
+
+      When the |SM| crashes, it stores a core dump in flash and restarts.
+      The core dump stays in flash over the restart until it is uploaded.
+      The |SM| keeps the other data in RAM, so the data is lost on reset or power loss.
+
+   .. TODO: REMOVE FILTERING WHEN NRF91M1 IS RELEASED
+   .. only:: not nrf91m1
+
+      Core dumps and the first pending modem fault are retained in flash for later upload.
+      Other buffered data is stored in RAM and lost on reset or power loss.
+
 #. The host connects the |SM| to nRF Cloud with the :ref:`#XNRFCLOUD <SM_AT_NRFCLOUD>` command.
    You must onboard and claim the device first.
    See :ref:`SM_AT_PROVISIONING`.
@@ -359,9 +371,21 @@ The host controls when it is sent, and the data reaches the cloud as follows:
    The core dump storage holds one core dump.
    While a core dump is stored, subsequent crashes do not capture a new one until the stored one has been uploaded.
 
-Modem faults do not produce an application core dump.
-Reconnect to nRF Cloud after modem recovery to upload the retained fault.
-See :ref:`SM_AT_NRFCLOUDOBSUPLOAD` for retention and timestamp details.
+.. TODO: REMOVE FILTERING WHEN NRF91M1 IS RELEASED
+.. only:: nrf91m1
+
+   The core dump covers the crashes of the Serial Modem.
+   The |SM| records a modem fault only as an event.
+   The modem fault also drops the network connection, so the host cannot upload the event until the |SM| is connected to nRF Cloud again.
+   If the host resets the |SM| before the upload, the event is lost.
+
+.. TODO: REMOVE FILTERING WHEN NRF91M1 IS RELEASED
+.. only:: not nrf91m1
+
+   Modem faults do not produce an application core dump.
+   Reconnect to nRF Cloud after modem recovery to upload the retained fault.
+   See :ref:`SM_AT_NRFCLOUDOBSUPLOAD` for retention and timestamp details.
+
 To investigate a modem fault, collect the modem traces as described in :ref:`sm_logging_modem_traces`.
 
 .. only:: not nrf91m1

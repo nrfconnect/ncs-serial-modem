@@ -14,7 +14,10 @@ ICMP echo request #XPING
 
 The ``#XPING`` command sends an ICMP Echo Request, also known as *Ping*.
 
-Only one ping request can be active at a time.
+.. TODO: REMOVE FILTERING WHEN NRF91M1 IS RELEASED
+.. only:: not nrf91m1
+
+   Only one ping request can be active at a time.
 
 Set command
 -----------
