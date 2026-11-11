@@ -53,7 +53,7 @@ The Data Terminal Ready (DTR) and Ring Indicator (RI) signals are the control si
 
 .. important::
    The |SM| has hardware flow control (RTS and CTS) permanently enabled.
-   Using the |SM| without connecting RTS and CTS to the host is `experimental <Software maturity levels_>`_ and strongly not recommended.
+   Using the |SM| without connecting RTS and CTS to the host is :ref:`experimental <nrf:software_maturity>` and strongly not recommended.
    See :ref:`uart_without_flow_control` for more information.
 
 .. _nrf91m1_uart_pin_assignment:
@@ -128,7 +128,7 @@ Operating without hardware flow control
 ***************************************
 
 .. important::
-   The use of the |SM| without hardware flow control (RTS/CTS) is `experimental <Software maturity levels_>`_ and strongly not recommended.
+   The use of the |SM| without hardware flow control (RTS/CTS) is :ref:`experimental <nrf:software_maturity>` and strongly not recommended.
    Hardware flow control ensures reliable communication and prevents timing-related issues.
    Without hardware flow control, there is a risk of data loss in UART communication, especially in high-throughput scenarios.
 
@@ -159,7 +159,7 @@ The UART receive buffer of the |SM| is fixed to 532 bytes and cannot be configur
 Operating with the nRF9151 DK
 *****************************
 
-You can flash the nRF91M1 firmware to the `nrf9151dk`_ board for development and testing purposes.
+You can flash the nRF91M1 firmware to the :doc:`nrf9151dk <zephyr:boards/nordic/nrf9151dk/doc/index>` board for development and testing purposes.
 On the DK, the SiP is an nRF9151, and the UART pins follow the pin mapping of the nRF91M1 as listed in the following table:
 
 .. list-table::
@@ -182,14 +182,14 @@ On the DK, the SiP is an nRF9151, and the UART pins follow the pin mapping of th
    * - UART1 TX
      - P0.29
 
-By default on the `nrf9151dk`_ board, UART0 is routed to VCOM0 on the interface chip, and UART1 is routed to VCOM1 on the interface chip.
-This allows you to use the `nrf9151dk`_ board with a PC host for development and testing.
+By default on the :doc:`nrf9151dk <zephyr:boards/nordic/nrf9151dk/doc/index>` board, UART0 is routed to VCOM0 on the interface chip, and UART1 is routed to VCOM1 on the interface chip.
+This allows you to use the :doc:`nrf9151dk <zephyr:boards/nordic/nrf9151dk/doc/index>` board with a PC host for development and testing.
 
 PC host
 =======
 
 .. important::
-   When you use the `nrf9151dk`_ board with a PC host, you must wire the **DTR** pin to **GND** to power on UART0.
+   When you use the :doc:`nrf9151dk <zephyr:boards/nordic/nrf9151dk/doc/index>` board with a PC host, you must wire the **DTR** pin to **GND** to power on UART0.
    Currently, you must use a physical jumper wire, but in the future, the `Board Configurator app`_ can be used.
 
 When you use a PC serial terminal application (for example, PuTTY, Tera Term, minicom) to send AT commands, configure the terminal as follows:
@@ -211,7 +211,7 @@ See :ref:`SM_AT_syntax` for the AT command syntax.
 External MCU host
 =================
 
-When you use the `nrf9151dk`_ board with an external MCU host, you must disable VCOM0 in the `Board Configurator app`_ to release the UART pins for external use.
+When you use the :doc:`nrf9151dk <zephyr:boards/nordic/nrf9151dk/doc/index>` board with an external MCU host, you must disable VCOM0 in the `Board Configurator app`_ to release the UART pins for external use.
 
 .. _nrf91m1_uart_cellular_ppp_modem:
 
@@ -219,7 +219,7 @@ Cellular PPP modem
 ==================
 
 For information on how the |SM| works as a cellular PPP modem, see :ref:`nrf91m1_cellular_modem`.
-For information on how to configure a Linux host with the `nrf9151dk`_ board running nRF91M1 firmware, see `Serial Modem PPP Linux host`_.
+For information on how to configure a Linux host with the :doc:`nrf9151dk <zephyr:boards/nordic/nrf9151dk/doc/index>` board running nRF91M1 firmware, see `Serial Modem PPP Linux host`_.
 For a Zephyr host, see `Serial Modem PPP Zephyr host`_.
 
 .. include:: ../uart_configuration.rst
