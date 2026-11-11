@@ -431,7 +431,12 @@ The parameters and their defined values are the following:
      This is effective only after a download has started, that is, after the first ``#XNRFCLOUDFOTA`` progress notification.
    * ``1`` - Check for and download an application update.
    * ``2`` - Check for and download a modem firmware update.
-     If an interrupted download is detected, it is continued.
+
+     .. TODO: REMOVE FILTERING WHEN NRF91M1 IS RELEASED
+     .. only:: not nrf91m1
+
+        If an interrupted download is detected, it is continued.
+
    * ``4`` - Check for an application update, without downloading it.
    * ``6`` - Check for a modem firmware update, without downloading it.
 
@@ -538,16 +543,19 @@ The ``#XNRFCLOUDOBSUPLOAD`` command uploads the buffered observability data to n
 
 The captured logs are collected before the upload so that they are included.
 
-|SM| retains the first pending modem fault in flash until nRF Cloud acknowledges its upload.
-After |SM| saves the fault, it survives resets and power loss.
-|SM| can upload it after modem recovery or reboot.
-Further modem faults do not overwrite it or create additional modem-fault events while it is pending.
-Both on-demand and automatic uploads include the retained fault.
-Retries can produce duplicate reports.
+.. TODO: REMOVE FILTERING WHEN NRF91M1 IS RELEASED
+.. only:: not nrf91m1
 
-The fault log includes the reason, program counter, and UTC observation time as ``occurred_at=YYYY-MM-DDTHH:MM:SSZ``.
-If the time is unavailable, the fault log includes ``occurred_at=unknown`` instead.
-The Memfault ``captured_date`` field records when the event is captured during upload, not the original observation time.
+   |SM| retains the first pending modem fault in flash until nRF Cloud acknowledges its upload.
+   After |SM| saves the fault, it survives resets and power loss.
+   |SM| can upload it after modem recovery or reboot.
+   Further modem faults do not overwrite it or create additional modem-fault events while it is pending.
+   Both on-demand and automatic uploads include the retained fault.
+   Retries can produce duplicate reports.
+
+   The fault log includes the reason, program counter, and UTC observation time as ``occurred_at=YYYY-MM-DDTHH:MM:SSZ``.
+   If the time is unavailable, the fault log includes ``occurred_at=unknown`` instead.
+   The Memfault ``captured_date`` field records when the event is captured during upload, not the original observation time.
 
 Set command
 -----------
