@@ -53,7 +53,7 @@ The Data Terminal Ready (DTR) and Ring Indicator (RI) signals are the control si
 
 .. important::
    The |SM| has hardware flow control (RTS and CTS) permanently enabled.
-   Using the |SM| without connecting RTS and CTS to the host is is :ref:`experimental <nrf:software_maturity>` and strongly not recommended.
+   Using the |SM| without connecting RTS and CTS to the host is :ref:`experimental <nrf:software_maturity>` and strongly not recommended.
    See :ref:`uart_without_flow_control` for more information.
 
 .. _nrf91m1_uart_pin_assignment:
@@ -164,7 +164,7 @@ You can flash the nRF91M1 firmware to the :doc:`nrf9151dk <zephyr:boards/nordic/
 
 .. important::
    The UART stays disabled until the **DTR** pin is asserted.
-   On the `nrf9151dk`_ board, you must connect **P0.31** (DTR) to **GND**.
+   On the :doc:`nrf9151dk <zephyr:boards/nordic/nrf9151dk/doc/index>` board, you must connect **P0.31** (DTR) to **GND**.
    Otherwise, the |SM| does not respond to AT commands.
 
 On the DK, the SiP is an nRF9151, and the UART pins follow the pin mapping of the nRF91M1 as listed in the following table:

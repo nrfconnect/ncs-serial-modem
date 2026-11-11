@@ -390,7 +390,7 @@ To investigate a modem fault, collect the modem traces as described in :ref:`sm_
 
 .. only:: not nrf91m1
 
-   The nRF Cloud observability AT commands require the :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY <CONFIG_SM_NRF_CLOUD_OBSERVABILITY>` Kconfig option, which is enabled by default.
+   The nRF Cloud observability AT commands require the :option:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY` Kconfig option, which is enabled by default.
    The ``CONFIG_MEMFAULT_METRICS_HEARTBEAT_INTERVAL_SECS`` Kconfig option sets the heartbeat interval.
    The default build stores the core dump in flash.
 

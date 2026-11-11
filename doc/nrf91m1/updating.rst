@@ -67,7 +67,7 @@ Application firmware images
 ===========================
 
 The application firmware package is available on the `nRF91M1 Downloads`_ page.
-The package contains the images that the update procedures send to the |SM|, and the image for programming the firmware to the `nrf9151dk`_ board.
+The package contains the images that the update procedures send to the |SM|, and the image for programming the firmware to the :doc:`nrf9151dk <zephyr:boards/nordic/nrf9151dk/doc/index>` board.
 
 .. list-table::
    :header-rows: 1
@@ -79,7 +79,7 @@ The package contains the images that the update procedures send to the |SM|, and
    * - :file:`serial_modem_nrf91m1_2.0.0.zip`
      - :file:`serial_modem_nrf91m1_2.0.0_nrf9151dk.hex`
      - The firmware image that is pre-programmed to the nRF91M1 module.
-       Use it to program the nRF91M1 firmware v2.0.0 to the `nrf9151dk`_ board (see :ref:`nrf91m1_update_dk`).
+       Use it to program the nRF91M1 firmware v2.0.0 to the :doc:`nrf9151dk <zephyr:boards/nordic/nrf9151dk/doc/index>` board (see :ref:`nrf91m1_update_dk`).
    * -
      - :file:`serial_modem_nrf91m1_2.0.0.bin`
      - Application update image v2.0.0.
@@ -102,7 +102,7 @@ Modem firmware images
 
 The modem firmware packages are available on the `nRF9151 Downloads`_ page.
 Each package contains the modem firmware and the images that the update procedures send to the |SM|.
-You can also program a whole package to the `nrf9151dk`_ board (see :ref:`nrf91m1_update_dk`).
+You can also program a whole package to the :doc:`nrf9151dk <zephyr:boards/nordic/nrf9151dk/doc/index>` board (see :ref:`nrf91m1_update_dk`).
 
 .. list-table::
    :header-rows: 1
@@ -114,7 +114,7 @@ You can also program a whole package to the `nrf9151dk`_ board (see :ref:`nrf91m
    * - :file:`mfw_nrf91x1_2.0.4.zip`
      - The whole package
      - Modem firmware ``mfw_nrf91x1`` v2.0.4.
-       Use it to program the modem firmware to the `nrf9151dk`_ board.
+       Use it to program the modem firmware to the :doc:`nrf9151dk <zephyr:boards/nordic/nrf9151dk/doc/index>` board.
    * -
      - :file:`mfw_nrf91x1_update_from_2.0.4_to_2.0.4-FOTA-TEST.bin`
      - Delta update image from ``2.0.4`` to ``2.0.4-FOTA-TEST``.
@@ -126,7 +126,7 @@ You can also program a whole package to the `nrf9151dk`_ board (see :ref:`nrf91m
    * - :file:`mfw_nrf9151-ntn_1.0.1.zip`
      - The whole package
      - Modem firmware ``mfw_nrf9151-ntn`` v1.0.1.
-       Use it to program the modem firmware to the `nrf9151dk`_ board.
+       Use it to program the modem firmware to the :doc:`nrf9151dk <zephyr:boards/nordic/nrf9151dk/doc/index>` board.
    * -
      - :file:`mfw_nrf9151-ntn_1.0.1.cbor`
      - Full modem firmware image.
@@ -165,7 +165,7 @@ The firmware on the |SM| can be changed only with the update methods described i
 Testing updates with the nRF9151 DK
 ***********************************
 
-You can use the `nrf9151dk`_ board to try the update procedures without the one-way limitations of the |SM| described in :ref:`nrf91m1_update_rollback`.
+You can use the :doc:`nrf9151dk <zephyr:boards/nordic/nrf9151dk/doc/index>` board to try the update procedures without the one-way limitations of the |SM| described in :ref:`nrf91m1_update_rollback`.
 The nRF91M1 firmware does not set APPROTECT or ERASEPROTECT, and the modem does not have ``AT%XPRODDONE`` set.
 This means that you can always program the DK again with any firmware, including any modem firmware, and return to an earlier version that way.
 The rollback protection of the application and MCUboot in the nRF91M1 firmware still applies on the DK while the firmware is running, so the updates themselves cannot go backwards.
