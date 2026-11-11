@@ -15,7 +15,20 @@ Select MQTT v5.0 with the ``<version>`` parameter of ``#XMQTTCFG``.
 The AT interface supports the MQTT v5.0 Session Expiry Interval property, Session Present flag, and acknowledgment reason codes.
 It does not expose other MQTT v5.0 properties, subscription options, or enhanced authentication.
 The client also applies the Server Keep Alive property received in CONNACK.
+The client checks application-initiated outgoing packets against the broker's Maximum Packet Size from a successful MQTT v5.0 CONNACK.
+The check includes the fixed header, variable header, and payload.
+Oversized publish, subscribe, and unsubscribe commands return ``ERROR`` without sending the packet.
+If an oversized publish is detected after entering data mode, the client uses the existing data-mode error handling and reports ``#XDATAMODE: -1`` when data mode ends.
+If a required acknowledgment does not fit, the client closes the connection instead of sending it.
+Each new connection resets the limit until CONNACK supplies a new value.
+If the property is absent, only the protocol and local buffer limits apply.
 Examples use MQTT v3.1.1 unless stated otherwise.
+
+.. note::
+
+   Maximum Packet Size enforcement is implemented in the Serial Modem application.
+   DISCONNECT packets generated internally by the MQTT library on protocol errors bypass these checks.
+   Full enforcement of that error path requires a library change.
 
 .. only:: not nrf91m1
 
