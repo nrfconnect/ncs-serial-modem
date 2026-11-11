@@ -65,8 +65,8 @@ The |SM| uses the following log levels, from the most severe to the most verbose
    By default, the |SM| logs at the debug level, which is required for ``AT#XLOG=2``.
    To change the level, set one of the ``CONFIG_SM_LOG_LEVEL_ERR``, ``CONFIG_SM_LOG_LEVEL_WRN``, ``CONFIG_SM_LOG_LEVEL_INF``, or ``CONFIG_SM_LOG_LEVEL_DBG`` Kconfig options.
    The other components, such as Zephyr and the |NCS| libraries, log at the information level unless their level is set explicitly.
-   To change the level of a component, set its own Kconfig option, for example, the ``CONFIG_MODEM_CMUX_LOG_LEVEL_DBG`` Kconfig option.
-   The ``CONFIG_LOG_DEFAULT_LEVEL`` Kconfig option sets the default level for the components that do not set their own.
+   To change the level of a component, set its own Kconfig option, for example, the :kconfig:option:`CONFIG_MODEM_CMUX_LOG_LEVEL_DBG` Kconfig option.
+   The :kconfig:option:`CONFIG_LOG_DEFAULT_LEVEL` Kconfig option sets the default level for the components that do not set their own.
 
 You select what the |SM| outputs on the log UART at runtime with the ``AT#XLOG`` command:
 
@@ -390,8 +390,8 @@ To investigate a modem fault, collect the modem traces as described in :ref:`sm_
 
 .. only:: not nrf91m1
 
-   The nRF Cloud observability AT commands require the :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY <CONFIG_SM_NRF_CLOUD_OBSERVABILITY>` Kconfig option, which is enabled by default.
-   The ``CONFIG_MEMFAULT_METRICS_HEARTBEAT_INTERVAL_SECS`` Kconfig option sets the heartbeat interval.
+   The nRF Cloud observability AT commands require the :option:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY` Kconfig option, which is enabled by default.
+   The :kconfig:option:`CONFIG_MEMFAULT_METRICS_HEARTBEAT_INTERVAL_SECS` Kconfig option sets the heartbeat interval.
    The default build stores the core dump in flash.
 
 See :ref:`SM_AT_NRFCLOUDOBS` for the full command reference.

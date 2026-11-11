@@ -256,14 +256,5 @@ Example
 
    Check and configure the following configuration options for data mode:
 
-   .. _CONFIG_SM_DATAMODE_TERMINATOR:
-
-   CONFIG_SM_DATAMODE_TERMINATOR - Pattern string to terminate data mode
-      This option specifies a pattern string to terminate data mode.
-      The default pattern string is ``+++``.
-
-   .. _CONFIG_SM_DATAMODE_BUF_SIZE:
-
-   CONFIG_SM_DATAMODE_BUF_SIZE - Buffer size for data mode
-      This option defines the buffer size for the data mode.
-      The default value is 4096.
+   * :option:`CONFIG_SM_DATAMODE_TERMINATOR`
+   * :option:`CONFIG_SM_DATAMODE_BUF_SIZE`

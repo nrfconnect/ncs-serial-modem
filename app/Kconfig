@@ -90,7 +90,7 @@ config SM_DATAMODE_BUF_SIZE
 	range 1024 8192
 	default 4096
 	help
-	  Size of the buffer for data received in data mode.
+	  This option defines the buffer size for the data mode.
 	  The default value is 4096.
 
 if SM_MQTTC
@@ -398,7 +398,7 @@ config SM_DATAMODE_TERMINATOR
 	string "Pattern string to terminate data mode"
 	default "+++"
 	help
-	  Pattern string to terminate data mode.
+	  his option specifies a pattern string to terminate data mode.
 	  The default pattern string is ``+++``.
 
 config SM_URC_DELAY_WITH_INCOMPLETE_ECHO_MS

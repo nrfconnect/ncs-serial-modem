@@ -12,7 +12,7 @@ These commands allow you to update the application firmware, delta modem firmwar
 
 .. only:: not nrf91m1
 
-   The commands are available when the :ref:`CONFIG_SM_DFU <CONFIG_SM_DFU>` Kconfig option is enabled.
+   The commands are available when the :option:`CONFIG_SM_DFU` Kconfig option is enabled.
 
 .. note::
 

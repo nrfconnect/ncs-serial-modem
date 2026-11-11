@@ -23,22 +23,36 @@ config SM_FOTA
 	select HTTP_PARSER_URL
 	select SM_FOTA_SESSION
 	help
-	  Enable FOTA support via the AT#XFOTA command.
+	  This option enables the ``AT#XFOTA`` command for over-the-air firmware downloads over HTTP or HTTPS.
+      When this option is disabled, the command is not included in the build.
+      The default value is ``y``.
+      See :ref:`SM_AT_FOTA` for more information.
 
 config SM_FULL_FOTA
-	bool "Full modem FOTA support"
-	depends on SM_FOTA
+	bool "Full modem FOTA
+	help
+	  This option enables full modem firmware FOTA using the ``AT#XFOTA`` command with an ``<op>`` parameter value of ``3``.
+      This requires :ref:`CONFIG_SM_FOTA <CONFIG_SM_FOTA>`.
+      See :ref:`SM_AT_FOTA` for more information.
 
 config SM_DFU
 	bool "DFU (Device Firmware Update) support"
 	default y
 	select SM_FW_UPDATE
 	help
-	  Enable DFU support via the AT#XDFUINIT, AT#XDFUWRITE and AT#XDFUAPPLY commands.
+	  This option enables the ``AT#XDFUINIT``, ``AT#XDFUWRITE``, and ``AT#XDFUAPPLY`` commands for uploading firmware to the device through UART.
+      When this option is disabled, the commands are not included in the build.
+      The default value is ``y``.
+      See :ref:`DFU_AT_commands` for more information.
 
 config SM_DFU_MODEM_FULL
 	bool "Full modem DFU support"
 	depends on SM_DFU
+	help
+	  This option enables the ``AT#XDFUINIT``, ``AT#XDFUWRITE``, and ``AT#XDFUAPPLY`` commands for uploading firmware to the device through UART.
+      When this option is disabled, the commands are not included in the build.
+      The default value is ``y``.
+      See :ref:`DFU_AT_commands` for more information.
 
 config SM_FOTA_SESSION
 	bool
