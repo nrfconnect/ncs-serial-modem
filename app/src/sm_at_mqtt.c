@@ -30,6 +30,7 @@ LOG_MODULE_REGISTER(sm_mqtt, CONFIG_SM_LOG_LEVEL);
 
 /* MQTT 5.0 section 2.4: reason codes from 0x80 indicate failure. */
 #define SM_MQTT_REASON_CODE_FAILURE 0x80
+#define SM_MQTT_REMAINING_LENGTH_MAX 268435455U
 
 /**@brief MQTT client operations. */
 enum sm_mqttcon_operation {
@@ -63,6 +64,10 @@ static struct sm_mqtt_ctx {
 	/* Incoming PUBLISH state: valid from mqtt_input() return until drain completes */
 	size_t publish_payload_remaining;
 	size_t rx_topic_len;    /* > 0 while header unsent; cleared when pipe is locked */
+	int packet_size_error;
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	uint32_t maximum_packet_size;
+#endif
 } ctx;
 
 static uint16_t mqtt_broker_port;
@@ -84,6 +89,35 @@ static struct mqtt_conn *mqtt_conn;
 /* The mqtt client struct */
 static struct mqtt_client client;
 
+/* Remaining Length excludes the control byte and its own variable-width encoding. */
+STATIC int mqtt_check_packet_size(size_t remaining)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	if (client.protocol_version == MQTT_VERSION_5_0) {
+		if (remaining > SM_MQTT_REMAINING_LENGTH_MAX) {
+			LOG_ERR("Invalid MQTT remaining length: %zu", remaining);
+			return -EMSGSIZE;
+		}
+		size_t packet_size = remaining + 1;
+		size_t value = remaining;
+
+		do {
+			packet_size++;
+			value >>= 7;
+		} while (value != 0);
+
+		if (packet_size > ctx.maximum_packet_size) {
+			LOG_ERR("MQTT packet too large: remaining=%zu, maximum=%u", remaining,
+				ctx.maximum_packet_size);
+			return -EMSGSIZE;
+		}
+	}
+#else
+	ARG_UNUSED(remaining);
+#endif
+	return 0;
+}
+
 /**@brief Function to handle received publish event.
  */
 static void handle_mqtt_publish_evt(struct mqtt_client *const c, const struct mqtt_evt *evt)
@@ -94,12 +128,20 @@ static void handle_mqtt_publish_evt(struct mqtt_client *const c, const struct mq
 			.message_id = evt->param.publish.message_id
 		};
 
+		ctx.packet_size_error = mqtt_check_packet_size(2);
+		if (ctx.packet_size_error != 0) {
+			return;
+		}
 		mqtt_publish_qos1_ack(&client, &ack);
 	} else if (evt->param.publish.message.topic.qos == MQTT_QOS_2_EXACTLY_ONCE) {
 		const struct mqtt_pubrec_param ack = {
 			.message_id = evt->param.publish.message_id
 		};
 
+		ctx.packet_size_error = mqtt_check_packet_size(2);
+		if (ctx.packet_size_error != 0) {
+			return;
+		}
 		mqtt_publish_qos2_receive(&client, &ack);
 	}
 
@@ -192,10 +234,22 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 			ctx.connected = false;
 		}
 #if defined(CONFIG_MQTT_VERSION_5_0)
-		else if (client.protocol_version == MQTT_VERSION_5_0 &&
-			 evt->param.connack.prop.rx.has_server_keep_alive) {
-			client.keepalive = evt->param.connack.prop.server_keep_alive;
-			LOG_INF("MQTT server keep alive: %u", client.keepalive);
+		if (evt->result == 0 && client.protocol_version == MQTT_VERSION_5_0) {
+			ctx.maximum_packet_size = UINT32_MAX;
+			if (evt->param.connack.prop.rx.has_maximum_packet_size) {
+				ctx.maximum_packet_size =
+					evt->param.connack.prop.maximum_packet_size;
+				if (ctx.maximum_packet_size == 0) {
+					LOG_ERR("Invalid MQTT maximum packet size: 0");
+					ctx.packet_size_error = -EBADMSG;
+				} else {
+					ctx.packet_size_error = mqtt_check_packet_size(0);
+				}
+			}
+			if (evt->param.connack.prop.rx.has_server_keep_alive) {
+				client.keepalive = evt->param.connack.prop.server_keep_alive;
+				LOG_INF("MQTT server keep alive: %u", client.keepalive);
+			}
 		}
 #endif
 		break;
@@ -230,6 +284,11 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 		{
 			struct mqtt_pubrel_param param = {.message_id =
 								  evt->param.pubrec.message_id};
+			ret = mqtt_check_packet_size(2);
+			if (ret != 0) {
+				ctx.packet_size_error = ret;
+				break;
+			}
 			ret = mqtt_publish_qos2_release(&client, &param);
 			if (ret) {
 				LOG_ERR("QoS2 release failed: %d", ret);
@@ -246,6 +305,11 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 			struct mqtt_pubcomp_param param = {
 				.message_id = evt->param.pubrel.message_id
 			};
+			ret = mqtt_check_packet_size(2);
+			if (ret != 0) {
+				ctx.packet_size_error = ret;
+				break;
+			}
 			ret = mqtt_publish_qos2_complete(&client, &param);
 			if (ret) {
 				LOG_ERR("QoS2 complete failed: %d", ret);
@@ -392,6 +456,9 @@ static void mqtt_poll_work_handler(struct k_work *work)
 	if (revents & ZSOCK_POLLIN) {
 		if (ctx.rx_topic_len == 0 && ctx.publish_payload_remaining == 0) {
 			err = mqtt_input(&client);
+			if (err == 0) {
+				err = ctx.packet_size_error;
+			}
 			if (err != 0) {
 				LOG_ERR("MQTT input failed: %d", err);
 				goto abort;
@@ -473,7 +540,11 @@ static void mqtt_keepalive_work_handler(struct k_work *work)
 		return;
 	}
 
-	int err = mqtt_live(&client);
+	int err = mqtt_check_packet_size(0);
+
+	if (err == 0) {
+		err = mqtt_live(&client);
+	}
 
 	if (err != 0 && err != -EAGAIN) {
 		LOG_ERR("MQTT keepalive failed: %d", err);
@@ -612,6 +683,10 @@ static int do_mqtt_connect(void)
 
 	/* Connect to MQTT broker */
 	client.keepalive = mqtt_configured_keepalive;
+	ctx.packet_size_error = 0;
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	ctx.maximum_packet_size = UINT32_MAX;
+#endif
 	err = mqtt_connect(&client);
 	if (err != 0) {
 		LOG_ERR("MQTT connect failed: %d", err);
@@ -646,7 +721,10 @@ static int do_mqtt_disconnect(void)
 	}
 
 	ctx.disconnect_requested = true;
-	err = mqtt_disconnect(&client, NULL);
+	err = mqtt_check_packet_size(0);
+	if (err == 0) {
+		err = mqtt_disconnect(&client, NULL);
+	}
 	if (err) {
 		/* A graceful DISCONNECT is not always possible. mqtt_disconnect()
 		 * checks verify_tx_state(), so it fails with -ENOTCONN whenever the
@@ -667,10 +745,33 @@ static int do_mqtt_disconnect(void)
 	return 0;
 }
 
+static int mqtt_check_publish_size(size_t msg_len)
+{
+	/* No outgoing properties are exposed by the AT API; MQTT 5 adds a zero
+	 * Property Length byte. QoS 1/2 also include a two-byte packet identifier.
+	 */
+	size_t remaining = 2 + mqtt_conn->pub_param.message.topic.topic.size + msg_len;
+
+	if (mqtt_conn->pub_param.message.topic.qos != MQTT_QOS_0_AT_MOST_ONCE) {
+		remaining += 2;
+	}
+	if (client.protocol_version == MQTT_VERSION_5_0) {
+		remaining++;
+	}
+	return mqtt_check_packet_size(remaining);
+}
+
 static int do_mqtt_publish(uint8_t *msg, size_t msg_len)
 {
+	int err;
+
 	if (!ctx.connected || mqtt_conn == NULL) {
 		return -ENOTCONN;
+	}
+
+	err = mqtt_check_publish_size(msg_len);
+	if (err != 0) {
+		return err;
 	}
 
 	/* MQTT client does not store packets, so we will not retransmit packets
@@ -709,6 +810,16 @@ static int do_mqtt_subscribe(uint16_t op,
 	}
 	subscribe_topic.topic.utf8 = topic_buf;
 	subscribe_topic.topic.size = topic_len;
+
+	size_t remaining = 2 + 2 + topic_len + (op == AT_MQTTSUB_SUB ? 1 : 0);
+
+	if (client.protocol_version == MQTT_VERSION_5_0) {
+		remaining++;
+	}
+	err = mqtt_check_packet_size(remaining);
+	if (err != 0) {
+		return err;
+	}
 
 	if (op == 1) {
 		err = mqtt_subscribe(&client, &subscription_list);
@@ -996,6 +1107,10 @@ STATIC int handle_at_mqtt_publish(enum at_parser_cmd_type cmd_type, struct at_pa
 		}
 		if (pub_msg_ptr == NULL || msg_sz == 0) {
 			/* Publish payload in data mode */
+			err = mqtt_check_publish_size(data_len);
+			if (err != 0) {
+				return err;
+			}
 			err = enter_datamode(mqtt_datamode_callback, data_len);
 		} else {
 			err = do_mqtt_publish((uint8_t *)pub_msg_ptr, msg_sz);

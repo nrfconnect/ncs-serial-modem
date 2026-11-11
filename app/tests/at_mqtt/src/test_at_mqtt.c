@@ -45,6 +45,7 @@ extern const char *get_captured_response(void);
 extern size_t get_captured_response_len(void);
 extern void clear_captured_response(void);
 extern void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt);
+extern int mqtt_check_packet_size(size_t remaining);
 
 /* Poll callback registered by sm_at_mqtt.c via SO_POLLCB. */
 static socket_ncs_pollcb_t mqtt_pollcb;
@@ -545,6 +546,271 @@ static void assert_mqtt_reconnects(void)
 	mqtt_disconnect_ok();
 }
 
+#if defined(CONFIG_MQTT_VERSION_5_0)
+static void set_server_packet_limit(uint32_t maximum)
+{
+	struct mqtt_evt evt = {
+		.type = MQTT_EVT_CONNACK,
+		.param.connack.prop.maximum_packet_size = maximum,
+		.param.connack.prop.rx.has_maximum_packet_size = true,
+	};
+
+	inject_mqtt_evt(&evt);
+}
+
+static struct mqtt_evt packet_limit_event;
+
+static int packet_limit_input_stub(struct mqtt_client *client, int calls)
+{
+	ARG_UNUSED(calls);
+
+	client->evt_cb(client, &packet_limit_event);
+	return 0;
+}
+
+static void receive_packet_limit_event(void)
+{
+	struct socket_ncs_pollcb_params params = {
+		.fd = 0,
+		.events = ZSOCK_POLLIN,
+		.revents = ZSOCK_POLLIN,
+	};
+
+	__cmock_mqtt_input_Stub(packet_limit_input_stub);
+	TEST_ASSERT_NOT_NULL(mqtt_pollcb);
+	mqtt_pollcb(&params);
+	k_sleep(K_MSEC(20));
+	uart_stub_tx_done_reset();
+}
+#endif
+
+void test_mqtt_maximum_packet_size_publish(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	char command[80];
+
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,5\r\n", MQTT_VERSION_5_0);
+	for (unsigned int qos = 0; qos <= 2; qos++) {
+		for (unsigned int retain = 0; retain <= 1; retain++) {
+			/* Topic length, topic, optional identifier, property length, payload,
+			 * and a two-byte fixed header.
+			 */
+			uint32_t size = qos == 0 ? 7 : 9;
+
+			snprintf(command, sizeof(command), "AT#XMQTTPUB=\"t\",\"x\",%u,%u\r\n", qos,
+				 retain);
+			set_server_packet_limit(size - 1);
+			send_at_command(command);
+			TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "ERROR"));
+			set_server_packet_limit(size);
+			__cmock_mqtt_publish_ExpectAnyArgsAndReturn(0);
+			send_at_command(command);
+			TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "OK"));
+		}
+	}
+	mqtt_disconnect_ok();
+#else
+	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
+#endif
+}
+
+void test_mqtt_maximum_packet_size_remaining_length_boundaries(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	static const struct {
+		size_t remaining;
+		uint32_t size;
+	} cases[] = {
+		{127, 129},         {128, 131},         {16383, 16386},         {16384, 16388},
+		{2097151, 2097155}, {2097152, 2097157}, {268435455, 268435460},
+	};
+
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,5\r\n", MQTT_VERSION_5_0);
+	for (size_t i = 0; i < ARRAY_SIZE(cases); i++) {
+		set_server_packet_limit(cases[i].size);
+		TEST_ASSERT_EQUAL_INT(0, mqtt_check_packet_size(cases[i].remaining));
+		TEST_ASSERT_EQUAL_INT(-EMSGSIZE, mqtt_check_packet_size(cases[i].remaining + 1));
+		set_server_packet_limit(cases[i].size - 1);
+		TEST_ASSERT_EQUAL_INT(-EMSGSIZE, mqtt_check_packet_size(cases[i].remaining));
+	}
+	set_server_packet_limit(UINT32_MAX);
+	TEST_ASSERT_EQUAL_INT(-EMSGSIZE, mqtt_check_packet_size(SIZE_MAX));
+	mqtt_disconnect_ok();
+#else
+	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
+#endif
+}
+
+void test_mqtt_maximum_packet_size_publish_header_growth(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	char payload[125];
+	char command[180];
+
+	memset(payload, 'x', sizeof(payload));
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,5\r\n", MQTT_VERSION_5_0);
+	for (size_t len = 123; len <= 124; len++) {
+		uint32_t size = len == 123 ? 129 : 131;
+
+		payload[len] = '\0';
+		snprintf(command, sizeof(command), "AT#XMQTTPUB=\"t\",\"%s\",0,0\r\n", payload);
+		set_server_packet_limit(size - 1);
+		send_at_command(command);
+		TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "ERROR"));
+		set_server_packet_limit(size);
+		__cmock_mqtt_publish_ExpectAnyArgsAndReturn(0);
+		send_at_command(command);
+		TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "OK"));
+		payload[len] = 'x';
+	}
+	mqtt_disconnect_ok();
+#else
+	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
+#endif
+}
+
+void test_mqtt_maximum_packet_size_subscriptions(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,5\r\n", MQTT_VERSION_5_0);
+	set_server_packet_limit(8);
+	send_at_command("AT#XMQTTSUB=\"t\",2\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "ERROR"));
+	set_server_packet_limit(9);
+	__cmock_mqtt_subscribe_ExpectAnyArgsAndReturn(0);
+	send_at_command("AT#XMQTTSUB=\"t\",2\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "OK"));
+	set_server_packet_limit(7);
+	send_at_command("AT#XMQTTUNSUB=\"t\"\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "ERROR"));
+	set_server_packet_limit(8);
+	__cmock_mqtt_unsubscribe_ExpectAnyArgsAndReturn(0);
+	send_at_command("AT#XMQTTUNSUB=\"t\"\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "OK"));
+	mqtt_disconnect_ok();
+#else
+	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
+#endif
+}
+
+void test_mqtt_maximum_packet_size_negotiation_and_reset(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	struct mqtt_evt evt = {
+		.type = MQTT_EVT_CONNACK,
+		.param.connack.prop.maximum_packet_size = 1,
+	};
+
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,5\r\n", MQTT_VERSION_5_0);
+	inject_mqtt_evt(&evt);
+	__cmock_mqtt_publish_ExpectAnyArgsAndReturn(0);
+	send_at_command("AT#XMQTTPUB=\"t\",\"x\"\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "OK"));
+	set_server_packet_limit(2);
+	send_at_command("AT#XMQTTPUB=\"t\",\"x\"\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "ERROR"));
+	mqtt_disconnect_ok();
+
+	/* Reconnect without reconfiguring: the previous broker's limit must not persist. */
+	mqtt_connect_ok();
+	__cmock_mqtt_publish_ExpectAnyArgsAndReturn(0);
+	send_at_command("AT#XMQTTPUB=\"t\",\"x\"\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "OK"));
+	mqtt_disconnect_ok();
+
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,4\r\n", MQTT_VERSION_3_1_1);
+	evt.param.connack.prop.rx.has_maximum_packet_size = true;
+	inject_mqtt_evt(&evt);
+	__cmock_mqtt_publish_ExpectAnyArgsAndReturn(0);
+	send_at_command("AT#XMQTTPUB=\"t\",\"x\"\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "OK"));
+	mqtt_disconnect_ok();
+
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,5\r\n", MQTT_VERSION_5_0);
+	evt.result = 0x89;
+	inject_mqtt_evt(&evt);
+	TEST_ASSERT_EQUAL_INT(0, mqtt_check_packet_size(7));
+	/* A rejected CONNACK already marks the client disconnected. */
+	assert_mqtt_reconnects();
+#else
+	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
+#endif
+}
+
+void test_mqtt_maximum_packet_size_mandatory_acknowledgments(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	for (size_t i = 0; i < 4; i++) {
+		mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,5\r\n", MQTT_VERSION_5_0);
+		packet_limit_event = (struct mqtt_evt){0};
+		switch (i) {
+		case 0:
+		case 1:
+			packet_limit_event.type = MQTT_EVT_PUBLISH;
+			packet_limit_event.param.publish.message.topic.qos =
+				i == 0 ? MQTT_QOS_1_AT_LEAST_ONCE : MQTT_QOS_2_EXACTLY_ONCE;
+			packet_limit_event.param.publish.message.topic.topic =
+				(struct mqtt_utf8)MQTT_UTF8_LITERAL("t");
+			packet_limit_event.param.publish.message_id = 1;
+			break;
+		case 2:
+			packet_limit_event.type = MQTT_EVT_PUBREC;
+			packet_limit_event.param.pubrec.message_id = 1;
+			break;
+		default:
+			packet_limit_event.type = MQTT_EVT_PUBREL;
+			packet_limit_event.param.pubrel.message_id = 1;
+			break;
+		}
+		set_server_packet_limit(4);
+		switch (i) {
+		case 0:
+			__cmock_mqtt_publish_qos1_ack_ExpectAnyArgsAndReturn(0);
+			break;
+		case 1:
+			__cmock_mqtt_publish_qos2_receive_ExpectAnyArgsAndReturn(0);
+			break;
+		case 2:
+			__cmock_mqtt_publish_qos2_release_ExpectAnyArgsAndReturn(0);
+			break;
+		default:
+			__cmock_mqtt_publish_qos2_complete_ExpectAnyArgsAndReturn(0);
+			break;
+		}
+		receive_packet_limit_event();
+		set_server_packet_limit(3);
+		__cmock_mqtt_abort_ExpectAnyArgsAndReturn(0);
+		receive_packet_limit_event();
+		TEST_ASSERT_NULL(connected_client->rx_buf);
+		assert_mqtt_disconnected();
+	}
+	assert_mqtt_reconnects();
+#else
+	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
+#endif
+}
+
+void test_mqtt_maximum_packet_size_invalid_or_unusable_limit(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	for (uint32_t limit = 0; limit <= 1; limit++) {
+		mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,5\r\n", MQTT_VERSION_5_0);
+		packet_limit_event = (struct mqtt_evt){
+			.type = MQTT_EVT_CONNACK,
+			.param.connack.prop.maximum_packet_size = limit,
+			.param.connack.prop.rx.has_maximum_packet_size = true,
+		};
+		__cmock_mqtt_abort_ExpectAnyArgsAndReturn(0);
+		receive_packet_limit_event();
+		TEST_ASSERT_NULL(connected_client->rx_buf);
+		assert_mqtt_disconnected();
+	}
+	assert_mqtt_reconnects();
+#else
+	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
+#endif
+}
+
 void test_mqtt_dns_failure_recovery(void)
 {
 	send_at_command("AT#XMQTTCFG=\"test_client\",60,1,4\r\n");
@@ -943,6 +1209,26 @@ void test_mqtt_server_keep_alive_reschedules_work(void)
 	mqtt_disconnect_ok();
 	k_sem_reset(&keepalive_calls);
 	TEST_ASSERT_NOT_EQUAL(0, k_sem_take(&keepalive_calls, K_SECONDS(2)));
+#else
+	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
+#endif
+}
+
+void test_mqtt_maximum_packet_size_keepalive(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	start_keepalive_test("AT#XMQTTCFG=\"test_client\",60,1,5\r\n");
+	server_keepalive = 1;
+	packet_limit_event = (struct mqtt_evt){
+		.type = MQTT_EVT_CONNACK,
+		.param.connack.prop.maximum_packet_size = 2,
+		.param.connack.prop.server_keep_alive = 1,
+		.param.connack.prop.rx.has_maximum_packet_size = true,
+		.param.connack.prop.rx.has_server_keep_alive = true,
+	};
+	receive_packet_limit_event();
+	TEST_ASSERT_EQUAL_INT(0, k_sem_take(&keepalive_calls, K_SECONDS(2)));
+	mqtt_disconnect_ok();
 #else
 	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
 #endif
@@ -1377,6 +1663,49 @@ static int binary_publish_stub(struct mqtt_client *client, const struct mqtt_pub
 	}
 	published_bytes += param->message.payload.len;
 	return 0;
+}
+
+void test_mqtt_maximum_packet_size_datamode(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	uint8_t terminated[sizeof(binary_payload) + 3];
+
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,5\r\n", MQTT_VERSION_5_0);
+	set_server_packet_limit(19);
+	send_at_command("AT#XMQTTPUB=\"my/topic\",\"\",0,0,7\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "ERROR"));
+	clear_captured_response();
+	send_at_command("AT#XMQTTCFG?\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "OK"));
+
+	set_server_packet_limit(20);
+	published_bytes = 0;
+	expected_publish_size = sizeof(binary_payload);
+	__cmock_mqtt_publish_Stub(binary_publish_stub);
+	send_at_command("AT#XMQTTPUB=\"my/topic\",\"\",0,0,7\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "OK"));
+	clear_captured_response();
+	uart_stub_rx_nowait(binary_payload, sizeof(binary_payload));
+	k_sleep(K_MSEC(20));
+	uart_stub_tx_done_reset();
+	TEST_ASSERT_EQUAL_UINT(sizeof(binary_payload), published_bytes);
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "#XDATAMODE: 0\r\n"));
+	__cmock_mqtt_publish_Stub(NULL);
+
+	set_server_packet_limit(19);
+	send_at_command("AT#XMQTTPUB=\"my/topic\",\"\",0,0\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "OK"));
+	clear_captured_response();
+	memcpy(terminated, binary_payload, sizeof(binary_payload));
+	memcpy(terminated + sizeof(binary_payload), "+++", 3);
+	uart_stub_rx_nowait(terminated, sizeof(terminated));
+	k_sleep(K_MSEC(20));
+	uart_stub_tx_done_reset();
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "#XDATAMODE: -1\r\n"));
+	mqtt_disconnect_ok();
+#else
+	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
+#endif
 }
 
 static void publish_binary_datamode(size_t len)
