@@ -95,7 +95,6 @@ extensions = [
     'options_from_kconfig',
     'zephyr.doxyrunner',
     'zephyr.doxybridge',
-    'zephyr.external_content',
     'zephyr.kconfig',
     'sphinxcontrib.inkscapeconverter',
     'sm_project_info',
@@ -117,16 +116,12 @@ COMMON_EXCLUDE_PATTERNS = [
     ".DS_Store",
 ]
 
-# Options for external_content -------------------------------------------------
-
-external_content_contents = [
-    (SM_BASE / "doc", "[!_]*"),
-    (SM_BASE, "applications/**/*.rst"),
-    (SM_BASE, "scripts/**/README.rst"),
-    (SM_BASE, "samples/**/*.rst"),
-    (SM_BASE, "tests/**/*.rst"),
-    (SM_BASE, "lib/**/Kconfig"),
-]
+# The zephyr.external_content extension must not be enabled here. Every page is
+# already in doc/, which is the source directory the docsets are built from, and
+# the extension deletes every file of its source directory that it did not copy
+# there itself. With doc/ as both ends it empties _docsets/, _scripts/, _utils/,
+# _extensions/, _static/ and _templates/ during the first Sphinx run, and the
+# docsets built after that one fail with a missing conf.py.
 
 # -- Options for doxyrunner plugin ---------------------------------------------
 
