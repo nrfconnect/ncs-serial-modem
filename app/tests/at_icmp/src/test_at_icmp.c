@@ -128,6 +128,8 @@ static int dest_flags;
 static int dest_gai_calls;
 /* PDN passed to SO_BINDTOPDN, or -1 */
 static int bound_pdn;
+static int bind_to_pdn_calls;
+static int bind_to_pdn_errno;
 
 static K_SEM_DEFINE(freed_sem, 0, 16);
 
@@ -313,7 +315,12 @@ static int setsockopt_stub(int sock, int level, int optname, const void *optval,
 			   net_socklen_t optlen, int num_calls)
 {
 	if (level == SOL_SOCKET && optname == SO_BINDTOPDN) {
+		bind_to_pdn_calls++;
 		bound_pdn = *(const int *)optval;
+		if (bind_to_pdn_errno) {
+			errno = bind_to_pdn_errno;
+			return -1;
+		}
 	}
 	return 0;
 }
@@ -456,6 +463,8 @@ void setUp(void)
 	dest_flags = 0;
 	dest_gai_calls = 0;
 	bound_pdn = -1;
+	bind_to_pdn_calls = 0;
+	bind_to_pdn_errno = 0;
 	test_pdn_id_response = NULL;
 	k_sem_reset(&freed_sem);
 	clear_captured_response();
@@ -1143,14 +1152,35 @@ void test_target_is_resolved_on_the_pdn(void)
 
 void test_target_is_resolved_on_the_default_pdn(void)
 {
-	/* No lookup of a PDN ID, and the socket is not bound, for the default PDN connection */
+	/* No lookup of a PDN ID for the default PDN connection, but the socket is still bound to
+	 * it. An unbound raw socket does not work while PPP has a raw socket on another PDN.
+	 */
 	script_add(0, F_NONE, 10);
 	run_ping("AT#XPING=\"example.com\",32,1000\r\n");
 	assert_ok();
 	TEST_ASSERT_TRUE(wait_done());
 	TEST_ASSERT_EQUAL_STRING("0", dest_service);
 	TEST_ASSERT_BITS(AI_PDNSERV | ZSOCK_AI_NUMERICSERV, AI_PDNSERV, dest_flags);
-	TEST_ASSERT_EQUAL_INT(-1, bound_pdn);
+	TEST_ASSERT_EQUAL_INT(0, bound_pdn);
+	TEST_ASSERT_EQUAL_INT(1, bind_to_pdn_calls);
+}
+
+void test_bind_to_pdn_failure_is_a_loss(void)
+{
+	/* The ping must not be sent unbound, as it would not work next to PPP on another PDN */
+	bind_to_pdn_errno = EINVAL;
+	run_ping("AT#XPING=\"1.2.3.4\",32,1000\r\n");
+	assert_ok();
+	TEST_ASSERT_TRUE(wait_done());
+	TEST_ASSERT_EQUAL_INT(1, bind_to_pdn_calls);
+	TEST_ASSERT_EQUAL_INT(0, req_count);
+}
+
+void test_cid_above_the_maximum_is_rejected(void)
+{
+	run_ping("AT#XPING=\"1.2.3.4\",32,1000,1,1000,11\r\n");
+	assert_error();
+	TEST_ASSERT_EQUAL_INT(0, socket_calls);
 }
 
 void test_unknown_pdn_is_rejected(void)

@@ -367,15 +367,13 @@ static int send_ping_wait_reply(uint16_t seq, uint32_t *rtt_ms)
 		return err;
 	}
 
-	/* Use non-primary PDN if specified, fail if cannot proceed
+	/* Always bind the raw socket to the PDN, also for the default PDN. An unbound raw socket
+	 * does not work while another raw socket (such as the one of PPP) is bound to another PDN.
 	 */
-	if (ping_argv.cid != 0) {
-		if (zsock_setsockopt(fd, SOL_SOCKET, SO_BINDTOPDN, &ping_argv.pdn_id,
-				     sizeof(int))) {
-			err = -errno;
-			LOG_WRN("SO_BINDTOPDN error: %d", err);
-			goto close_end;
-		}
+	if (zsock_setsockopt(fd, SOL_SOCKET, SO_BINDTOPDN, &ping_argv.pdn_id, sizeof(int))) {
+		err = -errno;
+		LOG_WRN("SO_BINDTOPDN error: %d", err);
+		goto close_end;
 	}
 	LOG_DBG("Use PDN ID: %d", ping_argv.pdn_id);
 
