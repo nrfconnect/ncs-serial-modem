@@ -582,7 +582,246 @@ static void receive_packet_limit_event(void)
 	k_sleep(K_MSEC(20));
 	uart_stub_tx_done_reset();
 }
+
+static uint16_t inflight_ids[8];
+static size_t inflight_calls;
+static int inflight_publish_result;
+
+static int inflight_publish_stub(struct mqtt_client *c, const struct mqtt_publish_param *param,
+				 int calls)
+{
+	ARG_UNUSED(c);
+	ARG_UNUSED(calls);
+	TEST_ASSERT_LESS_THAN(ARRAY_SIZE(inflight_ids), inflight_calls);
+	inflight_ids[inflight_calls++] = param->message_id;
+	return inflight_publish_result;
+}
+
+static void receive_maximum_connect(uint16_t maximum)
+{
+	struct mqtt_evt evt = {
+		.type = MQTT_EVT_CONNACK,
+		.param.connack.prop.rx.has_receive_maximum = true,
+		.param.connack.prop.receive_maximum = maximum,
+	};
+
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,5\r\n", MQTT_VERSION_5_0);
+	inject_mqtt_evt(&evt);
+	inflight_calls = 0;
+	inflight_publish_result = 0;
+	__cmock_mqtt_publish_Stub(inflight_publish_stub);
+}
+
+static void inflight_command(const char *command, bool allowed)
+{
+	clear_captured_response();
+	send_at_command(command);
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), allowed ? "OK" : "ERROR"));
+}
 #endif
+
+void test_mqtt_receive_maximum_qos1(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	receive_maximum_connect(2);
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\",1\r\n", true);
+	inflight_command("AT#XMQTTPUBEMPTY=\"t\",1\r\n", true);
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\",1\r\n", false);
+	inflight_command("AT#XMQTTPUBEMPTY=\"t\",2\r\n", false);
+	inflight_command("AT#XMQTTPUB=\"t\",\"\",1,0,3\r\n", false);
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\",0\r\n", true);
+	TEST_ASSERT_EQUAL_UINT(3, inflight_calls);
+
+	struct mqtt_evt evt = {
+		.type = MQTT_EVT_PUBACK,
+		.param.puback.message_id = 60000,
+	};
+
+	inject_mqtt_evt(&evt);
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\",1\r\n", false);
+	evt.param.puback.message_id = inflight_ids[1];
+	evt.result = -EBADMSG;
+	inject_mqtt_evt(&evt);
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\",1\r\n", false);
+	evt.result = 0;
+	evt.param.puback.reason_code = 0x80;
+	inject_mqtt_evt(&evt);
+	inject_mqtt_evt(&evt);
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\",1\r\n", true);
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\",1\r\n", false);
+	evt.param.puback.message_id = inflight_ids[0];
+	inject_mqtt_evt(&evt);
+	inflight_publish_result = -EIO;
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\",1\r\n", false);
+	inflight_publish_result = 0;
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\",1\r\n", true);
+	TEST_ASSERT_EQUAL_UINT(6, inflight_calls);
+	__cmock_mqtt_publish_Stub(NULL);
+	mqtt_disconnect_ok();
+#else
+	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
+#endif
+}
+
+void test_mqtt_receive_maximum_qos2(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	receive_maximum_connect(1);
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\",2\r\n", true);
+	struct mqtt_evt evt = {
+		.type = MQTT_EVT_PUBACK,
+		.param.puback.message_id = inflight_ids[0],
+	};
+
+	inject_mqtt_evt(&evt);
+	evt.type = MQTT_EVT_PUBCOMP;
+	evt.param.pubcomp.message_id = inflight_ids[0];
+	inject_mqtt_evt(&evt);
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\",1\r\n", false);
+	evt.type = MQTT_EVT_PUBREC;
+	evt.param.pubrec.message_id = inflight_ids[0];
+	evt.param.pubrec.reason_code = 0;
+	__cmock_mqtt_publish_qos2_release_ExpectAnyArgsAndReturn(-EIO);
+	inject_mqtt_evt(&evt);
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\",1\r\n", false);
+	__cmock_mqtt_publish_qos2_release_ExpectAnyArgsAndReturn(0);
+	inject_mqtt_evt(&evt);
+	__cmock_mqtt_publish_qos2_release_ExpectAnyArgsAndReturn(0);
+	inject_mqtt_evt(&evt);
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\",2\r\n", false);
+	evt.type = MQTT_EVT_PUBCOMP;
+	evt.param.pubcomp.message_id = inflight_ids[0];
+	evt.result = -EBADMSG;
+	inject_mqtt_evt(&evt);
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\",2\r\n", false);
+	evt.result = 0;
+	inject_mqtt_evt(&evt);
+	inject_mqtt_evt(&evt);
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\",2\r\n", true);
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\",2\r\n", false);
+	evt.type = MQTT_EVT_PUBREC;
+	evt.param.pubrec.message_id = inflight_ids[1];
+	evt.param.pubrec.reason_code = 0x80;
+	inject_mqtt_evt(&evt);
+	inflight_command("AT#XMQTTPUBEMPTY=\"t\",1\r\n", true);
+	TEST_ASSERT_EQUAL_UINT(3, inflight_calls);
+	__cmock_mqtt_publish_Stub(NULL);
+	mqtt_disconnect_ok();
+#else
+	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
+#endif
+}
+
+void test_mqtt_receive_maximum_reset_and_legacy(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	receive_maximum_connect(1);
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\",1\r\n", true);
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\",1\r\n", false);
+	mqtt_disconnect_ok();
+	mqtt_connect_ok();
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\",1\r\n", true);
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\",1\r\n", true);
+	struct mqtt_evt evt = {
+		.type = MQTT_EVT_CONNACK,
+		.param.connack.prop.receive_maximum = 0,
+	};
+
+	inject_mqtt_evt(&evt);
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\",1\r\n", true);
+	mqtt_disconnect_ok();
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,4\r\n", MQTT_VERSION_3_1_1);
+	evt.param.connack.prop.rx.has_receive_maximum = true;
+	inject_mqtt_evt(&evt);
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\",1\r\n", true);
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\",1\r\n", true);
+	__cmock_mqtt_publish_Stub(NULL);
+	mqtt_disconnect_ok();
+#else
+	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
+#endif
+}
+
+void test_mqtt_receive_maximum_zero(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,5\r\n", MQTT_VERSION_5_0);
+	packet_limit_event = (struct mqtt_evt){
+		.type = MQTT_EVT_CONNACK,
+		.param.connack.prop.rx.has_receive_maximum = true,
+		.param.connack.prop.receive_maximum = 0,
+		.param.connack.prop.rx.has_maximum_packet_size = true,
+		.param.connack.prop.maximum_packet_size = 100,
+	};
+	__cmock_mqtt_abort_ExpectAnyArgsAndReturn(0);
+	receive_packet_limit_event();
+	assert_mqtt_disconnected();
+	assert_mqtt_reconnects();
+#else
+	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
+#endif
+}
+
+void test_mqtt_receive_maximum_datamode(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	receive_maximum_connect(1);
+	inflight_command("AT#XMQTTPUB=\"t\",\"\",1,0,3\r\n", true);
+	clear_captured_response();
+	uart_stub_rx_nowait((const uint8_t *)"abc", 3);
+	k_sleep(K_MSEC(20));
+	uart_stub_tx_done_reset();
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "#XDATAMODE: 0\r\n"));
+	TEST_ASSERT_EQUAL_UINT(1, inflight_calls);
+	inflight_command("AT#XMQTTPUB=\"t\",\"\",2,0,3\r\n", false);
+	inflight_command("AT#XMQTTCFG?\r\n", true);
+	struct mqtt_evt evt = {
+		.type = MQTT_EVT_PUBACK,
+		.param.puback.message_id = inflight_ids[0],
+	};
+
+	inject_mqtt_evt(&evt);
+	inflight_command("AT#XMQTTPUB=\"t\",\"\",2,0,3\r\n", true);
+	clear_captured_response();
+	uart_stub_rx_nowait((const uint8_t *)"abc", 3);
+	k_sleep(K_MSEC(20));
+	uart_stub_tx_done_reset();
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "#XDATAMODE: 0\r\n"));
+	TEST_ASSERT_EQUAL_UINT(2, inflight_calls);
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\",1\r\n", false);
+	__cmock_mqtt_publish_Stub(NULL);
+	mqtt_disconnect_ok();
+#else
+	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
+#endif
+}
+
+void test_mqtt_receive_maximum_abort_reset(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	receive_maximum_connect(1);
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\",2\r\n", true);
+	struct socket_ncs_pollcb_params params = {
+		.fd = 0,
+		.events = ZSOCK_POLLIN,
+		.revents = ZSOCK_POLLHUP,
+	};
+
+	__cmock_mqtt_abort_ExpectAnyArgsAndReturn(0);
+	mqtt_pollcb(&params);
+	k_sleep(K_MSEC(20));
+	uart_stub_tx_done_reset();
+	assert_mqtt_disconnected();
+	mqtt_connect_ok();
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\",1\r\n", true);
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\",2\r\n", true);
+	TEST_ASSERT_EQUAL_UINT(3, inflight_calls);
+	__cmock_mqtt_publish_Stub(NULL);
+	mqtt_disconnect_ok();
+#else
+	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
+#endif
+}
 
 static int empty_publish_stub(struct mqtt_client *client, const struct mqtt_publish_param *param,
 			      int calls)

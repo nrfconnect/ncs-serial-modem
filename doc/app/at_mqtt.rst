@@ -30,6 +30,20 @@ Unsubscribe requests remain allowed even when the broker disables the correspond
 Absent properties default to maximum QoS 2 and support for retained publications, wildcard subscriptions, and shared subscriptions.
 Each new connection resets these capabilities before applying the broker's CONNACK.
 The AT interface does not send Subscription Identifiers, so Subscription Identifiers Available requires no additional restriction.
+The client enforces the broker's Receive Maximum from a successful MQTT v5.0 CONNACK.
+If the property is absent, the limit is 65,535.
+QoS 1 and QoS 2 publications share this limit. QoS 0 publications do not consume it.
+A QoS 1 publication occupies a slot until PUBACK.
+A QoS 2 publication occupies a slot until PUBCOMP or a PUBREC with a failure reason code.
+Duplicate, unrelated, and unsuccessfully decoded acknowledgments do not release slots.
+When no slot is available, publish commands return ``ERROR`` without sending a packet or entering data mode.
+The client does not queue these requests. Retry after an acknowledgment releases a slot.
+The check also applies to ``#XMQTTPUBEMPTY`` and runs again before sending data-mode payloads.
+Tracking uses dynamically allocated metadata for each outstanding QoS 1 or QoS 2 publication.
+Allocation failure returns ``ERROR`` without sending the publication.
+Each new network connection resets the limit and outstanding-publication tracking.
+A broker Receive Maximum of zero is a protocol error and closes the connection.
+The AT interface does not configure an inbound Receive Maximum and uses the protocol default of 65,535.
 Examples use MQTT v3.1.1 unless stated otherwise.
 
 .. note::
@@ -44,7 +58,7 @@ Examples use MQTT v3.1.1 unless stated otherwise.
 
 .. note::
 
-   The MQTT client holds no internal state information for publish and subscript.
+   The MQTT client tracks outstanding MQTT v5.0 publications for flow control only.
    It will not retransmit packets or guarantee packet delivery according to QoS classes.
    This deviates from MQTT v3.1.1 and MQTT v5.0.
 
