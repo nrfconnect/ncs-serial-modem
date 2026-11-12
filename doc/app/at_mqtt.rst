@@ -14,37 +14,30 @@ MQTT v3.1.1 is the default.
 Select MQTT v5.0 with the ``<version>`` parameter of ``#XMQTTCFG``.
 The AT interface supports the MQTT v5.0 Session Expiry Interval property, Session Present flag, and acknowledgment reason codes.
 It does not expose other MQTT v5.0 properties, subscription options, or enhanced authentication.
-The client also applies the Server Keep Alive property received in CONNACK.
-The client checks application-initiated outgoing packets against the broker's Maximum Packet Size from a successful MQTT v5.0 CONNACK.
-The check includes the fixed header, variable header, and payload.
-Oversized publish, subscribe, and unsubscribe commands return ``ERROR`` without sending the packet.
-If an oversized publish is detected after entering data mode, the client uses the existing data-mode error handling and reports ``#XDATAMODE: -1`` when data mode ends.
-If a required acknowledgment does not fit, the client closes the connection instead of sending it.
-Each new connection resets the limit until CONNACK supplies a new value.
-If the property is absent, only the protocol and local buffer limits apply.
-The client also enforces Maximum QoS, Retain Available, Wildcard Subscription Available, and Shared Subscription Available from a successful MQTT v5.0 CONNACK.
-Unsupported publish or subscribe requests return ``ERROR`` without sending a packet.
-Publish checks apply before entering data mode and again before sending its payload.
-Maximum QoS limits outgoing publications, not the requested subscription QoS.
-Unsubscribe requests remain allowed even when the broker disables the corresponding subscription capability.
-Absent properties default to maximum QoS 2 and support for retained publications, wildcard subscriptions, and shared subscriptions.
-Each new connection resets these capabilities before applying the broker's CONNACK.
-The AT interface does not send Subscription Identifiers, so Subscription Identifiers Available requires no additional restriction.
-The client enforces the broker's Receive Maximum from a successful MQTT v5.0 CONNACK.
-If the property is absent, the limit is 65,535.
-QoS 1 and QoS 2 publications share this limit. QoS 0 publications do not consume it.
-A QoS 1 publication occupies a slot until PUBACK.
-A QoS 2 publication occupies a slot until PUBCOMP or a PUBREC with a failure reason code.
-Duplicate, unrelated, and unsuccessfully decoded acknowledgments do not release slots.
-When no slot is available, publish commands return ``ERROR`` without sending a packet or entering data mode.
-The client does not queue these requests. Retry after an acknowledgment releases a slot.
-The check also applies to ``#XMQTTPUBEMPTY`` and runs again before sending data-mode payloads.
-Tracking uses dynamically allocated metadata for each outstanding QoS 1 or QoS 2 publication.
-Allocation failure returns ``ERROR`` without sending the publication.
-Each new network connection resets the limit and outstanding-publication tracking.
-A broker Receive Maximum of zero is a protocol error and closes the connection.
-The AT interface does not configure an inbound Receive Maximum and uses the protocol default of 65,535.
 Examples use MQTT v3.1.1 unless stated otherwise.
+
+Each connection applies the following properties from a successful MQTT v5.0 CONNACK:
+
+* **Broker capabilities and Keep Alive.**
+  The client applies Server Keep Alive and enforces Maximum QoS, Retain Available, Wildcard Subscription Available, and Shared Subscription Available.
+  Unsupported publish or subscribe requests return ``ERROR`` without sending a packet.
+  Maximum QoS limits publications, not subscription QoS. Unsubscribe requests remain allowed.
+  Absent capability properties default to QoS 2 and support for retained publications and wildcard and shared subscriptions.
+* **Maximum Packet Size.**
+  The client checks outgoing packets, including headers and payload.
+  Oversized publish, subscribe, and unsubscribe requests return ``ERROR`` without sending a packet.
+  If a required acknowledgment does not fit, the client closes the connection.
+  If the property is absent, only protocol and local buffer limits apply.
+* **Receive Maximum.**
+  QoS 1 and QoS 2 publications share the broker's limit, which defaults to 65,535. QoS 0 does not consume slots.
+  Slots are released on PUBACK, PUBCOMP, or a failed PUBREC.
+  At capacity, publish requests return ``ERROR`` without sending or entering data mode.
+  Requests are not queued. Retry after an acknowledgment releases a slot.
+  The inbound limit is not configurable and remains 65,535.
+
+Publish checks apply to ``#XMQTTPUB`` and ``#XMQTTPUBEMPTY``, before entering data mode and again before sending.
+Failures detected during data-mode sending report ``#XDATAMODE: -1`` when data mode ends.
+Each new network connection resets negotiated limits and outstanding-publication tracking.
 
 .. note::
 
@@ -76,9 +69,7 @@ Unsolicited notification
 
    #XMQTTEVT: <evt_type>,<result>[,<detail>]
 
-The optional third field depends on the event type.
-For a successful MQTT v5.0 CONNACK, ``<detail>`` is ``<session_present>``.
-For MQTT v5.0 acknowledgment events ``3`` to ``8``, it is ``<reason_code>``.
+MQTT v5.0 adds an event-specific ``<detail>`` field, described below.
 MQTT v3.1.1 notifications retain the two-field format.
 
 The parameters and their defined values are the following:
@@ -115,10 +106,7 @@ The parameters and their defined values are the following:
 
 <detail>
    Integer.
-   The event-specific value described below.
-
-   For CONNACK (``<evt_type>`` ``0``), this value is ``<session_present>``.
-   It is present only with MQTT v5.0 and when ``<result>`` is ``0``.
+   For a successful MQTT v5.0 CONNACK (``<evt_type>`` ``0``), this value is ``<session_present>``.
 
    * ``0`` - The broker starts a new session.
      The host must subscribe to the required topics.
@@ -130,7 +118,6 @@ The parameters and their defined values are the following:
    A failed CONNACK has no third field.
 
    For acknowledgment events ``3`` to ``8``, this value is ``<reason_code>``.
-   The following description applies to that value.
 
 Reason codes
 ~~~~~~~~~~~~
@@ -830,7 +817,7 @@ The test command is not supported.
 .. _SM_AT_MQTT_XMQTTPUBEMPTY:
 
 MQTT empty publish #XMQTTPUBEMPTY
-================================
+=================================
 
 The ``#XMQTTPUBEMPTY`` command publishes a zero-length payload without entering data mode.
 It supports MQTT v3.1.1 and MQTT v5.0 and requires an active MQTT connection.
