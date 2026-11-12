@@ -64,9 +64,10 @@ static struct sm_mqtt_ctx {
 	/* Incoming PUBLISH state: valid from mqtt_input() return until drain completes */
 	size_t publish_payload_remaining;
 	size_t rx_topic_len;    /* > 0 while header unsent; cleared when pipe is locked */
-	int packet_size_error;
+	int protocol_error;
 #if defined(CONFIG_MQTT_VERSION_5_0)
 	uint32_t maximum_packet_size;
+	uint16_t receive_maximum;
 	uint8_t maximum_qos;
 	bool retain_available;
 	bool wildcard_sub_available;
@@ -78,6 +79,15 @@ static uint16_t mqtt_broker_port;
 static uint16_t mqtt_configured_keepalive;
 static char mqtt_clientid[MQTT_MAX_CID_LEN + 1];
 
+#if defined(CONFIG_MQTT_VERSION_5_0)
+struct mqtt_inflight {
+	struct mqtt_inflight *next;
+	uint16_t message_id;
+	uint8_t qos;
+	bool pubrel_sent;
+};
+#endif
+
 struct mqtt_conn {
 	uint8_t rx[CONFIG_SM_MQTTC_MESSAGE_BUFFER_LEN];
 	uint8_t tx[CONFIG_SM_MQTTC_MESSAGE_BUFFER_LEN];
@@ -87,6 +97,10 @@ struct mqtt_conn {
 	char username[SM_MAX_USERNAME + 1];
 	char password[SM_MAX_PASSWORD + 1];
 	struct mqtt_publish_param pub_param;
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	struct mqtt_inflight *inflight;
+	uint16_t inflight_count;
+#endif
 };
 static struct mqtt_conn *mqtt_conn;
 
@@ -94,6 +108,51 @@ static struct mqtt_conn *mqtt_conn;
 static struct mqtt_client client;
 
 #if defined(CONFIG_MQTT_VERSION_5_0)
+static struct mqtt_inflight *mqtt_inflight_find(uint16_t message_id)
+{
+	if (mqtt_conn == NULL) {
+		return NULL;
+	}
+	for (struct mqtt_inflight *item = mqtt_conn->inflight; item != NULL; item = item->next) {
+		if (item->message_id == message_id) {
+			return item;
+		}
+	}
+	return NULL;
+}
+
+static void mqtt_inflight_remove(uint16_t message_id)
+{
+	if (mqtt_conn == NULL) {
+		return;
+	}
+	struct mqtt_inflight **link = &mqtt_conn->inflight;
+
+	while (*link != NULL) {
+		struct mqtt_inflight *item = *link;
+
+		if (item->message_id == message_id) {
+			*link = item->next;
+			free(item);
+			mqtt_conn->inflight_count--;
+			return;
+		}
+		link = &item->next;
+	}
+}
+
+static void mqtt_inflight_ack(uint16_t message_id, uint8_t qos, bool pubrel_sent)
+{
+	if (client.protocol_version != MQTT_VERSION_5_0) {
+		return;
+	}
+	struct mqtt_inflight *item = mqtt_inflight_find(message_id);
+
+	if (item != NULL && item->qos == qos && item->pubrel_sent == pubrel_sent) {
+		mqtt_inflight_remove(message_id);
+	}
+}
+
 static void mqtt_capabilities_reset(void)
 {
 	ctx.maximum_qos = MQTT_QOS_2_EXACTLY_ONCE;
@@ -142,8 +201,8 @@ static void handle_mqtt_publish_evt(struct mqtt_client *const c, const struct mq
 			.message_id = evt->param.publish.message_id
 		};
 
-		ctx.packet_size_error = mqtt_check_packet_size(2);
-		if (ctx.packet_size_error != 0) {
+		ctx.protocol_error = mqtt_check_packet_size(2);
+		if (ctx.protocol_error != 0) {
 			return;
 		}
 		mqtt_publish_qos1_ack(&client, &ack);
@@ -152,8 +211,8 @@ static void handle_mqtt_publish_evt(struct mqtt_client *const c, const struct mq
 			.message_id = evt->param.publish.message_id
 		};
 
-		ctx.packet_size_error = mqtt_check_packet_size(2);
-		if (ctx.packet_size_error != 0) {
+		ctx.protocol_error = mqtt_check_packet_size(2);
+		if (ctx.protocol_error != 0) {
 			return;
 		}
 		mqtt_publish_qos2_receive(&client, &ack);
@@ -250,6 +309,14 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 #if defined(CONFIG_MQTT_VERSION_5_0)
 		if (evt->result == 0 && client.protocol_version == MQTT_VERSION_5_0) {
 			mqtt_capabilities_reset();
+			ctx.receive_maximum = UINT16_MAX;
+			if (evt->param.connack.prop.rx.has_receive_maximum) {
+				ctx.receive_maximum = evt->param.connack.prop.receive_maximum;
+				if (ctx.receive_maximum == 0) {
+					LOG_ERR("Invalid MQTT receive maximum: 0");
+					ctx.protocol_error = -EBADMSG;
+				}
+			}
 			if (evt->param.connack.prop.rx.has_maximum_qos) {
 				ctx.maximum_qos = evt->param.connack.prop.maximum_qos;
 			}
@@ -271,9 +338,13 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 					evt->param.connack.prop.maximum_packet_size;
 				if (ctx.maximum_packet_size == 0) {
 					LOG_ERR("Invalid MQTT maximum packet size: 0");
-					ctx.packet_size_error = -EBADMSG;
+					ctx.protocol_error = -EBADMSG;
 				} else {
-					ctx.packet_size_error = mqtt_check_packet_size(0);
+					int err = mqtt_check_packet_size(0);
+
+					if (err != 0) {
+						ctx.protocol_error = err;
+					}
 				}
 			}
 			if (evt->param.connack.prop.rx.has_server_keep_alive) {
@@ -295,6 +366,10 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 	case MQTT_EVT_PUBACK:
 		if (evt->result == 0) {
 			LOG_DBG("PUBACK id=%u", evt->param.puback.message_id);
+#if defined(CONFIG_MQTT_VERSION_5_0)
+			mqtt_inflight_ack(evt->param.puback.message_id, MQTT_QOS_1_AT_LEAST_ONCE,
+					  false);
+#endif
 		}
 		break;
 
@@ -306,6 +381,8 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 #if defined(CONFIG_MQTT_VERSION_5_0)
 		/* MQTT 5.0 section 4.3.3: no PUBREL after a PUBREC failure reason code. */
 		if (evt->param.pubrec.reason_code >= SM_MQTT_REASON_CODE_FAILURE) {
+			mqtt_inflight_ack(evt->param.pubrec.message_id, MQTT_QOS_2_EXACTLY_ONCE,
+					  false);
 			LOG_WRN("PUBREC id=%u failed: 0x%02x", evt->param.pubrec.message_id,
 				evt->param.pubrec.reason_code);
 			break;
@@ -316,13 +393,23 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 								  evt->param.pubrec.message_id};
 			ret = mqtt_check_packet_size(2);
 			if (ret != 0) {
-				ctx.packet_size_error = ret;
+				ctx.protocol_error = ret;
 				break;
 			}
 			ret = mqtt_publish_qos2_release(&client, &param);
 			if (ret) {
 				LOG_ERR("QoS2 release failed: %d", ret);
 			}
+#if defined(CONFIG_MQTT_VERSION_5_0)
+			if (ret == 0 && client.protocol_version == MQTT_VERSION_5_0) {
+				struct mqtt_inflight *item =
+					mqtt_inflight_find(evt->param.pubrec.message_id);
+
+				if (item != NULL && item->qos == MQTT_QOS_2_EXACTLY_ONCE) {
+					item->pubrel_sent = true;
+				}
+			}
+#endif
 		}
 		break;
 
@@ -337,7 +424,7 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 			};
 			ret = mqtt_check_packet_size(2);
 			if (ret != 0) {
-				ctx.packet_size_error = ret;
+				ctx.protocol_error = ret;
 				break;
 			}
 			ret = mqtt_publish_qos2_complete(&client, &param);
@@ -350,6 +437,10 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 	case MQTT_EVT_PUBCOMP:
 		if (evt->result == 0) {
 			LOG_DBG("PUBCOMP id=%u", evt->param.pubcomp.message_id);
+#if defined(CONFIG_MQTT_VERSION_5_0)
+			mqtt_inflight_ack(evt->param.pubcomp.message_id, MQTT_QOS_2_EXACTLY_ONCE,
+					  true);
+#endif
 		}
 		break;
 
@@ -390,6 +481,11 @@ static void mqtt_poll_cb(const struct socket_ncs_pollcb_params *params);
 
 static void mqtt_conn_release(void)
 {
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	while (mqtt_conn != NULL && mqtt_conn->inflight != NULL) {
+		mqtt_inflight_remove(mqtt_conn->inflight->message_id);
+	}
+#endif
 	ctx.username.utf8 = NULL;
 	ctx.username.size = 0;
 	ctx.password.utf8 = NULL;
@@ -487,7 +583,7 @@ static void mqtt_poll_work_handler(struct k_work *work)
 		if (ctx.rx_topic_len == 0 && ctx.publish_payload_remaining == 0) {
 			err = mqtt_input(&client);
 			if (err == 0) {
-				err = ctx.packet_size_error;
+				err = ctx.protocol_error;
 			}
 			if (err != 0) {
 				LOG_ERR("MQTT input failed: %d", err);
@@ -713,9 +809,10 @@ static int do_mqtt_connect(void)
 
 	/* Connect to MQTT broker */
 	client.keepalive = mqtt_configured_keepalive;
-	ctx.packet_size_error = 0;
+	ctx.protocol_error = 0;
 #if defined(CONFIG_MQTT_VERSION_5_0)
 	ctx.maximum_packet_size = UINT32_MAX;
+	ctx.receive_maximum = UINT16_MAX;
 	mqtt_capabilities_reset();
 #endif
 	err = mqtt_connect(&client);
@@ -788,6 +885,11 @@ static int mqtt_check_publish(size_t msg_len)
 			LOG_ERR("MQTT server does not support retained publications");
 			return -ENOTSUP;
 		}
+		if (mqtt_conn->pub_param.message.topic.qos != MQTT_QOS_0_AT_MOST_ONCE &&
+		    mqtt_conn->inflight_count >= ctx.receive_maximum) {
+			LOG_WRN("MQTT receive maximum reached: %u", ctx.receive_maximum);
+			return -EAGAIN;
+		}
 	}
 #endif
 	/* No outgoing properties are exposed by the AT API; MQTT 5 adds a zero
@@ -823,7 +925,33 @@ static int do_mqtt_publish(uint8_t *msg, size_t msg_len)
 	mqtt_conn->pub_param.message.payload.data = msg;
 	mqtt_conn->pub_param.message.payload.len  = msg_len;
 
-	return mqtt_publish(&client, &mqtt_conn->pub_param);
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	struct mqtt_inflight *item = NULL;
+	uint16_t message_id = mqtt_conn->pub_param.message_id;
+
+	if (client.protocol_version == MQTT_VERSION_5_0 &&
+	    mqtt_conn->pub_param.message.topic.qos != MQTT_QOS_0_AT_MOST_ONCE) {
+		item = malloc(sizeof(*item));
+		if (item == NULL) {
+			LOG_ERR("MQTT in-flight allocation failed: %d", -ENOMEM);
+			return -ENOMEM;
+		}
+		*item = (struct mqtt_inflight){
+			.next = mqtt_conn->inflight,
+			.message_id = message_id,
+			.qos = mqtt_conn->pub_param.message.topic.qos,
+		};
+		mqtt_conn->inflight = item;
+		mqtt_conn->inflight_count++;
+	}
+#endif
+	err = mqtt_publish(&client, &mqtt_conn->pub_param);
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	if (err != 0 && item != NULL) {
+		mqtt_inflight_remove(message_id);
+	}
+#endif
+	return err;
 }
 
 static int do_mqtt_subscribe(uint16_t op,
@@ -1098,11 +1226,25 @@ static int mqtt_prepare_publish(size_t topic_len, uint16_t qos, uint16_t retain)
 	mqtt_conn->pub_param.message.topic.topic.utf8 = mqtt_conn->pub_topic;
 	mqtt_conn->pub_param.message.topic.topic.size = topic_len;
 	mqtt_conn->pub_param.dup_flag = 0;
-	mqtt_conn->pub_param.message_id++;
-	if (mqtt_conn->pub_param.message_id == UINT16_MAX) {
-		mqtt_conn->pub_param.message_id = 1;
-	}
-	return 0;
+	uint16_t attempts = 0;
+
+	do {
+		mqtt_conn->pub_param.message_id++;
+		if (mqtt_conn->pub_param.message_id == 0 ||
+		    (client.protocol_version != MQTT_VERSION_5_0 &&
+		     mqtt_conn->pub_param.message_id == UINT16_MAX)) {
+			mqtt_conn->pub_param.message_id = 1;
+		}
+#if defined(CONFIG_MQTT_VERSION_5_0)
+		if (client.protocol_version == MQTT_VERSION_5_0 && qos != MQTT_QOS_0_AT_MOST_ONCE &&
+		    mqtt_inflight_find(mqtt_conn->pub_param.message_id) != NULL) {
+			continue;
+		}
+#endif
+		return 0;
+	} while (++attempts < UINT16_MAX);
+	LOG_WRN("MQTT publish packet identifiers exhausted");
+	return -EAGAIN;
 }
 
 SM_AT_CMD_CUSTOM(xmqttpubempty, "AT#XMQTTPUBEMPTY", handle_at_mqtt_publish_empty);
