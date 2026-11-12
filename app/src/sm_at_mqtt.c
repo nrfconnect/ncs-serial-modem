@@ -166,11 +166,10 @@ static void mqtt_capabilities_reset(void)
 STATIC int mqtt_check_packet_size(size_t remaining)
 {
 #if defined(CONFIG_MQTT_VERSION_5_0)
-	if (client.protocol_version == MQTT_VERSION_5_0) {
-		if (remaining > SM_MQTT_REMAINING_LENGTH_MAX) {
-			LOG_ERR("Invalid MQTT remaining length: %zu", remaining);
-			return -EMSGSIZE;
-		}
+	if (client.protocol_version != MQTT_VERSION_5_0) {
+		return 0;
+	}
+	if (remaining <= SM_MQTT_REMAINING_LENGTH_MAX) {
 		size_t packet_size = remaining + 1;
 		size_t value = remaining;
 
@@ -179,12 +178,13 @@ STATIC int mqtt_check_packet_size(size_t remaining)
 			value >>= 7;
 		} while (value != 0);
 
-		if (packet_size > ctx.maximum_packet_size) {
-			LOG_ERR("MQTT packet too large: remaining=%zu, maximum=%u", remaining,
-				ctx.maximum_packet_size);
-			return -EMSGSIZE;
+		if (packet_size <= ctx.maximum_packet_size) {
+			return 0;
 		}
 	}
+	LOG_ERR("MQTT packet too large: remaining=%zu, maximum=%u", remaining,
+		ctx.maximum_packet_size);
+	return -EMSGSIZE;
 #else
 	ARG_UNUSED(remaining);
 #endif
@@ -301,6 +301,11 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 	int detail;
 
 	ret = evt->result;
+	if (ret == 0 && evt->type >= MQTT_EVT_PUBACK && evt->type <= MQTT_EVT_UNSUBACK) {
+		/* message_id is the first member of every ack parameter struct (C11 6.5.2.3). */
+		LOG_DBG("MQTT ack type=%d id=%u", evt->type, evt->param.puback.message_id);
+	}
+
 	switch (evt->type) {
 	case MQTT_EVT_CONNACK:
 		if (evt->result != 0) {
@@ -363,21 +368,19 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 		handle_mqtt_publish_evt(c, evt);
 		break;
 
+#if defined(CONFIG_MQTT_VERSION_5_0)
 	case MQTT_EVT_PUBACK:
 		if (evt->result == 0) {
-			LOG_DBG("PUBACK id=%u", evt->param.puback.message_id);
-#if defined(CONFIG_MQTT_VERSION_5_0)
 			mqtt_inflight_ack(evt->param.puback.message_id, MQTT_QOS_1_AT_LEAST_ONCE,
 					  false);
-#endif
 		}
 		break;
+#endif
 
 	case MQTT_EVT_PUBREC:
 		if (evt->result != 0) {
 			break;
 		}
-		LOG_DBG("PUBREC id=%u", evt->param.pubrec.message_id);
 #if defined(CONFIG_MQTT_VERSION_5_0)
 		/* MQTT 5.0 section 4.3.3: no PUBREL after a PUBREC failure reason code. */
 		if (evt->param.pubrec.reason_code >= SM_MQTT_REASON_CODE_FAILURE) {
@@ -417,7 +420,6 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 		if (evt->result != 0) {
 			break;
 		}
-		LOG_DBG("PUBREL id=%u", evt->param.pubrel.message_id);
 		{
 			struct mqtt_pubcomp_param param = {
 				.message_id = evt->param.pubrel.message_id
@@ -434,27 +436,14 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 		}
 		break;
 
+#if defined(CONFIG_MQTT_VERSION_5_0)
 	case MQTT_EVT_PUBCOMP:
 		if (evt->result == 0) {
-			LOG_DBG("PUBCOMP id=%u", evt->param.pubcomp.message_id);
-#if defined(CONFIG_MQTT_VERSION_5_0)
 			mqtt_inflight_ack(evt->param.pubcomp.message_id, MQTT_QOS_2_EXACTLY_ONCE,
 					  true);
+		}
+		break;
 #endif
-		}
-		break;
-
-	case MQTT_EVT_SUBACK:
-		if (evt->result == 0) {
-			LOG_DBG("SUBACK id=%u", evt->param.suback.message_id);
-		}
-		break;
-
-	case MQTT_EVT_UNSUBACK:
-		if (evt->result == 0) {
-			LOG_DBG("UNSUBACK id=%u", evt->param.unsuback.message_id);
-		}
-		break;
 
 	default:
 		break;
@@ -721,12 +710,10 @@ static int do_mqtt_config(uint16_t keep_alive, uint8_t clean_session, uint16_t v
 	if (clean_session != 0 && clean_session != 1) {
 		return -EINVAL;
 	}
-	if (!mqtt_version_supported(version)) {
-		LOG_ERR("Unsupported MQTT version: %u", version);
-		return -EINVAL;
-	}
-	if (session_expiry != 0 && version != MQTT_VERSION_5_0) {
-		LOG_ERR("Session expiry interval requires MQTT 5.0");
+	if (!mqtt_version_supported(version) ||
+	    (session_expiry != 0 && version != MQTT_VERSION_5_0)) {
+		LOG_ERR("Invalid MQTT configuration: version=%u session_expiry=%u", version,
+			session_expiry);
 		return -EINVAL;
 	}
 
@@ -877,12 +864,10 @@ static int mqtt_check_publish(size_t msg_len)
 {
 #if defined(CONFIG_MQTT_VERSION_5_0)
 	if (client.protocol_version == MQTT_VERSION_5_0) {
-		if (mqtt_conn->pub_param.message.topic.qos > ctx.maximum_qos) {
-			LOG_ERR("MQTT publish QoS exceeds server maximum: %u", ctx.maximum_qos);
-			return -ENOTSUP;
-		}
-		if (mqtt_conn->pub_param.retain_flag && !ctx.retain_available) {
-			LOG_ERR("MQTT server does not support retained publications");
+		if (mqtt_conn->pub_param.message.topic.qos > ctx.maximum_qos ||
+		    (mqtt_conn->pub_param.retain_flag && !ctx.retain_available)) {
+			LOG_ERR("MQTT publish exceeds server limits: max_qos=%u retain=%d",
+				ctx.maximum_qos, ctx.retain_available);
 			return -ENOTSUP;
 		}
 		if (mqtt_conn->pub_param.message.topic.qos != MQTT_QOS_0_AT_MOST_ONCE &&
@@ -933,7 +918,6 @@ static int do_mqtt_publish(uint8_t *msg, size_t msg_len)
 	    mqtt_conn->pub_param.message.topic.qos != MQTT_QOS_0_AT_MOST_ONCE) {
 		item = malloc(sizeof(*item));
 		if (item == NULL) {
-			LOG_ERR("MQTT in-flight allocation failed: %d", -ENOMEM);
 			return -ENOMEM;
 		}
 		*item = (struct mqtt_inflight){
@@ -984,14 +968,12 @@ static int do_mqtt_subscribe(uint16_t op,
 
 #if defined(CONFIG_MQTT_VERSION_5_0)
 	if (client.protocol_version == MQTT_VERSION_5_0 && op == AT_MQTTSUB_SUB) {
-		if (!ctx.shared_sub_available && topic_len >= sizeof("$share/") - 1 &&
-		    memcmp(topic_buf, "$share/", sizeof("$share/") - 1) == 0) {
-			LOG_ERR("MQTT server does not support shared subscriptions");
-			return -ENOTSUP;
-		}
-		if (!ctx.wildcard_sub_available && (memchr(topic_buf, '+', topic_len) != NULL ||
-						    memchr(topic_buf, '#', topic_len) != NULL)) {
-			LOG_ERR("MQTT server does not support wildcard subscriptions");
+		if ((!ctx.shared_sub_available && topic_len >= sizeof("$share/") - 1 &&
+		     memcmp(topic_buf, "$share/", sizeof("$share/") - 1) == 0) ||
+		    (!ctx.wildcard_sub_available && (memchr(topic_buf, '+', topic_len) != NULL ||
+						     memchr(topic_buf, '#', topic_len) != NULL))) {
+			LOG_ERR("MQTT subscription exceeds server limits: wildcard=%d shared=%d",
+				ctx.wildcard_sub_available, ctx.shared_sub_available);
 			return -ENOTSUP;
 		}
 	}
@@ -1207,9 +1189,6 @@ static int mqtt_datamode_callback(uint8_t op, const uint8_t *data, int len, uint
 		}
 		/* Return the amount of data sent. */
 		return len;
-
-	} else if (op == DATAMODE_EXIT) {
-		LOG_DBG("MQTT data mode exit");
 	}
 
 	return 0;
@@ -1243,7 +1222,7 @@ static int mqtt_prepare_publish(size_t topic_len, uint16_t qos, uint16_t retain)
 #endif
 		return 0;
 	} while (++attempts < UINT16_MAX);
-	LOG_WRN("MQTT publish packet identifiers exhausted");
+	/* Unreachable in practice: memory runs out long before 65535 publishes are in flight. */
 	return -EAGAIN;
 }
 
