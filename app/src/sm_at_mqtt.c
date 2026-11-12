@@ -1087,6 +1087,70 @@ static int mqtt_datamode_callback(uint8_t op, const uint8_t *data, int len, uint
 	return 0;
 }
 
+static int mqtt_prepare_publish(size_t topic_len, uint16_t qos, uint16_t retain)
+{
+	if (qos > MQTT_QOS_2_EXACTLY_ONCE || retain > 1) {
+		return -EINVAL;
+	}
+
+	mqtt_conn->pub_param.message.topic.qos = (uint8_t)qos;
+	mqtt_conn->pub_param.retain_flag = (uint8_t)retain;
+	mqtt_conn->pub_param.message.topic.topic.utf8 = mqtt_conn->pub_topic;
+	mqtt_conn->pub_param.message.topic.topic.size = topic_len;
+	mqtt_conn->pub_param.dup_flag = 0;
+	mqtt_conn->pub_param.message_id++;
+	if (mqtt_conn->pub_param.message_id == UINT16_MAX) {
+		mqtt_conn->pub_param.message_id = 1;
+	}
+	return 0;
+}
+
+SM_AT_CMD_CUSTOM(xmqttpubempty, "AT#XMQTTPUBEMPTY", handle_at_mqtt_publish_empty);
+STATIC int handle_at_mqtt_publish_empty(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+					uint32_t param_count)
+{
+	int err;
+	uint16_t qos = MQTT_QOS_0_AT_MOST_ONCE;
+	uint16_t retain = 0;
+	size_t topic_len = MQTT_MAX_TOPIC_LEN;
+
+	if (cmd_type == AT_PARSER_CMD_TYPE_TEST) {
+		rsp_send("\r\n#XMQTTPUBEMPTY: <topic>,(0,1,2),(0,1)\r\n");
+		return 0;
+	}
+	if (cmd_type != AT_PARSER_CMD_TYPE_SET || param_count < 2 || param_count > 4) {
+		return -EINVAL;
+	}
+	if (!ctx.connected) {
+		return -ENOTCONN;
+	}
+	err = util_string_get(parser, 1, mqtt_conn->pub_topic, &topic_len);
+	if (err != 0) {
+		return err;
+	}
+	if (topic_len == 0) {
+		return -EINVAL;
+	}
+	if (param_count > 2) {
+		err = at_parser_num_get(parser, 2, &qos);
+		if (err != 0) {
+			return err;
+		}
+	}
+	if (param_count > 3) {
+		err = at_parser_num_get(parser, 3, &retain);
+		if (err != 0) {
+			return err;
+		}
+	}
+	err = mqtt_prepare_publish(topic_len, qos, retain);
+	if (err != 0) {
+		return err;
+	}
+	/* Keep a valid pointer even for transports that inspect an empty I/O vector. */
+	return do_mqtt_publish(mqtt_conn->pub_topic, 0);
+}
+
 SM_AT_CMD_CUSTOM(xmqttpub, "AT#XMQTTPUB", handle_at_mqtt_publish);
 STATIC int handle_at_mqtt_publish(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 				  uint32_t param_count)
@@ -1145,23 +1209,9 @@ STATIC int handle_at_mqtt_publish(enum at_parser_cmd_type cmd_type, struct at_pa
 			}
 		}
 
-		/* common publish parameters*/
-		if (qos <= MQTT_QOS_2_EXACTLY_ONCE) {
-			mqtt_conn->pub_param.message.topic.qos = (uint8_t)qos;
-		} else {
-			return -EINVAL;
-		}
-		if (retain <= 1) {
-			mqtt_conn->pub_param.retain_flag = (uint8_t)retain;
-		} else {
-			return -EINVAL;
-		}
-		mqtt_conn->pub_param.message.topic.topic.utf8 = mqtt_conn->pub_topic;
-		mqtt_conn->pub_param.message.topic.topic.size = topic_sz;
-		mqtt_conn->pub_param.dup_flag = 0;
-		mqtt_conn->pub_param.message_id++;
-		if (mqtt_conn->pub_param.message_id == UINT16_MAX) {
-			mqtt_conn->pub_param.message_id = 1;
+		err = mqtt_prepare_publish(topic_sz, qos, retain);
+		if (err != 0) {
+			return err;
 		}
 		if (pub_msg_ptr == NULL || msg_sz == 0) {
 			/* Publish payload in data mode */
