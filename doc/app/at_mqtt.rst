@@ -732,6 +732,7 @@ The parameters and their defined values are the following:
    String.
    The payload on the topic being published.
    If the payload is empty (for example, ``""``), |SM| enters :ref:`sm_data_mode`.
+   To publish a zero-length payload without entering data mode, use :ref:`SM_AT_MQTT_XMQTTPUBEMPTY`.
 
 <qos>
    * ``0`` - Lowest Quality of Service (default value).
@@ -811,3 +812,64 @@ Test command
 ------------
 
 The test command is not supported.
+
+.. _SM_AT_MQTT_XMQTTPUBEMPTY:
+
+MQTT empty publish #XMQTTPUBEMPTY
+================================
+
+The ``#XMQTTPUBEMPTY`` command publishes a zero-length payload without entering data mode.
+It supports MQTT v3.1.1 and MQTT v5.0 and requires an active MQTT connection.
+The existing ``#XMQTTPUB`` data-mode behavior does not change.
+
+Set command
+-----------
+
+::
+
+   AT#XMQTTPUBEMPTY=<topic>[,<qos>[,<retain>]]
+
+<topic>
+   Non-empty string.
+   The topic on which the empty payload is published.
+
+<qos>
+   Integer.
+   The Quality of Service level, ``0``, ``1``, or ``2``.
+   The default is ``0``.
+
+<retain>
+   Integer.
+   Set to ``0`` (default) for a normal publication or ``1`` to delete the broker's retained message for this topic.
+   Connected subscribers can also receive the empty publication.
+
+The command uses the same broker capability and packet-size checks as ``#XMQTTPUB``.
+It returns ``OK`` when the MQTT library accepts the send or ``ERROR`` on failure.
+QoS 1 produces PUBACK events, and QoS 2 produces PUBREC and PUBCOMP events unless PUBREC reports failure.
+See :ref:`SM_AT_MQTT_XMQTTEVT` for acknowledgment details.
+The command does not produce ``#XDATAMODE`` notifications.
+
+Example
+~~~~~~~
+
+Delete a retained message using QoS 1 with MQTT v5.0:
+
+::
+
+   AT#XMQTTPUBEMPTY="nrf91/sm/mqtt/topic1",1,1
+   OK
+   #XMQTTEVT: 3,0,0
+
+Read command
+------------
+
+The read command is not supported.
+
+Test command
+------------
+
+::
+
+   AT#XMQTTPUBEMPTY=?
+   #XMQTTPUBEMPTY: <topic>,(0,1,2),(0,1)
+   OK

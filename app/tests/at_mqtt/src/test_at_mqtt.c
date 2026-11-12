@@ -584,6 +584,146 @@ static void receive_packet_limit_event(void)
 }
 #endif
 
+static int empty_publish_stub(struct mqtt_client *client, const struct mqtt_publish_param *param,
+			      int calls)
+{
+	ARG_UNUSED(calls);
+
+	TEST_ASSERT_EQUAL_PTR(connected_client, client);
+	assert_mqtt_utf8("empty/topic", &param->message.topic.topic);
+	TEST_ASSERT_EQUAL_UINT8(forwarding_qos, param->message.topic.qos);
+	TEST_ASSERT_EQUAL_UINT8(forwarding_retain, param->retain_flag);
+	TEST_ASSERT_EQUAL_UINT8(0, param->dup_flag);
+	TEST_ASSERT_EQUAL_UINT(0, param->message.payload.len);
+	TEST_ASSERT_NOT_NULL(param->message.payload.data);
+	TEST_ASSERT_NOT_EQUAL(0, param->message_id);
+	if (forwarding_calls != 0) {
+		TEST_ASSERT_EQUAL_UINT16(forwarding_message_id + 1, param->message_id);
+	}
+	forwarding_message_id = param->message_id;
+	forwarding_calls++;
+	return 0;
+}
+
+static void publish_empty_version(uint8_t version)
+{
+	char command[96];
+
+	snprintf(command, sizeof(command), "AT#XMQTTCFG=\"test_client\",60,1,%u\r\n", version);
+	mqtt_connect_version(command, version);
+	forwarding_calls = 0;
+	forwarding_qos = 0;
+	forwarding_retain = 0;
+	__cmock_mqtt_publish_Stub(empty_publish_stub);
+	send_at_command("AT#XMQTTPUBEMPTY=\"empty/topic\"\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "OK"));
+	for (uint8_t qos = 0; qos <= 2; qos++) {
+		for (uint8_t retain = 0; retain <= 1; retain++) {
+			forwarding_qos = qos;
+			forwarding_retain = retain;
+			snprintf(command, sizeof(command),
+				 "AT#XMQTTPUBEMPTY=\"empty/topic\",%u,%u\r\n", qos, retain);
+			clear_captured_response();
+			send_at_command(command);
+			TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "OK"));
+			TEST_ASSERT_NULL(strstr(get_captured_response(), "#XDATAMODE"));
+		}
+	}
+	forwarding_qos = 1;
+	forwarding_retain = 0;
+	clear_captured_response();
+	send_at_command("AT#XMQTTPUBEMPTY=\"empty/topic\",1\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "OK"));
+	TEST_ASSERT_EQUAL_UINT(8, forwarding_calls);
+	__cmock_mqtt_publish_Stub(NULL);
+	clear_captured_response();
+	send_at_command("AT#XMQTTCFG?\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "OK"));
+	mqtt_disconnect_ok();
+}
+
+void test_mqtt_publish_empty(void)
+{
+	publish_empty_version(MQTT_VERSION_3_1_1);
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	publish_empty_version(MQTT_VERSION_5_0);
+#endif
+}
+
+void test_mqtt_publish_empty_invalid_parameters(void)
+{
+	static const char *const commands[] = {
+		"AT#XMQTTPUBEMPTY=\"\"\r\n",
+		"AT#XMQTTPUBEMPTY=\"empty/topic\",3\r\n",
+		"AT#XMQTTPUBEMPTY=\"empty/topic\",-1\r\n",
+		"AT#XMQTTPUBEMPTY=\"empty/topic\",0,2\r\n",
+		"AT#XMQTTPUBEMPTY=\"empty/topic\",0,-1\r\n",
+		"AT#XMQTTPUBEMPTY=\"empty/topic\",\"bad\"\r\n",
+		"AT#XMQTTPUBEMPTY=\"empty/topic\",0,0,1\r\n",
+		"AT#XMQTTPUBEMPTY?\r\n",
+		"AT#XMQTTPUBEMPTY\r\n",
+	};
+
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,4\r\n", MQTT_VERSION_3_1_1);
+	for (size_t i = 0; i < ARRAY_SIZE(commands); i++) {
+		clear_captured_response();
+		send_at_command(commands[i]);
+		TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "ERROR"));
+	}
+	clear_captured_response();
+	__cmock_mqtt_publish_ExpectAnyArgsAndReturn(-EIO);
+	send_at_command("AT#XMQTTPUBEMPTY=\"empty/topic\"\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "ERROR"));
+	mqtt_disconnect_ok();
+	send_at_command("AT#XMQTTPUBEMPTY=\"empty/topic\"\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "ERROR"));
+	clear_captured_response();
+	send_at_command("AT#XMQTTPUBEMPTY=?\r\n");
+	TEST_ASSERT_NOT_NULL(
+		strstr(get_captured_response(), "#XMQTTPUBEMPTY: <topic>,(0,1,2),(0,1)\r\n"));
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "OK"));
+}
+
+void test_mqtt_publish_empty_server_limits(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	struct mqtt_evt evt = {
+		.type = MQTT_EVT_CONNACK,
+		.param.connack.prop.rx.has_maximum_qos = true,
+		.param.connack.prop.rx.has_retain_available = true,
+	};
+
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,5\r\n", MQTT_VERSION_5_0);
+	inject_mqtt_evt(&evt);
+	send_at_command("AT#XMQTTPUBEMPTY=\"t\",1,0\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "ERROR"));
+	clear_captured_response();
+	send_at_command("AT#XMQTTPUBEMPTY=\"t\",0,1\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "ERROR"));
+	clear_captured_response();
+	__cmock_mqtt_publish_ExpectAnyArgsAndReturn(0);
+	send_at_command("AT#XMQTTPUBEMPTY=\"t\",0,0\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "OK"));
+
+	for (unsigned int qos = 0; qos <= 2; qos++) {
+		char command[64];
+		uint32_t size = qos == 0 ? 6 : 8;
+
+		snprintf(command, sizeof(command), "AT#XMQTTPUBEMPTY=\"t\",%u,1\r\n", qos);
+		set_server_packet_limit(size - 1);
+		send_at_command(command);
+		TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "ERROR"));
+		set_server_packet_limit(size);
+		__cmock_mqtt_publish_ExpectAnyArgsAndReturn(0);
+		send_at_command(command);
+		TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "OK"));
+	}
+	mqtt_disconnect_ok();
+#else
+	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
+#endif
+}
+
 void test_mqtt_maximum_packet_size_publish(void)
 {
 #if defined(CONFIG_MQTT_VERSION_5_0)
