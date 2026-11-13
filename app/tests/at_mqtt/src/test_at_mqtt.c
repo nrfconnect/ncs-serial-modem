@@ -46,6 +46,7 @@ extern size_t get_captured_response_len(void);
 extern void clear_captured_response(void);
 extern void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt);
 extern int mqtt_check_packet_size(size_t remaining);
+extern int mqtt_message_id_next(void);
 
 /* Poll callback registered by sm_at_mqtt.c via SO_POLLCB. */
 static socket_ncs_pollcb_t mqtt_pollcb;
@@ -706,6 +707,158 @@ void test_mqtt_receive_maximum_qos2(void)
 	inflight_command("AT#XMQTTPUBEMPTY=\"t\",1\r\n", true);
 	TEST_ASSERT_EQUAL_UINT(3, inflight_calls);
 	__cmock_mqtt_publish_Stub(NULL);
+	mqtt_disconnect_ok();
+#else
+	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
+#endif
+}
+
+static uint16_t packet_ids[8];
+static size_t packet_id_calls;
+
+static void packet_id_record(uint16_t message_id)
+{
+	TEST_ASSERT_LESS_THAN(ARRAY_SIZE(packet_ids), packet_id_calls);
+	packet_ids[packet_id_calls++] = message_id;
+}
+
+static int packet_id_publish_stub(struct mqtt_client *c, const struct mqtt_publish_param *param,
+				  int calls)
+{
+	ARG_UNUSED(c);
+	ARG_UNUSED(calls);
+	packet_id_record(param->message_id);
+	return 0;
+}
+
+static int packet_id_subscription_stub(struct mqtt_client *c,
+				       const struct mqtt_subscription_list *param, int calls)
+{
+	ARG_UNUSED(c);
+	ARG_UNUSED(calls);
+	packet_id_record(param->message_id);
+	return 0;
+}
+
+static void packet_id_subscription_stubs(bool enable)
+{
+	packet_id_calls = 0;
+	__cmock_mqtt_subscribe_Stub(enable ? packet_id_subscription_stub : NULL);
+	__cmock_mqtt_unsubscribe_Stub(enable ? packet_id_subscription_stub : NULL);
+}
+
+static void packet_id_command(const char *command)
+{
+	clear_captured_response();
+	send_at_command(command);
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "OK"));
+}
+
+static void packet_id_shared_sequence(uint8_t version)
+{
+	char command[64];
+
+	snprintf(command, sizeof(command), "AT#XMQTTCFG=\"test_client\",60,1,%u\r\n", version);
+	mqtt_connect_version(command, version);
+	packet_id_subscription_stubs(true);
+	__cmock_mqtt_publish_Stub(packet_id_publish_stub);
+	packet_id_command("AT#XMQTTPUB=\"t\",\"x\",1\r\n");
+	packet_id_command("AT#XMQTTSUB=\"t\",1\r\n");
+	packet_id_command("AT#XMQTTPUB=\"t\",\"x\",2\r\n");
+	packet_id_command("AT#XMQTTUNSUB=\"t\"\r\n");
+	TEST_ASSERT_EQUAL_UINT(4, packet_id_calls);
+	for (size_t i = 1; i < packet_id_calls; i++) {
+		TEST_ASSERT_EQUAL_UINT16(packet_ids[0] + i, packet_ids[i]);
+	}
+	__cmock_mqtt_publish_Stub(NULL);
+	packet_id_subscription_stubs(false);
+	mqtt_disconnect_ok();
+}
+
+void test_mqtt_packet_id_shared_sequence(void)
+{
+	packet_id_shared_sequence(MQTT_VERSION_3_1_1);
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	packet_id_shared_sequence(MQTT_VERSION_5_0);
+#endif
+}
+
+void test_mqtt_packet_id_subscription_tracking_5_0(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	receive_maximum_connect(1);
+	packet_id_subscription_stubs(true);
+	/* Pending subscriptions do not consume Receive Maximum slots. */
+	inflight_command("AT#XMQTTSUB=\"t\",1\r\n", true);
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\",1\r\n", true);
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\",1\r\n", false);
+
+	/* Acknowledgments of the wrong type do not release packet identifiers. */
+	struct mqtt_evt evt = {
+		.type = MQTT_EVT_SUBACK,
+		.param.suback.message_id = inflight_ids[0],
+	};
+
+	inject_mqtt_evt(&evt);
+	evt = (struct mqtt_evt){
+		.type = MQTT_EVT_PUBACK,
+		.param.puback.message_id = packet_ids[0],
+	};
+	inject_mqtt_evt(&evt);
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\",1\r\n", false);
+	evt.param.puback.message_id = inflight_ids[0];
+	inject_mqtt_evt(&evt);
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\",1\r\n", true);
+	TEST_ASSERT_EQUAL_UINT(2, inflight_calls);
+	TEST_ASSERT_NOT_EQUAL(packet_ids[0], inflight_ids[0]);
+	TEST_ASSERT_NOT_EQUAL(packet_ids[0], inflight_ids[1]);
+	__cmock_mqtt_publish_Stub(NULL);
+	packet_id_subscription_stubs(false);
+	mqtt_disconnect_ok();
+#else
+	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
+#endif
+}
+
+void test_mqtt_packet_id_skips_pending_subscriptions_5_0(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	bool released[2] = {false, false};
+	int id;
+
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,5\r\n", MQTT_VERSION_5_0);
+	packet_id_subscription_stubs(true);
+	packet_id_command("AT#XMQTTSUB=\"t\",1\r\n");
+	packet_id_command("AT#XMQTTUNSUB=\"t\"\r\n");
+	TEST_ASSERT_EQUAL_UINT(2, packet_id_calls);
+
+	/* Wrap the whole identifier space: pending identifiers are never reassigned. */
+	for (uint32_t i = 0; i < UINT16_MAX; i++) {
+		id = mqtt_message_id_next();
+		TEST_ASSERT_GREATER_THAN_INT(0, id);
+		TEST_ASSERT_NOT_EQUAL(packet_ids[0], id);
+		TEST_ASSERT_NOT_EQUAL(packet_ids[1], id);
+	}
+
+	struct mqtt_evt evt = {
+		.type = MQTT_EVT_SUBACK,
+		.param.suback.message_id = packet_ids[0],
+	};
+
+	inject_mqtt_evt(&evt);
+	evt = (struct mqtt_evt){
+		.type = MQTT_EVT_UNSUBACK,
+		.param.unsuback.message_id = packet_ids[1],
+	};
+	inject_mqtt_evt(&evt);
+	for (uint32_t i = 0; i < UINT16_MAX; i++) {
+		id = mqtt_message_id_next();
+		released[0] |= id == packet_ids[0];
+		released[1] |= id == packet_ids[1];
+	}
+	TEST_ASSERT_TRUE(released[0]);
+	TEST_ASSERT_TRUE(released[1]);
+	packet_id_subscription_stubs(false);
 	mqtt_disconnect_ok();
 #else
 	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");

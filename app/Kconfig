@@ -365,6 +365,12 @@ choice MQTT_VERSION_SUPPORT
 	default MQTT_VERSION_5_0 if SM_MQTTC_VERSION_5_0
 endchoice
 
+# Incoming topic names can be longer than any fixed alias buffer, because wildcard
+# subscriptions match topics of any length. The library drops the connection when an
+# aliased topic does not fit, so do not advertise topic alias support to the server.
+configdefault MQTT_TOPIC_ALIAS_MAX
+	default 0
+
 endif # SM_MQTTC
 
 if SM_GNSS

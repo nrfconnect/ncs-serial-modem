@@ -39,6 +39,10 @@ Publish checks apply to ``#XMQTTPUB`` and ``#XMQTTPUBEMPTY``, before entering da
 Failures detected during data-mode sending report ``#XDATAMODE: -1`` when data mode ends.
 Each new network connection resets negotiated limits and outstanding-publication tracking.
 
+Publications, subscriptions, and unsubscriptions share one packet identifier sequence.
+With MQTT v5.0, the client does not reuse a packet identifier until the corresponding acknowledgment arrives.
+The client does not accept topic aliases, so the broker always sends full topic names.
+
 .. note::
 
    Maximum Packet Size enforcement is implemented in the Serial Modem application.
