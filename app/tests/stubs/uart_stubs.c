@@ -30,10 +30,15 @@ static K_WORK_DELAYABLE_DEFINE(tx_done_work, tx_done_fn);
 /* Forward declaration to capture response data */
 extern void capture_response_data(const uint8_t *data, size_t len);
 
-void uart_stub_rx(const uint8_t *data, size_t len)
+void uart_stub_rx_nowait(const uint8_t *data, size_t len)
 {
 	ring_buf_put(&uart_rx_ring_buf, data, len);
 	modem_pipe_notify_receive_ready(sm_uart_pipe_get());
+}
+
+void uart_stub_rx(const uint8_t *data, size_t len)
+{
+	uart_stub_rx_nowait(data, len);
 	k_sem_take(&tx_done, K_SECONDS(1));
 }
 

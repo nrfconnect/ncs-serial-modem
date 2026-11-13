@@ -353,6 +353,39 @@ config SM_MQTTC_MESSAGE_BUFFER_LEN
 	  Specifies maximum message size that can be transmitted/received through
 	  MQTT (excluding MQTT PUBLISH payload).
 
+config SM_MQTTC_VERSION_5_0
+	bool "MQTT 5.0 support [EXPERIMENTAL]"
+	default y
+	help
+	  Build the MQTT library with MQTT 5.0 protocol support.
+	  The MQTT client uses MQTT 3.1.1 unless MQTT 5.0 is selected with
+	  the AT#XMQTTCFG command.
+
+choice MQTT_VERSION_SUPPORT
+	default MQTT_VERSION_5_0 if SM_MQTTC_VERSION_5_0
+endchoice
+
+config SM_MQTTC_TOPIC_ALIAS_MAX
+	int "Maximum number of outgoing MQTT 5.0 topic aliases"
+	depends on SM_MQTTC_VERSION_5_0
+	range 0 16
+	default 4
+	help
+	  Number of topic aliases the MQTT client assigns to the topics of its own
+	  MQTT 5.0 publications, limited by the broker's Topic Alias Maximum.
+	  Repeated publications to an aliased topic omit the topic name.
+	  Each alias uses about 130 bytes of heap while connected.
+	  Set to 0 to disable outgoing topic aliases.
+	  MQTT_TOPIC_ALIAS_MAX is a separate MQTT library option that limits the
+	  topic aliases the broker uses in messages to the client.
+
+# Incoming topic names can be longer than any fixed alias buffer, because wildcard
+# subscriptions match topics of any length. The library drops the connection when an
+# aliased topic does not fit, so do not advertise topic alias support by default.
+# To enable, also set MQTT_TOPIC_ALIAS_STRING_MAX to at least SM_MQTTC_MESSAGE_BUFFER_LEN.
+configdefault MQTT_TOPIC_ALIAS_MAX
+	default 0
+
 endif # SM_MQTTC
 
 if SM_GNSS

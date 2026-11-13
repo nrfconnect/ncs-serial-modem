@@ -5,6 +5,8 @@
  */
 
 void uart_stub_rx(const uint8_t *data, size_t len);
+/* Inject a fragment without waiting for a response or advancing to an inactivity timeout. */
+void uart_stub_rx_nowait(const uint8_t *data, size_t len);
 void uart_stub_tx_done_drain(void);
 void uart_stub_tx_done_reset(void);
 

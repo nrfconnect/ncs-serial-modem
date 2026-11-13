@@ -31,6 +31,10 @@ target_compile_options(app PRIVATE
   -Wno-return-local-addr
 )
 
+if(CONFIG_SM_TEST_MQTT_VERSION_5_0)
+  zephyr_compile_definitions(CONFIG_MQTT_VERSION_5_0=1)
+endif()
+
 # Generate CMock mocks for external dependencies
 cmock_handle(${ZEPHYR_BASE}/../nrfxlib/nrf_modem/include/nrf_modem.h)
 cmock_handle(${ZEPHYR_NRF_MODULE_DIR}/include/modem/nrf_modem_lib.h)
