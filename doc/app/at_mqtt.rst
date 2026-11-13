@@ -34,6 +34,13 @@ Each connection applies the following properties from a successful MQTT v5.0 CON
   At capacity, publish requests return ``ERROR`` without sending or entering data mode.
   Requests are not queued. Retry after an acknowledgment releases a slot.
   The inbound limit is not configurable and remains 65,535.
+* **Topic Alias Maximum.**
+  The client assigns topic aliases to the first topics it publishes to, up to the broker's limit, and then omits those topic names.
+  Aliases are not reassigned and do not persist across connections.
+
+  .. only:: not nrf91m1
+
+     :ref:`CONFIG_SM_MQTTC_TOPIC_ALIAS_MAX` sets the local limit.
 
 Publish checks apply to ``#XMQTTPUB`` and ``#XMQTTPUBEMPTY``, before entering data mode and again before sending.
 Failures detected during data-mode sending report ``#XDATAMODE: -1`` when data mode ends.
@@ -41,7 +48,11 @@ Each new network connection resets negotiated limits and outstanding-publication
 
 Publications, subscriptions, and unsubscriptions share one packet identifier sequence.
 With MQTT v5.0, the client does not reuse a packet identifier until the corresponding acknowledgment arrives.
-The client does not accept topic aliases, so the broker always sends full topic names.
+By default, the client does not accept topic aliases from the broker, so incoming messages always carry full topic names.
+
+.. only:: not nrf91m1
+
+   See :ref:`CONFIG_SM_MQTTC_TOPIC_ALIAS_MAX` for enabling incoming topic aliases.
 
 .. note::
 

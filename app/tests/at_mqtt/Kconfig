@@ -43,6 +43,13 @@ config MQTT_TOPIC_ALIAS_STRING_MAX
 	int "Maximum length of a topic alias name"
 	default 64
 
+config SM_MQTTC_TOPIC_ALIAS_MAX
+	int "Maximum number of outgoing MQTT 5.0 topic aliases"
+	default 2
+	help
+	  Test-only value; the application default in app/Kconfig is 4.
+	  A small table lets the tests fill it with few topics.
+
 endif # SM_TEST_MQTT_VERSION_5_0
 
 # SM core symbols — normally defined inside menu "Nordic Serial Modem" in
