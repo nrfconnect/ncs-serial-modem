@@ -80,11 +80,11 @@ static uint16_t mqtt_configured_keepalive;
 static char mqtt_clientid[MQTT_MAX_CID_LEN + 1];
 
 #if defined(CONFIG_MQTT_VERSION_5_0)
+/* Packet identifier in use by an unacknowledged QoS 1/2 PUBLISH, SUBSCRIBE or UNSUBSCRIBE. */
 struct mqtt_inflight {
 	struct mqtt_inflight *next;
 	uint16_t message_id;
-	uint8_t qos;
-	bool pubrel_sent;
+	uint8_t ack_evt; /* enum mqtt_evt_type that completes the exchange */
 };
 #endif
 
@@ -97,9 +97,10 @@ struct mqtt_conn {
 	char username[SM_MAX_USERNAME + 1];
 	char password[SM_MAX_PASSWORD + 1];
 	struct mqtt_publish_param pub_param;
+	uint16_t message_id; /* Last assigned packet identifier */
 #if defined(CONFIG_MQTT_VERSION_5_0)
 	struct mqtt_inflight *inflight;
-	uint16_t inflight_count;
+	uint16_t inflight_count; /* QoS 1/2 PUBLISH entries, for Receive Maximum */
 #endif
 };
 static struct mqtt_conn *mqtt_conn;
@@ -121,6 +122,30 @@ static struct mqtt_inflight *mqtt_inflight_find(uint16_t message_id)
 	return NULL;
 }
 
+static bool mqtt_inflight_is_publish(uint8_t ack_evt)
+{
+	return ack_evt != MQTT_EVT_SUBACK && ack_evt != MQTT_EVT_UNSUBACK;
+}
+
+static int mqtt_inflight_add(uint16_t message_id, uint8_t ack_evt)
+{
+	struct mqtt_inflight *item = malloc(sizeof(*item));
+
+	if (item == NULL) {
+		return -ENOMEM;
+	}
+	*item = (struct mqtt_inflight){
+		.next = mqtt_conn->inflight,
+		.message_id = message_id,
+		.ack_evt = ack_evt,
+	};
+	mqtt_conn->inflight = item;
+	if (mqtt_inflight_is_publish(ack_evt)) {
+		mqtt_conn->inflight_count++;
+	}
+	return 0;
+}
+
 static void mqtt_inflight_remove(uint16_t message_id)
 {
 	if (mqtt_conn == NULL) {
@@ -133,25 +158,54 @@ static void mqtt_inflight_remove(uint16_t message_id)
 
 		if (item->message_id == message_id) {
 			*link = item->next;
+			if (mqtt_inflight_is_publish(item->ack_evt)) {
+				mqtt_conn->inflight_count--;
+			}
 			free(item);
-			mqtt_conn->inflight_count--;
 			return;
 		}
 		link = &item->next;
 	}
 }
 
-static void mqtt_inflight_ack(uint16_t message_id, uint8_t qos, bool pubrel_sent)
+/* Release the packet identifier if ack_evt is the one its exchange is waiting for. */
+static void mqtt_inflight_ack(uint16_t message_id, uint8_t ack_evt)
 {
 	if (client.protocol_version != MQTT_VERSION_5_0) {
 		return;
 	}
 	struct mqtt_inflight *item = mqtt_inflight_find(message_id);
 
-	if (item != NULL && item->qos == qos && item->pubrel_sent == pubrel_sent) {
+	if (item != NULL && item->ack_evt == ack_evt) {
 		mqtt_inflight_remove(message_id);
 	}
 }
+#endif
+
+/* SUBSCRIBE, UNSUBSCRIBE and QoS 1/2 PUBLISH share one packet identifier space
+ * (MQTT 5.0 section 2.2.1). Returns an identifier not in use by an MQTT 5.0 exchange.
+ */
+STATIC int mqtt_message_id_next(void)
+{
+	for (uint16_t attempts = 0; attempts < UINT16_MAX; attempts++) {
+		mqtt_conn->message_id++;
+		if (mqtt_conn->message_id == 0 || (client.protocol_version != MQTT_VERSION_5_0 &&
+						   mqtt_conn->message_id == UINT16_MAX)) {
+			mqtt_conn->message_id = 1;
+		}
+#if defined(CONFIG_MQTT_VERSION_5_0)
+		if (client.protocol_version == MQTT_VERSION_5_0 &&
+		    mqtt_inflight_find(mqtt_conn->message_id) != NULL) {
+			continue;
+		}
+#endif
+		return mqtt_conn->message_id;
+	}
+	/* Unreachable in practice: memory runs out long before 65535 exchanges are in flight. */
+	return -EAGAIN;
+}
+
+#if defined(CONFIG_MQTT_VERSION_5_0)
 
 static void mqtt_capabilities_reset(void)
 {
@@ -370,9 +424,12 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 
 #if defined(CONFIG_MQTT_VERSION_5_0)
 	case MQTT_EVT_PUBACK:
+	case MQTT_EVT_PUBCOMP:
+	case MQTT_EVT_SUBACK:
+	case MQTT_EVT_UNSUBACK:
 		if (evt->result == 0) {
-			mqtt_inflight_ack(evt->param.puback.message_id, MQTT_QOS_1_AT_LEAST_ONCE,
-					  false);
+			/* message_id is the first member of every ack parameter struct. */
+			mqtt_inflight_ack(evt->param.puback.message_id, evt->type);
 		}
 		break;
 #endif
@@ -384,8 +441,7 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 #if defined(CONFIG_MQTT_VERSION_5_0)
 		/* MQTT 5.0 section 4.3.3: no PUBREL after a PUBREC failure reason code. */
 		if (evt->param.pubrec.reason_code >= SM_MQTT_REASON_CODE_FAILURE) {
-			mqtt_inflight_ack(evt->param.pubrec.message_id, MQTT_QOS_2_EXACTLY_ONCE,
-					  false);
+			mqtt_inflight_ack(evt->param.pubrec.message_id, MQTT_EVT_PUBREC);
 			LOG_WRN("PUBREC id=%u failed: 0x%02x", evt->param.pubrec.message_id,
 				evt->param.pubrec.reason_code);
 			break;
@@ -408,8 +464,9 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 				struct mqtt_inflight *item =
 					mqtt_inflight_find(evt->param.pubrec.message_id);
 
-				if (item != NULL && item->qos == MQTT_QOS_2_EXACTLY_ONCE) {
-					item->pubrel_sent = true;
+				if (item != NULL && (item->ack_evt == MQTT_EVT_PUBREC ||
+						     item->ack_evt == MQTT_EVT_PUBCOMP)) {
+					item->ack_evt = MQTT_EVT_PUBCOMP;
 				}
 			}
 #endif
@@ -435,15 +492,6 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 			}
 		}
 		break;
-
-#if defined(CONFIG_MQTT_VERSION_5_0)
-	case MQTT_EVT_PUBCOMP:
-		if (evt->result == 0) {
-			mqtt_inflight_ack(evt->param.pubcomp.message_id, MQTT_QOS_2_EXACTLY_ONCE,
-					  true);
-		}
-		break;
-#endif
 
 	default:
 		break;
@@ -911,27 +959,25 @@ static int do_mqtt_publish(uint8_t *msg, size_t msg_len)
 	mqtt_conn->pub_param.message.payload.len  = msg_len;
 
 #if defined(CONFIG_MQTT_VERSION_5_0)
-	struct mqtt_inflight *item = NULL;
+	bool tracked = false;
 	uint16_t message_id = mqtt_conn->pub_param.message_id;
 
 	if (client.protocol_version == MQTT_VERSION_5_0 &&
 	    mqtt_conn->pub_param.message.topic.qos != MQTT_QOS_0_AT_MOST_ONCE) {
-		item = malloc(sizeof(*item));
-		if (item == NULL) {
-			return -ENOMEM;
+		uint8_t ack_evt = mqtt_conn->pub_param.message.topic.qos == MQTT_QOS_1_AT_LEAST_ONCE
+					  ? MQTT_EVT_PUBACK
+					  : MQTT_EVT_PUBREC;
+
+		err = mqtt_inflight_add(message_id, ack_evt);
+		if (err != 0) {
+			return err;
 		}
-		*item = (struct mqtt_inflight){
-			.next = mqtt_conn->inflight,
-			.message_id = message_id,
-			.qos = mqtt_conn->pub_param.message.topic.qos,
-		};
-		mqtt_conn->inflight = item;
-		mqtt_conn->inflight_count++;
+		tracked = true;
 	}
 #endif
 	err = mqtt_publish(&client, &mqtt_conn->pub_param);
 #if defined(CONFIG_MQTT_VERSION_5_0)
-	if (err != 0 && item != NULL) {
+	if (err != 0 && tracked) {
 		mqtt_inflight_remove(message_id);
 	}
 #endif
@@ -944,18 +990,11 @@ static int do_mqtt_subscribe(uint16_t op,
 				uint16_t qos)
 {
 	int err = -EINVAL;
+	int message_id;
 	struct mqtt_topic subscribe_topic;
-	static uint16_t sub_message_id;
-
-	sub_message_id++;
-	if (sub_message_id == UINT16_MAX) {
-		sub_message_id = 1;
-	}
-
-	const struct mqtt_subscription_list subscription_list = {
+	struct mqtt_subscription_list subscription_list = {
 		.list = &subscribe_topic,
 		.list_count = 1,
-		.message_id = sub_message_id
 	};
 
 	if (qos <= MQTT_QOS_2_EXACTLY_ONCE) {
@@ -989,11 +1028,31 @@ static int do_mqtt_subscribe(uint16_t op,
 		return err;
 	}
 
-	if (op == 1) {
+	message_id = mqtt_message_id_next();
+	if (message_id < 0) {
+		return message_id;
+	}
+	subscription_list.message_id = (uint16_t)message_id;
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	if (client.protocol_version == MQTT_VERSION_5_0) {
+		err = mqtt_inflight_add(subscription_list.message_id,
+					op == AT_MQTTSUB_SUB ? MQTT_EVT_SUBACK : MQTT_EVT_UNSUBACK);
+		if (err != 0) {
+			return err;
+		}
+	}
+#endif
+
+	if (op == AT_MQTTSUB_SUB) {
 		err = mqtt_subscribe(&client, &subscription_list);
-	} else if (op == 0) {
+	} else {
 		err = mqtt_unsubscribe(&client, &subscription_list);
 	}
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	if (err != 0) {
+		mqtt_inflight_remove(subscription_list.message_id);
+	}
+#endif
 
 	return err;
 }
@@ -1205,25 +1264,14 @@ static int mqtt_prepare_publish(size_t topic_len, uint16_t qos, uint16_t retain)
 	mqtt_conn->pub_param.message.topic.topic.utf8 = mqtt_conn->pub_topic;
 	mqtt_conn->pub_param.message.topic.topic.size = topic_len;
 	mqtt_conn->pub_param.dup_flag = 0;
-	uint16_t attempts = 0;
 
-	do {
-		mqtt_conn->pub_param.message_id++;
-		if (mqtt_conn->pub_param.message_id == 0 ||
-		    (client.protocol_version != MQTT_VERSION_5_0 &&
-		     mqtt_conn->pub_param.message_id == UINT16_MAX)) {
-			mqtt_conn->pub_param.message_id = 1;
-		}
-#if defined(CONFIG_MQTT_VERSION_5_0)
-		if (client.protocol_version == MQTT_VERSION_5_0 && qos != MQTT_QOS_0_AT_MOST_ONCE &&
-		    mqtt_inflight_find(mqtt_conn->pub_param.message_id) != NULL) {
-			continue;
-		}
-#endif
-		return 0;
-	} while (++attempts < UINT16_MAX);
-	/* Unreachable in practice: memory runs out long before 65535 publishes are in flight. */
-	return -EAGAIN;
+	int message_id = mqtt_message_id_next();
+
+	if (message_id < 0) {
+		return message_id;
+	}
+	mqtt_conn->pub_param.message_id = (uint16_t)message_id;
+	return 0;
 }
 
 SM_AT_CMD_CUSTOM(xmqttpubempty, "AT#XMQTTPUBEMPTY", handle_at_mqtt_publish_empty);
