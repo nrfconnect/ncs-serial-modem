@@ -8,6 +8,7 @@ on:
     types: [closed]
     branches:
       - main
+      - 'v*-branch'
 
 jobs:
   remove:
@@ -17,4 +18,10 @@ jobs:
         env:
           AZCOPY_CONCURRENCY_VALUE: 3000
         run: |
-          azcopy rm "${{ vars.NCS_DOC_PR_STORAGE_URL }}addon-serial_modem/PR-${{ github.event.number }}?${{ secrets.NCS_DOC_SAS_PRS }}" --recursive=true || true
+          # One preview per publication, under the add-on directory that
+          # .github/workflows/doc-publish.yml uploaded it to. A publication
+          # that the pull request did not build has no preview to remove, which
+          # azcopy reports as an error that is ignored here.
+          for ADDON in addon-serial_modem addon-nrf91m1; do
+            azcopy rm "${{ vars.NCS_DOC_PR_STORAGE_URL }}addons/${ADDON}/PR-${{ github.event.number }}?${{ secrets.NCS_DOC_SAS_PRS }}" --recursive=true || true
+          done
