@@ -19,3 +19,6 @@ The nRF91M1 module supports the following modem firmware:
 
 * ``mfw_nrf91x1`` v2.0.4 (pre-programmed on the module)
 * ``mfw_nrf9151-ntn`` v1.0.1 (can be updated using the :ref:`DFU_AT_commands`)
+
+You can flash the nRF91M1 application firmware and the modem firmware to the `nrf9151dk`_ board for development purposes.
+See `Run the application firmware on the nRF9151 DK`_ for guidance.

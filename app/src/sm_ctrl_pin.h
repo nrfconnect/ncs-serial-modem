@@ -42,6 +42,11 @@ void sm_ctrl_pin_enter_sleep_no_uninit(bool at_host_power_off);
  */
 void sm_ctrl_pin_enter_shutdown(void);
 
+/**
+ * @brief Log a debug message if DTR is deasserted.
+ */
+void sm_ctrl_pin_dtr_check(void);
+
 /** @} */
 
 #endif /* SM_CTRL_PIN_ */
