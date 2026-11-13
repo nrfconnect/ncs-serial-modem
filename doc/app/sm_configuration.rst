@@ -14,315 +14,10 @@ Configuration
 Configuration options
 *********************
 
-.. _CONFIG_SM_CUSTOMER_VERSION:
+The following configuration options are available in the |SM| application.
 
-CONFIG_SM_CUSTOMER_VERSION - Customer version string
-   Version string defined by the customer after customizing the application.
-   When defined, this version is reported with the baseline versions by the ``AT#XSMVER`` AT command.
-
-.. _CONFIG_SM_CMUX:
-
-CONFIG_SM_CMUX - Enable CMUX functionality
-   This option is enabled by the CMUX overlay.
-   It adds support for CMUX.
-   See :ref:`SM_AT_CMUX` for more information.
-
-.. _CONFIG_SM_PPP:
-
-CONFIG_SM_PPP - Enable PPP functionality
-   This option is enabled by the PPP overlay.
-   It adds support for PPP.
-   PPP can be used in conjunction with :ref:`CMUX <CONFIG_SM_CMUX>` in order to use a single UART for both AT data and PPP.
-   When CMUX is also enabled, PPP is usable only through a CMUX channel.
-   See :ref:`SM_AT_PPP` for more information.
-
-.. _CONFIG_SM_EXTERNAL_XTAL:
-
-CONFIG_SM_EXTERNAL_XTAL - Use external XTAL for UARTE
-   This option configures the application to use an external XTAL for UARTE.
-   For more information, see the UARTE - Universal asynchronous receiver/transmitter with EasyDMA section of the `nRF9151 Product Specification`_ documentation.
-
-.. _CONFIG_SM_AUTO_CONNECT:
-
-CONFIG_SM_AUTO_CONNECT - Connect to the network at start-up or reset
-   This option enables connecting to the network at start-up or reset using a defined PDN configuration.
-   This option is enabled by the LwM2M Carrier overlay, but is otherwise disabled by default.
-
-   When enabled, the following sub-options are available for configuration:
-
-   .. _CONFIG_SM_AUTO_CONNECT_SYSTEM_MODE:
-
-   CONFIG_SM_AUTO_CONNECT_SYSTEM_MODE - System mode for automatic network attach
-      This option defines the system mode to use for automatic network attach.
-      The format is a comma-separated string of four single-digit integers: ``"X,Y,Z,W"``
-
-      Where:
-
-      * ``X`` = LTE-M support (0=disabled, 1=enabled)
-      * ``Y`` = NB-IoT support (0=disabled, 1=enabled)
-      * ``Z`` = GNSS support (0=disabled, 1=enabled)
-      * ``W`` = LTE preference (0=no preference, 1=LTE-M, 2=NB-IoT, 3=network selection, 4=LTE-M then NB-IoT)
-
-      See the `%XSYSTEMMODE`_ command in the AT command Reference Guide for more details.
-      The default value is ``"1,1,1,0"`` (enable LTE-M, NB-IoT, and GNSS with no preference).
-
-   .. _CONFIG_SM_AUTO_CONNECT_PDN_CONFIG:
-
-   CONFIG_SM_AUTO_CONNECT_PDN_CONFIG - Enable PDN configuration
-      This option enables sending of PDN configuration commands during automatic network attach.
-      When enabled, the following sub-options become available:
-
-      .. _CONFIG_SM_AUTO_CONNECT_PDN_APN:
-
-      CONFIG_SM_AUTO_CONNECT_PDN_APN - Access Point Name (APN)
-         This option specifies the APN to use for automatic network attach.
-         If not set (default), the APN configured in the modem will be used.
-
-      .. _CONFIG_SM_AUTO_CONNECT_PDN_FAMILY:
-
-      CONFIG_SM_AUTO_CONNECT_PDN_FAMILY - PDN family (IP type)
-         This choice option selects the PDN family (IP address type) to use for automatic network attach.
-         See the `+CGDCONT`_ command in the AT command Reference Guide for more details.
-
-         Available options:
-
-         * ``CONFIG_SM_AUTO_CONNECT_PDN_FAMILY_IP`` - Use IPv4 only
-         * ``CONFIG_SM_AUTO_CONNECT_PDN_FAMILY_IPV6`` - Use IPv6 only
-         * ``CONFIG_SM_AUTO_CONNECT_PDN_FAMILY_IPV4V6`` - Use both IPv4 and IPv6 (dual stack, default)
-         * ``CONFIG_SM_AUTO_CONNECT_PDN_FAMILY_NON_IP`` - Use Non-IP PDN type for data transmission without IP headers
-
-      .. _CONFIG_SM_AUTO_CONNECT_PDN_AUTH:
-
-      CONFIG_SM_AUTO_CONNECT_PDN_AUTH - PDN authentication type
-         This option specifies the PDN authentication protocol to use for automatic network attach.
-         See the `+CGAUTH`_ command in the AT command Reference Guide for more details.
-
-         Valid values:
-
-         * ``0`` - None (no authentication, default)
-         * ``1`` - PAP (Password Authentication Protocol)
-         * ``2`` - CHAP (Challenge Handshake Authentication Protocol)
-
-      .. _CONFIG_SM_AUTO_CONNECT_PDN_USERNAME:
-
-      CONFIG_SM_AUTO_CONNECT_PDN_USERNAME - PDN authentication username
-         This option specifies the username to use for PDN authentication during automatic network attach.
-         Do not set the Kconfig option (default) if no username is required.
-         Use only when :ref:`CONFIG_SM_AUTO_CONNECT_PDN_AUTH <CONFIG_SM_AUTO_CONNECT_PDN_AUTH>` is set to 1 (PAP) or 2 (CHAP).
-
-      .. _CONFIG_SM_AUTO_CONNECT_PDN_PASSWORD:
-
-      CONFIG_SM_AUTO_CONNECT_PDN_PASSWORD - PDN authentication password
-         This option specifies the password to use for PDN authentication during automatic network attach.
-         Leave empty (default) if no password is required.
-         Use only when :ref:`CONFIG_SM_AUTO_CONNECT_PDN_AUTH <CONFIG_SM_AUTO_CONNECT_PDN_AUTH>` is set to 1 (PAP) or 2 (CHAP).
-
-   Example configuration overlay for NB-IoT with Non-IP PDN:
-
-   ::
-
-      CONFIG_SM_AUTO_CONNECT=y
-      CONFIG_SM_AUTO_CONNECT_SYSTEM_MODE="0,1,0,0"
-      CONFIG_SM_AUTO_CONNECT_PDN_CONFIG=y
-      CONFIG_SM_AUTO_CONNECT_PDN_FAMILY_NON_IP=y
-
-   Example configuration overlay for LTE-M with custom APN and PAP authentication:
-
-   ::
-
-      CONFIG_SM_AUTO_CONNECT=y
-      CONFIG_SM_AUTO_CONNECT_SYSTEM_MODE="1,0,0,0"
-      CONFIG_SM_AUTO_CONNECT_PDN_CONFIG=y
-      CONFIG_SM_AUTO_CONNECT_PDN_APN="internet"
-      CONFIG_SM_AUTO_CONNECT_PDN_FAMILY_IPV4V6=y
-      CONFIG_SM_AUTO_CONNECT_PDN_AUTH=1
-      CONFIG_SM_AUTO_CONNECT_PDN_USERNAME="myuser"
-      CONFIG_SM_AUTO_CONNECT_PDN_PASSWORD="mypass"
-
-.. _CONFIG_SM_CR_TERMINATION:
-
-CONFIG_SM_CR_TERMINATION - CR termination
-   This option configures the application to accept AT commands ending with a carriage return.
-   This is the default AT command terminator.
-
-   Select this option if you want to connect to the development kit using PuTTY.
-   See `Testing and optimization`_  for instructions.
-
-.. _CONFIG_SM_LF_TERMINATION:
-
-CONFIG_SM_LF_TERMINATION - LF termination
-   This option configures the application to accept AT commands ending with a line feed.
-
-.. _CONFIG_SM_CR_LF_TERMINATION:
-
-CONFIG_SM_CR_LF_TERMINATION - CR+LF termination
-   This option configures the application to accept AT commands ending with a carriage return followed by a line feed.
-
-.. _CONFIG_SM_SMS:
-
-CONFIG_SM_SMS - SMS support in |SM|
-   This option enables additional AT commands for using the SMS service.
-
-.. _CONFIG_SM_GNSS:
-
-CONFIG_SM_GNSS - GNSS support in |SM|
-   This option enables additional AT commands for using the GNSS service.
-
-.. _CONFIG_SM_ICMP:
-
-CONFIG_SM_ICMP - ICMP ping support in |SM|
-   This option enables AT command for sending ICMP echo requests.
-
-.. _CONFIG_SM_NRF_CLOUD:
-
-CONFIG_SM_NRF_CLOUD - nRF Cloud support in |SM|
-   This option enables additional AT commands for using the nRF Cloud service.
-
-.. _CONFIG_SM_NRF_CLOUD_LOCATION:
-
-CONFIG_SM_NRF_CLOUD_LOCATION - nRF Cloud Location support
-   This option enables the `nRF Cloud Location Services <nRF Cloud Location Services_>`_ for cloud-assisted geolocation.
-   Supports cellular and Wi-Fi positioning.
-   This requires :ref:`CONFIG_SM_NRF_CLOUD <CONFIG_SM_NRF_CLOUD>` to be enabled.
-
-.. _CONFIG_SM_NRF_CLOUD_OBSERVABILITY:
-
-CONFIG_SM_NRF_CLOUD_OBSERVABILITY - nRF Cloud observability support
-   This option enables the ``#XNRFCLOUDOBS*`` commands, which control the Memfault data upload over the nRF Cloud CoAP transport.
-   This requires :ref:`CONFIG_SM_NRF_CLOUD <CONFIG_SM_NRF_CLOUD>`.
-   See :ref:`SM_AT_NRFCLOUDOBS` for more information.
-
-.. _CONFIG_SM_NRF_CLOUD_OBSERVABILITY_AUTO_INTERVAL_SECONDS:
-
-CONFIG_SM_NRF_CLOUD_OBSERVABILITY_AUTO_INTERVAL_SECONDS - Default interval of the automatic upload
-   This option sets the interval, in seconds, that ``#XNRFCLOUDOBSAUTO`` uses when the host enables the automatic upload without giving one, and no interval has been stored yet.
-   It defaults to one hour.
-   The interval the host gives is persistent, so this value only applies until the host configures one.
-   This requires :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY <CONFIG_SM_NRF_CLOUD_OBSERVABILITY>` to be enabled.
-
-.. _CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG:
-
-CONFIG_SM_NRF_CLOUD_OBSERVABILITY_DEBUG - Debug observability commands
-   This option enables the ``#XNRFCLOUDOBSDEVINFO``, ``#XNRFCLOUDOBSCRASH`` and ``#XNRFCLOUDOBSEXPORT`` commands, which return the Memfault device information, force a crash for testing the coredump capture, and print the buffered Memfault chunks to the AT interface.
-   It is disabled by default, because ``#XNRFCLOUDOBSCRASH`` deliberately crashes the application.
-   Enable it only in development builds.
-   This requires :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY <CONFIG_SM_NRF_CLOUD_OBSERVABILITY>` to be enabled.
-
-.. _CONFIG_SM_NRF_CLOUD_OBSERVABILITY_LTE_METRICS:
-
-CONFIG_SM_NRF_CLOUD_OBSERVABILITY_LTE_METRICS - Additional LTE metrics for Memfault
-   This option collects the cell ID, the tracking area code, the LTE mode, the PSM active time and periodic TAU, and the eDRX interval and paging time window on each Memfault heartbeat.
-   It also tracks connection statistics between heartbeats, including the time to connect to the network, the number of connection losses, and the time the LTE link has been active.
-   It is enabled by default.
-   This requires :ref:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY <CONFIG_SM_NRF_CLOUD_OBSERVABILITY>`.
-
-.. _CONFIG_SM_NRF_CLOUD_FOTA:
-
-CONFIG_SM_NRF_CLOUD_FOTA - nRF Cloud FOTA AT commands
-   This option enables the ``#XNRFCLOUDFOTA*`` commands, which check for and download application and modem firmware updates using `Memfault release management`_, delivered over the same nRF Cloud CoAP transport as ``#XNRFCLOUDOBS*``.
-   This requires :ref:`CONFIG_SM_NRF_CLOUD <CONFIG_SM_NRF_CLOUD>`.
-   See :ref:`SM_AT_NRFCLOUDFOTA` for more information.
-
-.. _CONFIG_SM_COAPC:
-
-CONFIG_SM_COAPC - CoAP client support in |SM|
-   This option enables the CoAP client AT commands for making CoAP requests.
-   See :ref:`SM_AT_COAPC` for more information.
-
-.. _CONFIG_SM_MQTTC:
-
-CONFIG_SM_MQTTC - MQTT client support in |SM|
-   This option enables additional AT commands for using the MQTT client service.
-
-.. _CONFIG_SM_MQTTC_MESSAGE_BUFFER_LEN:
-
-CONFIG_SM_MQTTC_MESSAGE_BUFFER_LEN - Size of the buffer for the MQTT library
-   This option specifies the maximum message size which can be transmitted or received through MQTT (excluding PUBLISH payload).
-   The default value is 512, meaning 512 bytes for TX and RX, respectively.
-
-.. _CONFIG_SM_HTTPC:
-
-CONFIG_SM_HTTPC - HTTP client support in |SM|
-   This option enables the HTTP client AT commands for making HTTP/HTTPS requests.
-   See :ref:`SM_AT_HTTPC` for more information.
-
-   When enabled, the following sub-option is available:
-
-   .. _CONFIG_SM_HTTPC_RESPONSE_TIMEOUT_MS:
-
-   CONFIG_SM_HTTPC_RESPONSE_TIMEOUT_MS - HTTP client idle timeout (ms)
-      Idle timeout for an active HTTP request in milliseconds.
-      The timer is a sliding window that resets each time data is sent or received (request headers, body upload chunks, and response body chunks).
-      If no activity occurs within this window the request is aborted, and ``#XHTTPCSTAT: <fd>,-1,<bytes>`` is reported.
-      The default value is 30000 (30 seconds).
-
-.. _CONFIG_SM_UART_RX_BUF_COUNT:
-
-CONFIG_SM_UART_RX_BUF_COUNT - Receive buffers for UART.
-   This option defines the number of buffers for receiving (RX) UART traffic.
-   The default value is 3.
-
-.. _CONFIG_SM_UART_RX_BUF_SIZE:
-
-CONFIG_SM_UART_RX_BUF_SIZE - Receive buffer size for UART.
-   This option defines the size of a single buffer for receiving (RX) UART traffic.
-   The default value is 256.
-
-.. _CONFIG_SM_UART_TX_BUF_SIZE:
-
-CONFIG_SM_UART_TX_BUF_SIZE - Send buffer size for UART.
-   This option defines the size of the buffer for sending (TX) UART traffic.
-   The default value is 256.
-
-.. _CONFIG_SM_URC_BUFFER_SIZE:
-
-CONFIG_SM_URC_BUFFER_SIZE - URC buffer size.
-   Buffer, in which unsolicited result codes (URC) are stored before being sent to the host.
-   The buffer has to be large enough to hold the largest URC that can be sent by the modem.
-   Result codes longer than this size will get dropped.
-   The default and maximum value is 4096.
-
-.. _CONFIG_SM_PPP_FALLBACK_MTU:
-
-CONFIG_SM_PPP_FALLBACK_MTU - Control the MTU used by PPP.
-   This option controls the MTU used by PPP.
-   PPP tries to retrieve the cellular link MTU from the modem (using ``AT+CGCONTRDP``).
-   If MTU is not returned by the modem, this value will be used as a fallback.
-   The MTU will be used for sending and receiving data on both the PPP and cellular links.
-   The default value is 1280.
-
-.. _CONFIG_SM_CARRIER_AUTO_STARTUP:
-
-CONFIG_SM_CARRIER_AUTO_STARTUP - Enable automatic startup on boot.
-   This option enables automatic startup of the library on device boot.
-   If this configuration is disabled, automatic startup is controlled through a dedicated AT command.
-
-.. _CONFIG_SM_PGPS_INJECT_FIX_DATA:
-
-CONFIG_SM_PGPS_INJECT_FIX_DATA - Injects the data obtained when acquiring a fix.
-   This option, if enabled, when a fix is acquired the current location and time will be passed to the P-GPS subsystem.
-   It allows you to speed up the time it takes to acquire the next fix when A-GNSS is disabled or unavailable.
-   This can be detrimental to short TTFF if the device is expected to move distances longer than a few dozen kilometers between fix attempts.
-   In that case, this option should be disabled.
-   The default value is ``y``.
-
-.. _CONFIG_SM_DFU_MODEM_FULL:
-
-CONFIG_SM_DFU_MODEM_FULL - Enable full modem DFU
-   This option enables support for full modem firmware updates using the ``AT#XDFUINIT``, ``AT#XDFUWRITE``, and ``AT#XDFUAPPLY`` commands.
-   See the :ref:`DFU_AT_commands` for more information.
-
-.. _CONFIG_SM_DEBUG_STATS_HEAP:
-
-CONFIG_SM_DEBUG_STATS_HEAP - Enable heap memory statistics
-   This option enables the ``AT#XDBGSTATSMEM`` command for printing heap memory statistics.
-   See the :ref:`SM_AT_DBGSTATSMEM` for more information.
-
-.. _CONFIG_SM_DEBUG_STATS_THREAD_STACK:
-
-CONFIG_SM_DEBUG_STATS_THREAD_STACK - Enable thread stack memory statistics
-   This option enables thread stack memory statistics in the ``AT#XDBGSTATSMEM`` command.
-   See the :ref:`SM_AT_DBGSTATSMEM` for more information.
+.. options-from-kconfig::
+   :show-type:
 
 .. _sm_config_files:
 
@@ -335,11 +30,11 @@ Configuration files have a :file:`.conf` or :file:`.overlay` extension for Kconf
 Board-specific configuration files are named :file:`<BOARD>` with a :file:`.conf` or :file:`.overlay` extension and are located in the :file:`boards` directory.
 When the name of the board-specific configuration file matches the board target, the overlay is automatically included by the build system.
 
-See `Build and configuration system`_ for more information on the |NCS| configuration system.
+See :ref:`Build and configuration system <nrf:app_build_system>` for more information on the |NCS| configuration system.
 
 .. important::
 
-  When adding Kconfig fragments and devicetree overlays, make sure to use the :makevar:`EXTRA_CONF_FILE` and :makevar:`EXTRA_DTC_OVERLAY_FILE` `CMake options <cmake_options_>`_, respectively.
+  When adding Kconfig fragments and devicetree overlays, make sure to use the :makevar:`EXTRA_CONF_FILE` and :makevar:`EXTRA_DTC_OVERLAY_FILE` :ref:`CMake options <nrf:cmake_options>`, respectively.
   Otherwise, if :makevar:`CONF_FILE` or :makevar:`DTC_OVERLAY_FILE` is used, all the configuration files that normally get picked up automatically will have to be included explicitly.
 
 The following configuration files are provided:
@@ -362,7 +57,7 @@ The following configuration files are provided:
   Configures the ``uart0`` pins to match the interposer footprint and moves the DTR pin off the UART0 TX pin.
   See :ref:`uart_configuration_interposer` for pin details.
 
-* :file:`carrier.conf` - Configuration file that adds |NCS| `LwM2M carrier`_ support.
+* :file:`carrier.conf` - Configuration file that adds |NCS| :ref:`LwM2M carrier <nrf:liblwm2m_carrier_readme>` support.
   Used in conjunction with :file:`carrier-nrf9151.overlay`.
   See :ref:`sm_carrier_library_support` for more information on how to connect to an operator's device management platform.
 
@@ -372,18 +67,18 @@ The following configuration files are provided:
 
 * :file:`carrier-softbank.conf` and :file:`sysbuild-softbank.conf` - Configuration files that add SoftBank configurations needed by the carrier library.
   Used in conjunction with :file:`carrier.conf` and :file:`carrier-nrf9151.overlay`.
-  For more information, see the `Carrier-specific dependencies`_ section of the `LwM2M carrier`_ documentation.
+  For more information, see the :ref:`Carrier-specific dependencies <nrf:lwm2m_carrier_dependent>` section of the :ref:`LwM2M carrier <nrf:liblwm2m_carrier_readme>` documentation.
 
 * :file:`carrier-lgu.conf` - This configuration file adds LG U+ configurations needed by the carrier library.
   Used in conjunction with :file:`carrier.conf` and :file:`carrier-nrf9151.overlay`.
-  For more information, see the `Carrier-specific dependencies`_ section of the `LwM2M carrier`_ documentation.
+  For more information, see the :ref:`Carrier-specific dependencies <nrf:lwm2m_carrier_dependent>` section of the :ref:`LwM2M carrier <nrf:liblwm2m_carrier_readme>` documentation.
 
 * :file:`cmux.conf` - Configuration file that adds support for the CMUX protocol.
   See :ref:`SM_AT_CMUX` for more information.
 
 * :file:`ppp.conf` - Configuration file that adds support for the Point-to-Point Protocol (PPP).
   This disables most of the IP-based protocols available through AT commands (such as MQTT) as it is expected that the controlling chip's own IP stack is used instead.
-  See :ref:`CONFIG_SM_PPP <CONFIG_SM_PPP>` and :ref:`SM_AT_PPP` for more information.
+  See :option:`CONFIG_SM_PPP` and :ref:`SM_AT_PPP` for more information.
 
 * :file:`trace-backend-cmux.conf` - Configuration file that enables CMUX modem trace backend.
   When enabled, modem traces are transmitted on a dedicated CMUX channel.
@@ -407,7 +102,7 @@ The following configuration files are provided:
 
 * :file:`pgps-nrf9151.overlay` - Devicetree overlay that adds a dedicated flash partition for P-GPS prediction data storage.
   The overlay resizes the MCUboot primary and secondary slots to free up space for the ``pgps_partition``.
-  Required when ``CONFIG_NRF_CLOUD_PGPS`` is enabled.
+  Required when :kconfig:option:`CONFIG_NRF_CLOUD_PGPS` is enabled.
   Must also be passed to the ``mcuboot`` image using :makevar:`mcuboot_EXTRA_DTC_OVERLAY_FILE` so that MCUboot operates with the same partition layout.
   The absolute path to the overlay file must be provided.
   It does not reserve a ``memfault_coredump_partition``, so the Memfault coredump falls back to RAM in this configuration.

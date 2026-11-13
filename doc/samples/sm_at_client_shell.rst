@@ -26,9 +26,9 @@ The sample supports the following development kit:
      - PCA
      - Board name
      - Board target
-   * - `nRF54L15 DK <nRF54L15 DK_>`_
+   * - :ref:`nRF54L15 DK <nrf:ug_nrf54l>`
      - PCA10156
-     - `nrf54l15dk`_
+     - :doc:`nrf54l15dk <zephyr:boards/nordic/nrf54l15dk/doc/index>`
      - ``nrf54l15dk/nrf54l15/cpuapp``
 
 Connect the DK pins that are defined in the board-specific overlay files :file:`samples/sm_at_client_shell/boards/*.overlay` to the corresponding pins in the nRF91 Series DK, which are defined in :file:`app/external-mcu.overlay`.

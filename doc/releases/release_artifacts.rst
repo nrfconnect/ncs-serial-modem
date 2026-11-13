@@ -44,4 +44,4 @@ The artifacts are zipped and contain build files such as:
    * - ``.config``
      - Application image Kconfig options.
 
-For more details about the build artifacts, see the `build output files`_ documentation.
+For more details about the build artifacts, see the :ref:`build output files <nrf:app_build_output_files>` documentation.

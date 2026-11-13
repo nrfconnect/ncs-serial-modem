@@ -26,8 +26,10 @@ config SM_NRF_CLOUD_OBSERVABILITY
 	depends on SM_NRF_CLOUD
 	select BASE64
 	help
-	  Enable the AT#XNRFCLOUDOBS* commands, which control Memfault
+	  Enables the ``AT#XNRFCLOUDOBS*`` commands, which control the Memfault data upload
 	  over the nRF Cloud CoAP transport.
+	  This requires :option:`CONFIG_SM_NRF_CLOUD`.
+	  See :ref:`SM_AT_NRFCLOUDOBS` for more information.
 
 config SM_NRF_CLOUD_OBSERVABILITY_AUTO_INTERVAL_SECONDS
 	int "Default interval of the automatic upload"
@@ -35,10 +37,12 @@ config SM_NRF_CLOUD_OBSERVABILITY_AUTO_INTERVAL_SECONDS
 	default 3600
 	range 60 86400
 	help
-	  Interval used by AT#XNRFCLOUDOBSAUTO when the host enables the
+	  Interval, in seconds, used by ``AT#XNRFCLOUDOBSAUTO`` when the host enables the
 	  automatic upload without giving one, and no interval has been stored
 	  yet. The interval the host gives is persistent, so this value only
 	  applies until the host configures one.
+	  It defaults to one hour.
+	  This requires :option:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY` to be enabled.
 
 config SM_NRF_CLOUD_OBSERVABILITY_DEBUG
 	bool "Debug nRF Cloud observability AT commands"
@@ -46,14 +50,15 @@ config SM_NRF_CLOUD_OBSERVABILITY_DEBUG
 	help
 	  Enable the debug observability commands:
 
-	  * AT#XNRFCLOUDOBSDEVINFO returns the Memfault device information.
-	  * AT#XNRFCLOUDOBSCRASH forces a crash so that coredump capture and
+	  * ``AT#XNRFCLOUDOBSDEVINFO`` returns the Memfault device information.
+	  * ``AT#XNRFCLOUDOBSCRASH`` forces a crash so that coredump capture and
 	    upload can be tested.
-	  * AT#XNRFCLOUDOBSEXPORT prints the buffered Memfault chunks to the AT
+	  * ``AT#XNRFCLOUDOBSEXPORT`` prints the buffered Memfault chunks to the AT
 	    interface instead of uploading them.
 
-	  This is disabled by default: AT#XNRFCLOUDOBSCRASH deliberately crashes
+	  This is disabled by default: ``AT#XNRFCLOUDOBSCRASH`` deliberately crashes
 	  the application, so enable it only in development builds.
+	  This requires :option:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY` to be enabled.
 
 config SM_NRF_CLOUD_OBSERVABILITY_LTE_METRICS
 	bool "Collect additional LTE metrics via AT commands for Memfault"
@@ -65,16 +70,19 @@ config SM_NRF_CLOUD_OBSERVABILITY_LTE_METRICS
 	  Collect cell ID, tracking area code, LTE mode, PSM (TAU and active time) and
 	  eDRX (interval and paging time window) metrics on each Memfault heartbeat.
 	  Also track time to connect, connection-loss count, and LTE on-time.
+	  It is enabled by default.
+	  This requires :option:`CONFIG_SM_NRF_CLOUD_OBSERVABILITY`.
 
 config SM_NRF_CLOUD_FOTA
 	bool "nRF Cloud FOTA AT commands"
 	default y
 	depends on SM_NRF_CLOUD
 	help
-	  Enable the AT#XNRFCLOUDFOTA* commands, which check for and download
-	  application and modem firmware updates via Memfault release
-	  management (https://mflt.io/release-mgmt), delivered over the same
-	  nRF Cloud CoAP transport as AT#XNRFCLOUDOBS*.
+	  Enables the ``AT#XNRFCLOUDFOTA*`` commands, which check for and download
+	  application and modem firmware updates using `Memfault release management`_,
+	  delivered over the same nRF Cloud CoAP transport as ``AT#XNRFCLOUDOBS*``.
+	  This requires :option:`CONFIG_SM_NRF_CLOUD`.
+	  See :ref:`SM_AT_NRFCLOUDFOTA` for more information.
 
 # Report a statically configured firmware version. A choice symbol cannot be given a
 # configdefault, which warns that it has no effect, so the default of the choice itself is

@@ -228,7 +228,7 @@ The parameters and their defined values are the following:
    .. __:
 
    Download error codes
-      The download error codes are common to all FOTA types and correspond to the ``fota_download_error_cause`` enumeration of the `FOTA download`_ library:
+      The download error codes are common to all FOTA types and correspond to the ``fota_download_error_cause`` enumeration of the :ref:`FOTA download <nrf:lib_fota_download>` library:
 
       * ``1`` - Connecting to the server failed (for example, because of wrong TLS credentials).
       * ``2`` - Download failed.
