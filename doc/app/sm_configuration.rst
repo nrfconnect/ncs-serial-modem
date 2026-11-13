@@ -249,6 +249,27 @@ CONFIG_SM_MQTTC_VERSION_5_0 - MQTT 5.0 protocol support
    Select MQTT v5.0 with the ``<version>`` parameter of ``#XMQTTCFG``.
    See :ref:`SM_AT_MQTT` for supported features and limitations.
 
+.. _CONFIG_SM_MQTTC_TOPIC_ALIAS_MAX:
+
+CONFIG_SM_MQTTC_TOPIC_ALIAS_MAX - Maximum number of outgoing MQTT 5.0 topic aliases
+   This option sets how many topics of its own MQTT v5.0 publications the client replaces with topic aliases.
+   The broker's Topic Alias Maximum can lower the limit.
+   The default value is 4. Set it to 0 to disable outgoing topic aliases.
+
+   The Zephyr MQTT library option ``CONFIG_MQTT_TOPIC_ALIAS_MAX`` is separate and limits the topic aliases that the broker can use in messages to the client.
+   |SM| sets it to 0 by default, so incoming messages always carry full topic names.
+   To enable incoming topic aliases, set both library options, for example:
+
+   .. code-block:: none
+
+      CONFIG_MQTT_TOPIC_ALIAS_MAX=4
+      CONFIG_MQTT_TOPIC_ALIAS_STRING_MAX=512
+
+   Set ``CONFIG_MQTT_TOPIC_ALIAS_STRING_MAX`` to at least the value of :ref:`CONFIG_SM_MQTTC_MESSAGE_BUFFER_LEN`.
+   The client closes the connection when the broker assigns an alias to a longer topic, and wildcard subscriptions can match topics of any length.
+   Each incoming alias uses ``CONFIG_MQTT_TOPIC_ALIAS_STRING_MAX`` + 2 bytes of static RAM.
+   The broker decides whether to use aliases, so the savings depend on the broker.
+
 .. _CONFIG_SM_HTTPC:
 
 CONFIG_SM_HTTPC - HTTP client support in |SM|

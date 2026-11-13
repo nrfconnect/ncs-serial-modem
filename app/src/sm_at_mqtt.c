@@ -32,6 +32,13 @@ LOG_MODULE_REGISTER(sm_mqtt, CONFIG_SM_LOG_LEVEL);
 #define SM_MQTT_REASON_CODE_FAILURE 0x80
 #define SM_MQTT_REMAINING_LENGTH_MAX 268435455U
 
+/* Number of outgoing topic aliases; 0 compiles the alias code out. */
+#if defined(CONFIG_MQTT_VERSION_5_0) && defined(CONFIG_SM_MQTTC_TOPIC_ALIAS_MAX)
+#define SM_MQTT_TOPIC_ALIASES CONFIG_SM_MQTTC_TOPIC_ALIAS_MAX
+#else
+#define SM_MQTT_TOPIC_ALIASES 0
+#endif
+
 /**@brief MQTT client operations. */
 enum sm_mqttcon_operation {
 	MQTTC_DISCONNECT,
@@ -75,6 +82,9 @@ static struct sm_mqtt_ctx {
 	bool wildcard_sub_available;
 	bool shared_sub_available;
 #endif
+#if SM_MQTT_TOPIC_ALIASES > 0
+	uint16_t topic_alias_max; /* Usable outgoing aliases: local and broker limit */
+#endif
 } ctx;
 
 static uint16_t mqtt_broker_port;
@@ -103,6 +113,14 @@ struct mqtt_conn {
 #if defined(CONFIG_MQTT_VERSION_5_0)
 	struct mqtt_inflight *inflight;
 	uint16_t inflight_count; /* QoS 1/2 PUBLISH entries, for Receive Maximum */
+#endif
+#if SM_MQTT_TOPIC_ALIASES > 0
+	/* Outgoing aliases in assignment order; alias N is aliases[N - 1]. */
+	struct {
+		uint8_t topic[MQTT_MAX_TOPIC_LEN];
+		uint8_t len; /* 0 while unassigned */
+	} aliases[SM_MQTT_TOPIC_ALIASES];
+	uint16_t alias_new; /* Alias that pub_param assigns, recorded once sent */
 #endif
 };
 static struct mqtt_conn *mqtt_conn;
@@ -215,6 +233,69 @@ static void mqtt_capabilities_reset(void)
 	ctx.retain_available = true;
 	ctx.wildcard_sub_available = true;
 	ctx.shared_sub_available = true;
+#if SM_MQTT_TOPIC_ALIASES > 0
+	ctx.topic_alias_max = 0;
+#endif
+}
+#endif
+
+#if SM_MQTT_TOPIC_ALIASES > 0
+BUILD_ASSERT(MQTT_MAX_TOPIC_LEN <= UINT8_MAX);
+
+/* Aliases are valid for one network connection, starting from its CONNACK. */
+static void mqtt_alias_connack(const struct mqtt_connack_param *connack)
+{
+	if (mqtt_conn != NULL) {
+		memset(mqtt_conn->aliases, 0, sizeof(mqtt_conn->aliases));
+		mqtt_conn->alias_new = 0;
+	}
+	if (connack->prop.rx.has_topic_alias_maximum) {
+		ctx.topic_alias_max = MIN(connack->prop.topic_alias_maximum, SM_MQTT_TOPIC_ALIASES);
+	}
+}
+
+/* Use the alias of a known topic, or assign the next free alias. Without a free alias,
+ * the topic is sent in full. Called after pub_param holds the full topic.
+ */
+static void mqtt_alias_select(void)
+{
+	struct mqtt_publish_param *param = &mqtt_conn->pub_param;
+	size_t len = param->message.topic.topic.size;
+
+	param->prop.topic_alias = 0;
+	mqtt_conn->alias_new = 0;
+	if (client.protocol_version != MQTT_VERSION_5_0 || len == 0) {
+		return;
+	}
+	for (uint16_t i = 0; i < ctx.topic_alias_max; i++) {
+		if (mqtt_conn->aliases[i].len == 0) {
+			/* Aliases are assigned in order, so later ones are free too. */
+			mqtt_conn->alias_new = i + 1;
+			param->prop.topic_alias = i + 1;
+			return;
+		}
+		if (mqtt_conn->aliases[i].len == len &&
+		    memcmp(mqtt_conn->aliases[i].topic, mqtt_conn->pub_topic, len) == 0) {
+			param->prop.topic_alias = i + 1;
+			param->message.topic.topic.size = 0;
+			return;
+		}
+	}
+}
+
+/* Record an assigned alias once the PUBLISH that carries its topic was sent. */
+static void mqtt_alias_commit(void)
+{
+	uint16_t alias = mqtt_conn->alias_new;
+
+	if (alias == 0) {
+		return;
+	}
+	mqtt_conn->aliases[alias - 1].len = mqtt_conn->pub_param.message.topic.topic.size;
+	memcpy(mqtt_conn->aliases[alias - 1].topic, mqtt_conn->pub_topic,
+	       mqtt_conn->aliases[alias - 1].len);
+	mqtt_conn->alias_new = 0;
+	LOG_DBG("MQTT topic alias %u assigned", alias);
 }
 #endif
 
@@ -388,6 +469,9 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 #if defined(CONFIG_MQTT_VERSION_5_0)
 		if (evt->result == 0 && client.protocol_version == MQTT_VERSION_5_0) {
 			mqtt_capabilities_reset();
+#if SM_MQTT_TOPIC_ALIASES > 0
+			mqtt_alias_connack(&evt->param.connack);
+#endif
 			ctx.receive_maximum = UINT16_MAX;
 			if (evt->param.connack.prop.rx.has_receive_maximum) {
 				ctx.receive_maximum = evt->param.connack.prop.receive_maximum;
@@ -959,6 +1043,9 @@ static int mqtt_check_publish(size_t msg_len)
 		if (mqtt_conn->pub_param.prop.message_expiry_interval != 0) {
 			remaining += 1 + sizeof(uint32_t);
 		}
+		if (mqtt_conn->pub_param.prop.topic_alias != 0) {
+			remaining += 1 + sizeof(uint16_t);
+		}
 #endif
 	}
 	return mqtt_check_packet_size(remaining);
@@ -1001,6 +1088,11 @@ static int do_mqtt_publish(uint8_t *msg, size_t msg_len)
 	}
 #endif
 	err = mqtt_publish(&client, &mqtt_conn->pub_param);
+#if SM_MQTT_TOPIC_ALIASES > 0
+	if (err == 0) {
+		mqtt_alias_commit();
+	}
+#endif
 #if defined(CONFIG_MQTT_VERSION_5_0)
 	if (err != 0 && tracked) {
 		mqtt_inflight_remove(message_id);
@@ -1293,6 +1385,9 @@ static int mqtt_prepare_publish(size_t topic_len, uint16_t qos, uint16_t retain,
 	mqtt_conn->pub_param.dup_flag = 0;
 #if defined(CONFIG_MQTT_VERSION_5_0)
 	mqtt_conn->pub_param.prop.message_expiry_interval = msg_expiry;
+#endif
+#if SM_MQTT_TOPIC_ALIASES > 0
+	mqtt_alias_select();
 #endif
 
 	int message_id = mqtt_message_id_next();

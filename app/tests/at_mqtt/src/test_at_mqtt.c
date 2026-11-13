@@ -1455,6 +1455,200 @@ void test_mqtt_publish_message_expiry_3_1_1(void)
 	mqtt_disconnect_ok();
 }
 
+#if defined(CONFIG_MQTT_VERSION_5_0)
+static struct {
+	uint16_t alias;
+	char topic[16];
+} alias_seen[8];
+static size_t alias_calls;
+static int alias_publish_result;
+
+static int alias_publish_stub(struct mqtt_client *c, const struct mqtt_publish_param *param,
+			      int calls)
+{
+	ARG_UNUSED(c);
+	ARG_UNUSED(calls);
+	TEST_ASSERT_LESS_THAN(ARRAY_SIZE(alias_seen), alias_calls);
+	TEST_ASSERT_LESS_THAN(sizeof(alias_seen[0].topic), param->message.topic.topic.size);
+	alias_seen[alias_calls].alias = param->prop.topic_alias;
+	memcpy(alias_seen[alias_calls].topic, param->message.topic.topic.utf8,
+	       param->message.topic.topic.size);
+	alias_seen[alias_calls].topic[param->message.topic.topic.size] = '\0';
+	alias_calls++;
+	return alias_publish_result;
+}
+
+static void alias_connect_evt(const struct mqtt_evt *connack)
+{
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,5\r\n", MQTT_VERSION_5_0);
+	inject_mqtt_evt(connack);
+	memset(alias_seen, 0, sizeof(alias_seen));
+	alias_calls = 0;
+	alias_publish_result = 0;
+	__cmock_mqtt_publish_Stub(alias_publish_stub);
+}
+
+static void alias_connect(bool has_maximum, uint16_t maximum)
+{
+	struct mqtt_evt evt = {
+		.type = MQTT_EVT_CONNACK,
+		.param.connack.prop.rx.has_topic_alias_maximum = has_maximum,
+		.param.connack.prop.topic_alias_maximum = maximum,
+	};
+
+	alias_connect_evt(&evt);
+}
+
+static void alias_publish(const char *topic, bool allowed)
+{
+	char command[48];
+
+	snprintf(command, sizeof(command), "AT#XMQTTPUB=\"%s\",\"x\"\r\n", topic);
+	inflight_command(command, allowed);
+}
+
+/* Check the topic and alias of the i-th sent PUBLISH; "" means the alias replaced it. */
+static void assert_alias(size_t i, uint16_t alias, const char *topic)
+{
+	TEST_ASSERT_LESS_THAN(alias_calls, i);
+	TEST_ASSERT_EQUAL_UINT16(alias, alias_seen[i].alias);
+	TEST_ASSERT_EQUAL_STRING(topic, alias_seen[i].topic);
+}
+
+static void alias_disconnect(void)
+{
+	__cmock_mqtt_publish_Stub(NULL);
+	mqtt_disconnect_ok();
+}
+#endif
+
+void test_mqtt_topic_alias_assignment_5_0(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	/* The broker allows more aliases than the local limit of 2. */
+	alias_connect(true, 10);
+	alias_publish("t/a", true);
+	alias_publish("t/a", true);
+	alias_publish("t/b", true);
+	/* No free alias: the topic is sent in full, without reassigning an alias. */
+	alias_publish("t/c", true);
+	alias_publish("t/b", true);
+	inflight_command("AT#XMQTTPUBEMPTY=\"t/a\"\r\n", true);
+	inflight_command("AT#XMQTTPUB=\"t/b\",\"\",0,0,3\r\n", true);
+	clear_captured_response();
+	uart_stub_rx_nowait((const uint8_t *)"abc", 3);
+	k_sleep(K_MSEC(20));
+	uart_stub_tx_done_reset();
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "#XDATAMODE: 0\r\n"));
+	TEST_ASSERT_EQUAL_UINT(7, alias_calls);
+	assert_alias(0, 1, "t/a");
+	assert_alias(1, 1, "");
+	assert_alias(2, 2, "t/b");
+	assert_alias(3, 0, "t/c");
+	assert_alias(4, 2, "");
+	assert_alias(5, 1, "");
+	assert_alias(6, 2, "");
+	alias_disconnect();
+#else
+	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
+#endif
+}
+
+void test_mqtt_topic_alias_broker_limit_5_0(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	/* Absent or zero Topic Alias Maximum: no aliases. */
+	alias_connect(false, 10);
+	alias_publish("t/a", true);
+	alias_publish("t/a", true);
+	assert_alias(0, 0, "t/a");
+	assert_alias(1, 0, "t/a");
+	alias_disconnect();
+	alias_connect(true, 0);
+	alias_publish("t/a", true);
+	alias_publish("t/a", true);
+	assert_alias(1, 0, "t/a");
+	alias_disconnect();
+
+	/* The broker limit applies when it is below the local limit. */
+	alias_connect(true, 1);
+	alias_publish("t/a", true);
+	alias_publish("t/b", true);
+	alias_publish("t/a", true);
+	assert_alias(0, 1, "t/a");
+	assert_alias(1, 0, "t/b");
+	assert_alias(2, 1, "");
+	alias_disconnect();
+#else
+	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
+#endif
+}
+
+void test_mqtt_topic_alias_reset_and_failure_5_0(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	alias_connect(true, 2);
+	/* A failed send does not record the alias. */
+	alias_publish_result = -EIO;
+	alias_publish("t/a", false);
+	alias_publish_result = 0;
+	alias_publish("t/a", true);
+	alias_publish("t/a", true);
+	assert_alias(0, 1, "t/a");
+	assert_alias(1, 1, "t/a");
+	assert_alias(2, 1, "");
+	alias_disconnect();
+
+	/* Aliases do not survive a new network connection. */
+	alias_connect(true, 2);
+	alias_publish("t/a", true);
+	assert_alias(0, 1, "t/a");
+	alias_disconnect();
+
+	/* MQTT 3.1.1 has no topic aliases. */
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,4\r\n", MQTT_VERSION_3_1_1);
+	alias_calls = 0;
+	__cmock_mqtt_publish_Stub(alias_publish_stub);
+	alias_publish("t/a", true);
+	alias_publish("t/a", true);
+	assert_alias(0, 0, "t/a");
+	assert_alias(1, 0, "t/a");
+	alias_disconnect();
+#else
+	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
+#endif
+}
+
+void test_mqtt_topic_alias_packet_size_5_0(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	struct mqtt_evt evt = {
+		.type = MQTT_EVT_CONNACK,
+		.param.connack.prop.rx.has_topic_alias_maximum = true,
+		.param.connack.prop.topic_alias_maximum = 2,
+		.param.connack.prop.rx.has_maximum_packet_size = true,
+		.param.connack.prop.maximum_packet_size = 18,
+	};
+
+	alias_connect_evt(&evt);
+	/* Assigning an alias adds three bytes: 2 + 9 + 1 + 1 + 3 = 16, packet size 18. */
+	inflight_command("AT#XMQTTPUB=\"topic/abc\",\"x\"\r\n", true);
+	/* The alias replaces the topic: 2 + 0 + 10 + 1 + 3 = 16, without it 22. */
+	inflight_command("AT#XMQTTPUB=\"topic/abc\",\"0123456789\"\r\n", true);
+	/* 2 + 10 + 1 + 1 + 3 = 17, packet size 19, but 16 without the new alias. */
+	inflight_command("AT#XMQTTPUB=\"topic/abcd\",\"x\"\r\n", false);
+	/* The rejected request did not consume alias 2. */
+	inflight_command("AT#XMQTTPUB=\"topic/abd\",\"x\"\r\n", true);
+	TEST_ASSERT_EQUAL_UINT(3, alias_calls);
+	assert_alias(0, 1, "topic/abc");
+	assert_alias(1, 1, "");
+	assert_alias(2, 2, "topic/abd");
+	alias_disconnect();
+#else
+	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
+#endif
+}
+
 void test_mqtt_maximum_packet_size_subscriptions(void)
 {
 #if defined(CONFIG_MQTT_VERSION_5_0)
