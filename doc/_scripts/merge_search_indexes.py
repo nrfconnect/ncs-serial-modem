@@ -7,15 +7,15 @@
 Sphinx search index merge utility
 =================================
 
-This script can be used to merge search indexes of multiple docsets, thus
-allowing to obtain a cross-search experience.
+This script can be used to merge search indexes of the docsets of one
+publication, thus allowing to obtain a cross-search experience.
 
 Credits go to Dominik Kilian for the original idea and part of this code.
 
 Usage
 *****
 
-python merge_search_indexes.py -b path/to/doc/build/dir
+python merge_search_indexes.py -b path/to/doc/build/dir -p publication
 """
 
 import argparse
@@ -162,25 +162,31 @@ def merge_objects(src: dict, dst: dict, offset: int) -> None:
             )
 
 
-def main(build_dir: Path) -> None:
+def main(build_dir: Path, publication: str) -> None:
     """Entry point.
+
+    Only the docsets of one publication are merged. A result of the merged
+    index is linked relative to the docset that holds it, which cannot reach
+    another publication.
 
     Args:
         build_dir: Documentation build directory.
+        publication: Publication whose docsets are merged.
     """
 
     # discover built docsets
     built_docsets = list()
-    for entry in (build_dir / "html").iterdir():
-        if entry.is_dir() and entry.name in docsets.ALL_DOCSETS:
+    for entry in (build_dir / "html" / publication).iterdir():
+        if entry.is_dir() and entry.name in docsets.PUBLICATIONS[publication].docsets:
             built_docsets.append(entry.name)
 
     # load indexes
     indexes = dict()
     for docset in built_docsets:
-        index_file = build_dir / "html" / docset / "searchindex.orig.js"
+        docset_dir = docsets.html_dir(build_dir, docset)
+        index_file = docset_dir / "searchindex.orig.js"
         if not index_file.exists():
-            shutil.copy(build_dir / "html" / docset / "searchindex.js", index_file)
+            shutil.copy(docset_dir / "searchindex.js", index_file)
 
         indexes[docset] = load_search_index(index_file, docsets.ALL_DOCSETS[docset][0])
 
@@ -197,7 +203,7 @@ def main(build_dir: Path) -> None:
             merge_terms(index_to_merge, final_index, offset)
             merge_objects(index_to_merge, final_index, offset)
 
-        dump_search_index(final_index, build_dir / "html" / docset / "searchindex.js")
+        dump_search_index(final_index, docsets.html_dir(build_dir, docset) / "searchindex.js")
 
 
 if __name__ == "__main__":
@@ -210,7 +216,14 @@ if __name__ == "__main__":
         required=True,
         help="Documentation build directory",
     )
+    parser.add_argument(
+        "-p",
+        "--publication",
+        required=True,
+        choices=list(docsets.PUBLICATIONS),
+        help="Publication whose docsets are merged",
+    )
 
     args = parser.parse_args()
 
-    main(args.build_dir)
+    main(args.build_dir, args.publication)
