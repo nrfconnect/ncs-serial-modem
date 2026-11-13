@@ -1,0 +1,13 @@
+/* Style sheet of a docset that is published at the root of its publication,
+   see PUBLICATIONS in _utils/docsets.py.
+
+   The theme renders the docset bar below the header and links every entry to
+   a sibling directory of the current docset. Such a publication holds one
+   docset, which is published without a directory of its own, so the only
+   entry of the bar is the current docset and its link points outside the
+   version directory. Hiding the bar removes both the dead link and a row that
+   offers nothing to switch to. */
+
+.ncs-header-nav {
+  display: none;
+}

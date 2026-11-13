@@ -12,14 +12,21 @@ Builds every docset listed in :data:`docsets.ALL_DOCSETS` from the shared
 sources in :file:`doc/`, one Sphinx run per docset and output format, and
 assembles the directory layout that gets published::
 
-    <build>/html/index.html         redirect to the default docset
-    <build>/html/versions.json      Serial Modem release list (git tags)
-    <build>/html/<docset>/          one directory per docset
-    <build>/pdf/<docset>/latex/     LaTeX sources and PDF of one docset
+    <build>/html/<publication>/index.html      redirect to the first docset
+    <build>/html/<publication>/versions.json   version list, dropdown only
+    <build>/html/<publication>/<docset>/       one directory per docset
+    <build>/pdf/<publication>/<docset>/latex/  LaTeX sources and PDF
 
-The docsets must be siblings below the HTML root because that is where the
-docset switcher of ``sphinx_ncs_theme`` looks for them, and versions.json must
-sit next to them for the same reason.
+Each publication is uploaded as a document of its own, so its directory is
+what :file:`.github/workflows/doc-build.yml` archives. The docsets must be
+siblings below the root of their publication because that is where the docset
+switcher of ``sphinx_ncs_theme`` looks for them, and versions.json must sit
+next to them for the same reason.
+
+A publication that is published from its single docset is archived from that
+docset directory instead, so that the pages end up one level higher than the
+layout above, and the two files above are copied into that docset directory.
+See :func:`docsets.publish_dir`.
 
 Only the HTML is built by default. The PDF additionally needs a LaTeX
 installation, Latexmk and Inkscape, so it is normally left to the doc-build
@@ -77,6 +84,7 @@ def build_docset(docset: str, fmt: str, build_dir: Path, sphinx_opts: list[str])
     # The docset name is also set as a Sphinx tag, so that a shared page can
     # vary per docset with ".. only:: <docset>" instead of being forked.
     conf_opts = ["-c", str(DOC_BASE / "_docsets" / docset), "-t", docset]
+    out_dir = build_dir / fmt / docsets.publication_of(docset) / docset
 
     if fmt == "html":
         # Each docset needs its own doctree cache. Sharing one between builds
@@ -93,7 +101,7 @@ def build_docset(docset: str, fmt: str, build_dir: Path, sphinx_opts: list[str])
             str(build_dir / "doctrees" / docset),
             *sphinx_opts,
             str(DOC_BASE),
-            str(build_dir / "html" / docset),
+            str(out_dir),
         ]
     else:
         # Make mode runs Latexmk over the generated sources itself, so that the
@@ -108,7 +116,7 @@ def build_docset(docset: str, fmt: str, build_dir: Path, sphinx_opts: list[str])
             "-M",
             "latexpdf",
             str(DOC_BASE),
-            str(build_dir / "pdf" / docset),
+            str(out_dir),
             *conf_opts,
             *sphinx_opts,
         ]
@@ -135,27 +143,44 @@ def copy_pdf(docset: str, build_dir: Path) -> None:
         build_dir: Documentation build directory.
     """
 
-    html_dir = build_dir / "html" / docset
+    html_dir = docsets.html_dir(build_dir, docset)
     if not html_dir.is_dir():
         print(f"Skipping the PDF copy of the {docset} docset: no HTML built", flush=True)
         return
 
-    pdf = build_dir / "pdf" / docset / "latex" / f"{docsets.pdf_stem(docset)}.pdf"
+    publication = docsets.publication_of(docset)
+    pdf = build_dir / "pdf" / publication / docset / "latex" / f"{docsets.pdf_stem(docset)}.pdf"
     print(f"Copying {pdf.name} into the {docset} docset", flush=True)
     shutil.copy(pdf, html_dir / pdf.name)
 
 
-def copy_extra_content(build_dir: Path) -> None:
+def copy_extra_content(publication: str, build_dir: Path) -> None:
     """Copy the content that belongs next to the docsets instead of inside one.
 
+    The landing page is published as the ``index.html`` of the publication, so
+    that the hosted root forwards to the first docset. The version list is only
+    copied for a publication that is hosted in several versions, because that
+    is the one whose theme shows a version dropdown. The theme always reads it
+    from the current version, so every version ships a copy.
+
+    Both belong next to the docset directories, which is the root of the
+    publication, except for a publication that is published from its single
+    docset: there that docset is the root, see :func:`docsets.publish_dir`.
+
     Args:
+        publication: Publication name.
         build_dir: Documentation build directory.
     """
 
-    html_dir = build_dir / "html"
-    for src in (DOC_BASE / "_static" / "html" / "index.html", DOC_BASE / "versions.json"):
-        print(f"Copying {src.name} to the HTML root", flush=True)
-        shutil.copy(src, html_dir / src.name)
+    root = docsets.publish_dir(build_dir, publication)
+    sources = {"index.html": DOC_BASE / "_static" / "html" / f"index_{publication}.html"}
+    versions = docsets.versions_file(publication)
+    if versions:
+        sources["versions.json"] = versions
+
+    for name, src in sources.items():
+        print(f"Copying {src.name} to the root of the {publication} publication", flush=True)
+        shutil.copy(src, root / name)
 
 
 def main() -> None:
@@ -200,13 +225,21 @@ def main() -> None:
             build_docset(docset, fmt, build_dir, sphinx_opts)
 
     if "html" in formats:
-        copy_extra_content(build_dir)
+        for publication, spec in docsets.PUBLICATIONS.items():
+            built = [name for name in spec.docsets if name in selected]
+            if not built:
+                continue
 
-        # Merging rewrites every index in terms of the others, so it only makes
-        # sense once all of them are up to date.
-        if len(selected) == len(docsets.ALL_DOCSETS):
-            print("Merging the search indexes", flush=True)
-            merge_search_indexes.main(build_dir)
+            copy_extra_content(publication, build_dir)
+
+            # Merging rewrites every index in terms of the others, so it only
+            # makes sense once every docset of the publication is up to date,
+            # and only a publication that holds several of them has anything
+            # to merge. A docset never searches outside its publication,
+            # because the result links are relative to the docset directory.
+            if len(built) == len(spec.docsets) > 1:
+                print(f"Merging the search indexes of {publication}", flush=True)
+                merge_search_indexes.main(build_dir, publication)
 
     if "pdf" in formats:
         for docset in selected:

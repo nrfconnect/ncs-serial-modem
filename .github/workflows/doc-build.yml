@@ -95,27 +95,63 @@ jobs:
           PUBLISH="$PWD/publish"
           mkdir -p "$PUBLISH"
 
-          MONITOR="monitor_${{ github.run_id }}.txt"
-
-          # Create documentation upload files
+          # The branch the build belongs to, which is the base branch of a
+          # pull request and the tag name of a tag build.
+          BRANCH="${{ github.event.pull_request.base.ref || github.ref_name }}"
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            ARCHIVE="legacy-addon-serial_modem-pr-${{ github.event.number }}.zip"
-            echo "publish2 dev PR-${{ github.event.number }} ${ARCHIVE}" > "${MONITOR}"
-            echo "${{ github.event.number }}" > pr.txt
+            echo "${{ github.event.number }}" > "$PUBLISH/pr.txt"
+            CHANNEL=dev
+            OUTDIR="PR-${{ github.event.number }}"
           else
-            ARCHIVE="legacy-addon-serial_modem-${VERSION}.zip"
-            echo "publish2 main ${VERSION} ${ARCHIVE}" > "${MONITOR}"
+            CHANNEL=main
+            OUTDIR="${VERSION}"
           fi
 
-          # The build copied the PDF of every docset into its HTML directory,
-          # so the archive ships them alongside the pages that link to them.
-          pushd "doc/build/html"
-          zip -rq "${ARCHIVE}" .
-          mv "${ARCHIVE}" "$PUBLISH"
-          popd
+          # One archive and one monitor file per publication, each uploaded to
+          # an add-on directory of its own. Which publications this build
+          # publishes, the directory of the add-on each goes into, and the
+          # directory each is archived from all follow from PUBLICATIONS in
+          # doc/_utils/docsets.py. Every branch builds every publication, which
+          # keeps the sources validated, but a publication can be limited to
+          # the branch it is published from and the tags of its releases.
+          SPECS=$(python - "$OUTDIR" "$BRANCH" <<'EOF'
+          import sys
+          from pathlib import Path
 
-          mv "${MONITOR}" "$PUBLISH"
-          if [[ -f pr.txt ]]; then mv pr.txt "$PUBLISH"; fi
+          sys.path.insert(0, "doc/_utils")
+          import docsets
+
+          version, branch = sys.argv[1:]
+
+          for publication in docsets.PUBLICATIONS:
+              outdir = docsets.publish_version(publication, version, branch)
+              if outdir is None:
+                  print(f"Not publishing {publication} from {branch}", file=sys.stderr)
+                  continue
+              print(publication, outdir, docsets.publish_dir(Path("doc/build"), publication))
+          EOF
+          )
+
+          while read -r PUBLICATION OUTDIR SOURCE; do
+            # An empty SPECS still feeds the loop one empty line.
+            [ -n "$PUBLICATION" ] || continue
+
+            # doc-publish.yml reads the add-on directory back out of the
+            # archive name, so the name carries the publication, and unpacks
+            # the archive into the directory of the third field.
+            MONITOR="monitor_${{ github.run_id }}_${PUBLICATION}.txt"
+            ARCHIVE="legacy-addon-${PUBLICATION}-${OUTDIR,,}.zip"
+            echo "publish2 ${CHANNEL} ${OUTDIR} ${ARCHIVE}" > "${MONITOR}"
+
+            # The build copied the PDF of every docset into its HTML directory,
+            # so the archive ships them alongside the pages that link to them.
+            pushd "${SOURCE}"
+            zip -rq "${ARCHIVE}" .
+            mv "${ARCHIVE}" "$PUBLISH"
+            popd
+
+            mv "${MONITOR}" "$PUBLISH"
+          done <<< "$SPECS"
 
       - name: Store
         if: ${{ !contains(github.event.pull_request.labels.*.name, 'external') || contains(github.event.pull_request.labels.*.name, 'CI-trusted-author') }}
@@ -131,5 +167,6 @@ jobs:
         with:
           name: sphinx-pdf
           retention-days: 5
-          # One PDF per docset, kept apart by the docset directory in the path.
-          path: doc/build/pdf/*/latex/ncs-serial-modem.pdf
+          # One PDF per docset, kept apart by the publication and docset
+          # directories in the path.
+          path: doc/build/pdf/*/*/latex/*.pdf
