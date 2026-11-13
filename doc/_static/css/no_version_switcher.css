@@ -1,0 +1,18 @@
+/* Style sheet of a docset whose publication is hosted in one version only,
+   see PUBLICATIONS in _utils/docsets.py.
+
+   The theme always renders the version dropdown in the header and fills it
+   from the versions.json next to the docset directories. Such a publication
+   ships no versions.json, so the dropdown would stay empty, and there is
+   nothing to switch between in the first place. Hiding the surrounding
+   element takes the gap between the header buttons with it; the fallback
+   leaves that gap for a browser without :has() support but still removes the
+   button. */
+
+.ncs-header-top .dropdown:has(> .ncs-btn-versions) {
+  display: none;
+}
+
+.ncs-btn-versions {
+  display: none;
+}

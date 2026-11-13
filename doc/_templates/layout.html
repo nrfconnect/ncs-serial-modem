@@ -1,0 +1,34 @@
+{% extends "!layout.html" %}
+
+{#- The header button that leads to the other publication, see HEADER_LINKS in
+    _docsets/conf_common.py. The theme renders it from the addons_url option
+    but hardcodes both of its labels, "nRF Connect SDK Add-ons" and "Add-ons",
+    and which of the two shows depends on the viewport width. The script below
+    replaces both, so the button reads the same at every width. It identifies
+    the button by the href the theme gave it, which is the one addons_url
+    holds. This block is emitted in the head, hence the listener. -#}
+{%- block scripts %}
+{{ super() }}
+{%- if header_link %}
+<script type="text/javascript">
+  (function (link) {
+    document.addEventListener("DOMContentLoaded", function () {
+      var button = document.querySelector(
+        '.ncs-header-top a.ncs-btn-header[href="' + link.url + '"]'
+      );
+      if (!button) {
+        return;
+      }
+
+      var labels = {"ncs-label-long": link.long, "ncs-label-short": link.short};
+      Object.keys(labels).forEach(function (css_class) {
+        var label = button.querySelector("span." + css_class);
+        if (label) {
+          label.textContent = labels[css_class];
+        }
+      });
+    });
+  })({{ header_link | tojson }});
+</script>
+{%- endif %}
+{%- endblock %}
