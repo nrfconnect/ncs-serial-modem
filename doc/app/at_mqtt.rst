@@ -12,7 +12,7 @@ This page describes the AT commands used to operate the MQTT client.
 The MQTT client supports MQTT v3.1.1 and experimental MQTT v5.0.
 MQTT v3.1.1 is the default.
 Select MQTT v5.0 with the ``<version>`` parameter of ``#XMQTTCFG``.
-The AT interface supports the MQTT v5.0 Session Expiry Interval property, Session Present flag, and acknowledgment reason codes.
+The AT interface supports the MQTT v5.0 Session Expiry Interval and Message Expiry Interval properties, Session Present flag, and acknowledgment reason codes.
 It does not expose other MQTT v5.0 properties, subscription options, or enhanced authentication.
 Examples use MQTT v3.1.1 unless stated otherwise.
 
@@ -533,7 +533,7 @@ Unsolicited notification
 
 ::
 
-   #XMQTTMSG: <topic_length>,<message_length>
+   #XMQTTMSG: <topic_length>,<message_length>[,<msg_expiry>]
    <topic_received>
    <message>
 
@@ -546,6 +546,11 @@ The parameters and their defined values are the following:
 <message_length>
    Integer.
    The length of the ``<message>`` field.
+
+<msg_expiry>
+   Integer.
+   Remaining MQTT v5.0 Message Expiry Interval in seconds.
+   Present only when the received message contains the property.
 
 <topic_received>
    String.
@@ -700,6 +705,8 @@ Test command
 
 The test command is not supported.
 
+.. _SM_AT_MQTT_XMQTTPUB:
+
 MQTT publish #XMQTTPUB
 ======================
 
@@ -724,7 +731,7 @@ Syntax
 
 ::
 
-   AT#XMQTTPUB=<topic>[,<msg>[,<qos>[,<retain>[,<data_len>]]]]
+   AT#XMQTTPUB=<topic>[,<msg>[,<qos>[,<retain>[,<data_len>[,<msg_expiry>]]]]]
 
 
 The parameters and their defined values are the following:
@@ -771,6 +778,12 @@ The parameters and their defined values are the following:
    The value ``0`` is equivalent to omitting the parameter.
    Specifying a non-zero ``<data_len>`` together with a non-empty ``<msg>`` results in an error.
 
+<msg_expiry>
+   Integer.
+   MQTT v5.0 Message Expiry Interval in seconds.
+   The default value ``0`` means that the message does not expire.
+   With a non-empty ``<msg>``, set ``<data_len>`` to ``0``.
+
 Examples
 ~~~~~~~~
 
@@ -778,6 +791,14 @@ Examples
 
    AT#XMQTTPUB="nrf91/sm/mqtt/topic0","Test message with QoS 0",0,0
    OK
+
+Publish a message that expires after one hour, using MQTT v5.0:
+
+::
+
+   AT#XMQTTPUB="nrf91/sm/mqtt/topic0","Test message with expiry",1,0,0,3600
+   OK
+   #XMQTTEVT: 3,0,0
 
 ::
 
@@ -832,7 +853,7 @@ Set command
 
 ::
 
-   AT#XMQTTPUBEMPTY=<topic>[,<qos>[,<retain>]]
+   AT#XMQTTPUBEMPTY=<topic>[,<qos>[,<retain>[,<msg_expiry>]]]
 
 <topic>
    Non-empty string.
@@ -847,6 +868,11 @@ Set command
    Integer.
    Set to ``0`` (default) for a normal publication or ``1`` to delete the broker's retained message for this topic.
    Connected subscribers can also receive the empty publication.
+
+<msg_expiry>
+   Integer.
+   The MQTT v5.0 Message Expiry Interval in seconds, as described for :ref:`SM_AT_MQTT_XMQTTPUB`.
+   The default is ``0``, which sends no Message Expiry Interval.
 
 The command uses the same broker capability and packet-size checks as ``#XMQTTPUB``.
 It returns ``OK`` when the MQTT library accepts the send or ``ERROR`` on failure.
@@ -876,5 +902,5 @@ Test command
 ::
 
    AT#XMQTTPUBEMPTY=?
-   #XMQTTPUBEMPTY: <topic>,(0,1,2),(0,1)
+   #XMQTTPUBEMPTY: <topic>,(0,1,2),(0,1)[,<msg_expiry>]
    OK

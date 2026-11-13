@@ -57,6 +57,8 @@ static const char *pub_payload_in;
 static size_t pub_payload_len;
 static size_t pub_payload_off;
 static bool eagain_emitted;
+/* Message Expiry Interval of the simulated incoming PUBLISH, 0 when absent. */
+static uint32_t pub_msg_expiry_in;
 
 /* zsock_setsockopt stub: capture the SO_POLLCB callback, accept everything. */
 static int setsockopt_stub(int socket, int level, int option_name,
@@ -116,6 +118,10 @@ static int mqtt_input_stub(struct mqtt_client *client, int calls)
 	evt.param.publish.message.topic.topic.size = strlen(pub_topic_in);
 	evt.param.publish.message.payload.len = pub_payload_len;
 	evt.param.publish.message_id = 1;
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	evt.param.publish.prop.message_expiry_interval = pub_msg_expiry_in;
+	evt.param.publish.prop.rx.has_message_expiry_interval = pub_msg_expiry_in != 0;
+#endif
 
 	client->evt_cb(client, &evt);
 	return 0;
@@ -157,6 +163,7 @@ void setUp(void)
 	pub_payload_len = 0;
 	pub_payload_off = 0;
 	eagain_emitted = false;
+	pub_msg_expiry_in = 0;
 
 	__cmock_zsock_setsockopt_Stub(setsockopt_stub);
 	__cmock_mqtt_keepalive_time_left_IgnoreAndReturn(60000);
@@ -1052,6 +1059,7 @@ void test_mqtt_publish_empty_invalid_parameters(void)
 		"AT#XMQTTPUBEMPTY=\"empty/topic\",0,-1\r\n",
 		"AT#XMQTTPUBEMPTY=\"empty/topic\",\"bad\"\r\n",
 		"AT#XMQTTPUBEMPTY=\"empty/topic\",0,0,1\r\n",
+		"AT#XMQTTPUBEMPTY=\"empty/topic\",0,0,0,1\r\n",
 		"AT#XMQTTPUBEMPTY?\r\n",
 		"AT#XMQTTPUBEMPTY\r\n",
 	};
@@ -1071,8 +1079,8 @@ void test_mqtt_publish_empty_invalid_parameters(void)
 	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "ERROR"));
 	clear_captured_response();
 	send_at_command("AT#XMQTTPUBEMPTY=?\r\n");
-	TEST_ASSERT_NOT_NULL(
-		strstr(get_captured_response(), "#XMQTTPUBEMPTY: <topic>,(0,1,2),(0,1)\r\n"));
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(),
+				    "#XMQTTPUBEMPTY: <topic>,(0,1,2),(0,1)[,<msg_expiry>]\r\n"));
 	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "OK"));
 }
 
@@ -1367,6 +1375,84 @@ void test_mqtt_maximum_packet_size_publish_header_growth(void)
 #else
 	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
 #endif
+}
+
+#if defined(CONFIG_MQTT_VERSION_5_0)
+static uint32_t expiry_seen[4];
+static size_t expiry_calls;
+
+static int expiry_publish_stub(struct mqtt_client *c, const struct mqtt_publish_param *param,
+			       int calls)
+{
+	ARG_UNUSED(c);
+	ARG_UNUSED(calls);
+	TEST_ASSERT_LESS_THAN(ARRAY_SIZE(expiry_seen), expiry_calls);
+	expiry_seen[expiry_calls++] = param->prop.message_expiry_interval;
+	return 0;
+}
+#endif
+
+void test_mqtt_publish_message_expiry_5_0(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	static const uint32_t expected[] = {3600, 0, 60, UINT32_MAX};
+	static const char *const invalid[] = {
+		"AT#XMQTTPUB=\"t\",\"x\",0,0,0,-1\r\n",
+		"AT#XMQTTPUB=\"t\",\"x\",0,0,0,\"bad\"\r\n",
+		"AT#XMQTTPUBEMPTY=\"t\",0,0,-1\r\n",
+	};
+
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,5\r\n", MQTT_VERSION_5_0);
+	expiry_calls = 0;
+	__cmock_mqtt_publish_Stub(expiry_publish_stub);
+	packet_id_command("AT#XMQTTPUB=\"t\",\"x\",1,0,0,3600\r\n");
+	/* The interval applies to one publication only. */
+	packet_id_command("AT#XMQTTPUB=\"t\",\"x\",1\r\n");
+	packet_id_command("AT#XMQTTPUBEMPTY=\"t\",0,0,60\r\n");
+	packet_id_command("AT#XMQTTPUB=\"t\",\"\",0,0,3,4294967295\r\n");
+	clear_captured_response();
+	uart_stub_rx_nowait((const uint8_t *)"abc", 3);
+	k_sleep(K_MSEC(20));
+	uart_stub_tx_done_reset();
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "#XDATAMODE: 0\r\n"));
+	TEST_ASSERT_EQUAL_UINT(ARRAY_SIZE(expected), expiry_calls);
+	TEST_ASSERT_EQUAL_UINT32_ARRAY(expected, expiry_seen, ARRAY_SIZE(expected));
+	for (size_t i = 0; i < ARRAY_SIZE(invalid); i++) {
+		clear_captured_response();
+		send_at_command(invalid[i]);
+		TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "ERROR"));
+	}
+	TEST_ASSERT_EQUAL_UINT(ARRAY_SIZE(expected), expiry_calls);
+	__cmock_mqtt_publish_Stub(NULL);
+
+	/* The property adds five bytes to the packet size check. */
+	set_server_packet_limit(11);
+	__cmock_mqtt_publish_ExpectAnyArgsAndReturn(0);
+	packet_id_command("AT#XMQTTPUB=\"t\",\"x\",0,0,0,0\r\n");
+	clear_captured_response();
+	send_at_command("AT#XMQTTPUB=\"t\",\"x\",0,0,0,3600\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "ERROR"));
+	set_server_packet_limit(12);
+	__cmock_mqtt_publish_ExpectAnyArgsAndReturn(0);
+	packet_id_command("AT#XMQTTPUB=\"t\",\"x\",0,0,0,3600\r\n");
+	mqtt_disconnect_ok();
+#else
+	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
+#endif
+}
+
+void test_mqtt_publish_message_expiry_3_1_1(void)
+{
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,4\r\n", MQTT_VERSION_3_1_1);
+	clear_captured_response();
+	send_at_command("AT#XMQTTPUB=\"t\",\"x\",0,0,0,3600\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "ERROR"));
+	clear_captured_response();
+	send_at_command("AT#XMQTTPUBEMPTY=\"t\",0,0,3600\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "ERROR"));
+	__cmock_mqtt_publish_ExpectAnyArgsAndReturn(0);
+	packet_id_command("AT#XMQTTPUB=\"t\",\"x\",0,0,0,0\r\n");
+	mqtt_disconnect_ok();
 }
 
 void test_mqtt_maximum_packet_size_subscriptions(void)
@@ -2474,7 +2560,9 @@ void test_mqtt_datamode_invalid_lengths(void)
 	mqtt_disconnect_ok();
 }
 
-static void receive_framed_payload(const uint8_t *payload, size_t len)
+/* expiry_field is the expected optional third #XMQTTMSG field, including the comma. */
+static void receive_framed(const uint8_t *payload, size_t len, uint8_t version,
+			   const char *expiry_field)
 {
 	struct socket_ncs_pollcb_params params = {
 		.fd = 0,
@@ -2482,11 +2570,13 @@ static void receive_framed_payload(const uint8_t *payload, size_t len)
 		.revents = ZSOCK_POLLIN,
 	};
 	char header[80];
+	char command[64];
 	static const char trailer[] = "\r\n\r\n#XMQTTEVT: 2,0\r\n";
 	const uint8_t *captured;
 	size_t header_len;
 
-	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,4\r\n", MQTT_VERSION_3_1_1);
+	snprintf(command, sizeof(command), "AT#XMQTTCFG=\"test_client\",60,1,%u\r\n", version);
+	mqtt_connect_version(command, version);
 	pub_topic_in = "device/data";
 	pub_payload_in = (const char *)payload;
 	pub_payload_len = len;
@@ -2500,8 +2590,8 @@ static void receive_framed_payload(const uint8_t *payload, size_t len)
 		k_sleep(K_MSEC(20));
 	}
 	uart_stub_tx_done_reset();
-	header_len =
-		snprintf(header, sizeof(header), "\r\n#XMQTTMSG: 11,%zu\r\ndevice/data\r\n", len);
+	header_len = snprintf(header, sizeof(header), "\r\n#XMQTTMSG: 11,%zu%s\r\ndevice/data\r\n",
+			      len, expiry_field);
 	captured = (const uint8_t *)get_captured_response();
 	TEST_ASSERT_EQUAL_UINT(header_len + len + sizeof(trailer) - 1, get_captured_response_len());
 	TEST_ASSERT_EQUAL_MEMORY(header, captured, header_len);
@@ -2512,6 +2602,11 @@ static void receive_framed_payload(const uint8_t *payload, size_t len)
 	mqtt_disconnect_ok();
 }
 
+static void receive_framed_payload(const uint8_t *payload, size_t len)
+{
+	receive_framed(payload, len, MQTT_VERSION_3_1_1, "");
+}
+
 void test_mqtt_incoming_binary_framing(void)
 {
 	receive_framed_payload(binary_payload, sizeof(binary_payload));
@@ -2520,6 +2615,29 @@ void test_mqtt_incoming_binary_framing(void)
 void test_mqtt_incoming_empty_payload(void)
 {
 	receive_framed_payload(NULL, 0);
+}
+
+void test_mqtt_incoming_message_expiry(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	static const uint8_t payload[] = "hello";
+
+	receive_framed(payload, sizeof(payload) - 1, MQTT_VERSION_5_0, "");
+	pub_payload_off = 0;
+	eagain_emitted = false;
+	pub_msg_expiry_in = 3600;
+	receive_framed(payload, sizeof(payload) - 1, MQTT_VERSION_5_0, ",3600");
+	pub_payload_off = 0;
+	eagain_emitted = false;
+	pub_msg_expiry_in = UINT32_MAX;
+	receive_framed(payload, sizeof(payload) - 1, MQTT_VERSION_5_0, ",4294967295");
+	/* MQTT 3.1.1 has no properties, so the format stays unchanged. */
+	pub_payload_off = 0;
+	eagain_emitted = false;
+	receive_framed(payload, sizeof(payload) - 1, MQTT_VERSION_3_1_1, "");
+#else
+	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
+#endif
 }
 
 extern int unity_main(void);
