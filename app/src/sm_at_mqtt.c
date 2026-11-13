@@ -66,6 +66,8 @@ static struct sm_mqtt_ctx {
 	size_t rx_topic_len;    /* > 0 while header unsent; cleared when pipe is locked */
 	int protocol_error;
 #if defined(CONFIG_MQTT_VERSION_5_0)
+	uint32_t rx_msg_expiry;
+	bool rx_has_msg_expiry;
 	uint32_t maximum_packet_size;
 	uint16_t receive_maximum;
 	uint8_t maximum_qos;
@@ -283,6 +285,11 @@ static void handle_mqtt_publish_evt(struct mqtt_client *const c, const struct mq
 	memcpy(mqtt_conn->payload_drain, evt->param.publish.message.topic.topic.utf8,
 	       ctx.rx_topic_len);
 	ctx.publish_payload_remaining = evt->param.publish.message.payload.len;
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	ctx.rx_has_msg_expiry = client.protocol_version == MQTT_VERSION_5_0 &&
+				evt->param.publish.prop.rx.has_message_expiry_interval;
+	ctx.rx_msg_expiry = evt->param.publish.prop.message_expiry_interval;
+#endif
 }
 
 /* Drain as much publish payload as is available without blocking.
@@ -306,6 +313,19 @@ static int drain_publish_payload(struct mqtt_client *const c)
 
 	ctx.publish_payload_remaining = 0;
 	return 0;
+}
+
+static void mqtt_msg_header_send(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	if (ctx.rx_has_msg_expiry) {
+		rsp_send_to(ctx.pipe, "\r\n#XMQTTMSG: %zu,%zu,%u\r\n", ctx.rx_topic_len,
+			    ctx.publish_payload_remaining, ctx.rx_msg_expiry);
+		return;
+	}
+#endif
+	rsp_send_to(ctx.pipe, "\r\n#XMQTTMSG: %zu,%zu\r\n", ctx.rx_topic_len,
+		    ctx.publish_payload_remaining);
 }
 
 /* Event-specific MQTT 5.0 detail, or -1 when there is none to report. */
@@ -634,8 +654,7 @@ static void mqtt_poll_work_handler(struct k_work *work)
 				/* Use rsp_send_to (immediate) so the header precedes the
 				 * payload; urc_send_to buffers and would trail the data.
 				 */
-				rsp_send_to(ctx.pipe, "\r\n#XMQTTMSG: %zu,%zu\r\n",
-					    ctx.rx_topic_len, ctx.publish_payload_remaining);
+				mqtt_msg_header_send();
 				data_send(ctx.pipe, mqtt_conn->payload_drain, ctx.rx_topic_len);
 				data_send(ctx.pipe, "\r\n", 2);
 				ctx.rx_topic_len = 0;
@@ -925,8 +944,9 @@ static int mqtt_check_publish(size_t msg_len)
 		}
 	}
 #endif
-	/* No outgoing properties are exposed by the AT API; MQTT 5 adds a zero
-	 * Property Length byte. QoS 1/2 also include a two-byte packet identifier.
+	/* MQTT 5 adds a Property Length byte and the optional Message Expiry Interval
+	 * property (identifier + four bytes), the only outgoing property exposed by the AT API.
+	 * QoS 1/2 also include a two-byte packet identifier.
 	 */
 	size_t remaining = 2 + mqtt_conn->pub_param.message.topic.topic.size + msg_len;
 
@@ -935,6 +955,11 @@ static int mqtt_check_publish(size_t msg_len)
 	}
 	if (client.protocol_version == MQTT_VERSION_5_0) {
 		remaining++;
+#if defined(CONFIG_MQTT_VERSION_5_0)
+		if (mqtt_conn->pub_param.prop.message_expiry_interval != 0) {
+			remaining += 1 + sizeof(uint32_t);
+		}
+#endif
 	}
 	return mqtt_check_packet_size(remaining);
 }
@@ -1253,9 +1278,11 @@ static int mqtt_datamode_callback(uint8_t op, const uint8_t *data, int len, uint
 	return 0;
 }
 
-static int mqtt_prepare_publish(size_t topic_len, uint16_t qos, uint16_t retain)
+static int mqtt_prepare_publish(size_t topic_len, uint16_t qos, uint16_t retain,
+				uint32_t msg_expiry)
 {
-	if (qos > MQTT_QOS_2_EXACTLY_ONCE || retain > 1) {
+	if (qos > MQTT_QOS_2_EXACTLY_ONCE || retain > 1 ||
+	    (msg_expiry != 0 && client.protocol_version != MQTT_VERSION_5_0)) {
 		return -EINVAL;
 	}
 
@@ -1264,6 +1291,9 @@ static int mqtt_prepare_publish(size_t topic_len, uint16_t qos, uint16_t retain)
 	mqtt_conn->pub_param.message.topic.topic.utf8 = mqtt_conn->pub_topic;
 	mqtt_conn->pub_param.message.topic.topic.size = topic_len;
 	mqtt_conn->pub_param.dup_flag = 0;
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	mqtt_conn->pub_param.prop.message_expiry_interval = msg_expiry;
+#endif
 
 	int message_id = mqtt_message_id_next();
 
@@ -1281,13 +1311,14 @@ STATIC int handle_at_mqtt_publish_empty(enum at_parser_cmd_type cmd_type, struct
 	int err;
 	uint16_t qos = MQTT_QOS_0_AT_MOST_ONCE;
 	uint16_t retain = 0;
+	uint32_t msg_expiry = 0;
 	size_t topic_len = MQTT_MAX_TOPIC_LEN;
 
 	if (cmd_type == AT_PARSER_CMD_TYPE_TEST) {
-		rsp_send("\r\n#XMQTTPUBEMPTY: <topic>,(0,1,2),(0,1)\r\n");
+		rsp_send("\r\n#XMQTTPUBEMPTY: <topic>,(0,1,2),(0,1)[,<msg_expiry>]\r\n");
 		return 0;
 	}
-	if (cmd_type != AT_PARSER_CMD_TYPE_SET || param_count < 2 || param_count > 4) {
+	if (cmd_type != AT_PARSER_CMD_TYPE_SET || param_count < 2 || param_count > 5) {
 		return -EINVAL;
 	}
 	if (!ctx.connected) {
@@ -1312,7 +1343,13 @@ STATIC int handle_at_mqtt_publish_empty(enum at_parser_cmd_type cmd_type, struct
 			return err;
 		}
 	}
-	err = mqtt_prepare_publish(topic_len, qos, retain);
+	if (param_count > 4) {
+		err = at_parser_num_get(parser, 4, &msg_expiry);
+		if (err != 0) {
+			return err;
+		}
+	}
+	err = mqtt_prepare_publish(topic_len, qos, retain, msg_expiry);
 	if (err != 0) {
 		return err;
 	}
@@ -1332,6 +1369,7 @@ STATIC int handle_at_mqtt_publish(enum at_parser_cmd_type cmd_type, struct at_pa
 	const char *pub_msg_ptr = NULL;
 	size_t msg_sz = 0;
 	int data_len = 0;
+	uint32_t msg_expiry = 0;
 
 	if (!ctx.connected) {
 		return -ENOTCONN;
@@ -1377,8 +1415,14 @@ STATIC int handle_at_mqtt_publish(enum at_parser_cmd_type cmd_type, struct at_pa
 				return -EINVAL;
 			}
 		}
+		if (param_count > 6) {
+			err = at_parser_num_get(parser, 6, &msg_expiry);
+			if (err) {
+				return err;
+			}
+		}
 
-		err = mqtt_prepare_publish(topic_sz, qos, retain);
+		err = mqtt_prepare_publish(topic_sz, qos, retain, msg_expiry);
 		if (err != 0) {
 			return err;
 		}
@@ -1395,7 +1439,8 @@ STATIC int handle_at_mqtt_publish(enum at_parser_cmd_type cmd_type, struct at_pa
 		break;
 
 	case AT_PARSER_CMD_TYPE_TEST:
-		rsp_send("\r\n#XMQTTPUB: <topic>,<msg>,(0,1,2),(0,1)[,<data_len>]\r\n");
+		rsp_send("\r\n#XMQTTPUB: <topic>,<msg>,(0,1,2),(0,1)"
+			 "[,<data_len>[,<msg_expiry>]]\r\n");
 		err = 0;
 		break;
 
