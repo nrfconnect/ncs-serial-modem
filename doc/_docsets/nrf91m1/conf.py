@@ -9,6 +9,12 @@ This docset is a subset of the main docset: it reads the same sources from
 :file:`doc/` and starts from :file:`doc/index_nrf91m1.rst`. The shared settings
 live in :file:`doc/_docsets/conf_common.py`.
 
+It is the only docset of the nrf91m1 publication, so it is hosted as a
+document of its own, published from this docset directly and therefore without
+a docset switcher. The version dropdown follows
+:file:`doc/nrf91m1/versions.json`. See ``PUBLICATIONS`` in
+:file:`doc/_utils/docsets.py`.
+
 Add the pages that do not apply to the nRF91M1 to ``exclude_patterns`` below.
 Excluded pages are never read, so an ``:ref:`` or ``:doc:`` link from an
 included page to an excluded one becomes a warning. Turn such links into
@@ -25,7 +31,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from conf_common import *  # noqa: F401,F403
 from conf_common import author, docsets, docset_exclude_patterns, docset_rst_epilog, \
     html_theme_options, docset_latex_documents, docset_html_context, \
-    docset_latex_elements
+    docset_latex_elements, docset_html_css_files, docset_theme_options
 from pdf_revision import revision_for  # noqa: E402 — conf_common adds ``doc/_utils``
 
 DOCSET = Path(__file__).resolve().parent.name
@@ -54,14 +60,17 @@ latex_elements = docset_latex_elements(
     DOCSET, author_name=author, release_label=release
 )
 
-html_theme_options["docset"] = DOCSET
+html_theme_options.update(docset_theme_options(DOCSET))
+html_css_files = docset_html_css_files(DOCSET)
 html_context = docset_html_context(DOCSET)
 
-# Lets this docset link into the main docset with :external+main:. The mapping
-# is only available once the main docset has been built, which is why
-# _scripts/build_docsets.py builds the docsets in order.
+# Lets this docset link into the main docset with :external+main:. The main
+# docset belongs to another publication, so such a link resolves to its hosted
+# URL rather than to a sibling directory. The mapping is only available once
+# the main docset has been built, which is why _scripts/build_docsets.py builds
+# the docsets in order.
 intersphinx_mapping = {}
 
-_main_mapping = docsets.get_intersphinx_mapping("main")
+_main_mapping = docsets.get_intersphinx_mapping(DOCSET, "main")
 if _main_mapping:
     intersphinx_mapping["main"] = _main_mapping

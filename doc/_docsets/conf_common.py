@@ -79,7 +79,6 @@ html_theme = "sphinx_ncs_theme"
 html_show_sphinx = False
 
 html_theme_options = {
-    "docsets": docsets.ALL_DOCSETS,
     "addons_url": "https://nrfconnect.github.io/ncs-app-index/",
     "bare_metal_url": "",
     "ncs_url": "https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/index.html",
@@ -91,9 +90,10 @@ html_static_path = [str(DOC_BASE / "_static")]
 
 html_css_files = ['css/custom.css']
 
-# The theme fetches versions.json from the version root, one level above the
-# docset directories, so html_extra_path cannot deliver it. It is copied there
-# by _scripts/build_docsets.py instead.
+# The theme fetches versions.json from the version root, which is where the
+# docset directories sit, so html_extra_path cannot deliver it. It is copied
+# there by _scripts/build_docsets.py instead, and only for a publication that
+# is hosted in several versions.
 
 ## -- Options for Breathe ----------------------------------------------------
 # https://breathe.readthedocs.io/en/latest/index.html
@@ -668,12 +668,71 @@ def docset_exclude_patterns(docset: str) -> list[str]:
     ]
 
 
+# The header button that leads out of a docset, which is the only way to reach
+# another publication from the navigation: the docset it points at, its label
+# while the header shows long labels, and its label while the header shows
+# short ones. The theme renders this button from the addons_url option and
+# hardcodes both labels, so :file:`_templates/layout.html` rewrites them from
+# the html_context entries that :func:`docset_html_context` adds. A docset that
+# is absent keeps the nRF Connect SDK Add-ons link of the theme.
+HEADER_LINKS = {
+    "main": ("nrf91m1", "nRF91M1 AT commands", "nRF91M1"),
+    "nrf91m1": ("main", "Serial Modem", "Serial Modem"),
+}
+
+
+def docset_theme_options(docset: str) -> dict:
+    """Return the theme options that identify a docset.
+
+    The docset switcher is limited to the publication of the docset, because
+    the theme links it to a sibling directory, which only reaches a docset of
+    the same publication. The header button of :data:`HEADER_LINKS` is what
+    leads to the other publication instead.
+
+    Args:
+        docset: Docset name.
+
+    Returns:
+        Dictionary to merge into the ``html_theme_options`` configuration
+        option.
+    """
+
+    options = {"docset": docset, "docsets": docsets.publication_docsets(docset)}
+
+    link = HEADER_LINKS.get(docset)
+    if link:
+        options["addons_url"] = docsets.home_url(link[0])
+
+    return options
+
+
+def docset_html_css_files(docset: str) -> list[str]:
+    """Return the style sheets of a docset.
+
+    Args:
+        docset: Docset name.
+
+    Returns:
+        Value for the ``html_css_files`` configuration option.
+    """
+
+    files = list(html_css_files)
+    publication = docsets.publication_of(docset)
+    if not docsets.versions_file(publication):
+        files.append("css/no_version_switcher.css")
+    if docsets.PUBLICATIONS[publication].docset_at_root:
+        files.append("css/no_docset_switcher.css")
+
+    return files
+
+
 def docset_html_context(docset: str) -> dict:
     """Return the ``html_context`` additions for a docset.
 
     Exposes the per-docset PDF filename so that Jinja2 templates can link to
     the correct PDF without hardcoding a name that is only valid for one
-    docset.
+    docset, and the header button of :data:`HEADER_LINKS`, which
+    :file:`_templates/layout.html` has to find and relabel.
 
     Args:
         docset: Docset name.
@@ -682,7 +741,18 @@ def docset_html_context(docset: str) -> dict:
         Dictionary to merge into the ``html_context`` configuration option.
     """
 
-    return {"pdf_filename": f"{docsets.pdf_stem(docset)}.pdf"}
+    context = {"pdf_filename": f"{docsets.pdf_stem(docset)}.pdf"}
+
+    link = HEADER_LINKS.get(docset)
+    if link:
+        target, long_label, short_label = link
+        context["header_link"] = {
+            "url": docsets.home_url(target),
+            "long": long_label,
+            "short": short_label,
+        }
+
+    return context
 
 
 def docset_latex_documents(docset: str) -> list[tuple[str, str, str, str, str]]:

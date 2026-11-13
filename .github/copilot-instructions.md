@@ -174,21 +174,29 @@ make html
 python _scripts/build_docsets.py
 ```
 
-Output: `doc/build/html/`
+Output: `doc/build/html/<publication>/`
 
-The documentation is split into **docsets**, each built by its own Sphinx run over the shared sources in `doc/`:
+The documentation is split into **docsets**, each built by its own Sphinx run over the shared sources in `doc/`, and the docsets are grouped into **publications**. A publication is one hosted document: it is archived and uploaded on its own, under an add-on directory of its own, so the two publications below are two separate documents on the documentation site rather than two tabs of one.
 
-| Docset | Config dir | Root document | Output |
-|---|---|---|---|
-| `main` | `doc/_docsets/main/` | `doc/index.rst` | `doc/build/html/main/` |
-| `nrf91m1` | `doc/_docsets/nrf91m1/` | `doc/index_nrf91m1.rst` | `doc/build/html/nrf91m1/` |
+| Docset | Publication | Config dir | Root document | Output |
+|---|---|---|---|---|
+| `main` | `serial_modem` | `doc/_docsets/main/` | `doc/index.rst` | `doc/build/html/serial_modem/main/` |
+| `nrf91m1` | `nrf91m1` | `doc/_docsets/nrf91m1/` | `doc/index_nrf91m1.rst` | `doc/build/html/nrf91m1/nrf91m1/` |
 
-The docsets must be sibling directories below the HTML root, because that is where the docset switcher of `sphinx_ncs_theme` looks for them. `doc/build/html/index.html` redirects to the `main` docset, and `versions.json` is copied next to the docsets for the version dropdown.
+The docsets of a publication must be sibling directories below its root, because that is where the docset switcher of `sphinx_ncs_theme` looks for them, and the switcher therefore only offers the docsets of the same publication. `doc/build/html/<publication>/index.html` redirects to the first docset of the publication, copied from `doc/_static/html/index_<publication>.html`.
+
+A publication that sets `docset_at_root` in `PUBLICATIONS` is published from its single docset directory instead of from its root, so its pages sit in the version directory itself and the URL has no docset directory. `doc/_utils/docsets.py` holds that in `publish_dir()`, which decides both where `build_docsets.py` copies the landing page and the version list and what the doc-build workflow archives. Such a publication cannot show the docset switcher, whose entries are always sibling directories, so `doc/_static/css/no_docset_switcher.css` hides it.
+
+A reference across a publication boundary cannot be relative: `:external+main:` from the `nrf91m1` docset resolves against the hosted URL in `PUBLICATIONS`, and a plain hyperlink uses a target from `doc/links.txt`. In the navigation, the two publications reach each other through the header button that `HEADER_LINKS` in `doc/_docsets/conf_common.py` configures. It takes over the theme's `addons_url` slot, so the nRF Connect SDK Add-ons link is not shown; because the theme hardcodes both of that button's labels, `doc/_templates/layout.html` rewrites them.
+
+Both publications are hosted in several versions, each in a version directory below its add-on directory, and the theme renders a version dropdown from the `versions` file of the publication, which `build_docsets.py` copies next to its docsets as `versions.json`. `serial_modem` uses `doc/versions.json`, `nrf91m1` uses `doc/nrf91m1/versions.json`. The theme derives everything from the URL: it reads the list from `<add-on>/latest/versions.json`, treats the first entry as the current version hosted in `latest/`, and links every other entry to `<add-on>/<version>/<same page>`. A publication without a `versions` file hides the dropdown through `doc/_static/css/no_version_switcher.css`.
+
+`publish_version()` in `doc/_utils/docsets.py` decides which directory a build publishes into, so the doc-build workflow holds no per-publication rule. A publication that names a `branch` is published from that branch as `latest` and from the tags of the versions it lists, and is skipped everywhere else, which is why `nrf91m1` is published from `v2-branch` and from the `v2.0.0` and `v2.0.0-preview3` tags. A publication without a `branch` follows the version of the build on every ref. Every pull request previews both publications in a `PR-<number>` directory of their add-on, whatever branch it is against. Every branch also builds every publication, which keeps the sources validated.
 
 PDF revision (filename suffix and cover band) is centralized in `doc/_utils/pdf_revision.py`: **main** uses the ``VERSION`` environment variable; **nRF91m1** uses `doc/nrf91m1/DOC_VERSION` or ``NRF91M1_DOC_VERSION`` (set in CI when the file is non-empty). HTML sidebar `version` / `release` for **nrf91m1** follow the manual revision (same source as the PDF); **main** follows ``VERSION``. Filename suffixes use `_v<revision>` when the revision starts with a digit, otherwise `_<revision>` (for example `_v0.1` or `_latest`). Docset metadata and LaTeX wiring stay in `doc/_utils/docsets.py` and `doc/_docsets/conf_common.py`. Bump `doc/nrf91m1/DOC_VERSION` when a new release of the nRF91M1 AT command manual is made and add a row to `doc/nrf91m1/revision_history.rst` (Date, Version, Description table, same layout as the legacy nRF91x1 cellular AT command PDF). Also change the version to `x.x+dev` when new modifications are made after a release to indicate that this is a development version for the next document revision. `versions.json` still lists Serial Modem git release tags for the hosted version switcher.
 
 - Shared Sphinx settings: `doc/_docsets/conf_common.py`. Per-docset settings (project title, root document, exclusions, intersphinx): `doc/_docsets/<docset>/conf.py`.
-- The docset list is declared once in `doc/_utils/docsets.py` (`ALL_DOCSETS`). Adding a docset means adding an entry there, a config directory, and a root document.
+- The docset and publication lists are declared once in `doc/_utils/docsets.py` (`ALL_DOCSETS` and `PUBLICATIONS`). Adding a docset means adding an entry to both, a config directory, and a root document. A new publication also needs a landing page in `doc/_static/html/` and an add-on directory on the documentation site.
 - Relative paths in the config files resolve against the config directory, not `doc/`, so anchor new paths to `DOC_BASE`.
 - Build a single docset while iterating: `make main`, `make nrf91m1`, or `python _scripts/build_docsets.py --docset main`.
 
@@ -201,7 +209,7 @@ make latexpdf
 python _scripts/build_docsets.py --format pdf
 ```
 
-Output: `doc/build/pdf/<docset>/latex/ncs-serial-modem.pdf`, also copied to `doc/build/html/<docset>/` for the "Download PDF" link in the breadcrumb bar.
+Output: `doc/build/pdf/<publication>/<docset>/latex/<pdf stem>.pdf`, also copied to `doc/build/html/<publication>/<docset>/` for the "Download PDF" link in the breadcrumb bar.
 
 - Each docset renders its own PDF, from the same LaTeX settings in `doc/_docsets/conf_common.py`. Only `latex_documents` differs, and `docset_latex_documents()` derives it from `ALL_DOCSETS`, so per-docset LaTeX settings must not be added to `doc/_docsets/<docset>/conf.py`.
 - Needs XeLaTeX, Latexmk, and Inkscape (for the SVG figures) on `PATH`, plus the Open Sans font for the Nordic layout. Only the doc-build workflow installs these; the HTML build does not need them.
@@ -276,11 +284,11 @@ ncs-serial-modem/
 │   ├── images/                 # SVG/PNG diagrams
 │   ├── _docsets/               # Per-docset Sphinx configuration + conf_common.py
 │   ├── _scripts/               # build_docsets.py, merge_search_indexes.py
-│   ├── _static/html/index.html # Redirect from the published root to the main docset
-│   ├── _utils/docsets.py       # ALL_DOCSETS: the list of docsets
+│   ├── _static/html/           # Redirect from each publication root to its first docset
+│   ├── _utils/docsets.py       # ALL_DOCSETS and PUBLICATIONS: docsets and hosted documents
 │   ├── _doxygen/               # Doxygen main page source
 │   ├── _build_doxygen/xml/     # Doxygen output (auto-generated, not committed)
-│   └── _build_sphinx/html/<docset>/ # Sphinx output (auto-generated, not committed)
+│   └── _build_sphinx/html/<publication>/<docset>/ # Sphinx output (auto-generated, not committed)
 ├── lib/                        # Host-side AT client library
 │   └── sm_at_client/           # sm_at_client library (for host MCU samples)
 ├── samples/                    # Host device sample applications

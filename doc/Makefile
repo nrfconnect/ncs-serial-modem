@@ -1,7 +1,8 @@
 # Minimal makefile for Sphinx documentation
 #
 # The documentation is split into docsets, each built with its own
-# configuration from _docsets/ over the shared sources in this directory.
+# configuration from _docsets/ over the shared sources in this directory, and
+# grouped into publications that are hosted separately.
 # _scripts/build_docsets.py does the work; these targets are thin wrappers.
 
 # You can set these variables from the command line, and also from the
@@ -18,7 +19,7 @@ BUILDDOCSETS   = $(PYTHON) _scripts/build_docsets.py -b "$(BUILDDIR)" $(SPHINXOP
 help:
 	@echo "Run 'doxygen' first, then one of:"
 	@echo "  html       Build all docsets into $(BUILDDIR)/html (same as docsets)"
-	@echo "  docsets    Build all docsets into $(BUILDDIR)/html"
+	@echo "  docsets    Build all docsets into $(BUILDDIR)/html/<publication>"
 	@echo "  main       Build only the main docset"
 	@echo "  nrf91m1    Build only the nRF91M1 docset"
 	@echo "  latexpdf   Build the PDF of all docsets into $(BUILDDIR)/pdf"

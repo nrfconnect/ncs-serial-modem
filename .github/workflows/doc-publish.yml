@@ -22,22 +22,48 @@ jobs:
           workflow: doc-build.yml
           run_id: ${{ github.event.workflow_run.id }}
 
-      - name: Unzip html archive
+      - name: Unzip html archives
         id: unzip
         working-directory: docs
         run: |
-          OUTDIR=$(awk 'NR==1 { if ($3 ~ /^(latest|PR-[0-9]+|[0-9]+\.[0-9a-zA-Z\.\-]+|[0-9]+-branch)$/) print $3 }' monitor_*.txt)
-          if [ -z "$OUTDIR" ]; then
-            echo "::warning::Monitor file holds no publishable version. Nothing to publish."
+          # The build writes one monitor file per publication. Its third field
+          # is the version directory to publish into, its fourth the archive,
+          # and the archive name holds the add-on directory the publication is
+          # hosted in. Each publication is unpacked below that directory, so
+          # that publications sharing a version do not overwrite each other.
+          UPLOADS=""
+          for MONITOR in monitor_*.txt; do
+            # An unmatched glob is left as it is, so a build that produced no
+            # monitor file at all reaches this with a name that does not exist.
+            [ -f "$MONITOR" ] || continue
+
+            OUTDIR=$(awk 'NR==1 { if ($3 ~ /^(latest|PR-[0-9]+|[0-9]+\.[0-9a-zA-Z\.\-]+|[0-9]+-branch)$/) print $3 }' "$MONITOR")
+            if [ -z "$OUTDIR" ]; then
+              echo "::warning::$MONITOR holds no publishable version. Skipping it."
+              continue
+            fi
+
+            ARCHIVE=$(awk 'NR==1 { print $4 }' "$MONITOR")
+            if [[ ! "$ARCHIVE" =~ ^legacy-(addon-[A-Za-z0-9_]+)- ]]; then
+              echo "::warning::$ARCHIVE names no add-on. Skipping it."
+              continue
+            fi
+            ADDON="${BASH_REMATCH[1]}"
+
+            unzip "$ARCHIVE" -d "$ADDON/$OUTDIR"
+            find "$ADDON/$OUTDIR" -type l -delete
+            UPLOADS="$UPLOADS $ADDON/$OUTDIR"
+          done
+
+          if [ -z "$UPLOADS" ]; then
+            echo "::warning::No monitor file holds a publishable version. Nothing to publish."
             exit 0
           fi
-          echo "OUTDIR=$OUTDIR" >> "$GITHUB_ENV"
-          echo "outdir=$OUTDIR" >> "$GITHUB_OUTPUT"
-          unzip legacy-addon-serial_modem*.zip -d $OUTDIR
-          find "$OUTDIR" -type l -delete
+          echo "UPLOADS=$UPLOADS" >> "$GITHUB_ENV"
+          echo "uploads=$UPLOADS" >> "$GITHUB_OUTPUT"
 
       - name: Obtain PR number
-        if: ${{ steps.unzip.outputs.outdir && github.event.workflow_run.event == 'pull_request' }}
+        if: ${{ steps.unzip.outputs.uploads && github.event.workflow_run.event == 'pull_request' }}
         working-directory: docs
         run: |
           if [ -f pr.txt ]; then
@@ -46,21 +72,35 @@ jobs:
           printf 'PR=%s\n' "$PR" >> "$GITHUB_ENV"
 
       - name: Upload to Azure storage
-        if: ${{ steps.unzip.outputs.outdir }}
+        if: ${{ steps.unzip.outputs.uploads }}
         working-directory: docs
         env:
           AZCOPY_CONCURRENCY_VALUE: 1024
           NCS_DOC_SAS_PRS: ${{ secrets.NCS_DOC_SAS_PRS }}
           NCS_DOC_SAS_MAIN: ${{ secrets.NCS_DOC_SAS_MAIN }}
         run: |
-          if [[ "${{ github.event.workflow_run.event }}" == "pull_request" ]]; then
-            azcopy cp $OUTDIR "${{ vars.NCS_DOC_PR_STORAGE_URL }}addons/addon-serial_modem?$NCS_DOC_SAS_PRS" --recursive=true
-          else
-            azcopy cp $OUTDIR "${{ vars.NCS_DOC_STORAGE_URL }}addons/addon-serial_modem?$NCS_DOC_SAS_MAIN" --recursive=true
-          fi
+          # Each publication goes to the add-on directory its archive named,
+          # and a pull request collects one preview link per publication for
+          # the comment below.
+          PREVIEWS=""
+          for UPLOAD in $UPLOADS; do
+            ADDON=$(dirname "$UPLOAD")
+            if [[ "${{ github.event.workflow_run.event }}" == "pull_request" ]]; then
+              azcopy cp "$UPLOAD" "${{ vars.NCS_DOC_PR_STORAGE_URL }}addons/$ADDON?$NCS_DOC_SAS_PRS" --recursive=true
+              PREVIEWS="${PREVIEWS}- [${ADDON}](${{ vars.NCS_DOC_PR_HOSTING_URL }}addons/${UPLOAD}/)"$'\n'
+            else
+              azcopy cp "$UPLOAD" "${{ vars.NCS_DOC_STORAGE_URL }}addons/$ADDON?$NCS_DOC_SAS_MAIN" --recursive=true
+            fi
+          done
+
+          {
+            echo "PREVIEWS<<PREVIEWS_EOF"
+            echo "$PREVIEWS"
+            echo "PREVIEWS_EOF"
+          } >> "$GITHUB_ENV"
 
       - name: Find Comment
-        if: ${{ steps.unzip.outputs.outdir && github.event.workflow_run.event == 'pull_request' }}
+        if: ${{ steps.unzip.outputs.uploads && github.event.workflow_run.event == 'pull_request' }}
         uses: peter-evans/find-comment@3eae4d37986fb5a8592848f6a574fdf654e61f9e # v3
         id: fc
         with:
@@ -69,11 +109,13 @@ jobs:
           body-includes: documentation preview
 
       - name: Create or update comment
-        if: ${{ steps.unzip.outputs.outdir && github.event.workflow_run.event == 'pull_request' }}
+        if: ${{ steps.unzip.outputs.uploads && github.event.workflow_run.event == 'pull_request' }}
         uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # v4
         with:
           comment-id: ${{ steps.fc.outputs.comment-id }}
           issue-number: ${{ env.PR }}
           body: |
-            You can find the documentation preview for this PR [here](${{ vars.NCS_DOC_PR_HOSTING_URL }}addons/addon-serial_modem/PR-${{ env.PR }}/).
+            You can find the documentation preview for this PR here:
+
+            ${{ env.PREVIEWS }}
           edit-mode: replace
