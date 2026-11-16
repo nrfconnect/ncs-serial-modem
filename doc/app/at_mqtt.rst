@@ -748,8 +748,9 @@ Syntax
 The parameters and their defined values are the following:
 
 <topic>
-   String.
+   Non-empty string.
    The topic on which data is published.
+   It must not contain the wildcard characters ``+`` or ``#``.
 
 <msg>
    String.
@@ -869,6 +870,7 @@ Set command
 <topic>
    Non-empty string.
    The topic on which the empty payload is published.
+   It must not contain the wildcard characters ``+`` or ``#``.
 
 <qos>
    Integer.

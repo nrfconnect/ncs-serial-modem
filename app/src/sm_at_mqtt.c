@@ -1377,6 +1377,11 @@ static int mqtt_prepare_publish(size_t topic_len, uint16_t qos, uint16_t retain,
 	    (msg_expiry != 0 && client.protocol_version != MQTT_VERSION_5_0)) {
 		return -EINVAL;
 	}
+	/* A Topic Name must not be empty or contain wildcards (MQTT 5.0 section 3.3.2.1). */
+	if (topic_len == 0 || memchr(mqtt_conn->pub_topic, '+', topic_len) != NULL ||
+	    memchr(mqtt_conn->pub_topic, '#', topic_len) != NULL) {
+		return -EINVAL;
+	}
 
 	mqtt_conn->pub_param.message.topic.qos = (uint8_t)qos;
 	mqtt_conn->pub_param.retain_flag = (uint8_t)retain;
@@ -1422,9 +1427,6 @@ STATIC int handle_at_mqtt_publish_empty(enum at_parser_cmd_type cmd_type, struct
 	err = util_string_get(parser, 1, mqtt_conn->pub_topic, &topic_len);
 	if (err != 0) {
 		return err;
-	}
-	if (topic_len == 0) {
-		return -EINVAL;
 	}
 	if (param_count > 2) {
 		err = at_parser_num_get(parser, 2, &qos);

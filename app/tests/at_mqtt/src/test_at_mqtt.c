@@ -1084,6 +1084,48 @@ void test_mqtt_publish_empty_invalid_parameters(void)
 	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "OK"));
 }
 
+static void publish_topic_name_validation(uint8_t version)
+{
+	static const char *const invalid[] = {
+		"AT#XMQTTPUB=\"\",\"x\"\r\n",          "AT#XMQTTPUB=\"\",\"\",0,0,3\r\n",
+		"AT#XMQTTPUB=\"+\",\"x\"\r\n",         "AT#XMQTTPUB=\"#\",\"x\"\r\n",
+		"AT#XMQTTPUB=\"a/+/b\",\"x\"\r\n",     "AT#XMQTTPUB=\"a/#\",\"x\",1\r\n",
+		"AT#XMQTTPUB=\"a/b+\",\"\",0,0,3\r\n", "AT#XMQTTPUBEMPTY=\"a/+\"\r\n",
+		"AT#XMQTTPUBEMPTY=\"#\",1,1\r\n",
+	};
+	static const char *const valid[] = {
+		"AT#XMQTTPUB=\"a//b\",\"x\"\r\n",
+		"AT#XMQTTPUB=\"/\",\"x\"\r\n",
+		"AT#XMQTTPUB=\"$sys-like/a\",\"x\"\r\n",
+	};
+	char command[64];
+
+	snprintf(command, sizeof(command), "AT#XMQTTCFG=\"test_client\",60,1,%u\r\n", version);
+	mqtt_connect_version(command, version);
+	/* No mqtt_publish() expectation: an invalid topic must not reach the library. */
+	for (size_t i = 0; i < ARRAY_SIZE(invalid); i++) {
+		clear_captured_response();
+		send_at_command(invalid[i]);
+		TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "ERROR"));
+	}
+	/* Accepted commands also show that rejected data mode requests did not enter data mode. */
+	for (size_t i = 0; i < ARRAY_SIZE(valid); i++) {
+		__cmock_mqtt_publish_ExpectAnyArgsAndReturn(0);
+		clear_captured_response();
+		send_at_command(valid[i]);
+		TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "OK"));
+	}
+	mqtt_disconnect_ok();
+}
+
+void test_mqtt_publish_topic_name_validation(void)
+{
+	publish_topic_name_validation(MQTT_VERSION_3_1_1);
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	publish_topic_name_validation(MQTT_VERSION_5_0);
+#endif
+}
+
 void test_mqtt_publish_empty_server_limits(void)
 {
 #if defined(CONFIG_MQTT_VERSION_5_0)
