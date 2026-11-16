@@ -21,7 +21,7 @@ jobs:
     secrets: inherit
     with:
       trigger_source: 'release-workflow'
-      release_tag: ${{ inputs.tag }}
+      checkout_ref: ${{ inputs.tag }}
 
   attach-assets:
     runs-on: ubuntu-24.04
