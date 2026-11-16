@@ -33,6 +33,12 @@ jobs:
     permissions:
       contents: read
     runs-on: ubuntu-24.04
+    env:
+      # Nightly/manual full builds may fetch nuSIM when serial_modem.nusim exists in sample.yaml (see Prepare west).
+      WEST_ADD_NUSIM_REPO: >-
+        ${{ github.event_name != 'pull_request' && inputs.trigger_source != 'release-workflow' && (
+          inputs.trigger_source == 'nightly-workflow' || github.event_name == 'workflow_dispatch'
+        ) }}
     steps:
       - name: Checkout Serial Modem repository
         uses: actions/checkout@v4
@@ -51,10 +57,26 @@ jobs:
           git config --global user.name "GitHub Actions"
 
       - name: Prepare west project
+        env:
+          WEST_TOKEN: ${{ secrets.NCS_GITHUB_TOKEN }}
         run: |
           python3 -m pip install west
           west init -l serial_modem
+          use_nusim_west=false
+          # Nightly/manual full builds fetch nuSIM repo when serial_modem.nusim exists in sample.yaml (see Prepare west).
+          if [ "$WEST_ADD_NUSIM_REPO" = "true" ] && grep -qE '^  serial_modem\.nusim:' serial_modem/app/sample.yaml; then
+            use_nusim_west=true
+          fi
+          if [ "$use_nusim_west" = "true" ]; then
+            west config manifest.group-filter -- +nusim
+            git config --global credential.helper ""
+            git config --global --add credential.helper store
+            echo "https://x-access-token:${WEST_TOKEN}@github.com" >> ~/.git-credentials
+          fi
           west update -o=--depth=1 -n
+          if [ "$use_nusim_west" = "true" ]; then
+            rm -f ~/.git-credentials
+          fi
 
       - name: Install nrfutil and toolchain manager
         run: |
@@ -190,6 +212,11 @@ jobs:
 
           # nRF54L15 DK PPP shell build
           zip_artifacts "sm_ppp_shell" "${NRF54L15DK_DIR}/sm_ppp_shell/sample.sm_ppp_shell" "sm_ppp_shell_${VERSION}_nrf54l15dk" 1 "merged_nrf54l15dk.hex" "samples/sm_ppp_shell"
+
+          # nuSIM zip for manual dispatch when twister built it (not included in release zip)
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -d "${NRF9151DK_DIR}/serial_modem.nusim" ]; then
+            zip_artifacts "app" "${NRF9151DK_DIR}/serial_modem.nusim" "serial_modem_${VERSION}_nusim" 0 "merged_nrf9151dk.hex" "app"
+          fi
 
       - name: Upload artifacts
         if: ${{ inputs.trigger_source == 'release-workflow' || github.event_name == 'workflow_dispatch' }}
