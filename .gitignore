@@ -12,6 +12,7 @@ build_*
 _build_*
 # Not build output despite the name.
 !doc/_scripts/build_docsets.py
+!.github/workflows/build*.yml
 cscope.*
 .dir
 venv
