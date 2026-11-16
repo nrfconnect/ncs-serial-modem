@@ -666,7 +666,13 @@ The read command is not supported.
 Test command
 ------------
 
-The test command is not supported.
+The test command requires an active MQTT connection.
+
+::
+
+   AT#XMQTTSUB=?
+   #XMQTTSUB: <topic>,(0,1,2)
+   OK
 
 MQTT unsubscribe #XMQTTUNSUB
 ============================
@@ -714,7 +720,13 @@ The read command is not supported.
 Test command
 ------------
 
-The test command is not supported.
+The test command requires an active MQTT connection.
+
+::
+
+   AT#XMQTTUNSUB=?
+   #XMQTTUNSUB: <topic>
+   OK
 
 .. _SM_AT_MQTT_XMQTTPUB:
 
@@ -849,7 +861,13 @@ The read command is not supported.
 Test command
 ------------
 
-The test command is not supported.
+The test command requires an active MQTT connection.
+
+::
+
+   AT#XMQTTPUB=?
+   #XMQTTPUB: <topic>,<msg>,(0,1,2),(0,1)[,<data_len>[,<msg_expiry>]]
+   OK
 
 .. _SM_AT_MQTT_XMQTTPUBEMPTY:
 

@@ -6,12 +6,10 @@
 
 #include <zephyr/logging/log.h>
 #include <zephyr/kernel.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <zephyr/net/mqtt.h>
 #include <zephyr/net/socket.h>
 #include <zephyr/net/tls_credentials.h>
-#include <zephyr/random/random.h>
 #include <zephyr/net/socket_ncs.h>
 #include "sm_util.h"
 #include "sm_at_host.h"
@@ -59,7 +57,6 @@ static struct sm_mqtt_ctx {
 
 	bool connected;
 	bool disconnect_requested;
-	struct mqtt_utf8 client_id;
 	struct mqtt_utf8 username;
 	struct mqtt_utf8 password;
 	sec_tag_t sec_tag;
@@ -103,7 +100,8 @@ struct mqtt_inflight {
 struct mqtt_conn {
 	uint8_t rx[CONFIG_SM_MQTTC_MESSAGE_BUFFER_LEN];
 	uint8_t tx[CONFIG_SM_MQTTC_MESSAGE_BUFFER_LEN];
-	uint8_t payload_drain[MQTT_MAX_TOPIC_LEN];
+	/* Holds an incoming topic, which fits the receive buffer, and then payload chunks. */
+	uint8_t payload_drain[CONFIG_SM_MQTTC_MESSAGE_BUFFER_LEN];
 	uint8_t pub_topic[MQTT_MAX_TOPIC_LEN];
 	char broker_url[SM_MAX_DNS_LEN + 1];
 	char username[SM_MAX_USERNAME + 1];
@@ -204,6 +202,7 @@ static void mqtt_inflight_ack(uint16_t message_id, uint8_t ack_evt)
 
 /* SUBSCRIBE, UNSUBSCRIBE and QoS 1/2 PUBLISH share one packet identifier space
  * (MQTT 5.0 section 2.2.1). Returns an identifier not in use by an MQTT 5.0 exchange.
+ * MQTT 3.1.1 keeps its original wrap-around, which skips 65535; MQTT 5.0 uses 1 to 65535.
  */
 STATIC int mqtt_message_id_next(void)
 {
@@ -227,8 +226,11 @@ STATIC int mqtt_message_id_next(void)
 
 #if defined(CONFIG_MQTT_VERSION_5_0)
 
-static void mqtt_capabilities_reset(void)
+/* Defaults for the limits a CONNACK can set: they apply when a property is absent. */
+static void mqtt_server_limits_reset(void)
 {
+	ctx.maximum_packet_size = UINT32_MAX;
+	ctx.receive_maximum = UINT16_MAX;
 	ctx.maximum_qos = MQTT_QOS_2_EXACTLY_ONCE;
 	ctx.retain_available = true;
 	ctx.wildcard_sub_available = true;
@@ -330,39 +332,48 @@ STATIC int mqtt_check_packet_size(size_t remaining)
 
 /**@brief Function to handle received publish event.
  */
-static void handle_mqtt_publish_evt(struct mqtt_client *const c, const struct mqtt_evt *evt)
+static void handle_mqtt_publish_evt(const struct mqtt_evt *evt)
 {
+	uint8_t qos = evt->param.publish.message.topic.qos;
+	int err = 0;
+
 	/* Send QoS acknowledgments */
-	if (evt->param.publish.message.topic.qos == MQTT_QOS_1_AT_LEAST_ONCE) {
+	if (qos != MQTT_QOS_0_AT_MOST_ONCE) {
+		ctx.protocol_error = mqtt_check_packet_size(2);
+		if (ctx.protocol_error != 0) {
+			return;
+		}
+	}
+	if (qos == MQTT_QOS_1_AT_LEAST_ONCE) {
 		const struct mqtt_puback_param ack = {
 			.message_id = evt->param.publish.message_id
 		};
 
-		ctx.protocol_error = mqtt_check_packet_size(2);
-		if (ctx.protocol_error != 0) {
-			return;
+		err = mqtt_publish_qos1_ack(&client, &ack);
+		if (err) {
+			LOG_ERR("QoS1 ack failed: %d", err);
 		}
-		mqtt_publish_qos1_ack(&client, &ack);
-	} else if (evt->param.publish.message.topic.qos == MQTT_QOS_2_EXACTLY_ONCE) {
+	} else if (qos == MQTT_QOS_2_EXACTLY_ONCE) {
 		const struct mqtt_pubrec_param ack = {
 			.message_id = evt->param.publish.message_id
 		};
 
-		ctx.protocol_error = mqtt_check_packet_size(2);
-		if (ctx.protocol_error != 0) {
-			return;
+		err = mqtt_publish_qos2_receive(&client, &ack);
+		if (err) {
+			LOG_ERR("QoS2 receive failed: %d", err);
 		}
-		mqtt_publish_qos2_receive(&client, &ack);
 	}
 
-	/* MQTT client does not track the packet identifiers, so MQTT_QOS_2_EXACTLY_ONCE
-	 * promise is not kept. This deviates from MQTT v3.1.1.
+	/* Incoming QoS 2 packet identifiers are not tracked, so a redelivered message can be
+	 * forwarded twice. This deviates from MQTT v3.1.1 and v5.0.
 	 */
 
 	/* Copy topic into payload_drain now; rx_buf may be reused after mqtt_input() returns.
 	 * payload_drain is not used for draining until after the topic has been forwarded.
+	 * The library rejects topics that do not fit its receive buffer, so the topic fits.
 	 */
-	ctx.rx_topic_len = MIN(evt->param.publish.message.topic.topic.size, MQTT_MAX_TOPIC_LEN);
+	ctx.rx_topic_len =
+		MIN(evt->param.publish.message.topic.topic.size, sizeof(mqtt_conn->payload_drain));
 	memcpy(mqtt_conn->payload_drain, evt->param.publish.message.topic.topic.utf8,
 	       ctx.rx_topic_len);
 	ctx.publish_payload_remaining = evt->param.publish.message.payload.len;
@@ -413,32 +424,28 @@ static void mqtt_msg_header_send(void)
 static int mqtt_evt_detail(const struct mqtt_evt *evt)
 {
 #if defined(CONFIG_MQTT_VERSION_5_0)
+	const struct mqtt_binstr *codes;
+
 	if (client.protocol_version != MQTT_VERSION_5_0 || evt->result != 0) {
 		return -1;
 	}
 
+	/* The ack parameter structs of each group start with the same members, so they can
+	 * be read through the first one (C11 6.5.2.3).
+	 */
 	switch (evt->type) {
 	case MQTT_EVT_CONNACK:
 		return evt->param.connack.session_present_flag != 0;
 	case MQTT_EVT_PUBACK:
-		return evt->param.puback.reason_code;
 	case MQTT_EVT_PUBREC:
-		return evt->param.pubrec.reason_code;
 	case MQTT_EVT_PUBREL:
-		return evt->param.pubrel.reason_code;
 	case MQTT_EVT_PUBCOMP:
-		return evt->param.pubcomp.reason_code;
+		return evt->param.puback.reason_code;
 	case MQTT_EVT_SUBACK:
-		/* AT#XMQTTSUB subscribes to one topic, so there is one reason code. */
-		if (evt->param.suback.return_codes.len == 0) {
-			return -1;
-		}
-		return evt->param.suback.return_codes.data[0];
 	case MQTT_EVT_UNSUBACK:
-		if (evt->param.unsuback.reason_codes.len == 0) {
-			return -1;
-		}
-		return evt->param.unsuback.reason_codes.data[0];
+		/* AT#XMQTTSUB subscribes to one topic, so there is one reason code. */
+		codes = &evt->param.suback.return_codes;
+		return codes->len == 0 ? -1 : codes->data[0];
 	default:
 		return -1;
 	}
@@ -447,6 +454,53 @@ static int mqtt_evt_detail(const struct mqtt_evt *evt)
 	return -1;
 #endif
 }
+
+#if defined(CONFIG_MQTT_VERSION_5_0)
+/* Apply the server limits and capabilities of a successful MQTT 5.0 CONNACK. */
+static void mqtt_connack_apply(const struct mqtt_connack_param *connack)
+{
+	mqtt_server_limits_reset();
+#if SM_MQTT_TOPIC_ALIASES > 0
+	mqtt_alias_connack(connack);
+#endif
+	if (connack->prop.rx.has_receive_maximum) {
+		ctx.receive_maximum = connack->prop.receive_maximum;
+		if (ctx.receive_maximum == 0) {
+			LOG_ERR("Invalid MQTT receive maximum: 0");
+			ctx.protocol_error = -EBADMSG;
+		}
+	}
+	if (connack->prop.rx.has_maximum_qos) {
+		ctx.maximum_qos = connack->prop.maximum_qos;
+	}
+	if (connack->prop.rx.has_retain_available) {
+		ctx.retain_available = connack->prop.retain_available != 0;
+	}
+	if (connack->prop.rx.has_wildcard_sub_available) {
+		ctx.wildcard_sub_available = connack->prop.wildcard_sub_available != 0;
+	}
+	if (connack->prop.rx.has_shared_sub_available) {
+		ctx.shared_sub_available = connack->prop.shared_sub_available != 0;
+	}
+	if (connack->prop.rx.has_maximum_packet_size) {
+		ctx.maximum_packet_size = connack->prop.maximum_packet_size;
+		if (ctx.maximum_packet_size == 0) {
+			LOG_ERR("Invalid MQTT maximum packet size: 0");
+			ctx.protocol_error = -EBADMSG;
+		} else {
+			int err = mqtt_check_packet_size(0);
+
+			if (err != 0) {
+				ctx.protocol_error = err;
+			}
+		}
+	}
+	if (connack->prop.rx.has_server_keep_alive) {
+		client.keepalive = connack->prop.server_keep_alive;
+		LOG_INF("MQTT server keep alive: %u", client.keepalive);
+	}
+}
+#endif
 
 /**@brief MQTT client event handler
  */
@@ -468,52 +522,7 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 		}
 #if defined(CONFIG_MQTT_VERSION_5_0)
 		if (evt->result == 0 && client.protocol_version == MQTT_VERSION_5_0) {
-			mqtt_capabilities_reset();
-#if SM_MQTT_TOPIC_ALIASES > 0
-			mqtt_alias_connack(&evt->param.connack);
-#endif
-			ctx.receive_maximum = UINT16_MAX;
-			if (evt->param.connack.prop.rx.has_receive_maximum) {
-				ctx.receive_maximum = evt->param.connack.prop.receive_maximum;
-				if (ctx.receive_maximum == 0) {
-					LOG_ERR("Invalid MQTT receive maximum: 0");
-					ctx.protocol_error = -EBADMSG;
-				}
-			}
-			if (evt->param.connack.prop.rx.has_maximum_qos) {
-				ctx.maximum_qos = evt->param.connack.prop.maximum_qos;
-			}
-			if (evt->param.connack.prop.rx.has_retain_available) {
-				ctx.retain_available =
-					evt->param.connack.prop.retain_available != 0;
-			}
-			if (evt->param.connack.prop.rx.has_wildcard_sub_available) {
-				ctx.wildcard_sub_available =
-					evt->param.connack.prop.wildcard_sub_available != 0;
-			}
-			if (evt->param.connack.prop.rx.has_shared_sub_available) {
-				ctx.shared_sub_available =
-					evt->param.connack.prop.shared_sub_available != 0;
-			}
-			ctx.maximum_packet_size = UINT32_MAX;
-			if (evt->param.connack.prop.rx.has_maximum_packet_size) {
-				ctx.maximum_packet_size =
-					evt->param.connack.prop.maximum_packet_size;
-				if (ctx.maximum_packet_size == 0) {
-					LOG_ERR("Invalid MQTT maximum packet size: 0");
-					ctx.protocol_error = -EBADMSG;
-				} else {
-					int err = mqtt_check_packet_size(0);
-
-					if (err != 0) {
-						ctx.protocol_error = err;
-					}
-				}
-			}
-			if (evt->param.connack.prop.rx.has_server_keep_alive) {
-				client.keepalive = evt->param.connack.prop.server_keep_alive;
-				LOG_INF("MQTT server keep alive: %u", client.keepalive);
-			}
+			mqtt_connack_apply(&evt->param.connack);
 		}
 #endif
 		break;
@@ -523,7 +532,7 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 		break;
 
 	case MQTT_EVT_PUBLISH:
-		handle_mqtt_publish_evt(c, evt);
+		handle_mqtt_publish_evt(evt);
 		break;
 
 #if defined(CONFIG_MQTT_VERSION_5_0)
@@ -657,10 +666,10 @@ static void mqtt_keepalive_reschedule(void)
 				    K_MSEC(mqtt_keepalive_time_left(&client)));
 }
 
-static void mqtt_connection_abort(int err)
+/* Common teardown once the MQTT library connection is closed or aborted. */
+static void mqtt_connection_close(void)
 {
-	LOG_ERR("MQTT connection aborted: %d", err);
-	(void)mqtt_abort(&client);
+	k_work_cancel_delayable(&mqtt_keepalive_work);
 	ctx.connected = false;
 	if (ctx.rx_topic_len == 0 && ctx.publish_payload_remaining > 0) {
 		/* drain_publish_payload spanned multiple poll work invocations:
@@ -672,7 +681,13 @@ static void mqtt_connection_abort(int err)
 	ctx.publish_payload_remaining = 0;
 	client.broker = NULL;
 	mqtt_conn_release();
-	k_work_cancel_delayable(&mqtt_keepalive_work);
+}
+
+static void mqtt_connection_abort(int err)
+{
+	LOG_ERR("MQTT connection aborted: %d", err);
+	(void)mqtt_abort(&client);
+	mqtt_connection_close();
 }
 
 static int mqtt_arm_poll_cb(void)
@@ -851,9 +866,11 @@ static bool mqtt_version_supported(uint16_t version)
 }
 
 /**@brief Configure the MQTT client structure
+ *
+ * The configuration, including the client ID, is applied only when all parameters are valid.
  */
-static int do_mqtt_config(uint16_t keep_alive, uint8_t clean_session, uint16_t version,
-			  uint32_t session_expiry)
+static int do_mqtt_config(const char *client_id, uint16_t keep_alive, uint16_t clean_session,
+			  uint16_t version, uint32_t session_expiry)
 {
 	if (ctx.connected) {
 		return -EINVAL;
@@ -876,6 +893,7 @@ static int do_mqtt_config(uint16_t keep_alive, uint8_t clean_session, uint16_t v
 	client.evt_cb = mqtt_evt_handler;
 
 	/* MQTT client id configuration */
+	strcpy(mqtt_clientid, client_id);
 	client.client_id.utf8 = mqtt_clientid;
 	client.client_id.size = strlen(mqtt_clientid);
 
@@ -884,7 +902,7 @@ static int do_mqtt_config(uint16_t keep_alive, uint8_t clean_session, uint16_t v
 	/* MQTT Keep Alive configuration */
 	client.keepalive = keep_alive;
 	mqtt_configured_keepalive = keep_alive;
-	/* MQTT Clean Session configuration */
+	/* MQTT Clean Session configuration, validated as 0 or 1 above */
 	client.clean_session = clean_session;
 #if defined(CONFIG_MQTT_VERSION_5_0)
 	client.prop.session_expiry_interval = session_expiry;
@@ -949,9 +967,7 @@ static int do_mqtt_connect(void)
 	client.keepalive = mqtt_configured_keepalive;
 	ctx.protocol_error = 0;
 #if defined(CONFIG_MQTT_VERSION_5_0)
-	ctx.maximum_packet_size = UINT32_MAX;
-	ctx.receive_maximum = UINT16_MAX;
-	mqtt_capabilities_reset();
+	mqtt_server_limits_reset();
 #endif
 	err = mqtt_connect(&client);
 	if (err != 0) {
@@ -964,9 +980,9 @@ static int do_mqtt_connect(void)
 
 	err = mqtt_arm_poll_cb();
 	if (err) {
-		ctx.connected = false;
-		client.broker = NULL;
-		goto fail;
+		/* The library connection is open, so abort it rather than only freeing buffers. */
+		mqtt_connection_abort(err);
+		return err;
 	}
 
 	mqtt_keepalive_reschedule();
@@ -1003,10 +1019,7 @@ static int do_mqtt_disconnect(void)
 		return 0;
 	}
 
-	k_work_cancel_delayable(&mqtt_keepalive_work);
-	ctx.connected = false;
-	client.broker = NULL;
-	mqtt_conn_release();
+	mqtt_connection_close();
 
 	return 0;
 }
@@ -1065,7 +1078,7 @@ static int do_mqtt_publish(uint8_t *msg, size_t msg_len)
 	}
 
 	/* MQTT client does not store packets, so we will not retransmit packets
-	 * that are lacking response. This deviates from MQTT v3.1.1.
+	 * that are lacking response. This deviates from MQTT v3.1.1 and v5.0.
 	 */
 	mqtt_conn->pub_param.message.payload.data = msg;
 	mqtt_conn->pub_param.message.payload.len  = msg_len;
@@ -1183,12 +1196,14 @@ STATIC int handle_at_mqtt_config(enum at_parser_cmd_type cmd_type, struct at_par
 	uint16_t clean_session = MQTT_CLEAN_SESSION_INIT;
 	uint16_t version = SM_MQTT_VERSION_DEFAULT;
 	uint32_t session_expiry = 0;
+	char clientid[sizeof(mqtt_clientid)];
 
 	switch (cmd_type) {
 	case AT_PARSER_CMD_TYPE_SET:
-		size_t clientid_sz = sizeof(mqtt_clientid);
+		size_t clientid_sz = sizeof(clientid);
 
-		err = util_string_get(parser, 1, mqtt_clientid, &clientid_sz);
+		/* Parse into a local buffer: a rejected command keeps the current client ID. */
+		err = util_string_get(parser, 1, clientid, &clientid_sz);
 		if (err) {
 			return err;
 		}
@@ -1216,7 +1231,7 @@ STATIC int handle_at_mqtt_config(enum at_parser_cmd_type cmd_type, struct at_par
 				return err;
 			}
 		}
-		err = do_mqtt_config(keep_alive, (uint8_t)clean_session, version, session_expiry);
+		err = do_mqtt_config(clientid, keep_alive, clean_session, version, session_expiry);
 		break;
 
 	case AT_PARSER_CMD_TYPE_READ:
@@ -1276,36 +1291,31 @@ STATIC int handle_at_mqtt_connect(enum at_parser_cmd_type cmd_type, struct at_pa
 
 			err = util_string_get(parser, 2, mqtt_conn->username, &username_sz);
 			if (err) {
-				mqtt_conn_release();
-				return err;
+				goto release;
 			}
 			ctx.username.utf8 = mqtt_conn->username;
-			ctx.username.size = strlen(mqtt_conn->username);
+			ctx.username.size = username_sz;
 
 			err = util_string_get(parser, 3, mqtt_conn->password, &password_sz);
 			if (err) {
-				mqtt_conn_release();
-				return err;
+				goto release;
 			}
 			ctx.password.utf8 = mqtt_conn->password;
-			ctx.password.size = strlen(mqtt_conn->password);
+			ctx.password.size = password_sz;
 
 			err = util_string_get(parser, 4, mqtt_conn->broker_url, &url_sz);
 			if (err) {
-				mqtt_conn_release();
-				return err;
+				goto release;
 			}
 			err = at_parser_num_get(parser, 5, &mqtt_broker_port);
 			if (err) {
-				mqtt_conn_release();
-				return err;
+				goto release;
 			}
 			ctx.sec_tag = SEC_TAG_TLS_INVALID;
 			if (param_count > 6) {
 				err = at_parser_num_get(parser, 6, &ctx.sec_tag);
 				if (err) {
-					mqtt_conn_release();
-					return err;
+					goto release;
 				}
 			}
 			ctx.family = (op == MQTTC_CONNECT) ? NET_AF_INET : NET_AF_INET6;
@@ -1345,6 +1355,10 @@ STATIC int handle_at_mqtt_connect(enum at_parser_cmd_type cmd_type, struct at_pa
 		break;
 	}
 
+	return err;
+
+release:
+	mqtt_conn_release();
 	return err;
 }
 
@@ -1474,6 +1488,10 @@ STATIC int handle_at_mqtt_publish(enum at_parser_cmd_type cmd_type, struct at_pa
 
 	switch (cmd_type) {
 	case AT_PARSER_CMD_TYPE_SET:
+		/* Command name, <topic>, <msg>, <qos>, <retain>, <data_len> and <msg_expiry>. */
+		if (param_count < 2 || param_count > 7) {
+			return -EINVAL;
+		}
 		err = util_string_get(parser, 1, mqtt_conn->pub_topic, &topic_sz);
 		if (err) {
 			return err;
@@ -1548,14 +1566,14 @@ STATIC int handle_at_mqtt_publish(enum at_parser_cmd_type cmd_type, struct at_pa
 	return err;
 }
 
-SM_AT_CMD_CUSTOM(xmqttsub, "AT#XMQTTSUB", handle_at_mqtt_subscribe);
-STATIC int handle_at_mqtt_subscribe(enum at_parser_cmd_type cmd_type,
-				    struct at_parser *parser, uint32_t param_count)
+/* Shared AT#XMQTTSUB and AT#XMQTTUNSUB handling; only AT#XMQTTSUB takes <qos>. */
+static int handle_at_mqtt_subscription(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+				       uint32_t param_count, uint16_t op)
 {
-	int err = -EINVAL;
-	uint16_t qos;
+	int err;
+	uint16_t qos = 0;
 	char topic[MQTT_MAX_TOPIC_LEN];
-	int topic_sz = MQTT_MAX_TOPIC_LEN;
+	size_t topic_sz = sizeof(topic);
 
 	if (!ctx.connected) {
 		return -ENOTCONN;
@@ -1563,69 +1581,46 @@ STATIC int handle_at_mqtt_subscribe(enum at_parser_cmd_type cmd_type,
 
 	switch (cmd_type) {
 	case AT_PARSER_CMD_TYPE_SET:
-		if (param_count == 3) {
-			err = util_string_get(parser, 1, topic, &topic_sz);
-			if (err < 0) {
-				return err;
-			}
+		if (param_count != (op == AT_MQTTSUB_SUB ? 3 : 2)) {
+			return -EINVAL;
+		}
+		err = util_string_get(parser, 1, topic, &topic_sz);
+		if (err < 0) {
+			return err;
+		}
+		if (op == AT_MQTTSUB_SUB) {
 			err = at_parser_num_get(parser, 2, &qos);
 			if (err < 0) {
 				return err;
 			}
-			err = do_mqtt_subscribe(AT_MQTTSUB_SUB, topic, topic_sz, qos);
-		} else {
-			return -EINVAL;
 		}
-		break;
+		return do_mqtt_subscribe(op, topic, topic_sz, qos);
 
 	case AT_PARSER_CMD_TYPE_TEST:
-		rsp_send("\r\n#XMQTTSUB: <topic>,(0,1,2)\r\n");
-		err = 0;
-		break;
+		if (op == AT_MQTTSUB_SUB) {
+			rsp_send("\r\n#XMQTTSUB: <topic>,(0,1,2)\r\n");
+		} else {
+			rsp_send("\r\n#XMQTTUNSUB: <topic>\r\n");
+		}
+		return 0;
 
 	default:
-		break;
+		return -EINVAL;
 	}
+}
 
-	return err;
+SM_AT_CMD_CUSTOM(xmqttsub, "AT#XMQTTSUB", handle_at_mqtt_subscribe);
+STATIC int handle_at_mqtt_subscribe(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+				    uint32_t param_count)
+{
+	return handle_at_mqtt_subscription(cmd_type, parser, param_count, AT_MQTTSUB_SUB);
 }
 
 SM_AT_CMD_CUSTOM(xmqttunsub, "AT#XMQTTUNSUB", handle_at_mqtt_unsubscribe);
 STATIC int handle_at_mqtt_unsubscribe(enum at_parser_cmd_type cmd_type,
 				      struct at_parser *parser, uint32_t param_count)
 {
-	int err = -EINVAL;
-	char topic[MQTT_MAX_TOPIC_LEN];
-	int topic_sz = MQTT_MAX_TOPIC_LEN;
-
-	if (!ctx.connected) {
-		return -ENOTCONN;
-	}
-
-	switch (cmd_type) {
-	case AT_PARSER_CMD_TYPE_SET:
-		if (param_count == 2) {
-			err = util_string_get(parser, 1, topic, &topic_sz);
-			if (err < 0) {
-				return err;
-			}
-			err = do_mqtt_subscribe(AT_MQTTSUB_UNSUB,
-						topic, topic_sz, 0);
-		} else {
-			return -EINVAL;
-		}
-		break;
-
-	case AT_PARSER_CMD_TYPE_TEST:
-		rsp_send("\r\n#XMQTTUNSUB: <topic>\r\n");
-		err = 0;
-		break;
-
-	default:
-		break;
-	}
-
-	return err;
+	return handle_at_mqtt_subscription(cmd_type, parser, param_count, AT_MQTTSUB_UNSUB);
 }
 
 static int sm_at_mqtt_init(void)
@@ -1633,8 +1628,8 @@ static int sm_at_mqtt_init(void)
 	memset(&ctx, 0, sizeof(ctx));
 	ctx.sec_tag = SEC_TAG_TLS_INVALID;
 
-	strcpy(mqtt_clientid, SM_DEFAULT_CID);
-	do_mqtt_config(CONFIG_MQTT_KEEPALIVE, MQTT_CLEAN_SESSION_INIT, SM_MQTT_VERSION_DEFAULT, 0);
+	do_mqtt_config(SM_DEFAULT_CID, CONFIG_MQTT_KEEPALIVE, MQTT_CLEAN_SESSION_INIT,
+		       SM_MQTT_VERSION_DEFAULT, 0);
 
 	return 0;
 }

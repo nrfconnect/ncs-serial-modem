@@ -59,6 +59,8 @@ static size_t pub_payload_off;
 static bool eagain_emitted;
 /* Message Expiry Interval of the simulated incoming PUBLISH, 0 when absent. */
 static uint32_t pub_msg_expiry_in;
+/* QoS of the simulated incoming PUBLISH. */
+static uint8_t pub_qos_in;
 
 /* zsock_setsockopt stub: capture the SO_POLLCB callback, accept everything. */
 static int setsockopt_stub(int socket, int level, int option_name,
@@ -113,7 +115,7 @@ static int mqtt_input_stub(struct mqtt_client *client, int calls)
 	memset(&evt, 0, sizeof(evt));
 	evt.type = MQTT_EVT_PUBLISH;
 	evt.result = 0;
-	evt.param.publish.message.topic.qos = MQTT_QOS_0_AT_MOST_ONCE;
+	evt.param.publish.message.topic.qos = pub_qos_in;
 	evt.param.publish.message.topic.topic.utf8 = (uint8_t *)pub_topic_in;
 	evt.param.publish.message.topic.topic.size = strlen(pub_topic_in);
 	evt.param.publish.message.payload.len = pub_payload_len;
@@ -164,6 +166,7 @@ void setUp(void)
 	pub_payload_off = 0;
 	eagain_emitted = false;
 	pub_msg_expiry_in = 0;
+	pub_qos_in = MQTT_QOS_0_AT_MOST_ONCE;
 
 	__cmock_zsock_setsockopt_Stub(setsockopt_stub);
 	__cmock_mqtt_keepalive_time_left_IgnoreAndReturn(60000);
@@ -1126,6 +1129,27 @@ void test_mqtt_publish_topic_name_validation(void)
 #endif
 }
 
+/*
+ * Test: AT#XMQTTPUB rejects parameters beyond <msg_expiry>, like AT#XMQTTPUBEMPTY.
+ */
+void test_mqtt_publish_too_many_parameters(void)
+{
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,4\r\n", MQTT_VERSION_3_1_1);
+	/* No mqtt_publish() expectation: the request must not reach the library. */
+	clear_captured_response();
+	send_at_command("AT#XMQTTPUB=\"t\",\"x\",0,0,0,0,1\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "ERROR"));
+	clear_captured_response();
+	send_at_command("AT#XMQTTPUB=\"t\",\"\",0,0,3,0,1\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "ERROR"));
+	/* All six parameters are still accepted. */
+	__cmock_mqtt_publish_ExpectAnyArgsAndReturn(0);
+	clear_captured_response();
+	send_at_command("AT#XMQTTPUB=\"t\",\"x\",0,0,0,0\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "OK"));
+	mqtt_disconnect_ok();
+}
+
 void test_mqtt_publish_empty_server_limits(void)
 {
 #if defined(CONFIG_MQTT_VERSION_5_0)
@@ -1858,6 +1882,33 @@ void test_mqtt_connect_failure_recovery(void)
 	assert_mqtt_reconnects();
 }
 
+static int setsockopt_fail_stub(int socket, int level, int option_name, const void *option_value,
+				net_socklen_t option_len, int calls)
+{
+	errno = EIO;
+	return -1;
+}
+
+/*
+ * Test: Failing to arm the poll callback after a successful connect aborts the library
+ * connection instead of leaving its socket open.
+ */
+void test_mqtt_connect_poll_arm_failure_recovery(void)
+{
+	send_at_command("AT#XMQTTCFG=\"test_client\",60,1,4\r\n");
+	clear_captured_response();
+	__cmock_zsock_getaddrinfo_Stub(getaddrinfo_stub);
+	__cmock_zsock_freeaddrinfo_Ignore();
+	__cmock_mqtt_connect_ExpectAnyArgsAndReturn(0);
+	__cmock_zsock_setsockopt_Stub(setsockopt_fail_stub);
+	__cmock_mqtt_abort_ExpectAnyArgsAndReturn(0);
+	send_at_command("AT#XMQTTCON=1,\"user\",\"pass\",\"broker.example.com\",1883\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "ERROR"));
+	__cmock_zsock_setsockopt_Stub(setsockopt_stub);
+	assert_mqtt_disconnected();
+	assert_mqtt_reconnects();
+}
+
 static void mqtt_poll_failure(short revents)
 {
 	struct socket_ncs_pollcb_params params = {
@@ -1995,6 +2046,63 @@ void test_mqtt_config_version(void)
 	resp = get_captured_response();
 	TEST_ASSERT_NOT_NULL(strstr(resp, "#XMQTTCFG: <client_id>,<keep_alive>,<clean_session>,"
 					  "<version>,<session_expiry>"));
+}
+
+static void assert_client_id(const char *expected)
+{
+	char line[96];
+
+	snprintf(line, sizeof(line), "#XMQTTCFG: \"%s\",", expected);
+	clear_captured_response();
+	send_at_command("AT#XMQTTCFG?\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), line));
+}
+
+/*
+ * Test: A rejected AT#XMQTTCFG does not change the client ID used for the next connection.
+ */
+void test_mqtt_config_rejected_keeps_client_id(void)
+{
+	static const char *const rejected[] = {
+		"AT#XMQTTCFG=\"second_id\",60,1,6\r\n",
+		"AT#XMQTTCFG=\"second_id\",60,2\r\n",
+		/* Values that a cast to uint8_t would turn into 0 and 1. */
+		"AT#XMQTTCFG=\"second_id\",60,256\r\n",
+		"AT#XMQTTCFG=\"second_id\",60,257\r\n",
+		"AT#XMQTTCFG=\"second_id\",60,1,4,10\r\n",
+		"AT#XMQTTCFG=\"second_id\",\"bad\"\r\n",
+		/* 65 characters, one more than the maximum. */
+		"AT#XMQTTCFG=\"client id with sixty-five characters is one longer than "
+		"the limit\"\r\n",
+	};
+
+	send_at_command("AT#XMQTTCFG=\"first_id\",60,1\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "OK"));
+	for (size_t i = 0; i < ARRAY_SIZE(rejected); i++) {
+		clear_captured_response();
+		send_at_command(rejected[i]);
+		TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "ERROR"));
+		assert_client_id("first_id");
+	}
+
+	clear_captured_response();
+	connected_client = NULL;
+	__cmock_zsock_getaddrinfo_Stub(getaddrinfo_stub);
+	__cmock_zsock_freeaddrinfo_Ignore();
+	__cmock_mqtt_connect_Stub(mqtt_connect_version_stub);
+	send_at_command("AT#XMQTTCON=1,\"user\",\"pass\",\"broker.example.com\",1883\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "OK"));
+	__cmock_mqtt_connect_Stub(NULL);
+	TEST_ASSERT_NOT_NULL(connected_client);
+	TEST_ASSERT_EQUAL_UINT(strlen("first_id"), connected_client->client_id.size);
+	TEST_ASSERT_EQUAL_MEMORY("first_id", connected_client->client_id.utf8, strlen("first_id"));
+
+	/* Configuration is rejected while connected. */
+	clear_captured_response();
+	send_at_command("AT#XMQTTCFG=\"second_id\",60,1\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "ERROR"));
+	assert_client_id("first_id");
+	mqtt_disconnect_ok();
 }
 
 /*
@@ -2797,6 +2905,9 @@ void test_mqtt_datamode_invalid_lengths(void)
 }
 
 /* expiry_field is the expected optional third #XMQTTMSG field, including the comma. */
+/* Receive one PUBLISH on pub_topic_in ("device/data" by default) and check the framing.
+ * expiry_field is the expected optional third #XMQTTMSG field, including the comma.
+ */
 static void receive_framed(const uint8_t *payload, size_t len, uint8_t version,
 			   const char *expiry_field)
 {
@@ -2805,7 +2916,7 @@ static void receive_framed(const uint8_t *payload, size_t len, uint8_t version,
 		.events = ZSOCK_POLLIN,
 		.revents = ZSOCK_POLLIN,
 	};
-	char header[80];
+	static char header[CONFIG_SM_MQTTC_MESSAGE_BUFFER_LEN + 64];
 	char command[64];
 	static const char trailer[] = "\r\n\r\n#XMQTTEVT: 2,0\r\n";
 	const uint8_t *captured;
@@ -2813,7 +2924,9 @@ static void receive_framed(const uint8_t *payload, size_t len, uint8_t version,
 
 	snprintf(command, sizeof(command), "AT#XMQTTCFG=\"test_client\",60,1,%u\r\n", version);
 	mqtt_connect_version(command, version);
-	pub_topic_in = "device/data";
+	if (pub_topic_in == NULL) {
+		pub_topic_in = "device/data";
+	}
 	pub_payload_in = (const char *)payload;
 	pub_payload_len = len;
 	__cmock_mqtt_input_Stub(mqtt_input_stub);
@@ -2826,8 +2939,9 @@ static void receive_framed(const uint8_t *payload, size_t len, uint8_t version,
 		k_sleep(K_MSEC(20));
 	}
 	uart_stub_tx_done_reset();
-	header_len = snprintf(header, sizeof(header), "\r\n#XMQTTMSG: 11,%zu%s\r\ndevice/data\r\n",
-			      len, expiry_field);
+	header_len = snprintf(header, sizeof(header), "\r\n#XMQTTMSG: %zu,%zu%s\r\n%s\r\n",
+			      strlen(pub_topic_in), len, expiry_field, pub_topic_in);
+	TEST_ASSERT_LESS_THAN_UINT(sizeof(header), header_len);
 	captured = (const uint8_t *)get_captured_response();
 	TEST_ASSERT_EQUAL_UINT(header_len + len + sizeof(trailer) - 1, get_captured_response_len());
 	TEST_ASSERT_EQUAL_MEMORY(header, captured, header_len);
@@ -2846,6 +2960,40 @@ static void receive_framed_payload(const uint8_t *payload, size_t len)
 void test_mqtt_incoming_binary_framing(void)
 {
 	receive_framed_payload(binary_payload, sizeof(binary_payload));
+}
+
+/*
+ * Test: An incoming topic longer than the 128-byte publish topic limit is forwarded in full.
+ */
+void test_mqtt_incoming_long_topic(void)
+{
+	static const uint8_t payload[] = "hello";
+	static char topic[401];
+
+	for (size_t i = 0; i < sizeof(topic) - 1; i++) {
+		topic[i] = (i % 10 == 9) ? '/' : 'a' + (i % 10);
+	}
+	topic[sizeof(topic) - 1] = '\0';
+	pub_topic_in = topic;
+	receive_framed(payload, sizeof(payload) - 1, MQTT_VERSION_3_1_1, "");
+}
+
+/*
+ * Test: A failed PUBACK or PUBREC send is logged and the message is still forwarded.
+ */
+void test_mqtt_incoming_ack_send_failure(void)
+{
+	static const uint8_t payload[] = "hello";
+
+	pub_qos_in = MQTT_QOS_1_AT_LEAST_ONCE;
+	__cmock_mqtt_publish_qos1_ack_ExpectAnyArgsAndReturn(-EIO);
+	receive_framed(payload, sizeof(payload) - 1, MQTT_VERSION_3_1_1, "");
+
+	pub_payload_off = 0;
+	eagain_emitted = false;
+	pub_qos_in = MQTT_QOS_2_EXACTLY_ONCE;
+	__cmock_mqtt_publish_qos2_receive_ExpectAnyArgsAndReturn(-EIO);
+	receive_framed(payload, sizeof(payload) - 1, MQTT_VERSION_3_1_1, "");
 }
 
 void test_mqtt_incoming_empty_payload(void)
@@ -2874,6 +3022,50 @@ void test_mqtt_incoming_message_expiry(void)
 #else
 	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
 #endif
+}
+
+extern int handle_at_mqtt_connect(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+				  uint32_t param_count);
+
+/*
+ * Test: A graceful disconnect while an incoming payload is only partly forwarded, for example
+ * from another CMUX channel, releases the pipe and clears the receive state.
+ */
+void test_mqtt_disconnect_during_payload_drain(void)
+{
+	static const uint8_t payload[] = "0123456789abcdefghij";
+	struct socket_ncs_pollcb_params params = {
+		.fd = 0,
+		.events = ZSOCK_POLLIN,
+		.revents = ZSOCK_POLLIN,
+	};
+	struct at_parser parser;
+	size_t count;
+
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,4\r\n", MQTT_VERSION_3_1_1);
+	pub_topic_in = "device/data";
+	pub_payload_in = (const char *)payload;
+	pub_payload_len = sizeof(payload) - 1;
+	__cmock_mqtt_input_Stub(mqtt_input_stub);
+	__cmock_mqtt_read_publish_payload_Stub(mqtt_read_payload_stub);
+	mqtt_pollcb(&params);
+	k_sleep(K_MSEC(20));
+	uart_stub_tx_done_reset();
+	/* The read stub paused halfway, so the pipe stays locked for the rest of the payload. */
+	TEST_ASSERT_LESS_THAN_UINT(pub_payload_len, pub_payload_off);
+
+	/* The locked pipe does not parse commands, so call the handler as another channel would. */
+	TEST_ASSERT_EQUAL_INT(0, at_parser_init(&parser, "AT#XMQTTCON=0"));
+	TEST_ASSERT_EQUAL_INT(0, at_parser_cmd_count_get(&parser, &count));
+	__cmock_mqtt_disconnect_ExpectAnyArgsAndReturn(0);
+	TEST_ASSERT_EQUAL_INT(0, handle_at_mqtt_connect(AT_PARSER_CMD_TYPE_SET, &parser, count));
+
+	/* The pipe accepts commands again. */
+	assert_mqtt_disconnected();
+	/* The next connection frames a new message without leftovers from the old one. */
+	pub_payload_off = 0;
+	eagain_emitted = false;
+	receive_framed(payload, sizeof(payload) - 1, MQTT_VERSION_3_1_1, "");
 }
 
 extern int unity_main(void);
