@@ -2,26 +2,30 @@ name: Build
 
 on:
   workflow_dispatch:
-  pull_request:
-    paths-ignore:
-      - "doc/**"
-      - "README.md"
-      - ".github/workflows/*.yml"
-      - "!.github/workflows/build.yml"
-  schedule:
-    # Run every day at 03:00 AM
-    - cron: "00 3 * * *"
+    inputs:
+      checkout_ref:
+        description: 'Git ref to checkout (branch, tag, or SHA). Empty uses the ref selected for workflow.'
+        required: false
+        type: string
+        default: ''
   workflow_call:
     inputs:
       trigger_source:
         description: 'Trigger source'
         required: true
         type: string
-      release_tag:
-        description: 'Git tag for release builds (checkout ref and artifact version)'
+      checkout_ref:
+        description: 'Git ref to checkout (branch, tag, or SHA)'
         required: false
         type: string
         default: ''
+  pull_request:
+    paths-ignore:
+      - "doc/**"
+      - "README.md"
+      - ".github/workflows/*.yml"
+      - "!.github/workflows/build.yml"
+      - "!.github/workflows/build-nightly.yml"
 
 
 jobs:
@@ -34,7 +38,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: serial_modem
-          ref: ${{ inputs.release_tag != '' && inputs.release_tag || github.ref }}
+          ref: ${{ inputs.checkout_ref != '' && inputs.checkout_ref || github.ref }}
 
       - name: Install build libraries for native_sim
         run: |
@@ -125,7 +129,10 @@ jobs:
             ${{ github.workspace }}/pr-number.txt
 
       - name: Build Serial Modem nightly
-        if: ${{ github.event_name == 'schedule' || inputs.trigger_source == 'release-workflow' || github.event_name == 'workflow_dispatch' }}
+        if: >-
+          ${{ inputs.trigger_source == 'nightly-workflow' ||
+          inputs.trigger_source == 'release-workflow' ||
+          github.event_name == 'workflow_dispatch' }}
         run: |
           ./nrfutil toolchain-manager launch --chdir serial_modem -- west twister -T . -v --inline-logs --overflow-as-errors --all
 
@@ -135,7 +142,7 @@ jobs:
         run: |
           mkdir -p artifacts
           mkdir -p artifacts_extras
-          VERSION=${{ inputs.release_tag || github.event.release.tag_name || github.ref_name || 'unknown-version' }}
+          VERSION=${{ inputs.checkout_ref != '' && inputs.checkout_ref || github.ref_name || 'unknown-version' }}
           NRF9151DK_DIR=twister-out/nrf9151dk_nrf9151_ns/zephyr_gnu/serial_modem/app
           NRF54L15DK_DIR=twister-out/nrf54l15dk_nrf54l15_cpuapp/zephyr_gnu/serial_modem/samples
 

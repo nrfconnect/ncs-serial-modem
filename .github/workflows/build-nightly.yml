@@ -1,0 +1,20 @@
+name: Nightly Build
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Run every day at 00:00 AM UTC
+    - cron: "00 0 * * *"
+
+jobs:
+  build:
+    name: Nightly (${{ matrix.ref }})
+    strategy:
+      fail-fast: false
+      matrix:
+        ref: [main, v2-branch]
+    uses: ./.github/workflows/build.yml
+    secrets: inherit
+    with:
+      trigger_source: nightly-workflow
+      checkout_ref: ${{ matrix.ref }}
