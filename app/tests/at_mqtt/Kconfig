@@ -50,6 +50,13 @@ config SM_MQTTC_TOPIC_ALIAS_MAX
 	  Test-only value; the application default in app/Kconfig is 4.
 	  A small table lets the tests fill it with few topics.
 
+config SM_MQTTC_PUB_PROP_BUF_SIZE
+	int "Buffer size for outgoing MQTT 5.0 message properties"
+	default 128
+	help
+	  Test-only value; the application default in app/Kconfig is 256.
+	  The tests reach the limit with values that fit the test AT command buffer.
+
 endif # SM_TEST_MQTT_VERSION_5_0
 
 # SM core symbols — normally defined inside menu "Nordic Serial Modem" in

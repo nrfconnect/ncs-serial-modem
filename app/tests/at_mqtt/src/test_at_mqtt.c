@@ -3173,6 +3173,229 @@ void test_mqtt_msg_prop_command(void)
 #endif
 }
 
+#if defined(CONFIG_MQTT_VERSION_5_0)
+static struct mqtt_publish_param pub_prop_seen;
+static size_t pub_prop_calls;
+
+static int pub_prop_publish_stub(struct mqtt_client *c, const struct mqtt_publish_param *param,
+				 int calls)
+{
+	ARG_UNUSED(c);
+	ARG_UNUSED(calls);
+	pub_prop_seen = *param;
+	pub_prop_calls++;
+	return 0;
+}
+
+/* The values point to the connection's property buffer, which the next AT#XMQTTPUBPROP
+ * overwrites, so check them before setting new properties.
+ */
+static void assert_no_pub_props(void)
+{
+	TEST_ASSERT_EQUAL_UINT8(0, pub_prop_seen.prop.payload_format_indicator);
+	TEST_ASSERT_EQUAL_UINT(0, pub_prop_seen.prop.content_type.size);
+	TEST_ASSERT_EQUAL_UINT(0, pub_prop_seen.prop.response_topic.size);
+	TEST_ASSERT_EQUAL_UINT(0, pub_prop_seen.prop.correlation_data.len);
+	TEST_ASSERT_EQUAL_UINT(0, pub_prop_seen.prop.user_prop[0].name.size);
+}
+
+/* Command with a quoted parameter of len repetitions of fill. */
+static void pub_prop_long_command(char *buf, size_t size, uint16_t type, size_t len, char fill)
+{
+	int n = snprintf(buf, size, "AT#XMQTTPUBPROP=%u,\"", type);
+
+	TEST_ASSERT_LESS_OR_EQUAL_UINT(size, n + len + 4);
+	memset(buf + n, fill, len);
+	strcpy(buf + n + len, "\"\r\n");
+}
+#endif
+
+/*
+ * Test: AT#XMQTTPUBPROP properties reach the next publication only, for inline, data mode,
+ * and empty publications. Setting a property again replaces it, an empty value removes it,
+ * type 0 clears all, and a rejected publish command also clears them.
+ */
+void test_mqtt_pub_prop_publish(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	static const uint8_t correlation[] = {0x00, 0xff, '\r', '\n'};
+
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,5\r\n", MQTT_VERSION_5_0);
+	__cmock_mqtt_publish_Stub(pub_prop_publish_stub);
+	pub_prop_calls = 0;
+
+	inflight_command("AT#XMQTTPUBPROP=1,1\r\n", true);
+	inflight_command("AT#XMQTTPUBPROP=3,\"text/plain\"\r\n", true);
+	inflight_command("AT#XMQTTPUBPROP=3,\"application/json\"\r\n", true);
+	inflight_command("AT#XMQTTPUBPROP=8,\"resp/topic\"\r\n", true);
+	inflight_command("AT#XMQTTPUBPROP=9,\"00Ff0d0A\"\r\n", true);
+	inflight_command("AT#XMQTTPUBPROP=38,\"k1\",\"v1\"\r\n", true);
+	inflight_command("AT#XMQTTPUBPROP=38,\"k1\",\"v2\"\r\n", true);
+	inflight_command("AT#XMQTTPUB=\"t\",\"{}\",1\r\n", true);
+	TEST_ASSERT_EQUAL_UINT(1, pub_prop_calls);
+	TEST_ASSERT_EQUAL_UINT8(1, pub_prop_seen.prop.payload_format_indicator);
+	assert_mqtt_utf8("application/json", &pub_prop_seen.prop.content_type);
+	assert_mqtt_utf8("resp/topic", &pub_prop_seen.prop.response_topic);
+	TEST_ASSERT_EQUAL_UINT(sizeof(correlation), pub_prop_seen.prop.correlation_data.len);
+	TEST_ASSERT_EQUAL_MEMORY(correlation, pub_prop_seen.prop.correlation_data.data,
+				 sizeof(correlation));
+	assert_mqtt_utf8("k1", &pub_prop_seen.prop.user_prop[0].name);
+	assert_mqtt_utf8("v1", &pub_prop_seen.prop.user_prop[0].value);
+	assert_mqtt_utf8("k1", &pub_prop_seen.prop.user_prop[1].name);
+	assert_mqtt_utf8("v2", &pub_prop_seen.prop.user_prop[1].value);
+
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\",1\r\n", true);
+	assert_no_pub_props();
+
+	inflight_command("AT#XMQTTPUBPROP=3,\"text/plain\"\r\n", true);
+	inflight_command("AT#XMQTTPUB=\"t\",\"\",0,0,3\r\n", true);
+	clear_captured_response();
+	uart_stub_rx_nowait((const uint8_t *)"abc", 3);
+	k_sleep(K_MSEC(20));
+	uart_stub_tx_done_reset();
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "#XDATAMODE: 0\r\n"));
+	assert_mqtt_utf8("text/plain", &pub_prop_seen.prop.content_type);
+	inflight_command("AT#XMQTTPUBEMPTY=\"t\"\r\n", true);
+	assert_no_pub_props();
+
+	inflight_command("AT#XMQTTPUBPROP=1,1\r\n", true);
+	inflight_command("AT#XMQTTPUBPROP=3,\"text/plain\"\r\n", true);
+	inflight_command("AT#XMQTTPUBPROP=3,\"\"\r\n", true);
+	inflight_command("AT#XMQTTPUBEMPTY=\"t\",1\r\n", true);
+	TEST_ASSERT_EQUAL_UINT8(1, pub_prop_seen.prop.payload_format_indicator);
+	TEST_ASSERT_EQUAL_UINT(0, pub_prop_seen.prop.content_type.size);
+
+	inflight_command("AT#XMQTTPUBPROP=8,\"resp/topic\"\r\n", true);
+	inflight_command("AT#XMQTTPUBPROP=38,\"k\",\"v\"\r\n", true);
+	inflight_command("AT#XMQTTPUBPROP=0\r\n", true);
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\"\r\n", true);
+	assert_no_pub_props();
+
+	inflight_command("AT#XMQTTPUBPROP=8,\"resp/topic\"\r\n", true);
+	inflight_command("AT#XMQTTPUB=\"t/+\",\"x\"\r\n", false);
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\"\r\n", true);
+	assert_no_pub_props();
+	TEST_ASSERT_EQUAL_UINT(7, pub_prop_calls);
+	__cmock_mqtt_publish_Stub(NULL);
+	mqtt_disconnect_ok();
+#else
+	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
+#endif
+}
+
+/*
+ * Test: AT#XMQTTPUBPROP rejects invalid values, user properties over the library limit,
+ * and values over the buffer size, without using buffer space. It needs an MQTT 5.0
+ * connection.
+ */
+void test_mqtt_pub_prop_invalid(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	static const char *const invalid[] = {
+		"AT#XMQTTPUBPROP=2,1\r\n",
+		"AT#XMQTTPUBPROP=1,2\r\n",
+		"AT#XMQTTPUBPROP=1\r\n",
+		"AT#XMQTTPUBPROP=1,1,1\r\n",
+		"AT#XMQTTPUBPROP=0,1\r\n",
+		"AT#XMQTTPUBPROP=3\r\n",
+		"AT#XMQTTPUBPROP=8,\"a/+\"\r\n",
+		"AT#XMQTTPUBPROP=8,\"a/#\"\r\n",
+		"AT#XMQTTPUBPROP=9,\"0\"\r\n",
+		"AT#XMQTTPUBPROP=9,\"zz\"\r\n",
+		"AT#XMQTTPUBPROP=38,\"k\"\r\n",
+		"AT#XMQTTPUBPROP=38,\"\",\"v\"\r\n",
+		"AT#XMQTTPUBPROP=38,\"k\",\"\"\r\n",
+		"AT#XMQTTPUBPROP?\r\n",
+	};
+	char command[CONFIG_SM_MQTTC_PUB_PROP_BUF_SIZE + 32];
+
+	inflight_command("AT#XMQTTPUBPROP=1,1\r\n", false);
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,4\r\n", MQTT_VERSION_3_1_1);
+	inflight_command("AT#XMQTTPUBPROP=1,1\r\n", false);
+	mqtt_disconnect_ok();
+
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,5\r\n", MQTT_VERSION_5_0);
+	for (size_t i = 0; i < ARRAY_SIZE(invalid); i++) {
+		inflight_command(invalid[i], false);
+	}
+	clear_captured_response();
+	send_at_command("AT#XMQTTPUBPROP=?\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "#XMQTTPUBPROP: (0,1,3,8,9,38)\r\n"));
+
+	for (size_t i = 0; i < CONFIG_MQTT_USER_PROPERTIES_MAX; i++) {
+		inflight_command("AT#XMQTTPUBPROP=38,\"k\",\"v\"\r\n", true);
+	}
+	inflight_command("AT#XMQTTPUBPROP=38,\"k\",\"v\"\r\n", false);
+
+	/* Rejected values do not use buffer space, so a full-size value still fits. */
+	inflight_command("AT#XMQTTPUBPROP=0\r\n", true);
+	inflight_command("AT#XMQTTPUBPROP=38,\"k\",\"\"\r\n", false);
+	inflight_command("AT#XMQTTPUBPROP=8,\"a/+\"\r\n", false);
+	inflight_command("AT#XMQTTPUBPROP=9,\"0g\"\r\n", false);
+	pub_prop_long_command(command, sizeof(command), 3, CONFIG_SM_MQTTC_PUB_PROP_BUF_SIZE, 'a');
+	inflight_command(command, true);
+	inflight_command("AT#XMQTTPUBPROP=8,\"r\"\r\n", false);
+	inflight_command("AT#XMQTTPUBPROP=0\r\n", true);
+	pub_prop_long_command(command, sizeof(command), 9, 2, 'a');
+	inflight_command(command, true);
+	pub_prop_long_command(command, sizeof(command), 3, CONFIG_SM_MQTTC_PUB_PROP_BUF_SIZE - 1,
+			      'a');
+	inflight_command(command, true);
+	inflight_command("AT#XMQTTPUBPROP=3,\"\"\r\n", true);
+	inflight_command("AT#XMQTTPUBPROP=38,\"k\",\"v\"\r\n", false);
+	mqtt_disconnect_ok();
+#else
+	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
+#endif
+}
+
+/*
+ * Test: The packet size check counts the properties, with a two-byte Property Length
+ * when the properties exceed 127 bytes.
+ */
+void test_mqtt_pub_prop_packet_size(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	char command[CONFIG_SM_MQTTC_PUB_PROP_BUF_SIZE + 32];
+
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,5\r\n", MQTT_VERSION_5_0);
+	/* 2 + 1 + 1 + 1 + 3 + 2 = 10 remaining, packet size 12. */
+	set_server_packet_limit(11);
+	inflight_command("AT#XMQTTPUBPROP=3,\"ab\"\r\n", true);
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\"\r\n", false);
+	set_server_packet_limit(12);
+	inflight_command("AT#XMQTTPUBPROP=3,\"ab\"\r\n", true);
+	__cmock_mqtt_publish_ExpectAnyArgsAndReturn(0);
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\"\r\n", true);
+
+	/* User property 1 + 2 + 1 + 2 + 1: 2 + 1 + 1 + 7 = 11 remaining, packet size 13. */
+	set_server_packet_limit(12);
+	inflight_command("AT#XMQTTPUBPROP=38,\"k\",\"v\"\r\n", true);
+	inflight_command("AT#XMQTTPUBEMPTY=\"t\"\r\n", false);
+	set_server_packet_limit(13);
+	inflight_command("AT#XMQTTPUBPROP=38,\"k\",\"v\"\r\n", true);
+	__cmock_mqtt_publish_ExpectAnyArgsAndReturn(0);
+	inflight_command("AT#XMQTTPUBEMPTY=\"t\",0,0,0\r\n", true);
+
+	/* Content Type 3 + 120, Payload Format Indicator 2, and Message Expiry Interval 5 make
+	 * 130 bytes of properties: 2 + 1 + 1 + 2 + 130 = 136 remaining, packet size 139.
+	 */
+	set_server_packet_limit(138);
+	pub_prop_long_command(command, sizeof(command), 3, 120, 'a');
+	inflight_command(command, true);
+	inflight_command("AT#XMQTTPUBPROP=1,1\r\n", true);
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\",0,0,0,60\r\n", false);
+	set_server_packet_limit(139);
+	inflight_command(command, true);
+	inflight_command("AT#XMQTTPUBPROP=1,1\r\n", true);
+	__cmock_mqtt_publish_ExpectAnyArgsAndReturn(0);
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\",0,0,0,60\r\n", true);
+	mqtt_disconnect_ok();
+#else
+	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
+#endif
+}
+
 extern int handle_at_mqtt_connect(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 				  uint32_t param_count);
 

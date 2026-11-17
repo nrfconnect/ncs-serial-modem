@@ -386,8 +386,19 @@ config SM_MQTTC_TOPIC_ALIAS_MAX
 configdefault MQTT_TOPIC_ALIAS_MAX
 	default 0
 
-# User properties of an incoming message that AT#XMQTTMSGPROP can report; the MQTT library
-# drops any further user properties.
+config SM_MQTTC_PUB_PROP_BUF_SIZE
+	int "Buffer size for outgoing MQTT 5.0 message properties"
+	depends on SM_MQTTC_VERSION_5_0
+	range 32 SM_MQTTC_MESSAGE_BUFFER_LEN
+	default 256
+	help
+	  Total size in bytes of the Content Type, Response Topic, Correlation Data,
+	  and user property values that AT#XMQTTPUBPROP sets for one publication.
+	  The buffer uses heap while connected. The encoded properties and the topic
+	  must also fit in SM_MQTTC_MESSAGE_BUFFER_LEN.
+
+# User properties of an incoming message that AT#XMQTTMSGPROP can report, and of an outgoing
+# message that AT#XMQTTPUBPROP can set; the MQTT library drops any further user properties.
 configdefault MQTT_USER_PROPERTIES_MAX
 	default 4 if SM_MQTTC_VERSION_5_0
 

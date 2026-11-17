@@ -270,6 +270,14 @@ CONFIG_SM_MQTTC_TOPIC_ALIAS_MAX - Maximum number of outgoing MQTT 5.0 topic alia
    Each incoming alias uses ``CONFIG_MQTT_TOPIC_ALIAS_STRING_MAX`` + 2 bytes of static RAM.
    The broker decides whether to use aliases, so the savings depend on the broker.
 
+.. _CONFIG_SM_MQTTC_PUB_PROP_BUF_SIZE:
+
+CONFIG_SM_MQTTC_PUB_PROP_BUF_SIZE - Buffer size for outgoing MQTT 5.0 message properties
+   This option sets the total size in bytes of the property values that ``#XMQTTPUBPROP`` sets for one publication.
+   The buffer uses heap while connected.
+   The default value is 256.
+   See :ref:`SM_AT_MQTT_XMQTTPUBPROP` for more information.
+
 .. _CONFIG_SM_HTTPC:
 
 CONFIG_SM_HTTPC - HTTP client support in |SM|

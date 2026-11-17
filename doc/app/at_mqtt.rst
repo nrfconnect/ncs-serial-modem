@@ -14,6 +14,7 @@ MQTT v3.1.1 is the default.
 Select MQTT v5.0 with the ``<version>`` parameter of ``#XMQTTCFG``.
 The AT interface supports the MQTT v5.0 Session Expiry Interval and Message Expiry Interval properties, Session Present flag, and acknowledgment reason codes.
 It reports the Payload Format Indicator, Content Type, Response Topic, Correlation Data, and User Property of incoming messages with :ref:`SM_AT_MQTT_XMQTTMSGPROP`.
+It sets the same properties for outgoing messages with :ref:`SM_AT_MQTT_XMQTTPUBPROP`.
 It does not expose other MQTT v5.0 properties, subscription options, or enhanced authentication.
 Examples use MQTT v3.1.1 unless stated otherwise.
 
@@ -925,6 +926,8 @@ The parameters and their defined values are the following:
    The default value ``0`` means that the message does not expire.
    With a non-empty ``<msg>``, set ``<data_len>`` to ``0``.
 
+To send other MQTT v5.0 properties with the message, set them with :ref:`SM_AT_MQTT_XMQTTPUBPROP` before this command.
+
 Examples
 ~~~~~~~~
 
@@ -1022,7 +1025,7 @@ Set command
    The MQTT v5.0 Message Expiry Interval in seconds, as described for :ref:`SM_AT_MQTT_XMQTTPUB`.
    The default is ``0``, which sends no Message Expiry Interval.
 
-The command uses the same broker capability and packet-size checks as ``#XMQTTPUB``.
+The command uses the same broker capability and packet-size checks as ``#XMQTTPUB``, and the properties set with :ref:`SM_AT_MQTT_XMQTTPUBPROP`.
 It returns ``OK`` when the MQTT library accepts the send or ``ERROR`` on failure.
 QoS 1 produces PUBACK events, and QoS 2 produces PUBREC and PUBCOMP events unless PUBREC reports failure.
 See :ref:`SM_AT_MQTT_XMQTTEVT` for acknowledgment details.
@@ -1051,4 +1054,114 @@ Test command
 
    AT#XMQTTPUBEMPTY=?
    #XMQTTPUBEMPTY: <topic>,(0,1,2),(0,1)[,<msg_expiry>]
+   OK
+
+.. _SM_AT_MQTT_XMQTTPUBPROP:
+
+Outgoing message properties #XMQTTPUBPROP
+=========================================
+
+The ``#XMQTTPUBPROP`` command sets MQTT v5.0 properties for the next ``#XMQTTPUB`` or ``#XMQTTPUBEMPTY`` command.
+The properties apply to that command only.
+The |SM| clears them when the command completes, whether it succeeds or fails.
+When ``#XMQTTPUB`` enters data mode, the |SM| clears them when data mode ends.
+Disconnecting also clears them.
+The command requires an active MQTT v5.0 connection.
+
+.. only:: not nrf91m1
+
+   The command requires :ref:`CONFIG_SM_MQTTC_VERSION_5_0`.
+
+Set command
+-----------
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XMQTTPUBPROP=0
+   AT#XMQTTPUBPROP=1,<payload_format>
+   AT#XMQTTPUBPROP=<type>,<value>
+   AT#XMQTTPUBPROP=38,<name>,<value>
+
+<type>
+   Integer.
+   The MQTT v5.0 property identifier, as in :ref:`SM_AT_MQTT_XMQTTMSGPROP`:
+
+   * ``0`` - Clear all properties set for the next publication.
+   * ``1`` - Payload Format Indicator.
+   * ``3`` - Content Type.
+   * ``8`` - Response Topic.
+   * ``9`` - Correlation Data.
+   * ``38`` - User Property. Each command adds one user property.
+
+<payload_format>
+   * ``0`` - The payload is unspecified bytes (default).
+     The |SM| omits the property, which has the same meaning.
+   * ``1`` - The payload is UTF-8 encoded character data.
+     The |SM| does not check the payload.
+
+<value>
+   String.
+   The property value.
+   A Response Topic must not contain the wildcard characters ``+`` or ``#``.
+   Correlation Data is an even number of hexadecimal digits, which the |SM| sends as binary data.
+   Setting Content Type, Response Topic, or Correlation Data again replaces the earlier value.
+   An empty string removes the property.
+
+<name>, <value>
+   Non-empty strings.
+   The name and value of a user property.
+   Several user properties can have the same name.
+
+.. only:: not nrf91m1
+
+   The ``CONFIG_MQTT_USER_PROPERTIES_MAX`` Kconfig option of the MQTT library limits the number of user properties.
+   The default is ``4``.
+   The values set for one publication, including replaced values, must fit in :ref:`CONFIG_SM_MQTTC_PUB_PROP_BUF_SIZE <CONFIG_SM_MQTTC_PUB_PROP_BUF_SIZE>` bytes.
+   The topic and the encoded properties must also fit in :ref:`CONFIG_SM_MQTTC_MESSAGE_BUFFER_LEN <CONFIG_SM_MQTTC_MESSAGE_BUFFER_LEN>` bytes.
+
+.. only:: nrf91m1
+
+   Up to four user properties can be set.
+   The values set for one publication, including replaced values, can use up to 256 bytes.
+
+The publish command includes the properties in the broker's Maximum Packet Size check.
+
+Example
+~~~~~~~
+
+Publish a JSON request with a Response Topic, Correlation Data, and a user property:
+
+::
+
+   AT#XMQTTPUBPROP=1,1
+   OK
+   AT#XMQTTPUBPROP=3,"application/json"
+   OK
+   AT#XMQTTPUBPROP=8,"nrf91/sm/rsp"
+   OK
+   AT#XMQTTPUBPROP=9,"0A1B2C3D"
+   OK
+   AT#XMQTTPUBPROP=38,"fw","2.0.0"
+   OK
+   AT#XMQTTPUB="nrf91/sm/req","",1
+   OK
+   {"get":"temp"}+++
+   #XDATAMODE: 0
+   #XMQTTEVT: 3,0,0
+
+Read command
+------------
+
+The read command is not supported.
+
+Test command
+------------
+
+::
+
+   AT#XMQTTPUBPROP=?
+   #XMQTTPUBPROP: (0,1,3,8,9,38)
    OK
