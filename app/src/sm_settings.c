@@ -55,7 +55,7 @@ STATIC int sm_settings_set(const char *name, size_t len, settings_read_cb read_c
 		if (read_cb(cb_arg, &full_mfw_dfu_segment_type, len) > 0)
 			return 0;
 	}
-	if (IS_ENABLED(CONFIG_SM_FOTA) && !strcmp(name, "bl_fota_ver")) {
+	if (IS_ENABLED(CONFIG_SM_FOTA_SESSION) && !strcmp(name, "bl_fota_ver")) {
 		if (len != sizeof(sm_fota_bl_version_before))
 			return -EINVAL;
 		if (read_cb(cb_arg, &sm_fota_bl_version_before, len) > 0)
@@ -131,15 +131,13 @@ int sm_settings_fota_save(void)
 	return settings_save_one("sm/fota_nrfcloud", &sm_fota_nrfcloud,
 				 sizeof(sm_fota_nrfcloud));
 }
-#endif /* CONFIG_SM_FOTA_SESSION */
 
-#if defined(CONFIG_SM_FOTA)
 int sm_settings_fota_bl_version_save(void)
 {
 	return settings_save_one("sm/bl_fota_ver", &sm_fota_bl_version_before,
 				 sizeof(sm_fota_bl_version_before));
 }
-#endif /* CONFIG_SM_FOTA */
+#endif /* CONFIG_SM_FOTA_SESSION */
 
 #if defined(CONFIG_SM_DFU)
 int sm_settings_bootloader_mode_save(void)

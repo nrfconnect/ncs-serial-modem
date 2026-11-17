@@ -80,6 +80,7 @@
 .. _`Memfault Project Settings`: https://app.memfault.com/organizations/-/projects/-/settings/data-routes
 .. _`Memfault release management`: https://mflt.io/release-mgmt
 .. _`nRF Cloud over-the-air updates`: https://docs.nrfcloud.com/docs/platform/ota
+.. _`nRF Cloud multi-component OTA`: https://docs.nrfcloud.com/docs/platform/multi-component-ota
 
 .. ### nRF Connect for Desktop
 

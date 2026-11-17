@@ -24,28 +24,41 @@
  */
 void sm_fw_update_boot_check(void);
 
+/** Firmware update targets that direct DFU can claim. */
+enum sm_fw_update_target {
+	/** The modem DFU area, for delta modem firmware. */
+	SM_FW_UPDATE_TARGET_MODEM,
+	/** The MCUboot update slot, which application and MCUboot bootloader images share. */
+	SM_FW_UPDATE_TARGET_IMAGE,
+};
+
 /**
- * @brief Claim the modem DFU area for direct delta modem DFU.
+ * @brief Claim a firmware update target for direct DFU.
  *
- * AT#XFOTA and AT#XNRFCLOUDFOTA use the same modem DFU area, and the modem is not usable for a
- * download while an erase of the area is pending. So the claim is refused while one of them is
- * in progress or waiting for activation. Once claimed, the area stays claimed until the modem
- * library is shut down, which closes the modem write session and activates a scheduled update.
+ * AT#XFOTA and AT#XNRFCLOUDFOTA use the same targets as direct DFU.
+ * The claim is refused while a FOTA is in progress or waiting for activation.
+ *
+ * Once claimed, the modem DFU area stays claimed until the modem library is shut down, which closes
+ * the modem write session and activates a scheduled modem update.
+ * The MCUboot update slot stays claimed until the reset of the application, which activates the
+ * scheduled image.
+ *
+ * @param target The target to claim.
  *
  * @retval 0 on success.
  * @retval -EBUSY if a FOTA is in progress.
  */
-int sm_fw_update_modem_dfu_claim(void);
+int sm_fw_update_dfu_claim(enum sm_fw_update_target target);
 
 /**
- * @brief Check whether direct delta modem DFU has claimed the modem DFU area.
+ * @brief Check whether direct DFU has claimed any of the firmware update targets.
  *
- * While the area is claimed, AT#XFOTA and AT#XNRFCLOUDFOTA must not start a modem update or
- * erase the area.
+ * While a target is claimed, AT#XFOTA and AT#XNRFCLOUDFOTA must not start an update or erase the
+ * modem DFU area.
  *
- * @return true if the modem DFU area is claimed, false otherwise.
+ * @return true if a target is claimed, false otherwise.
  */
-bool sm_fw_update_modem_dfu_busy(void);
+bool sm_fw_update_dfu_busy(void);
 
 /** @} */
 

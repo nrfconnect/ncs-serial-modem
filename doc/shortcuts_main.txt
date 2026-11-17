@@ -4,3 +4,4 @@
 .. |SiP| replace:: nRF9151 SiP
 .. |SiP_pin| replace:: LGA pin
 .. |log_uart| replace:: ``UART1`` (VCOM1 on the nRF9151 DK)
+.. |badge_nrf91m1_v2_0_1| replace:: \
