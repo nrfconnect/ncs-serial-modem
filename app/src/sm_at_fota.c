@@ -33,10 +33,6 @@ LOG_MODULE_REGISTER(sm_fota, CONFIG_SM_LOG_LEVEL);
 
 #define ERASE_POLL_TIME 2
 
-#if FIXED_PARTITION_EXISTS(s1_partition)
-#define SM_FOTA_BL_SUPPORTED
-#endif
-
 enum sm_fota_operation {
 	SM_FOTA_STOP = 0,
 	SM_FOTA_START_APP = 1,

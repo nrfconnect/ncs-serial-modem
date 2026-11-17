@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
+#include <stdio.h>
 #include <string.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
@@ -14,6 +15,7 @@
 #include <memfault/ports/zephyr/fota.h>
 #include <memfault/http/http_client.h>
 #include <memfault/nrfconnect_port/coap.h>
+#include <memfault/nrfconnect_port/fota_component.h>
 #include "sm_util.h"
 #include "sm_at_host.h"
 #include "sm_at_fota.h"
@@ -39,11 +41,13 @@ LOG_MODULE_REGISTER(sm_nrfcloud_fota, CONFIG_SM_LOG_LEVEL);
 
 /* <op> values for AT#XNRFCLOUDFOTA. */
 enum {
-	FOTA_STOP	 = 0,
-	FOTA_APP	 = 1,
-	FOTA_MODEM	 = 2,
-	FOTA_APP_CHECK	 = 4,
-	FOTA_MODEM_CHECK = 6,
+	FOTA_STOP	   = 0,
+	FOTA_APP	   = 1,
+	FOTA_MODEM	   = 2,
+	FOTA_MCUBOOT	   = 3,
+	FOTA_APP_CHECK	   = 4,
+	FOTA_MODEM_CHECK   = 6,
+	FOTA_MCUBOOT_CHECK = 7,
 };
 
 /* Pipe that a #XFOTA or #XNRFCLOUDFOTA URC is sent to: the pipe of the command that started
@@ -51,14 +55,81 @@ enum {
  */
 static struct modem_pipe *fota_pipe;
 
-/* Optional <project_key> override for the ongoing AT#XNRFCLOUDFOTA check. Empty means the
- * build-time key is used: CONFIG_MEMFAULT_PROJECT_KEY for an application check (op 1) and
- * CONFIG_MEMFAULT_FOTA_MODEM_PROJECT_KEY for a modem check (op 2).
+/* Optional <project_key> override for the ongoing AT#XNRFCLOUDFOTA check. Empty means that the
+ * device's own project is used, that is, the project where it was claimed, unless the build
+ * sets a project key.
  */
 static char fota_project_key[FOTA_KEY_MAX_LEN + 1];
 
-/* Selects app or modem for the ongoing check-only (FOTA_APP_CHECK/FOTA_MODEM_CHECK) request. */
-static bool fota_check_only_modem;
+/* Selects the image type for the ongoing check-only (FOTA_*_CHECK) request. */
+static enum sm_fota_image_type fota_check_only_type;
+
+#if defined(SM_FOTA_BL_SUPPORTED)
+BUILD_ASSERT(IS_ENABLED(CONFIG_MEMFAULT_FOTA_COMPONENTS),
+	     "The MCUboot update through Memfault needs CONFIG_MEMFAULT_FOTA_COMPONENTS");
+
+/* The MCUboot update goes to the inactive one of the two MCUboot slots, and each slot needs its
+ * own image variant. Each variant is a separate Memfault software type, and only the one that
+ * targets the inactive slot applies. Upload the images of both variants with the same component
+ * version, which is the MCUboot version (the fw_info version) that the image has, for example
+ * "2".
+ */
+#define FOTA_MCUBOOT_S0_TYPE "mcuboot-s0"
+#define FOTA_MCUBOOT_S1_TYPE "mcuboot-s1"
+
+static int fota_mcuboot_version_get(bool target_s0, char *buf, size_t buf_len)
+{
+	uint32_t version;
+	int slot = sm_util_mcuboot_active_slot();
+	int err;
+
+	if (slot < 0) {
+		return slot;
+	}
+	/* Slot s0 is the target when s1 is active, and vice versa. */
+	if ((slot == 0) == target_s0) {
+		return -ENOTSUP;
+	}
+
+	err = sm_util_mcuboot_active_version(&version);
+	if (err) {
+		return err;
+	}
+	if (snprintf(buf, buf_len, "%u", version) >= (int)buf_len) {
+		return -ENOMEM;
+	}
+
+	return 0;
+}
+
+static int fota_mcuboot_s0_version_get(char *buf, size_t buf_len)
+{
+	return fota_mcuboot_version_get(true, buf, buf_len);
+}
+
+static int fota_mcuboot_s1_version_get(char *buf, size_t buf_len)
+{
+	return fota_mcuboot_version_get(false, buf, buf_len);
+}
+
+MEMFAULT_FOTA_COMPONENT_DEFINE(sm_mcuboot_s0, FOTA_MCUBOOT_S0_TYPE, fota_mcuboot_s0_version_get,
+			       kMemfaultFotaComponentInstall_Bootloader);
+MEMFAULT_FOTA_COMPONENT_DEFINE(sm_mcuboot_s1, FOTA_MCUBOOT_S1_TYPE, fota_mcuboot_s1_version_get,
+			       kMemfaultFotaComponentInstall_Bootloader);
+
+/* Returns the software type of the MCUboot variant for the inactive slot. */
+static int fota_mcuboot_type_get(const char **type)
+{
+	int slot = sm_util_mcuboot_active_slot();
+
+	if (slot < 0) {
+		return slot;
+	}
+	*type = (slot == 0) ? FOTA_MCUBOOT_S1_TYPE : FOTA_MCUBOOT_S0_TYPE;
+
+	return 0;
+}
+#endif /* SM_FOTA_BL_SUPPORTED */
 
 /* Swaps in the <project_key> override (if any) as the application's Memfault project key.
  * Returns the previous key, to be restored by the caller after its Memfault call.
@@ -132,7 +203,7 @@ static int nrfcloud_fota_modem_wait_for_erase(void)
 }
 
 /* Query Memfault release management and, if an update is available, start the download.
- * sm_fota_type selects app or modem; sm_fota_stage is already FOTA_STAGE_DOWNLOAD and
+ * sm_fota_type selects app, MCUboot or modem; sm_fota_stage is already FOTA_STAGE_DOWNLOAD and
  * fota_pipe already set by the caller.
  */
 static void nrfcloud_fota_check(void)
@@ -144,6 +215,22 @@ static void nrfcloud_fota_check(void)
 
 		rv = memfault_zephyr_fota_app_start();
 		g_mflt_http_client_config.api_key = saved_key;
+#if defined(SM_FOTA_BL_SUPPORTED)
+	} else if (sm_fota_type == SM_FOTA_TYPE_MCUBOOT_BL) {
+		const char *type;
+
+		rv = fota_mcuboot_type_get(&type);
+		if (rv == 0) {
+			const char *saved_key = nrfcloud_fota_app_key_swap();
+
+			/* The version before the update is used to validate it after the reset. */
+			rv = sm_util_mcuboot_active_version(&sm_fota_bl_version_before);
+			if (rv == 0) {
+				rv = memfault_zephyr_fota_component_start(type);
+			}
+			g_mflt_http_client_config.api_key = saved_key;
+		}
+#endif
 	} else {
 		rv = nrfcloud_fota_modem_wait_for_erase();
 		if (rv == 0) {
@@ -174,19 +261,31 @@ static void nrfcloud_fota_check_work_fn(struct k_work *work)
 }
 K_WORK_DEFINE(nrfcloud_fota_check_work, nrfcloud_fota_check_work_fn);
 
-/* Query Memfault release management for an app or modem update, without starting the
- * download. fota_check_only_modem selects app or modem; fota_pipe already set by the caller.
+/* Query Memfault release management for an app, MCUboot or modem update, without starting the
+ * download. fota_check_only_type selects the image; fota_pipe already set by the caller.
  */
 static void nrfcloud_fota_check_only(void)
 {
 	char *url = NULL;
 	int rv;
 
-	if (fota_check_only_modem) {
+	if (fota_check_only_type == SM_FOTA_TYPE_MFW) {
 		memfault_zephyr_fota_modem_project_key_set(
 			fota_project_key[0] != '\0' ? fota_project_key : NULL);
 		rv = memfault_zephyr_fota_modem_get_download_url(&url);
 		memfault_zephyr_fota_modem_project_key_set(NULL);
+#if defined(SM_FOTA_BL_SUPPORTED)
+	} else if (fota_check_only_type == SM_FOTA_TYPE_MCUBOOT_BL) {
+		const char *type;
+
+		rv = fota_mcuboot_type_get(&type);
+		if (rv == 0) {
+			const char *saved_key = nrfcloud_fota_app_key_swap();
+
+			rv = memfault_zephyr_fota_component_get_download_url(type, &url);
+			g_mflt_http_client_config.api_key = saved_key;
+		}
+#endif
 	} else {
 		const char *saved_key = nrfcloud_fota_app_key_swap();
 
@@ -300,6 +399,40 @@ void memfault_fota_download_callback(const struct fota_download_evt *evt)
 	}
 }
 
+/* Whether the <op> value is supported by this build. */
+static bool fota_op_supported(uint16_t op)
+{
+	switch (op) {
+	case FOTA_APP:
+	case FOTA_MODEM:
+	case FOTA_APP_CHECK:
+	case FOTA_MODEM_CHECK:
+		return true;
+#if defined(SM_FOTA_BL_SUPPORTED)
+	case FOTA_MCUBOOT:
+	case FOTA_MCUBOOT_CHECK:
+		return true;
+#endif
+	default:
+		return false;
+	}
+}
+
+/* The image type that a supported <op> handles. */
+static enum sm_fota_image_type fota_op_image_type(uint16_t op)
+{
+	switch (op) {
+	case FOTA_MODEM:
+	case FOTA_MODEM_CHECK:
+		return SM_FOTA_TYPE_MFW;
+	case FOTA_MCUBOOT:
+	case FOTA_MCUBOOT_CHECK:
+		return SM_FOTA_TYPE_MCUBOOT_BL;
+	default:
+		return SM_FOTA_TYPE_APP;
+	}
+}
+
 SM_AT_CMD_CUSTOM(xnrfcloudfota, "AT#XNRFCLOUDFOTA", handle_at_nrf_cloud_fota);
 STATIC int handle_at_nrf_cloud_fota(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 				    uint32_t param_count)
@@ -320,8 +453,7 @@ STATIC int handle_at_nrf_cloud_fota(enum at_parser_cmd_type cmd_type, struct at_
 			return fota_download_cancel();
 		}
 
-		if (op != FOTA_APP && op != FOTA_MODEM && op != FOTA_APP_CHECK &&
-		    op != FOTA_MODEM_CHECK) {
+		if (!fota_op_supported(op)) {
 			return -EINVAL;
 		}
 
@@ -346,8 +478,8 @@ STATIC int handle_at_nrf_cloud_fota(enum at_parser_cmd_type cmd_type, struct at_
 		}
 		strcpy(fota_project_key, key);
 
-		if (op == FOTA_APP_CHECK || op == FOTA_MODEM_CHECK) {
-			fota_check_only_modem = (op == FOTA_MODEM_CHECK);
+		if (op == FOTA_APP_CHECK || op == FOTA_MODEM_CHECK || op == FOTA_MCUBOOT_CHECK) {
+			fota_check_only_type = fota_op_image_type(op);
 			fota_pipe = sm_at_host_get_current_pipe();
 			/* Hold the shared busy gate until the check work completes. */
 			sm_fota_stage = FOTA_STAGE_DOWNLOAD;
@@ -355,7 +487,7 @@ STATIC int handle_at_nrf_cloud_fota(enum at_parser_cmd_type cmd_type, struct at_
 			return 0;
 		}
 
-		sm_fota_type = (op == FOTA_MODEM) ? SM_FOTA_TYPE_MFW : SM_FOTA_TYPE_APP;
+		sm_fota_type = fota_op_image_type(op);
 
 		sm_fota_stage = FOTA_STAGE_DOWNLOAD;
 		sm_fota_nrfcloud = true;
@@ -367,8 +499,14 @@ STATIC int handle_at_nrf_cloud_fota(enum at_parser_cmd_type cmd_type, struct at_
 		return 0;
 
 	case AT_PARSER_CMD_TYPE_TEST:
+#if defined(SM_FOTA_BL_SUPPORTED)
+		rsp_send("\r\n#XNRFCLOUDFOTA: (%d,%d,%d,%d,%d,%d,%d)[,<project_key>]\r\n",
+			FOTA_STOP, FOTA_APP, FOTA_MODEM, FOTA_MCUBOOT, FOTA_APP_CHECK,
+			FOTA_MODEM_CHECK, FOTA_MCUBOOT_CHECK);
+#else
 		rsp_send("\r\n#XNRFCLOUDFOTA: (%d,%d,%d,%d,%d)[,<project_key>]\r\n",
 			FOTA_STOP, FOTA_APP, FOTA_MODEM, FOTA_APP_CHECK, FOTA_MODEM_CHECK);
+#endif
 		return 0;
 
 	default:
