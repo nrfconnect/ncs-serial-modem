@@ -8,15 +8,23 @@
 # environment.
 SPHINXOPTS    ?= -W --keep-going
 PYTHON        ?= python3
-BUILDDIR      ?= _build_sphinx
+SPHINXBUILD   ?= sphinx-build
+SOURCEDIR     = _build/_src
+BUILDDIR      = _build
 
 BUILDDOCSETS   = $(PYTHON) _scripts/build_docsets.py -b "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
 .PHONY: help html docsets main nrf91m1 latexpdf clean
 
+mkdir:
+	mkdir -p ${SOURCEDIR}
+
+%: mkdir Makefile
+	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" --conf-dir . $(SPHINXOPTS) $(O)
+
 # Put it first so that "make" without argument is like "make help".
 help:
-	@echo "Run 'doxygen' first, then one of:"
+	@echo "Targets:"
 	@echo "  html       Build all docsets into $(BUILDDIR)/html (same as docsets)"
 	@echo "  docsets    Build all docsets into $(BUILDDIR)/html"
 	@echo "  main       Build only the main docset"

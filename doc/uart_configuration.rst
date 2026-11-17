@@ -45,7 +45,7 @@ The following UART signals are used:
 The Data Terminal Ready (DTR) and Ring Indicator (RI) signals are the **control signals** used for UART power management, while TX/RX/RTS/CTS are the standard UART signals.
 
 .. important::
-   The use of |SM| without hardware flow control (RTS/CTS) is `experimental <Software maturity levels_>`_ and strongly not recommended.
+   The use of |SM| without hardware flow control (RTS/CTS) is :ref:`experimental <nrf:software_maturity>` and strongly not recommended.
    See :ref:`uart_without_flow_control` for more information.
 
 Board-specific pin mapping
@@ -120,7 +120,7 @@ The following tables shows how to connect the UART pins to the corresponding pin
       * Baud rate: 115200
       * Hardware flow control: Enabled
 
-      On the `nrf9151dk`_ board, UART data and flow control pins (TX, RX, RTS, CTS) are on the **P4** connector, while control signals (DTR, RI) are on the **P3** connector.
+      On the :doc:`nrf9151dk <zephyr:boards/nordic/nrf9151dk/doc/index>` board, UART data and flow control pins (TX, RX, RTS, CTS) are on the **P4** connector, while control signals (DTR, RI) are on the **P3** connector.
 
       The DTR pin defaults to pull-up, so the external MCU must assert DTR to power on the UART.
       When UART power management is not used, the DTR pin should be pulled to active state.
@@ -134,7 +134,7 @@ The following tables shows how to connect the UART pins to the corresponding pin
 
       .. note::
 
-         DTR and RI pins use the **P0.31** and **P0.30** pins, which are shared with the I2C2 instance on the `nrf9151dk`_ board.
+         DTR and RI pins use the **P0.31** and **P0.30** pins, which are shared with the I2C2 instance on the :doc:`nrf9151dk <zephyr:boards/nordic/nrf9151dk/doc/index>` board.
          I2C2 must stay disabled to use these pins for DTR and RI signals.
 
    .. group-tab:: Thingy:91 X with PC host
@@ -197,7 +197,6 @@ The host must therefore be able to reset the |SiP| to a known state, either by p
 
 .. uart_power_pins_end
 
-
 .. _uart_configuration_nrf91m1:
 
 nRF91M1 pre-programmed |SM| application
@@ -217,7 +216,7 @@ Interposer boards
 An interposer board adapts the nRF9151 SiP to the footprint of another cellular module.
 The interposer wiring determines which nRF9151 pins carry the UART signals, so each interposer needs its own devicetree overlay.
 
-Both overlays target the `nrf9151dk`_ board.
+Both overlays target the :doc:`nrf9151dk <zephyr:boards/nordic/nrf9151dk/doc/index>` board.
 Each one assigns its own pinctrl states and points ``uart0`` at them, so the pin mapping does not depend on the states the board files happen to define.
 
 .. tabs::
@@ -247,7 +246,7 @@ Each one assigns its own pinctrl states and points ``uart0`` at them, so the pin
       * Hardware flow control: Disabled
 
       The overlay remaps the ``uart0`` pins to match the interposer footprint and removes ``hw-flow-control``.
-      DTR and RI keep the `nrf9151dk`_ board defaults.
+      DTR and RI keep the :doc:`nrf9151dk <zephyr:boards/nordic/nrf9151dk/doc/index>` board defaults.
 
       The RTS and CTS pins are still assigned in the pinctrl states but are not used for flow control, and both can be left unconnected.
       See :ref:`uart_without_flow_control` for further considerations.
@@ -278,12 +277,12 @@ Each one assigns its own pinctrl states and points ``uart0`` at them, so the pin
       * Baud rate: 115200
       * Hardware flow control: Enabled
 
-      The interposer routes UART0 TX to **P0.08**, which the `nrf9151dk`_ board overlay uses for DTR.
+      The interposer routes UART0 TX to **P0.08**, which the :doc:`nrf9151dk <zephyr:boards/nordic/nrf9151dk/doc/index>` board overlay uses for DTR.
       The overlay therefore moves DTR to **P0.15**, which UART0 CTS no longer occupies.
 
       .. note::
 
-         RI, together with the UART0 pins, overlaps **LED 1** (**P0.00**), **LED 3** (**P0.04**), **LED 4** (**P0.05**) and **Button 1** (**P0.08**) on the `nrf9151dk`_ board.
+         RI, together with the UART0 pins, overlaps **LED 1** (**P0.00**), **LED 3** (**P0.04**), **LED 4** (**P0.05**) and **Button 1** (**P0.08**) on the :doc:`nrf9151dk <zephyr:boards/nordic/nrf9151dk/doc/index>` board.
          The overlay disables the LED, PWM LED and button nodes so that nothing else can drive those pins.
 
       This setup is provided in the :file:`app/interposer-nrf9151-mk-gm02s.overlay` devicetree overlay file.
@@ -468,7 +467,7 @@ Operating without hardware flow control
 ========================================
 
 .. important::
-   The use of |SM| without hardware flow control (RTS/CTS) is `experimental <Software maturity levels_>`_ and strongly not recommended.
+   The use of |SM| without hardware flow control (RTS/CTS) is :ref:`experimental <nrf:software_maturity>` and strongly not recommended.
    Hardware flow control ensures reliable communication and prevents timing-related issues.
    Without hardware flow control, there is a risk of data loss in UART communication, especially in high-throughput scenarios.
 
@@ -487,7 +486,7 @@ The approach for a custom |SM| build is the following:
 
 **Buffer configuration:**
 
-Increase :ref:`CONFIG_SM_UART_RX_BUF_SIZE <CONFIG_SM_UART_RX_BUF_SIZE>` and possibly :ref:`CONFIG_SM_UART_RX_BUF_COUNT <CONFIG_SM_UART_RX_BUF_COUNT>` to provide sufficient buffer space for your use case.
+Increase :option:`CONFIG_SM_UART_RX_BUF_SIZE` and possibly :option:`CONFIG_SM_UART_RX_BUF_COUNT` to provide sufficient buffer space for your use case.
 
 .. _uart_zephyr_cellular_modem_driver:
 
@@ -535,7 +534,7 @@ The following example shows how to configure automatic UART power management for
 * ``cmux-close-pipe-on-power-save``: Closes the pipe when entering power save mode
 * ``cmux-idle-timeout-ms``: Timeout in milliseconds before entering idle state (5000 ms in this example)
 
-The setup above also required the ``CONFIG_PM_DEVICE_RUNTIME`` and ``CONFIG_PM_DEVICE_RUNTIME_ASYNC`` Kconfig options to be enabled.
+The setup above also required the :kconfig:option:`CONFIG_PM_DEVICE_RUNTIME` and :kconfig:option:`CONFIG_PM_DEVICE_RUNTIME_ASYNC` Kconfig options to be enabled.
 
 When the cellular modem driver enters the idle state and there is no data to be sent or received on any DLCI channel, the UART device is powered down.
 When the cellular modem driver exits the idle state and there is data to be sent or received on any DLCI channel, the UART device is powered up.

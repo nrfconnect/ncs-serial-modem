@@ -15,6 +15,8 @@ config SM_NRF_CLOUD
 	bool "nRF Cloud support"
 	default y
 	select SM_BLOCKING_WORK_Q
+	help
+	  Enables additional AT commands for using the nRF Cloud service.
 
 if SM_NRF_CLOUD
 
@@ -22,8 +24,10 @@ config SM_NRF_CLOUD_LOCATION
 	bool "nRF Cloud Location support"
 	default y
 	help
-	  Enable the nRF Cloud Location service for cloud-assisted geolocation.
+	  Enables the `nRF Cloud Location Services <nRF Cloud Location Services_>`_ for
+	  cloud-assisted geolocation.
 	  Supports cellular and Wi-Fi positioning.
+	  This requires :option:`CONFIG_SM_NRF_CLOUD` to be enabled.
 
 # Enable the nRF Cloud library.
 configdefault NRF_CLOUD

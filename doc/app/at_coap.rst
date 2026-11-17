@@ -117,9 +117,9 @@ The parameters and their defined values are the following:
 
    .. only:: not nrf91m1
 
-      * Small payload (≤ ``CONFIG_COAP_CLIENT_BLOCK_SIZE``, default 512 bytes) - All bytes are buffered until data mode exits, then the CoAP request is sent as a single packet.
-      * Large payload (> ``CONFIG_COAP_CLIENT_BLOCK_SIZE``) - The CoAP request starts transmitting while data mode is still active.
-        As soon as the first full block of ``CONFIG_COAP_CLIENT_BLOCK_SIZE`` bytes has arrived, the first CoAP Block1 packet is sent to the server.
+      * Small payload (≤ :kconfig:option:`CONFIG_COAP_CLIENT_BLOCK_SIZE`, default 512 bytes) - All bytes are buffered until data mode exits, then the CoAP request is sent as a single packet.
+      * Large payload (> :kconfig:option:`CONFIG_COAP_CLIENT_BLOCK_SIZE`) - The CoAP request starts transmitting while data mode is still active.
+        As soon as the first full block of :kconfig:option:`CONFIG_COAP_CLIENT_BLOCK_SIZE` bytes has arrived, the first CoAP Block1 packet is sent to the server.
         Each subsequent block is sent as more data arrives, so the server exchange runs concurrently with the host's serial upload.
 
    .. only:: nrf91m1
@@ -404,7 +404,7 @@ The parameters and their defined values are the following:
 
    .. only:: not nrf91m1
 
-      When omitted, the full block buffer size (``CONFIG_COAP_CLIENT_BLOCK_SIZE``, default 512 bytes) is used.
+      When omitted, the full block buffer size (:kconfig:option:`CONFIG_COAP_CLIENT_BLOCK_SIZE`, default 512 bytes) is used.
 
    .. only:: nrf91m1
 

@@ -153,19 +153,11 @@ CI compliance checks (run on PRs via `.github/workflows/compliance.yml`) also va
 
 ## Documentation Build
 
-Documentation is built from the `doc/` directory: Doxygen first, then Sphinx for the HTML, and optionally Sphinx again for the PDF. The Zephyr/NCS Python virtualenv must be active.
+Documentation is built from the `doc/` directory with a single Sphinx command for the HTML, and optionally a second one for the PDF. The Zephyr/NCS Python virtualenv must be active.
 
-### Step 1 — Doxygen (generates XML for API reference)
+Do not run `doxygen` as a separate step. There is no `doc/Doxyfile` to run it against: `doc/doxyfile.in` is a template whose `@DOCSET_SOURCE_BASE@` and `@DOCSET_BUILD_DIR@` placeholders only the build fills in. The `zephyr.doxyrunner` extension, configured in `doc/_docsets/conf_common.py`, expands the template and runs Doxygen as part of each Sphinx run, and `zephyr.doxybridge` passes the XML to Breathe. A bare `doxygen` call fails with `Doxyfile not found and no input file specified!`.
 
-```bash
-cd doc
-doxygen
-```
-
-Output: `doc/_build_doxygen/xml/`
-This step is required before Sphinx; Breathe reads the Doxygen XML.
-
-### Step 2 — Sphinx (generates HTML)
+### Sphinx (generates HTML, and runs Doxygen)
 
 ```bash
 cd doc
@@ -174,7 +166,9 @@ make html
 python _scripts/build_docsets.py
 ```
 
-Output: `doc/build/html/`
+Output: `doc/build/html/`, with the Doxygen output in `doc/build/html/doxygen/`.
+
+Always build through `make` or `_scripts/build_docsets.py`. They set `SM_DOC_BUILD_DIR`, which `conf_common.py` needs in order to place the Doxygen output inside the HTML of the docset. Calling `sphinx-build` directly fails with a message that says so.
 
 The documentation is split into **docsets**, each built by its own Sphinx run over the shared sources in `doc/`:
 
@@ -266,7 +260,7 @@ ncs-serial-modem/
 │   ├── *.overlay               # Feature DTC overlays
 │   └── sysbuild.conf           # Sysbuild Kconfig (MCUBoot, B0)
 ├── doc/                        # Sphinx + Doxygen documentation source
-│   ├── Doxyfile                # Doxygen configuration
+│   ├── doxyfile.in             # Doxygen configuration template, expanded by zephyr.doxyrunner
 │   ├── index.rst               # Root document of the main docset
 │   ├── index_nrf91m1.rst       # Root document of the nRF91M1 docset
 │   ├── requirements.txt        # Python doc build dependencies
@@ -278,8 +272,7 @@ ncs-serial-modem/
 │   ├── _scripts/               # build_docsets.py, merge_search_indexes.py
 │   ├── _static/html/index.html # Redirect from the published root to the main docset
 │   ├── _utils/docsets.py       # ALL_DOCSETS: the list of docsets
-│   ├── _doxygen/               # Doxygen main page source
-│   ├── _build_doxygen/xml/     # Doxygen output (auto-generated, not committed)
+│   ├── build/html/doxygen/     # Doxygen output (auto-generated, not committed)
 │   └── _build_sphinx/html/<docset>/ # Sphinx output (auto-generated, not committed)
 ├── lib/                        # Host-side AT client library
 │   └── sm_at_client/           # sm_at_client library (for host MCU samples)
@@ -408,7 +401,7 @@ int n   = sm_util_at_scanf("AT+CFUN?", "+CFUN: %d", &cfun);
 2. **Tests:** `west twister -T app/tests --platform native_sim -v` — all 2 tests PASSED.
 3. **Lint:** `clang-format --style=file --dry-run --Werror <changed files>` exits 0.
 4. **License header** present on any new `.c`/`.h` file.
-5. **Docs** (if RST or headers changed): `cd doc && doxygen && make html` builds every docset without new errors.
+5. **Docs** (if RST or headers changed): `cd doc && make html` builds every docset without new errors.
 
 ---
 

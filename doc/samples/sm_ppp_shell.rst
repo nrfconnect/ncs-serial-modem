@@ -32,9 +32,9 @@ The sample supports the following development kits:
      - PCA
      - Board name
      - Board target
-   * - `nRF54L15 DK <nRF54L15 DK_>`_
+   * - :ref:`nRF54L15 DK <nrf:ug_nrf54l>`
      - PCA10156
-     - `nrf54l15dk`_
+     - :doc:`nrf54l15dk <zephyr:boards/nordic/nrf54l15dk/doc/index>`
      - ``nrf54l15dk/nrf54l15/cpuapp``
    * - Native simulator
      - N/A
@@ -266,13 +266,13 @@ Dependencies
 
 The sample enables the following key features:
 
-* Networking stack (``CONFIG_NETWORKING``)
-* PPP L2 layer (``CONFIG_NET_L2_PPP``)
-* Cellular modem driver (``CONFIG_MODEM_CELLULAR``)
-* Network shell (``CONFIG_NET_SHELL``)
-* Zperf (``CONFIG_NET_ZPERF``)
-* Power management (``CONFIG_PM_DEVICE``)
-* AT command shell (``CONFIG_MODEM_AT_SHELL``)
+* Networking stack (:kconfig:option:`CONFIG_NETWORKING`)
+* PPP L2 layer (:kconfig:option:`CONFIG_NET_L2_PPP`)
+* Cellular modem driver (:kconfig:option:`CONFIG_MODEM_CELLULAR`)
+* Network shell (:kconfig:option:`CONFIG_NET_SHELL`)
+* Zperf (:kconfig:option:`CONFIG_NET_ZPERF`)
+* Power management (:kconfig:option:`CONFIG_PM_DEVICE`)
+* AT command shell (:kconfig:option:`CONFIG_MODEM_AT_SHELL`)
 
 References
 **********

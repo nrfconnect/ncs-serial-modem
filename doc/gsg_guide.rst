@@ -8,7 +8,7 @@ Getting started
    :depth: 2
 
 Before getting started, make sure you have a proper |NCS| development environment.
-Follow the official `Getting started guide`_.
+Follow the official :ref:`Getting started guide <nrf:installation>`.
 
 There are two options for setting up the project, depending on your preferred development environment:
 
@@ -87,7 +87,7 @@ Complete the following steps for building and running:
       #. Complete the steps in the `How to build an application`_ section in the extension documentation to build the application.
 
 	   You can also specify the additional configuration variables (Kconfig, DTC overlays, and extra Kconfig options) while setting up a build configuration during building the application.
-	   See `Providing CMake options <cmake_options_>`_ for more information on setting the additional configuration variables.
+	   See :ref:`Providing CMake options <nrf:cmake_options>` for more information on setting the additional configuration variables.
 
       #. Open the nRF Connect extension in |VSC| by clicking its icon in the :guilabel:`Activity Bar`.
       #. In the extension's `Actions View`_, click on :guilabel:`Flash`.
