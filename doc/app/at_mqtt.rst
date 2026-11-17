@@ -13,6 +13,7 @@ The MQTT client supports MQTT v3.1.1 and experimental MQTT v5.0.
 MQTT v3.1.1 is the default.
 Select MQTT v5.0 with the ``<version>`` parameter of ``#XMQTTCFG``.
 The AT interface supports the MQTT v5.0 Session Expiry Interval and Message Expiry Interval properties, Session Present flag, and acknowledgment reason codes.
+It reports the Payload Format Indicator, Content Type, Response Topic, Correlation Data, and User Property of incoming messages with :ref:`SM_AT_MQTT_XMQTTMSGPROP`.
 It does not expose other MQTT v5.0 properties, subscription options, or enhanced authentication.
 Examples use MQTT v3.1.1 unless stated otherwise.
 
@@ -571,6 +572,122 @@ The parameters and their defined values are the following:
    Raw payload bytes.
    The message received from the topic, forwarded without conversion or escaping.
    Read exactly ``<message_length>`` bytes, as the payload can contain NUL bytes and line breaks.
+
+With MQTT v5.0, ``#XMQTTMSGPROP`` notifications can precede ``#XMQTTMSG``.
+See :ref:`SM_AT_MQTT_XMQTTMSGPROP`.
+
+.. _SM_AT_MQTT_XMQTTMSGPROP:
+
+Incoming message properties #XMQTTMSGPROP
+=========================================
+
+The ``#XMQTTMSGPROP`` command enables reporting of MQTT v5.0 properties of incoming messages.
+When reporting is enabled, the |SM| sends one ``#XMQTTMSGPROP`` notification for each reported property of an incoming message, before its ``#XMQTTMSG`` notification.
+Reporting is disabled by default, and the setting applies to all later connections.
+MQTT v3.1.1 messages have no properties.
+
+.. only:: not nrf91m1
+
+   The command requires :ref:`CONFIG_SM_MQTTC_VERSION_5_0`.
+
+Set command
+-----------
+
+Syntax
+~~~~~~
+
+::
+
+   AT#XMQTTMSGPROP=<mode>
+
+<mode>
+   * ``0`` - Do not report properties (default).
+   * ``1`` - Report properties.
+
+Read command
+------------
+
+::
+
+   AT#XMQTTMSGPROP?
+   #XMQTTMSGPROP: <mode>
+   OK
+
+Test command
+------------
+
+::
+
+   AT#XMQTTMSGPROP=?
+   #XMQTTMSGPROP: (0,1)
+   OK
+
+Unsolicited notification
+------------------------
+
+The notification syntax depends on the property type:
+
+::
+
+   #XMQTTMSGPROP: 1,<payload_format>
+   #XMQTTMSGPROP: <type>,<length>
+   <value>
+   #XMQTTMSGPROP: 38,<name_length>,<value_length>
+   <name><value>
+
+<type>
+   Integer.
+   The MQTT v5.0 property identifier.
+   The properties are reported in the following order:
+
+   * ``1`` - Payload Format Indicator.
+   * ``3`` - Content Type.
+   * ``8`` - Response Topic.
+   * ``9`` - Correlation Data.
+   * ``38`` - User Property. One notification for each user property.
+
+<payload_format>
+   * ``0`` - The payload is unspecified bytes.
+   * ``1`` - The payload is UTF-8 encoded character data.
+
+<length>, <value_length>
+   Integer.
+   The length of the value in bytes.
+
+<name_length>
+   Integer.
+   The length of the user property name in bytes.
+
+<value>, <name><value>
+   Raw bytes.
+   The property value, or the user property name immediately followed by its value, forwarded without conversion or escaping.
+   Read exactly the given number of bytes, as Correlation Data can contain NUL bytes and line breaks.
+
+.. only:: not nrf91m1
+
+   The ``CONFIG_MQTT_USER_PROPERTIES_MAX`` Kconfig option of the MQTT library limits the number of reported user properties.
+   The default is ``4``. Further user properties are not reported.
+
+.. only:: nrf91m1
+
+   Up to four user properties are reported. Further user properties are not reported.
+
+Example
+~~~~~~~
+
+A message with a JSON payload, Content Type ``application/json``, and Payload Format Indicator ``1``:
+
+::
+
+   AT#XMQTTMSGPROP=1
+   OK
+   #XMQTTMSGPROP: 1,1
+   #XMQTTMSGPROP: 3,16
+   application/json
+   #XMQTTMSG: 13,9
+   nrf91/sm/cmd1
+   {"led":1}
+   #XMQTTEVT: 2,0
 
 .. _SM_AT_MQTT_XMQTTSUB:
 

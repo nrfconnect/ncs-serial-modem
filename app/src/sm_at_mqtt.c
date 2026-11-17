@@ -37,6 +37,28 @@ LOG_MODULE_REGISTER(sm_mqtt, CONFIG_SM_LOG_LEVEL);
 #define SM_MQTT_TOPIC_ALIASES 0
 #endif
 
+#if defined(CONFIG_MQTT_VERSION_5_0)
+/* MQTT 5.0 property identifiers, used as <type> in #XMQTTMSGPROP. */
+enum sm_mqtt_prop_type {
+	SM_MQTT_PROP_PAYLOAD_FORMAT = 0x01,
+	SM_MQTT_PROP_CONTENT_TYPE = 0x03,
+	SM_MQTT_PROP_RESPONSE_TOPIC = 0x08,
+	SM_MQTT_PROP_CORRELATION_DATA = 0x09,
+	SM_MQTT_PROP_USER = 0x26,
+};
+
+/* Payload Format Indicator, Content Type, Response Topic, Correlation Data and user properties. */
+#define SM_MQTT_RX_PROPS_MAX (4 + CONFIG_MQTT_USER_PROPERTIES_MAX)
+
+/* Property of an incoming message; the data is stored in payload_drain after the topic. */
+struct sm_mqtt_rx_prop {
+	uint8_t type;      /* enum sm_mqtt_prop_type */
+	uint16_t offset;   /* Offset of the data in payload_drain */
+	uint16_t name_len; /* User property name, stored before the value */
+	uint16_t len;      /* Value length; the value itself for Payload Format Indicator */
+};
+#endif
+
 /**@brief MQTT client operations. */
 enum sm_mqttcon_operation {
 	MQTTC_DISCONNECT,
@@ -72,6 +94,9 @@ static struct sm_mqtt_ctx {
 #if defined(CONFIG_MQTT_VERSION_5_0)
 	uint32_t rx_msg_expiry;
 	bool rx_has_msg_expiry;
+	bool msg_prop_report;  /* AT#XMQTTMSGPROP: report properties of incoming messages */
+	uint8_t rx_prop_count; /* Entries in rx_props, valid while the header is unsent */
+	struct sm_mqtt_rx_prop rx_props[SM_MQTT_RX_PROPS_MAX];
 	uint32_t maximum_packet_size;
 	uint16_t receive_maximum;
 	uint8_t maximum_qos;
@@ -330,6 +355,108 @@ STATIC int mqtt_check_packet_size(size_t remaining)
 	return 0;
 }
 
+#if defined(CONFIG_MQTT_VERSION_5_0)
+/* Record an incoming property and copy its name and value into payload_drain at *used.
+ * A NULL value records value_len without copying data (Payload Format Indicator).
+ */
+static bool mqtt_rx_prop_add(uint8_t type, size_t *used, const uint8_t *name, size_t name_len,
+			     const uint8_t *value, size_t value_len)
+{
+	size_t data_len = name_len + (value != NULL ? value_len : 0);
+
+	if (ctx.rx_prop_count >= ARRAY_SIZE(ctx.rx_props) ||
+	    data_len > sizeof(mqtt_conn->payload_drain) - *used) {
+		return false;
+	}
+	if (name_len > 0) {
+		memcpy(mqtt_conn->payload_drain + *used, name, name_len);
+	}
+	if (value != NULL && value_len > 0) {
+		memcpy(mqtt_conn->payload_drain + *used + name_len, value, value_len);
+	}
+	ctx.rx_props[ctx.rx_prop_count++] = (struct sm_mqtt_rx_prop){
+		.type = type,
+		.offset = *used,
+		.name_len = name_len,
+		.len = value_len,
+	};
+	*used += data_len;
+	return true;
+}
+
+/* Copy the reported properties of an incoming PUBLISH after its topic. They fit, because the
+ * library requires the topic and the properties to fit its receive buffer.
+ */
+static void mqtt_rx_props_copy(const struct mqtt_publish_param *param)
+{
+	size_t used = ctx.rx_topic_len;
+	bool ok = true;
+
+	ctx.rx_prop_count = 0;
+	if (!ctx.msg_prop_report || client.protocol_version != MQTT_VERSION_5_0) {
+		return;
+	}
+	if (param->prop.rx.has_payload_format_indicator) {
+		ok &= mqtt_rx_prop_add(SM_MQTT_PROP_PAYLOAD_FORMAT, &used, NULL, 0, NULL,
+				       param->prop.payload_format_indicator);
+	}
+	if (param->prop.rx.has_content_type) {
+		ok &= mqtt_rx_prop_add(SM_MQTT_PROP_CONTENT_TYPE, &used, NULL, 0,
+				       param->prop.content_type.utf8,
+				       param->prop.content_type.size);
+	}
+	if (param->prop.rx.has_response_topic) {
+		ok &= mqtt_rx_prop_add(SM_MQTT_PROP_RESPONSE_TOPIC, &used, NULL, 0,
+				       param->prop.response_topic.utf8,
+				       param->prop.response_topic.size);
+	}
+	if (param->prop.rx.has_correlation_data) {
+		ok &= mqtt_rx_prop_add(SM_MQTT_PROP_CORRELATION_DATA, &used, NULL, 0,
+				       param->prop.correlation_data.data,
+				       param->prop.correlation_data.len);
+	}
+	for (size_t i = 0; param->prop.rx.has_user_prop && i < ARRAY_SIZE(param->prop.user_prop);
+	     i++) {
+		const struct mqtt_utf8_pair *pair = &param->prop.user_prop[i];
+
+		/* The library fills user properties from the start of the array. */
+		if (pair->name.utf8 == NULL) {
+			break;
+		}
+		ok &= mqtt_rx_prop_add(SM_MQTT_PROP_USER, &used, pair->name.utf8, pair->name.size,
+				       pair->value.utf8, pair->value.size);
+	}
+	if (!ok) {
+		LOG_WRN("MQTT message properties not reported: %d", -ENOMEM);
+	}
+}
+
+/* Send the recorded properties ahead of the #XMQTTMSG header. */
+static void mqtt_msg_props_send(void)
+{
+	for (uint8_t i = 0; i < ctx.rx_prop_count; i++) {
+		const struct sm_mqtt_rx_prop *prop = &ctx.rx_props[i];
+		size_t data_len = prop->name_len + prop->len;
+
+		if (prop->type == SM_MQTT_PROP_USER) {
+			rsp_send_to(ctx.pipe, "\r\n#XMQTTMSGPROP: %u,%u,%u\r\n", prop->type,
+				    prop->name_len, prop->len);
+		} else {
+			rsp_send_to(ctx.pipe, "\r\n#XMQTTMSGPROP: %u,%u\r\n", prop->type,
+				    prop->len);
+		}
+		if (prop->type == SM_MQTT_PROP_PAYLOAD_FORMAT) {
+			continue;
+		}
+		if (data_len > 0) {
+			data_send(ctx.pipe, mqtt_conn->payload_drain + prop->offset, data_len);
+		}
+		data_send(ctx.pipe, "\r\n", 2);
+	}
+	ctx.rx_prop_count = 0;
+}
+#endif
+
 /**@brief Function to handle received publish event.
  */
 static void handle_mqtt_publish_evt(const struct mqtt_evt *evt)
@@ -381,6 +508,7 @@ static void handle_mqtt_publish_evt(const struct mqtt_evt *evt)
 	ctx.rx_has_msg_expiry = client.protocol_version == MQTT_VERSION_5_0 &&
 				evt->param.publish.prop.rx.has_message_expiry_interval;
 	ctx.rx_msg_expiry = evt->param.publish.prop.message_expiry_interval;
+	mqtt_rx_props_copy(&evt->param.publish);
 #endif
 }
 
@@ -679,6 +807,9 @@ static void mqtt_connection_close(void)
 	}
 	ctx.rx_topic_len = 0;
 	ctx.publish_payload_remaining = 0;
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	ctx.rx_prop_count = 0;
+#endif
 	client.broker = NULL;
 	mqtt_conn_release();
 }
@@ -753,6 +884,9 @@ static void mqtt_poll_work_handler(struct k_work *work)
 				/* Use rsp_send_to (immediate) so the header precedes the
 				 * payload; urc_send_to buffers and would trail the data.
 				 */
+#if defined(CONFIG_MQTT_VERSION_5_0)
+				mqtt_msg_props_send();
+#endif
 				mqtt_msg_header_send();
 				data_send(ctx.pipe, mqtt_conn->payload_drain, ctx.rx_topic_len);
 				data_send(ctx.pipe, "\r\n", 2);
@@ -1417,6 +1551,43 @@ static int mqtt_prepare_publish(size_t topic_len, uint16_t qos, uint16_t retain,
 	mqtt_conn->pub_param.message_id = (uint16_t)message_id;
 	return 0;
 }
+
+#if defined(CONFIG_MQTT_VERSION_5_0)
+SM_AT_CMD_CUSTOM(xmqttmsgprop, "AT#XMQTTMSGPROP", handle_at_mqtt_msg_prop);
+STATIC int handle_at_mqtt_msg_prop(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+				   uint32_t param_count)
+{
+	uint16_t mode;
+	int err;
+
+	switch (cmd_type) {
+	case AT_PARSER_CMD_TYPE_SET:
+		if (param_count != 2) {
+			return -EINVAL;
+		}
+		err = at_parser_num_get(parser, 1, &mode);
+		if (err) {
+			return err;
+		}
+		if (mode > 1) {
+			return -EINVAL;
+		}
+		ctx.msg_prop_report = mode == 1;
+		return 0;
+
+	case AT_PARSER_CMD_TYPE_READ:
+		rsp_send("\r\n#XMQTTMSGPROP: %d\r\n", ctx.msg_prop_report);
+		return 0;
+
+	case AT_PARSER_CMD_TYPE_TEST:
+		rsp_send("\r\n#XMQTTMSGPROP: (0,1)\r\n");
+		return 0;
+
+	default:
+		return -EINVAL;
+	}
+}
+#endif
 
 SM_AT_CMD_CUSTOM(xmqttpubempty, "AT#XMQTTPUBEMPTY", handle_at_mqtt_publish_empty);
 STATIC int handle_at_mqtt_publish_empty(enum at_parser_cmd_type cmd_type, struct at_parser *parser,

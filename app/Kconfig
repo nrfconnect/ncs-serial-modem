@@ -386,6 +386,11 @@ config SM_MQTTC_TOPIC_ALIAS_MAX
 configdefault MQTT_TOPIC_ALIAS_MAX
 	default 0
 
+# User properties of an incoming message that AT#XMQTTMSGPROP can report; the MQTT library
+# drops any further user properties.
+configdefault MQTT_USER_PROPERTIES_MAX
+	default 4 if SM_MQTTC_VERSION_5_0
+
 endif # SM_MQTTC
 
 if SM_GNSS

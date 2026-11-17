@@ -61,6 +61,11 @@ static bool eagain_emitted;
 static uint32_t pub_msg_expiry_in;
 /* QoS of the simulated incoming PUBLISH. */
 static uint8_t pub_qos_in;
+/* Optional hook that adds properties to the simulated incoming PUBLISH. */
+static void (*pub_props_in)(struct mqtt_publish_param *param);
+/* Bytes expected ahead of the #XMQTTMSG header, such as #XMQTTMSGPROP lines. */
+static const uint8_t *frame_prefix;
+static size_t frame_prefix_len;
 
 /* zsock_setsockopt stub: capture the SO_POLLCB callback, accept everything. */
 static int setsockopt_stub(int socket, int level, int option_name,
@@ -124,6 +129,9 @@ static int mqtt_input_stub(struct mqtt_client *client, int calls)
 	evt.param.publish.prop.message_expiry_interval = pub_msg_expiry_in;
 	evt.param.publish.prop.rx.has_message_expiry_interval = pub_msg_expiry_in != 0;
 #endif
+	if (pub_props_in != NULL) {
+		pub_props_in(&evt.param.publish);
+	}
 
 	client->evt_cb(client, &evt);
 	return 0;
@@ -167,9 +175,17 @@ void setUp(void)
 	eagain_emitted = false;
 	pub_msg_expiry_in = 0;
 	pub_qos_in = MQTT_QOS_0_AT_MOST_ONCE;
+	pub_props_in = NULL;
+	frame_prefix = NULL;
+	frame_prefix_len = 0;
 
 	__cmock_zsock_setsockopt_Stub(setsockopt_stub);
 	__cmock_mqtt_keepalive_time_left_IgnoreAndReturn(60000);
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	/* Property reporting is global state; a failed test must not leave it on. */
+	send_at_command("AT#XMQTTMSGPROP=0\r\n");
+	clear_captured_response();
+#endif
 }
 
 void tearDown(void)
@@ -2943,7 +2959,12 @@ static void receive_framed(const uint8_t *payload, size_t len, uint8_t version,
 			      strlen(pub_topic_in), len, expiry_field, pub_topic_in);
 	TEST_ASSERT_LESS_THAN_UINT(sizeof(header), header_len);
 	captured = (const uint8_t *)get_captured_response();
-	TEST_ASSERT_EQUAL_UINT(header_len + len + sizeof(trailer) - 1, get_captured_response_len());
+	TEST_ASSERT_EQUAL_UINT(frame_prefix_len + header_len + len + sizeof(trailer) - 1,
+			       get_captured_response_len());
+	if (frame_prefix_len > 0) {
+		TEST_ASSERT_EQUAL_MEMORY(frame_prefix, captured, frame_prefix_len);
+		captured += frame_prefix_len;
+	}
 	TEST_ASSERT_EQUAL_MEMORY(header, captured, header_len);
 	if (len > 0) {
 		TEST_ASSERT_EQUAL_MEMORY(payload, captured + header_len, len);
@@ -3019,6 +3040,134 @@ void test_mqtt_incoming_message_expiry(void)
 	pub_payload_off = 0;
 	eagain_emitted = false;
 	receive_framed(payload, sizeof(payload) - 1, MQTT_VERSION_3_1_1, "");
+#else
+	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
+#endif
+}
+
+#if defined(CONFIG_MQTT_VERSION_5_0)
+static void set_msg_prop_report(bool enable)
+{
+	clear_captured_response();
+	send_at_command(enable ? "AT#XMQTTMSGPROP=1\r\n" : "AT#XMQTTMSGPROP=0\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "OK"));
+	clear_captured_response();
+}
+
+static void all_props_in(struct mqtt_publish_param *param)
+{
+	static const uint8_t correlation[] = {0x00, '\r', '\n', 0xff};
+
+	param->prop.payload_format_indicator = 1;
+	param->prop.rx.has_payload_format_indicator = true;
+	param->prop.content_type = (struct mqtt_utf8)MQTT_UTF8_LITERAL("application/json");
+	param->prop.rx.has_content_type = true;
+	param->prop.response_topic = (struct mqtt_utf8)MQTT_UTF8_LITERAL("resp/t");
+	param->prop.rx.has_response_topic = true;
+	param->prop.correlation_data.data = (uint8_t *)correlation;
+	param->prop.correlation_data.len = sizeof(correlation);
+	param->prop.rx.has_correlation_data = true;
+	param->prop.user_prop[0].name = (struct mqtt_utf8)MQTT_UTF8_LITERAL("k1");
+	param->prop.user_prop[0].value = (struct mqtt_utf8)MQTT_UTF8_LITERAL("v1");
+	/* An empty value is valid. */
+	param->prop.user_prop[1].name = (struct mqtt_utf8)MQTT_UTF8_LITERAL("name");
+	param->prop.user_prop[1].value = (struct mqtt_utf8){.utf8 = (uint8_t *)"", .size = 0};
+	param->prop.rx.has_user_prop = true;
+}
+
+static void format_only_in(struct mqtt_publish_param *param)
+{
+	param->prop.payload_format_indicator = 0;
+	param->prop.rx.has_payload_format_indicator = true;
+}
+#endif
+
+/*
+ * Test: With AT#XMQTTMSGPROP=1, the properties of an incoming MQTT 5.0 message are reported
+ * ahead of #XMQTTMSG, including binary Correlation Data and an empty user property value.
+ */
+void test_mqtt_incoming_properties_reported(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	static const uint8_t payload[] = "{\"a\":1}";
+	static const uint8_t expected[] = "\r\n#XMQTTMSGPROP: 1,1\r\n"
+					  "\r\n#XMQTTMSGPROP: 3,16\r\napplication/json\r\n"
+					  "\r\n#XMQTTMSGPROP: 8,6\r\nresp/t\r\n"
+					  "\r\n#XMQTTMSGPROP: 9,4\r\n\x00\r\n\xff\r\n"
+					  "\r\n#XMQTTMSGPROP: 38,2,2\r\nk1v1\r\n"
+					  "\r\n#XMQTTMSGPROP: 38,4,0\r\nname\r\n";
+
+	set_msg_prop_report(true);
+	pub_props_in = all_props_in;
+	pub_msg_expiry_in = 60;
+	frame_prefix = expected;
+	frame_prefix_len = sizeof(expected) - 1;
+	/* The read stub pauses halfway, so the payload is forwarded in two poll rounds. */
+	receive_framed(payload, sizeof(payload) - 1, MQTT_VERSION_5_0, ",60");
+
+	pub_payload_off = 0;
+	eagain_emitted = false;
+	pub_msg_expiry_in = 0;
+	pub_props_in = format_only_in;
+	frame_prefix = (const uint8_t *)"\r\n#XMQTTMSGPROP: 1,0\r\n";
+	frame_prefix_len = strlen((const char *)frame_prefix);
+	receive_framed(payload, sizeof(payload) - 1, MQTT_VERSION_5_0, "");
+	set_msg_prop_report(false);
+#else
+	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
+#endif
+}
+
+/*
+ * Test: Properties are not reported by default or with MQTT 3.1.1, so the output is unchanged.
+ */
+void test_mqtt_incoming_properties_not_reported(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	static const uint8_t payload[] = "hello";
+
+	pub_props_in = all_props_in;
+	receive_framed(payload, sizeof(payload) - 1, MQTT_VERSION_5_0, "");
+
+	pub_payload_off = 0;
+	eagain_emitted = false;
+	set_msg_prop_report(true);
+	receive_framed(payload, sizeof(payload) - 1, MQTT_VERSION_3_1_1, "");
+	set_msg_prop_report(false);
+#else
+	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
+#endif
+}
+
+/*
+ * Test: AT#XMQTTMSGPROP set, read, and test commands. The setting does not need a connection.
+ */
+void test_mqtt_msg_prop_command(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	static const char *const invalid[] = {
+		"AT#XMQTTMSGPROP=2\r\n",   "AT#XMQTTMSGPROP=-1\r\n", "AT#XMQTTMSGPROP=\"1\"\r\n",
+		"AT#XMQTTMSGPROP=1,0\r\n", "AT#XMQTTMSGPROP\r\n",
+	};
+
+	clear_captured_response();
+	send_at_command("AT#XMQTTMSGPROP?\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "#XMQTTMSGPROP: 0\r\n"));
+	set_msg_prop_report(true);
+	send_at_command("AT#XMQTTMSGPROP?\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "#XMQTTMSGPROP: 1\r\n"));
+	for (size_t i = 0; i < ARRAY_SIZE(invalid); i++) {
+		clear_captured_response();
+		send_at_command(invalid[i]);
+		TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "ERROR"));
+	}
+	clear_captured_response();
+	send_at_command("AT#XMQTTMSGPROP?\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "#XMQTTMSGPROP: 1\r\n"));
+	clear_captured_response();
+	send_at_command("AT#XMQTTMSGPROP=?\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "#XMQTTMSGPROP: (0,1)\r\n"));
+	set_msg_prop_report(false);
 #else
 	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
 #endif

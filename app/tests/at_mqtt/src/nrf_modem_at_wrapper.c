@@ -30,6 +30,9 @@ extern int handle_at_mqtt_publish_wrapper_xmqttpub(char *buf, size_t len, char *
 extern int handle_at_mqtt_publish_empty_wrapper_xmqttpubempty(char *buf, size_t len, char *at_cmd);
 extern int handle_at_mqtt_subscribe_wrapper_xmqttsub(char *buf, size_t len, char *at_cmd);
 extern int handle_at_mqtt_unsubscribe_wrapper_xmqttunsub(char *buf, size_t len, char *at_cmd);
+#if defined(CONFIG_MQTT_VERSION_5_0)
+extern int handle_at_mqtt_msg_prop_wrapper_xmqttmsgprop(char *buf, size_t len, char *at_cmd);
+#endif
 
 /* Wrapper for nrf_modem_at_cmd that handles custom commands */
 int nrf_modem_at_cmd(void *buf, size_t buf_size, const char *fmt, ...)
@@ -67,6 +70,11 @@ int nrf_modem_at_cmd(void *buf, size_t buf_size, const char *fmt, ...)
 		} else if (strncasecmp(at_cmd, "AT#XMQTTSUB", 11) == 0) {
 			ret = handle_at_mqtt_subscribe_wrapper_xmqttsub((char *)buf, buf_size,
 									at_cmd);
+#if defined(CONFIG_MQTT_VERSION_5_0)
+		} else if (strncasecmp(at_cmd, "AT#XMQTTMSGPROP", 15) == 0) {
+			ret = handle_at_mqtt_msg_prop_wrapper_xmqttmsgprop((char *)buf, buf_size,
+									   at_cmd);
+#endif
 		} else {
 			/* Unknown custom command - return error */
 			return -EINVAL;

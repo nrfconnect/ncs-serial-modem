@@ -29,7 +29,7 @@ if SM_TEST_MQTT_VERSION_5_0
 
 config MQTT_USER_PROPERTIES_MAX
 	int "Maximum number of user properties in a packet"
-	default 1
+	default 2
 
 config MQTT_SUBSCRIPTION_ID_PROPERTIES_MAX
 	int "Maximum number of Subscription ID properties in a PUBLISH packet"
