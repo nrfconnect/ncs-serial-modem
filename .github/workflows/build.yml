@@ -45,6 +45,7 @@ jobs:
         with:
           path: serial_modem
           ref: ${{ inputs.checkout_ref != '' && inputs.checkout_ref || github.ref }}
+          fetch-depth: 0
 
       - name: Install build libraries for native_sim
         run: |
