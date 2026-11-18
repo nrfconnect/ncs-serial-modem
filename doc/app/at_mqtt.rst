@@ -13,7 +13,7 @@ This page describes the AT commands used to operate the MQTT client.
 
    The MQTT client holds no internal state information for publish and subscript.
    It will not retransmit packets or guarantee packet delivery according to QoS classes.
-   This deviates from MQTT v3.1.1.
+   This deviates from MQTT :versionbadge:`v3.1.1`.
 
 .. _SM_AT_MQTT_XMQTTEVT:
 
