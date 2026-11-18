@@ -184,8 +184,10 @@ void setUp(void)
 #if defined(CONFIG_MQTT_VERSION_5_0)
 	/* Property reporting is global state; a failed test must not leave it on. */
 	send_at_command("AT#XMQTTMSGPROP=0\r\n");
-	clear_captured_response();
 #endif
+	/* So is the Will. */
+	send_at_command("AT#XMQTTWILL=\"\"\r\n");
+	clear_captured_response();
 }
 
 void tearDown(void)
@@ -279,12 +281,28 @@ void test_mqtt_basic(void)
 static uint8_t connect_protocol_version;
 static struct mqtt_client *connected_client;
 
+/* Will of the last CONNECT; the topic and message stay valid until the Will changes. */
+static struct {
+	const struct mqtt_topic *topic;
+	const struct mqtt_utf8 *message;
+	uint8_t retain;
+	uint32_t delay;
+	uint32_t expiry;
+} connect_will;
+
 static int mqtt_connect_version_stub(struct mqtt_client *client, int num_calls)
 {
 	ARG_UNUSED(num_calls);
 
 	connect_protocol_version = client->protocol_version;
 	connected_client = client;
+	connect_will.topic = client->will_topic;
+	connect_will.message = client->will_message;
+	connect_will.retain = client->will_retain;
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	connect_will.delay = client->will_prop.will_delay_interval;
+	connect_will.expiry = client->will_prop.message_expiry_interval;
+#endif
 	return 0;
 }
 
@@ -3394,6 +3412,124 @@ void test_mqtt_pub_prop_packet_size(void)
 #else
 	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
 #endif
+}
+
+static void will_command(const char *command, bool ok)
+{
+	clear_captured_response();
+	send_at_command(command);
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), ok ? "OK" : "ERROR"));
+}
+
+static void will_read(const char *expected)
+{
+	clear_captured_response();
+	send_at_command("AT#XMQTTWILL?\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), expected));
+}
+
+/* Will command with a topic and a message of the given lengths. */
+static void will_long_command(char *buf, size_t size, size_t topic_len, size_t msg_len)
+{
+	size_t n = strlen("AT#XMQTTWILL=\"");
+
+	TEST_ASSERT_LESS_OR_EQUAL_UINT(size, n + topic_len + msg_len + 8);
+	memcpy(buf, "AT#XMQTTWILL=\"", n);
+	memset(buf + n, 't', topic_len);
+	n += topic_len;
+	memcpy(buf + n, "\",\"", 3);
+	n += 3;
+	memset(buf + n, 'm', msg_len);
+	strcpy(buf + n + msg_len, "\"\r\n");
+}
+
+static void assert_connect_will(const char *topic, const char *msg, uint8_t qos, uint8_t retain)
+{
+	TEST_ASSERT_NOT_NULL(connect_will.topic);
+	assert_mqtt_utf8(topic, &connect_will.topic->topic);
+	TEST_ASSERT_EQUAL_UINT8(qos, connect_will.topic->qos);
+	TEST_ASSERT_NOT_NULL(connect_will.message);
+	TEST_ASSERT_EQUAL_UINT(strlen(msg), connect_will.message->size);
+	if (strlen(msg) > 0) {
+		TEST_ASSERT_EQUAL_MEMORY(msg, connect_will.message->utf8, strlen(msg));
+	}
+	TEST_ASSERT_EQUAL_UINT8(retain, connect_will.retain);
+}
+
+/*
+ * Test: AT#XMQTTWILL sets the Will of later connections. A change while connected applies at
+ * the next connection, and an empty topic clears the Will.
+ */
+void test_mqtt_will_connect(void)
+{
+	will_read("#XMQTTWILL: \"\"\r\n");
+	will_command("AT#XMQTTWILL=\"dev/status\",\"offline\",1,1\r\n", true);
+	will_read("#XMQTTWILL: \"dev/status\",7,1,1,0,0\r\n");
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,4\r\n", MQTT_VERSION_3_1_1);
+	assert_connect_will("dev/status", "offline", MQTT_QOS_1_AT_LEAST_ONCE, 1);
+
+	will_command("AT#XMQTTWILL=\"dev/gone\"\r\n", true);
+	mqtt_disconnect_ok();
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,4\r\n", MQTT_VERSION_3_1_1);
+	assert_connect_will("dev/gone", "", MQTT_QOS_0_AT_MOST_ONCE, 0);
+
+	will_command("AT#XMQTTWILL=\"\"\r\n", true);
+	will_read("#XMQTTWILL: \"\"\r\n");
+	mqtt_disconnect_ok();
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,4\r\n", MQTT_VERSION_3_1_1);
+	TEST_ASSERT_NULL(connect_will.topic);
+	TEST_ASSERT_NULL(connect_will.message);
+	mqtt_disconnect_ok();
+
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	send_at_command("AT#XMQTTCFG=\"test_client\",60,1,5\r\n");
+	will_command("AT#XMQTTWILL=\"dev/status\",\"\",2,0,30,4294967295\r\n", true);
+	will_read("#XMQTTWILL: \"dev/status\",0,2,0,30,4294967295\r\n");
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,5\r\n", MQTT_VERSION_5_0);
+	assert_connect_will("dev/status", "", MQTT_QOS_2_EXACTLY_ONCE, 0);
+	TEST_ASSERT_EQUAL_UINT32(30, connect_will.delay);
+	TEST_ASSERT_EQUAL_UINT32(UINT32_MAX, connect_will.expiry);
+	mqtt_disconnect_ok();
+#endif
+}
+
+/*
+ * Test: AT#XMQTTWILL rejects invalid values and keeps the earlier Will. The MQTT 5.0
+ * intervals need MQTT 5.0 selected with AT#XMQTTCFG.
+ */
+void test_mqtt_will_invalid(void)
+{
+	static const char *const invalid[] = {
+		"AT#XMQTTWILL=\"a/+\",\"m\"\r\n",      "AT#XMQTTWILL=\"a/#\",\"m\"\r\n",
+		"AT#XMQTTWILL=\"a\",\"m\",3\r\n",      "AT#XMQTTWILL=\"a\",\"m\",0,2\r\n",
+		"AT#XMQTTWILL=\"a\",\"m\",0,0,-1\r\n", "AT#XMQTTWILL=\"a\",\"m\",0,0,0,0,0\r\n",
+		"AT#XMQTTWILL=\"a\",\"m\",0,0,1\r\n",  "AT#XMQTTWILL=\"a\",\"m\",0,0,0,1\r\n",
+		"AT#XMQTTWILL=\"\",\"m\"\r\n",         "AT#XMQTTWILL\r\n",
+	};
+	char command[200];
+
+	send_at_command("AT#XMQTTCFG=\"test_client\",60,1,4\r\n");
+	will_command("AT#XMQTTWILL=\"keep\",\"me\",1\r\n", true);
+	for (size_t i = 0; i < ARRAY_SIZE(invalid); i++) {
+		will_command(invalid[i], false);
+	}
+	will_long_command(command, sizeof(command), 129, 1);
+	will_command(command, false);
+	will_long_command(command, sizeof(command), 1, 129);
+	will_command(command, false);
+	will_read("#XMQTTWILL: \"keep\",2,1,0,0,0\r\n");
+
+	will_long_command(command, sizeof(command), 128, 1);
+	will_command(command, true);
+	will_long_command(command, sizeof(command), 1, 128);
+	will_command(command, true);
+	will_read("#XMQTTWILL: \"t\",128,0,0,0,0\r\n");
+
+	clear_captured_response();
+	send_at_command("AT#XMQTTWILL=?\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(),
+				    "#XMQTTWILL: <topic>,<msg>,(0,1,2),(0,1)"
+				    "[,<will_delay>[,<msg_expiry>]]\r\n"));
 }
 
 extern int handle_at_mqtt_connect(enum at_parser_cmd_type cmd_type, struct at_parser *parser,

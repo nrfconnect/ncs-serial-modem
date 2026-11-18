@@ -18,6 +18,7 @@ LOG_MODULE_REGISTER(sm_mqtt, CONFIG_SM_LOG_LEVEL);
 
 #define MQTT_MAX_TOPIC_LEN	128
 #define MQTT_MAX_CID_LEN	64
+#define MQTT_MAX_WILL_MSG_LEN   128
 
 #define SM_DEFAULT_CID		"sm_default_client_id"
 
@@ -97,6 +98,17 @@ static struct sm_mqtt_ctx {
 static uint16_t mqtt_broker_port;
 static uint16_t mqtt_configured_keepalive;
 static char mqtt_clientid[MQTT_MAX_CID_LEN + 1];
+
+/* Will set with AT#XMQTTWILL, followed by its topic and message. */
+struct mqtt_will {
+	struct mqtt_topic topic;
+	struct mqtt_utf8 message;
+	uint32_t delay;  /* MQTT 5.0 Will Delay Interval */
+	uint32_t expiry; /* MQTT 5.0 Message Expiry Interval */
+	uint8_t retain;
+	uint8_t data[];
+};
+static struct mqtt_will *mqtt_will;
 
 #if defined(CONFIG_MQTT_VERSION_5_0)
 /* Packet identifier in use by an unacknowledged QoS 1/2 PUBLISH, SUBSCRIBE or UNSUBSCRIBE. */
@@ -997,6 +1009,20 @@ static int do_mqtt_config(const char *client_id, uint16_t keep_alive, uint16_t c
 	return 0;
 }
 
+/* Set the Will of the next CONNECT. mqtt_client_init() in do_mqtt_config() clears it. */
+static void mqtt_will_apply(void)
+{
+	struct mqtt_will *will = mqtt_will;
+
+	client.will_topic = will != NULL ? &will->topic : NULL;
+	client.will_message = will != NULL ? &will->message : NULL;
+	client.will_retain = will != NULL ? will->retain : 0;
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	client.will_prop.will_delay_interval = will != NULL ? will->delay : 0;
+	client.will_prop.message_expiry_interval = will != NULL ? will->expiry : 0;
+#endif
+}
+
 static int do_mqtt_connect(void)
 {
 	int err;
@@ -1051,6 +1077,7 @@ static int do_mqtt_connect(void)
 
 	/* Connect to MQTT broker */
 	client.keepalive = mqtt_configured_keepalive;
+	mqtt_will_apply();
 	ctx.protocol_error = 0;
 #if defined(CONFIG_MQTT_VERSION_5_0)
 	mqtt_server_limits_reset();
@@ -1551,6 +1578,105 @@ static int mqtt_prepare_publish(size_t topic_len, uint16_t qos, uint16_t retain,
 		return message_id;
 	}
 	mqtt_conn->pub_param.message_id = (uint16_t)message_id;
+	return 0;
+}
+
+SM_AT_CMD_CUSTOM(xmqttwill, "AT#XMQTTWILL", handle_at_mqtt_will);
+STATIC int handle_at_mqtt_will(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+			       uint32_t param_count)
+{
+	struct mqtt_will *will = NULL;
+	const char *topic;
+	const char *msg = "";
+	size_t topic_len;
+	size_t msg_len = 0;
+	uint16_t qos = MQTT_QOS_0_AT_MOST_ONCE;
+	uint16_t retain = 0;
+	uint32_t delay = 0;
+	uint32_t expiry = 0;
+	int err;
+
+	switch (cmd_type) {
+	case AT_PARSER_CMD_TYPE_SET:
+		break;
+
+	case AT_PARSER_CMD_TYPE_READ:
+		will = mqtt_will;
+		if (will == NULL) {
+			rsp_send("\r\n#XMQTTWILL: \"\"\r\n");
+		} else {
+			rsp_send("\r\n#XMQTTWILL: \"%.*s\",%u,%u,%u,%u,%u\r\n",
+				 (int)will->topic.topic.size, will->topic.topic.utf8,
+				 will->message.size, will->topic.qos, will->retain, will->delay,
+				 will->expiry);
+		}
+		return 0;
+
+	case AT_PARSER_CMD_TYPE_TEST:
+		rsp_send("\r\n#XMQTTWILL: <topic>,<msg>,(0,1,2),(0,1)"
+			 "[,<will_delay>[,<msg_expiry>]]\r\n");
+		return 0;
+
+	default:
+		return -EINVAL;
+	}
+
+	/* Command name, <topic>, <msg>, <qos>, <retain>, <will_delay> and <msg_expiry>. */
+	if (param_count < 2 || param_count > 7) {
+		return -EINVAL;
+	}
+	err = at_parser_string_ptr_get(parser, 1, &topic, &topic_len);
+	if (err == 0 && param_count > 2) {
+		err = at_parser_string_ptr_get(parser, 2, &msg, &msg_len);
+	}
+	if (err == 0 && param_count > 3) {
+		err = at_parser_num_get(parser, 3, &qos);
+	}
+	if (err == 0 && param_count > 4) {
+		err = at_parser_num_get(parser, 4, &retain);
+	}
+	if (err == 0 && param_count > 5) {
+		err = at_parser_num_get(parser, 5, &delay);
+	}
+	if (err == 0 && param_count > 6) {
+		err = at_parser_num_get(parser, 6, &expiry);
+	}
+	if (err) {
+		return err;
+	}
+
+	/* A Will Topic must not be empty, so an empty topic clears the Will. */
+	if (topic_len == 0) {
+		if (param_count != 2) {
+			return -EINVAL;
+		}
+	} else {
+		if (topic_len > MQTT_MAX_TOPIC_LEN ||
+		    mqtt_topic_has_wildcard((const uint8_t *)topic, topic_len) ||
+		    msg_len > MQTT_MAX_WILL_MSG_LEN || qos > MQTT_QOS_2_EXACTLY_ONCE ||
+		    retain > 1 ||
+		    ((delay != 0 || expiry != 0) && client.protocol_version != MQTT_VERSION_5_0)) {
+			return -EINVAL;
+		}
+		will = malloc(sizeof(*will) + topic_len + msg_len);
+		if (will == NULL) {
+			return -ENOMEM;
+		}
+		memcpy(will->data, topic, topic_len);
+		memcpy(will->data + topic_len, msg, msg_len);
+		will->topic.topic.utf8 = will->data;
+		will->topic.topic.size = topic_len;
+		will->topic.qos = qos;
+		will->message.utf8 = will->data + topic_len;
+		will->message.size = msg_len;
+		will->retain = retain;
+		will->delay = delay;
+		will->expiry = expiry;
+	}
+	free(mqtt_will);
+	mqtt_will = will;
+	/* Keep the client off the freed Will. The new Will applies at the next connection. */
+	mqtt_will_apply();
 	return 0;
 }
 

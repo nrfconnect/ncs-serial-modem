@@ -498,6 +498,11 @@ This command can send ``#XMQTTEVT`` with the following ``<evt_type>`` values:
 
 See :ref:`SM_AT_MQTT_XMQTTEVT` for the notification syntax and parameter descriptions.
 
+.. TODO: REMOVE FILTERING WHEN NRF91M1 IS RELEASED
+.. only:: not nrf91m1
+
+   The connect request includes the Will set with :ref:`SM_AT_MQTT_XMQTTWILL`.
+
 Set command
 -----------
 
@@ -1366,3 +1371,117 @@ The test command requires an active MQTT connection.
       nrf91/sm/cmd1
       {"led":1}
       #XMQTTEVT: 2,0
+
+   .. _SM_AT_MQTT_XMQTTWILL:
+
+   MQTT Will #XMQTTWILL
+   ====================
+
+   The ``#XMQTTWILL`` command sets the Will message of the MQTT client.
+   The client sends the Will to the broker in the connect request of ``#XMQTTCON``.
+   The broker publishes the Will message if the connection ends without a disconnect request from the client, for example after a network failure or a missed keep-alive.
+   It does not publish the Will message after ``AT#XMQTTCON=0``.
+
+   The Will applies to all later connections until the command changes or clears it.
+   A change while connected applies at the next connection.
+   The command supports MQTT v3.1.1 and MQTT v5.0.
+
+   Set command
+   -----------
+
+   Syntax
+   ~~~~~~
+
+   ::
+
+      AT#XMQTTWILL=<topic>[,<msg>[,<qos>[,<retain>[,<will_delay>[,<msg_expiry>]]]]]
+
+   <topic>
+      String.
+      The topic on which the broker publishes the Will message, up to 128 bytes.
+      It must not contain the wildcard characters ``+`` or ``#``.
+      An empty string clears the Will, and then the command takes no other parameters.
+
+   <msg>
+      String.
+      The Will message, up to 128 bytes.
+      The default is an empty message.
+
+   <qos>
+      Integer.
+      The Quality of Service level of the Will message, ``0``, ``1``, or ``2``.
+      The default is ``0``.
+
+   <retain>
+      Integer.
+      Set to ``1`` to have the broker retain the Will message.
+      The default is ``0``.
+
+   <will_delay>
+      Integer.
+      The MQTT v5.0 Will Delay Interval in seconds.
+      The broker publishes the Will message when the interval ends or when the session ends, whichever is first.
+      If the client reconnects before that, the broker does not publish it.
+      The default is ``0``, which publishes the Will message without delay.
+
+   <msg_expiry>
+      Integer.
+      The MQTT v5.0 Message Expiry Interval of the Will message in seconds.
+      The default is ``0``, which means that the Will message does not expire.
+
+   Non-zero ``<will_delay>`` and ``<msg_expiry>`` require MQTT v5.0, selected with the ``<version>`` parameter of ``#XMQTTCFG``.
+   The broker can refuse the connection if it does not support the QoS level or the retain flag of the Will message.
+
+   Example
+   ~~~~~~~
+
+   ::
+
+      AT#XMQTTWILL="nrf91/sm/status","offline",1,1
+      OK
+      AT#XMQTTCON=1,"","","mqtt.server.com",1883
+      OK
+      #XMQTTEVT: 0,0
+
+   Clear the Will:
+
+   ::
+
+      AT#XMQTTWILL=""
+      OK
+
+   Read command
+   ------------
+
+   The read command shows the Will.
+
+   ::
+
+      AT#XMQTTWILL?
+      #XMQTTWILL: <topic>,<msg_length>,<qos>,<retain>,<will_delay>,<msg_expiry>
+      OK
+
+   Without a Will, the response is ``#XMQTTWILL: ""``.
+
+   <msg_length>
+      Integer.
+      The length of the Will message in bytes.
+      The response does not include the message.
+
+   Example
+   ~~~~~~~
+
+   ::
+
+      AT#XMQTTWILL?
+      #XMQTTWILL: "nrf91/sm/status",7,1,1,0,0
+      OK
+
+   Test command
+   ------------
+
+   ::
+
+      AT#XMQTTWILL=?
+      #XMQTTWILL: <topic>,<msg>,(0,1,2),(0,1)[,<will_delay>[,<msg_expiry>]]
+      OK
