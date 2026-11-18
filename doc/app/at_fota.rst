@@ -40,6 +40,7 @@ The parameters and their defined values are the following:
        Can only be used when the :file:`full-fota.conf` configuration file and :file:`full-fota-nrf9151.overlay` devicetree overlay are used.
 
    * ``5`` - Start FOTA for MCUboot second-stage bootloader update.
+     See :ref:`sm_mcuboot_update_risks` before using this type.
 
    .. only:: not nrf91m1
 
@@ -97,6 +98,7 @@ After the ``#XFOTA: 4,0`` notification indicating that the FOTA update is downlo
 
    For the MCUboot bootloader update, NSIB (B0) uses monotonic counter values to prevent rollback.
    When performing an MCUboot FOTA, the host must ensure that the new MCUboot image has a strictly higher monotonic counter value than the currently running MCUboot to avoid update failure.
+   See :ref:`sm_mcuboot_update_risks` for the risks of updating MCUboot.
 
    .. only:: not nrf91m1
 
