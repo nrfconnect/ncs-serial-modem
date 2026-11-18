@@ -198,6 +198,7 @@ PDF revision (filename suffix and cover band) is centralized in `doc/_utils/pdf_
 - Shared Sphinx settings: `doc/_docsets/conf_common.py`. Per-docset settings (project title, root document, exclusions, intersphinx): `doc/_docsets/<docset>/conf.py`.
 - The docset and publication lists are declared once in `doc/_utils/docsets.py` (`ALL_DOCSETS` and `PUBLICATIONS`). Adding a docset means adding an entry to both, a config directory, and a root document. A new publication also needs a landing page in `doc/_static/html/` and an add-on directory on the documentation site.
 - Relative paths in the config files resolve against the config directory, not `doc/`, so anchor new paths to `DOC_BASE`.
+- Inline version badges use the `versionbadge` role, for example ``:versionbadge:`v2.0.x` ``. `rst_prolog` in `doc/_docsets/conf_common.py` defines it, `doc/_static/css/custom.css` styles it for the HTML, and `\DUroleversionbadge` in the LaTeX preamble draws it for the PDF. A custom role needs all three; without the LaTeX command the badge prints as plain text.
 - Build a single docset while iterating: `make main`, `make nrf91m1`, or `python _scripts/build_docsets.py --docset main`.
 
 ### Step 3 — PDF (optional; needs a LaTeX toolchain)
