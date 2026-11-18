@@ -8,6 +8,11 @@ on:
         required: false
         type: string
         default: ''
+      sm_customer_version:
+        description: 'Optional <customer_version> in #XSMVER set for Serial Modem app (CONFIG_SM_CUSTOMER_VERSION)'
+        required: false
+        type: string
+        default: ''
   workflow_call:
     inputs:
       trigger_source:
@@ -156,8 +161,21 @@ jobs:
           ${{ inputs.trigger_source == 'nightly-workflow' ||
           inputs.trigger_source == 'release-workflow' ||
           github.event_name == 'workflow_dispatch' }}
+        env:
+          SM_CUSTOMER_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.sm_customer_version || '' }}
         run: |
-          ./nrfutil toolchain-manager launch --chdir serial_modem -- west twister -T . -v --inline-logs --overflow-as-errors --all
+          twister_common=(-T . -v --inline-logs --overflow-as-errors --all)
+          launcher=(./nrfutil toolchain-manager launch --chdir serial_modem -- west twister)
+
+          if [ -n "$SM_CUSTOMER_VERSION" ]; then
+            # extra-args apply to every scenario in a twister run; build app/sample.yaml separately.
+            "${launcher[@]}" -T app/tests -T samples "${twister_common[@]:1}"
+            "${launcher[@]}" -T app "${twister_common[@]:1}" \
+              --test-pattern '^serial_modem\.(?!unit_test)' \
+              --extra-args "CONFIG_SM_CUSTOMER_VERSION=\"${SM_CUSTOMER_VERSION}\""
+          else
+            "${launcher[@]}" "${twister_common[@]}"
+          fi
 
       - name: Zip build artifacts
         if: ${{ inputs.trigger_source == 'release-workflow' || github.event_name == 'workflow_dispatch' }}
