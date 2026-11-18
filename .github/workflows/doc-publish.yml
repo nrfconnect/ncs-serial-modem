@@ -50,6 +50,7 @@ jobs:
             fi
             ADDON="${BASH_REMATCH[1]}"
 
+            mkdir -p "$ADDON/$OUTDIR"
             unzip "$ARCHIVE" -d "$ADDON/$OUTDIR"
             find "$ADDON/$OUTDIR" -type l -delete
             UPLOADS="$UPLOADS $ADDON/$OUTDIR"
