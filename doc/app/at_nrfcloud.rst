@@ -384,6 +384,7 @@ The ``#XNRFCLOUDFOTA`` command checks for and downloads an application or modem 
    Requires the :ref:`CONFIG_SM_NRF_CLOUD_FOTA <CONFIG_SM_NRF_CLOUD_FOTA>` Kconfig option.
 
 An application update is staged the same way as ``AT#XFOTA=1``, that is, the host activates it with the ``AT#XRESET`` AT command.
+The host must supervise the activation and reset the device if it does not report ``Ready`` in time, as described in :ref:`sm_app_update_activation`.
 A modem update is staged the same way as ``AT#XFOTA=2``, that is, the host activates it with the ``AT#XMODEMRESET`` AT command.
 Both share their FOTA session with ``#XFOTA``, but progress and completion are reported over the ``#XNRFCLOUDFOTA`` notification instead, using the same ``<fota_stage>``, ``<fota_status>`` and ``<fota_info>`` tuple as ``#XFOTA`` (see :ref:`SM_AT_FOTA` for download and activation semantics).
 Only one FOTA session can be ongoing at a time, regardless of which command initiated it.

@@ -81,6 +81,9 @@ The parameters and their defined values are the following:
 
 After the ``#XFOTA: 4,0`` notification indicating that the FOTA update is downloaded, it must be activated by resetting either the whole device with the ``AT#XRESET`` command, or in case of modem update only the modem with the ``AT#XMODEMRESET`` command.
 
+For an application update, the host must supervise the activation and reset the device if it does not report ``Ready`` in time.
+See :ref:`sm_app_update_activation` for more information.
+
 .. note::
 
    During a delta update to the modem, the modem DFU area is automatically erased as needed as part of the update process. Erasing this area manually is optional.

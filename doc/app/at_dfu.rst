@@ -245,6 +245,7 @@ The parameters and their defined values are the following:
    The DFU image type as specified in the :ref:`dfu_types` section.
 
 For application (type ``0``), delta modem firmware (type ``1``), and MCUboot bootloader (type ``3``), the update is scheduled and will be activated on the next reset, which can be done with the ``AT#XRESET`` command.
+For an application update, see :ref:`sm_app_update_activation` for how to supervise the activation.
 For full modem firmware (type ``2``), the command applies the current segment (bootloader or firmware) and triggers a reboot if needed.
 
 .. TODO: REMOVE FILTERING WHEN NRF91M1 IS RELEASED
@@ -377,6 +378,27 @@ The following example shows a complete application firmware update:
    AT#XSMVER
    #XSMVER: "v1.99.1-8-gf0fd0f46-dirty","3.3.0-rc1"
    OK
+
+.. _sm_app_update_activation:
+
+Application update activation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The new application is activated on the reset that follows a completed application update.
+MCUboot swaps the new image in, and the new application must confirm itself after it has booted.
+If the new application resets before it has confirmed itself, MCUboot reverts to the previous application on the next boot.
+
+The |SM| application has no watchdog, so a new application that gets stuck during activation does not recover by itself.
+Therefore, the host must supervise the activation:
+
+1. After a reset to activate the new application, wait for the ``Ready`` indication.
+   A normal activation takes approximately 45 to 50 seconds.
+#. If the new application resets during boot and MCUboot rolls back to the previous application, the device goes through a second boot cycle.
+   Allow up to 120 seconds in total before concluding that the activation failed.
+#. If ``Ready`` has not been received within 120 seconds, reset the |SM| with the reset pin or power cycle it.
+   This causes MCUboot to roll back to the previous application, provided that the new application had not confirmed itself.
+#. After the device is back, verify with ``AT#XSMVER`` which application version is running.
+   If the previous version is running, the update failed and was rolled back.
 
 Delta modem firmware update
 ---------------------------
@@ -591,6 +613,7 @@ MCUboot update risks
    It boots the valid slot with the highest version, raises the monotonic counter, and jumps to it without ever regaining control.
 
    * If the new MCUboot image fails validation (signature, hash, or a version lower than the monotonic counter), B0 invalidates it and boots the other slot.
+
      The device stays operational, but the MCUboot slot did not change and the update was not applied.
      Verify with ``AT#XBOOTINFO=0`` that the monotonic counter value was updated.
    * If the new MCUboot image passes validation but fails at runtime, B0 boots the same slot again on every reset.
