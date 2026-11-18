@@ -32,3 +32,16 @@ table#nrf91m1-revision-history-table td ul.simple {
 table#nrf91m1-revision-history-table td ul.simple > li {
   list-style-type: disc !important;
 }
+
+/* Inline version badge: Nordic Fall outline and label. Produced by the
+   versionbadge role, which rst_prolog in _docsets/conf_common.py defines, and
+   drawn for the PDF by \DUroleversionbadge in the LaTeX preamble there. The
+   size and padding follow the theme's own inline labels, such as .guilabel. */
+.rst-content .versionbadge {
+  border: 1px solid #de823b;
+  border-radius: 4px;
+  color: #de823b;
+  font-size: 80%;
+  padding: 2.4px 6px;
+  white-space: nowrap;
+}
