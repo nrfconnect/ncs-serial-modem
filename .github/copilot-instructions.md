@@ -213,7 +213,7 @@ Output: `doc/build/pdf/<publication>/<docset>/latex/<pdf stem>.pdf`, also copied
 
 - Each docset renders its own PDF, from the same LaTeX settings in `doc/_docsets/conf_common.py`. Only `latex_documents` differs, and `docset_latex_documents()` derives it from `ALL_DOCSETS`, so per-docset LaTeX settings must not be added to `doc/_docsets/<docset>/conf.py`.
 - Needs XeLaTeX, Latexmk, and Inkscape (for the SVG figures) on `PATH`, plus the Open Sans font for the Nordic layout. Only the doc-build workflow installs these; the HTML build does not need them.
-- Run `make html` first. The PDF build reuses the intersphinx inventory of the HTML build, and the copy step needs the HTML output directory. The workflow builds both in one call: `python _scripts/build_docsets.py -b build --format html --format pdf -W --keep-going`.
+- Run `make html` first. The PDF build reuses the intersphinx inventory of the HTML build, and the copy step needs the HTML output directory. The workflow builds both in one call: `python _scripts/build_docsets.py -b build --format html --format pdf -W --keep-going`. Pull requests build HTML only: the workflow sets `DOC_BUILD_PDF=0`, skips the LaTeX installation and the PDF artifact, and `docset_html_context()` then leaves `pdf_filename` out, so `doc/_templates/breadcrumbs.html` hides the "Download PDF" button. Pushes to `main` and `v2-branch`, tags, and manual runs build the PDFs.
 
 ---
 
