@@ -3532,6 +3532,60 @@ void test_mqtt_will_invalid(void)
 				    "[,<will_delay>[,<msg_expiry>]]\r\n"));
 }
 
+static bool disconnect_param_given;
+static int disconnect_reason;
+
+static int disconnect_reason_stub(struct mqtt_client *client,
+				  const struct mqtt_disconnect_param *param, int calls)
+{
+	ARG_UNUSED(client);
+	ARG_UNUSED(calls);
+	disconnect_param_given = param != NULL;
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	disconnect_reason = param != NULL ? param->reason_code : -1;
+#endif
+	return 0;
+}
+
+static void disconnect_command(const char *command, bool with_will)
+{
+	disconnect_param_given = !with_will;
+	disconnect_reason = -1;
+	__cmock_mqtt_disconnect_Stub(disconnect_reason_stub);
+	clear_captured_response();
+	send_at_command(command);
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "OK"));
+	TEST_ASSERT_EQUAL(with_will, disconnect_param_given);
+	if (with_will) {
+		TEST_ASSERT_EQUAL_INT(MQTT_DISCONNECT_WITH_WILL_MSG, disconnect_reason);
+	}
+	__cmock_mqtt_disconnect_Stub(NULL);
+	assert_mqtt_disconnected();
+}
+
+/*
+ * Test: AT#XMQTTCON=0,1 sends DISCONNECT with reason code 0x04 (with Will Message) on an
+ * MQTT 5.0 connection. MQTT 3.1.1 has no reason codes, so the parameter must be 0 there.
+ */
+void test_mqtt_disconnect_with_will(void)
+{
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,4\r\n", MQTT_VERSION_3_1_1);
+	clear_captured_response();
+	send_at_command("AT#XMQTTCON=0,1\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "ERROR"));
+	disconnect_command("AT#XMQTTCON=0,0\r\n", false);
+
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,5\r\n", MQTT_VERSION_5_0);
+	clear_captured_response();
+	send_at_command("AT#XMQTTCON=0,2\r\n");
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "ERROR"));
+	disconnect_command("AT#XMQTTCON=0,1\r\n", true);
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,5\r\n", MQTT_VERSION_5_0);
+	disconnect_command("AT#XMQTTCON=0\r\n", false);
+#endif
+}
+
 extern int handle_at_mqtt_connect(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 				  uint32_t param_count);
 

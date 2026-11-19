@@ -1107,8 +1107,17 @@ fail:
 	return err;
 }
 
-static int do_mqtt_disconnect(void)
+/* with_will: MQTT 5.0 reason code 0x04, the broker publishes the Will despite the DISCONNECT. */
+static int do_mqtt_disconnect(bool with_will)
 {
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	const struct mqtt_disconnect_param will_param = {
+		.reason_code = MQTT_DISCONNECT_WITH_WILL_MSG,
+	};
+	const struct mqtt_disconnect_param *param = with_will ? &will_param : NULL;
+#else
+	const struct mqtt_disconnect_param *param = NULL;
+#endif
 	int err;
 
 	if (!ctx.connected) {
@@ -1116,9 +1125,10 @@ static int do_mqtt_disconnect(void)
 	}
 
 	ctx.disconnect_requested = true;
-	err = mqtt_check_packet_size(0);
+	/* A reason code adds the code and an empty Property Length. */
+	err = mqtt_check_packet_size(param != NULL ? 2 : 0);
 	if (err == 0) {
-		err = mqtt_disconnect(&client, NULL);
+		err = mqtt_disconnect(&client, param);
 	}
 	if (err) {
 		/* A graceful DISCONNECT is not always possible. mqtt_disconnect()
@@ -1475,7 +1485,20 @@ STATIC int handle_at_mqtt_connect(enum at_parser_cmd_type cmd_type, struct at_pa
 			ctx.family = (op == MQTTC_CONNECT) ? NET_AF_INET : NET_AF_INET6;
 			err = do_mqtt_connect();
 		} else if (op == MQTTC_DISCONNECT) {
-			err = do_mqtt_disconnect();
+			uint16_t with_will = 0;
+
+			if (param_count > 2) {
+				err = at_parser_num_get(parser, 2, &with_will);
+				if (err) {
+					return err;
+				}
+				/* MQTT 3.1.1 has no DISCONNECT reason codes. */
+				if (with_will > 1 ||
+				    (with_will && client.protocol_version != MQTT_VERSION_5_0)) {
+					return -EINVAL;
+				}
+			}
+			err = do_mqtt_disconnect(with_will == 1);
 		} else {
 			err = -EINVAL;
 		}

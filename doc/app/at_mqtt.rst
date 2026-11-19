@@ -548,6 +548,24 @@ The parameters and their defined values are the following:
    Integer.
    The credential of the security tag used for establishing a secure connection.
 
+.. TODO: REMOVE FILTERING WHEN NRF91M1 IS RELEASED
+.. only:: not nrf91m1
+
+   With ``<op>`` ``0``, the command takes one optional parameter:
+
+   ::
+
+      AT#XMQTTCON=0[,<with_will>]
+
+   <with_will>
+      Integer.
+
+      * ``0`` - Normal disconnection (default).
+        The broker discards the Will message.
+      * ``1`` - Disconnect with Will Message (MQTT v5.0 reason code ``4``).
+        The broker publishes the Will message set with :ref:`SM_AT_MQTT_XMQTTWILL`.
+        Requires MQTT v5.0.
+
 Examples
 ~~~~~~~~
 
@@ -1380,7 +1398,7 @@ The test command requires an active MQTT connection.
    The ``#XMQTTWILL`` command sets the Will message of the MQTT client.
    The client sends the Will to the broker in the connect request of ``#XMQTTCON``.
    The broker publishes the Will message if the connection ends without a disconnect request from the client, for example after a network failure or a missed keep-alive.
-   It does not publish the Will message after ``AT#XMQTTCON=0``.
+   It does not publish the Will message after ``AT#XMQTTCON=0``, unless ``AT#XMQTTCON=0,1`` requests it with MQTT v5.0.
 
    The Will applies to all later connections until the command changes or clears it.
    A change while connected applies at the next connection.
