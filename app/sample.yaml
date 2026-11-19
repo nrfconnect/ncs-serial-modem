@@ -239,6 +239,7 @@ tests:
       - mcuboot_CONFIG_BOOT_FIH_PROFILE_MEDIUM=y
     extra_configs:
       - CONFIG_SM_NRF_CLOUD=n
+      - CONFIG_SM_CUSTOMER_VERSION="nuSIM"
     modules:
       - redteamobile-nusim
     platform_allow:
