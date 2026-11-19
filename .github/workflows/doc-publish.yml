@@ -78,7 +78,7 @@ jobs:
         env:
           AZCOPY_CONCURRENCY_VALUE: 1024
           NCS_DOC_SAS_PRS: ${{ secrets.NCS_DOC_SAS_PRS }}
-          NCS_DOC_SAS_MAIN: ${{ secrets.NCS_DOC_SAS_PRS }}
+          NCS_DOC_SAS_MAIN: ${{ secrets.NCS_DOC_SAS_MAIN }}
         run: |
           # Each publication goes to the add-on directory its archive named,
           # and a pull request collects one preview link per publication for
@@ -90,7 +90,7 @@ jobs:
               azcopy cp "$UPLOAD" "${{ vars.NCS_DOC_PR_STORAGE_URL }}addons/$ADDON?$NCS_DOC_SAS_PRS" --recursive=true
               PREVIEWS="${PREVIEWS}- [${ADDON}](${{ vars.NCS_DOC_PR_HOSTING_URL }}addons/${UPLOAD}/)"$'\n'
             else
-              azcopy cp "$UPLOAD" "${{ vars.NCS_DOC_PR_STORAGE_URL }}addons/$ADDON?$NCS_DOC_SAS_PRS" --recursive=true
+              azcopy cp "$UPLOAD" "${{ vars.NCS_DOC_STORAGE_URL }}addons/$ADDON?$NCS_DOC_SAS_MAIN" --recursive=true
             fi
           done
 
