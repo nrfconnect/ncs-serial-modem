@@ -1278,6 +1278,33 @@ static int do_mqtt_publish(uint8_t *msg, size_t msg_len)
 	return err;
 }
 
+static bool mqtt_topic_has_wildcard(const uint8_t *topic, size_t len)
+{
+	return memchr(topic, '+', len) != NULL || memchr(topic, '#', len) != NULL;
+}
+
+#if defined(CONFIG_MQTT_VERSION_5_0)
+#define SM_MQTT_SHARE_PREFIX "$share/"
+
+/* A CONNACK can declare wildcard or shared subscriptions unavailable (MQTT 5.0 sections
+ * 3.2.2.3.10 and 3.2.2.3.12). The broker would then close the connection with reason code
+ * 0xA2 or 0x9E, so reject such a subscription locally without sending it.
+ */
+static bool mqtt_subscription_supported(const uint8_t *topic, size_t len)
+{
+	const size_t prefix_len = sizeof(SM_MQTT_SHARE_PREFIX) - 1;
+	bool shared = len >= prefix_len && memcmp(topic, SM_MQTT_SHARE_PREFIX, prefix_len) == 0;
+	bool wildcard = mqtt_topic_has_wildcard(topic, len);
+
+	if ((shared && !ctx.shared_sub_available) || (wildcard && !ctx.wildcard_sub_available)) {
+		LOG_ERR("MQTT subscription exceeds server limits: wildcard=%d shared=%d",
+			ctx.wildcard_sub_available, ctx.shared_sub_available);
+		return false;
+	}
+	return true;
+}
+#endif
+
 static int do_mqtt_subscribe(uint16_t op,
 				uint8_t *topic_buf,
 				size_t topic_len,
@@ -1300,15 +1327,10 @@ static int do_mqtt_subscribe(uint16_t op,
 	subscribe_topic.topic.size = topic_len;
 
 #if defined(CONFIG_MQTT_VERSION_5_0)
-	if (client.protocol_version == MQTT_VERSION_5_0 && op == AT_MQTTSUB_SUB) {
-		if ((!ctx.shared_sub_available && topic_len >= sizeof("$share/") - 1 &&
-		     memcmp(topic_buf, "$share/", sizeof("$share/") - 1) == 0) ||
-		    (!ctx.wildcard_sub_available && (memchr(topic_buf, '+', topic_len) != NULL ||
-						     memchr(topic_buf, '#', topic_len) != NULL))) {
-			LOG_ERR("MQTT subscription exceeds server limits: wildcard=%d shared=%d",
-				ctx.wildcard_sub_available, ctx.shared_sub_available);
-			return -ENOTSUP;
-		}
+	/* Unsubscribing stays allowed, so the client can always remove a subscription. */
+	if (client.protocol_version == MQTT_VERSION_5_0 && op == AT_MQTTSUB_SUB &&
+	    !mqtt_subscription_supported(topic_buf, topic_len)) {
+		return -ENOTSUP;
 	}
 #endif
 
@@ -1564,11 +1586,6 @@ static int mqtt_datamode_callback(uint8_t op, const uint8_t *data, int len, uint
 #endif
 
 	return 0;
-}
-
-static bool mqtt_topic_has_wildcard(const uint8_t *topic, size_t len)
-{
-	return memchr(topic, '+', len) != NULL || memchr(topic, '#', len) != NULL;
 }
 
 static int mqtt_prepare_publish(size_t topic_len, uint16_t qos, uint16_t retain,
