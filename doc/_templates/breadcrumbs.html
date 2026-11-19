@@ -6,8 +6,10 @@
     resolves the depth of the current page against the root of the docset,
     which is where _scripts/build_docsets.py puts the PDF of the docset. -#}
 {%- block breadcrumbs_aside %}
+      {%- if pdf_filename %}
       <li class="wy-breadcrumbs-aside">
         <a class="ncs-pdf-button" href="{{ pathto(pdf_filename, 1) }}"><span class="fa fa-file-pdf-o" aria-hidden="true"></span>Download PDF</a>
       </li>
+      {%- endif %}
       {{ super() }}
 {%- endblock %}

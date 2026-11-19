@@ -45,7 +45,16 @@ jobs:
           sudo tar xf doxygen-${DOXYGEN_VERSION}.linux.bin.tar.gz -C /opt
           echo "/opt/doxygen-${DOXYGEN_VERSION}/bin" >> $GITHUB_PATH
 
+      - name: Select output formats
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "DOC_BUILD_PDF=0" >> "$GITHUB_ENV"
+          else
+            echo "DOC_BUILD_PDF=1" >> "$GITHUB_ENV"
+          fi
+
       - name: Install LaTeX
+        if: ${{ github.event_name != 'pull_request' }}
         run: |
           sudo apt-get update
           sudo apt-get install -y texlive-full
@@ -88,7 +97,11 @@ jobs:
         working-directory: doc
         run: |
           doxygen
-          python _scripts/build_docsets.py -b build --format html --format pdf -W --keep-going
+          FORMATS="--format html"
+          if [[ "$DOC_BUILD_PDF" == "1" ]]; then
+            FORMATS="$FORMATS --format pdf"
+          fi
+          python _scripts/build_docsets.py -b build $FORMATS -W --keep-going
 
       - name: Prepare Azure upload
         run: |
@@ -163,6 +176,7 @@ jobs:
             publish/*
 
       - name: Upload PDF artifact
+        if: ${{ github.event_name != 'pull_request' }}
         uses: actions/upload-artifact@v4
         with:
           name: sphinx-pdf
