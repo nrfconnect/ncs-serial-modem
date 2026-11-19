@@ -741,7 +741,12 @@ def docset_html_context(docset: str) -> dict:
         Dictionary to merge into the ``html_context`` configuration option.
     """
 
-    context = {"pdf_filename": f"{docsets.pdf_stem(docset)}.pdf"}
+    context = {}
+
+    # An HTML-only build, such as a pull request preview, has no PDF to link to,
+    # so the template leaves the "Download PDF" button out when this is missing.
+    if os.environ.get("DOC_BUILD_PDF", "1") != "0":
+        context["pdf_filename"] = f"{docsets.pdf_stem(docset)}.pdf"
 
     link = HEADER_LINKS.get(docset)
     if link:
