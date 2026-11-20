@@ -448,6 +448,12 @@ config UART_2_NRF_HW_ASYNC_TIMER
 
 endif # UART_ASYNC_API
 
+config SM_NRF9251_SUPPORT
+	def_bool SOC_NRF9251_CPUAPP
+	select EXPERIMENTAL
+	help
+	  Support for the nRF9251 is experimental.
+
 module = SM
 module-str = serial modem
 source "$(ZEPHYR_BASE)/subsys/logging/Kconfig.template.log_config"

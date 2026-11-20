@@ -6,10 +6,13 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/kernel.h>
 #include <nrf_modem.h>
+#if !defined(CONFIG_SOC_SERIES_NRF92)
 #include <hal/nrf_power.h>
+#endif
 #include <modem/nrf_modem_lib.h>
 #include <zephyr/sys/reboot.h>
 #include <zephyr/logging/log_ctrl.h>
+#include <zephyr/drivers/hwinfo.h>
 #include <date_time.h>
 #if defined(CONFIG_SM_NRF_CLOUD_OBSERVABILITY)
 #include <memfault/core/trace_event.h>
@@ -205,14 +208,30 @@ int main(void)
 	return 0;
 }
 
+static uint32_t sm_reset_cause_get_and_clear(void)
+{
+	uint32_t rr = 0;
+
+#if defined(CONFIG_SOC_SERIES_NRF92)
+	hwinfo_get_reset_cause(&rr);
+	hwinfo_clear_reset_cause();
+#else
+	/* nrf_power.h has no POWER peripheral definitions on nRF92 */
+	rr = nrf_power_resetreas_get(NRF_POWER_NS);
+	nrf_power_resetreas_clear(NRF_POWER_NS, 0x70017);
+#endif
+	return rr;
+}
+
 static int sm_main(void)
 {
 	int ret;
 
-	const uint32_t rr = nrf_power_resetreas_get(NRF_POWER_NS);
+	if (!IS_ENABLED(CONFIG_MEMFAULT)) {
+		const uint32_t rr = sm_reset_cause_get_and_clear();
 
-	nrf_power_resetreas_clear(NRF_POWER_NS, 0x70017);
-	LOG_INF("Reset reason: 0x%08x", rr);
+		LOG_DBG("Reset cause: 0x%08x", rr);
+	}
 
 	if (IS_ENABLED(CONFIG_SM_DFU) && sm_bootloader_mode_requested) {
 		/* Clear bootloader mode flag */

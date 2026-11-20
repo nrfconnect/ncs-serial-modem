@@ -41,6 +41,11 @@ The application supports the following development kits:
      - `thingy91x <Thingy91X_>`_
      - ``thingy91x/nrf9151/ns``
      - `Experimental <Software maturity levels_>`_
+   * - nRF9251 DK
+     - \-
+     - ``nrf9251dk``
+     - ``nrf9251dk/nrf9251/cpuapp``
+     - `Experimental <Software maturity levels_>`_
 
 For more security, the application must use the ``*/ns`` `variant <app_boards_names_>`_ of the board target, which is required when using the nRF91 Series `Modem library`_.
 When built for this variant, the sample is configured to compile and run as a non-secure application using `security by separation <ug_tfm_security_by_separation_>`_.

@@ -16,6 +16,7 @@ tests:
     build_only: true
     platform_allow:
       - nrf9151dk/nrf9151/ns
+      - nrf9251dk/nrf9251/cpuapp
       - thingy91x/nrf9151/ns
     integration_platforms:
       - thingy91x/nrf9151/ns
