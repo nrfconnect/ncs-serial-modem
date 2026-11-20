@@ -1395,10 +1395,12 @@ static int do_mqtt_subscribe(uint16_t op,
 	return err;
 }
 
-/* Return -EBUSY if a set command would change the state of a data mode publication. */
+/* Return -EBUSY for any non-test command form while a data mode publication is pending.
+ * The publish wrappers clear the shared properties on any error, also for other forms.
+ */
 static int mqtt_pub_datamode_check(enum at_parser_cmd_type cmd_type)
 {
-	return (cmd_type == AT_PARSER_CMD_TYPE_SET && ctx.pub_datamode) ? -EBUSY : 0;
+	return (cmd_type != AT_PARSER_CMD_TYPE_TEST && ctx.pub_datamode) ? -EBUSY : 0;
 }
 
 SM_AT_CMD_CUSTOM(xmqttcfg, "AT#XMQTTCFG", handle_at_mqtt_config);

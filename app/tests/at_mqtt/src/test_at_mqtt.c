@@ -3642,15 +3642,17 @@ extern int handle_at_mqtt_pub_prop(enum at_parser_cmd_type cmd_type, struct at_p
 typedef int (*at_handler_t)(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			    uint32_t param_count);
 
-/* Run a set command as another CMUX channel would, bypassing the channel in data mode. */
-static int other_channel_set(at_handler_t handler, const char *command)
+/* Run a command as another CMUX channel would, bypassing the channel in data mode. */
+static int other_channel_cmd(at_handler_t handler, const char *command)
 {
 	struct at_parser parser;
+	enum at_parser_cmd_type type;
 	size_t count;
 
 	TEST_ASSERT_EQUAL_INT(0, at_parser_init(&parser, command));
 	TEST_ASSERT_EQUAL_INT(0, at_parser_cmd_count_get(&parser, &count));
-	return handler(AT_PARSER_CMD_TYPE_SET, &parser, count);
+	TEST_ASSERT_EQUAL_INT(0, at_parser_cmd_type_get(&parser, &type));
+	return handler(type, &parser, count);
 }
 
 static char shared_pub_topic[16];
@@ -3701,13 +3703,21 @@ void test_mqtt_publish_datamode_other_channel(void)
 	__cmock_mqtt_publish_Stub(capture_pub);
 	packet_id_command("AT#XMQTTPUB=\"a/topic\",\"\",1,0,3\r\n");
 
-	TEST_ASSERT_EQUAL_INT(-EBUSY, other_channel_set(handle_at_mqtt_publish_empty,
+	TEST_ASSERT_EQUAL_INT(-EBUSY, other_channel_cmd(handle_at_mqtt_publish_empty,
 							"AT#XMQTTPUBEMPTY=\"b\",2,1"));
 	TEST_ASSERT_EQUAL_INT(-EBUSY,
-			      other_channel_set(handle_at_mqtt_publish, "AT#XMQTTPUB=\"b\",\"x\""));
+			      other_channel_cmd(handle_at_mqtt_publish, "AT#XMQTTPUB=\"b\",\"x\""));
+	/* Invalid read forms must not clear the pending publication's properties either. */
+	TEST_ASSERT_EQUAL_INT(-EBUSY, other_channel_cmd(handle_at_mqtt_publish, "AT#XMQTTPUB?"));
+	TEST_ASSERT_EQUAL_INT(-EBUSY,
+			      other_channel_cmd(handle_at_mqtt_publish_empty, "AT#XMQTTPUBEMPTY?"));
+	clear_captured_response();
+	TEST_ASSERT_EQUAL_INT(0, other_channel_cmd(handle_at_mqtt_publish, "AT#XMQTTPUB=?"));
+	TEST_ASSERT_EQUAL_INT(
+		0, other_channel_cmd(handle_at_mqtt_publish_empty, "AT#XMQTTPUBEMPTY=?"));
 #if defined(CONFIG_MQTT_VERSION_5_0)
 	TEST_ASSERT_EQUAL_INT(-EBUSY,
-			      other_channel_set(handle_at_mqtt_pub_prop, "AT#XMQTTPUBPROP=0"));
+			      other_channel_cmd(handle_at_mqtt_pub_prop, "AT#XMQTTPUBPROP=0"));
 #endif
 	datamode_payload("#XDATAMODE: 0\r\n");
 	TEST_ASSERT_EQUAL_UINT(1, shared_pub_calls);
@@ -3722,9 +3732,9 @@ void test_mqtt_publish_datamode_other_channel(void)
 	/* Disconnecting stays possible, but a new connection waits until data mode ends. */
 	packet_id_command("AT#XMQTTPUB=\"a/topic\",\"\",0,0,3\r\n");
 	__cmock_mqtt_disconnect_ExpectAnyArgsAndReturn(0);
-	TEST_ASSERT_EQUAL_INT(0, other_channel_set(handle_at_mqtt_connect, "AT#XMQTTCON=0"));
+	TEST_ASSERT_EQUAL_INT(0, other_channel_cmd(handle_at_mqtt_connect, "AT#XMQTTCON=0"));
 	TEST_ASSERT_EQUAL_INT(
-		-EBUSY, other_channel_set(handle_at_mqtt_connect,
+		-EBUSY, other_channel_cmd(handle_at_mqtt_connect,
 					  "AT#XMQTTCON=1,\"\",\"\",\"broker.example.com\",1883"));
 	datamode_payload("#XDATAMODE: -");
 	TEST_ASSERT_EQUAL_UINT(2, shared_pub_calls);
