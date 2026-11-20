@@ -1,0 +1,13 @@
+/*
+ * Copyright (c) 2026 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+ */
+
+/* Assert DTR by default on the nRF9251 DK without external wiring.
+ * The pull-up keeps DTR asserted, which draws pull current from VDD_P1 and raises the idle current.
+ * This is a temporary overlay for testing on the DK and is not meant for production.
+ */
+&dtr_uart0 {
+	dtr-gpios = <&gpio1 1 (GPIO_PULL_UP | GPIO_ACTIVE_HIGH)>;
+};

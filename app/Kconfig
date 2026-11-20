@@ -64,8 +64,10 @@ config SM_URC_BUFFER_SIZE
 	  The buffer has to be large enough to hold the largest URC that can be sent by the modem.
 	  Result codes longer than this size will get dropped.
 
-	  The URC in here means an URC from the Modem or from a thread which is not serving sm_work_queue.
-	  Messages that are originally sent from sm_work_queue are part of AT-command responses, even though they are indistinguishable from the URCs.
+	  The URC in here means an URC from the Modem or from a thread which is not serving
+	  sm_work_queue.
+	  Messages that are originally sent from sm_work_queue are part of AT-command responses,
+	  even though they are indistinguishable from the URCs.
 
 	  This can be reduced if your use cases do not require lengthy notifications.
 	  Note: %NCELLMEAS notifications can be nearly 4kB in size,
@@ -77,7 +79,8 @@ config SM_AT_ECHO_MAX_LEN
 	range 2 4096
 	default 4096
 	help
-	  Maximum length of AT command echo that will be sent back to the host when AT command echo is enabled.
+	  Maximum length of AT command echo that will be sent back to the host when AT command
+	  echo is enabled.
 	  AT commands longer than this value will be truncated in the echo.
 	  The AT command terminator is included in this length and it is always echoed.
 
@@ -305,6 +308,7 @@ config SM_HTTPC_RESPONSE_TIMEOUT_MS
 	  server stalls silently without closing the TCP connection.
 
 endif # SM_HTTPC
+
 endmenu # "AT Command services"
 
 menu "LwM2M Carrier support"
@@ -477,6 +481,12 @@ config SM_CUSTOMER_VERSION
 	string "Customer version string"
 	help
 	   This version is reported together with baseline versions by AT command "#XSMVER".
+
+config SM_NRF9251_SUPPORT
+	def_bool SOC_NRF9251_CPUAPP
+	select EXPERIMENTAL
+	help
+	  Support for the nRF9251 is experimental.
 
 module = SM
 module-str = serial modem

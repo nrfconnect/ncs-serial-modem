@@ -47,6 +47,11 @@ config SM_FOTA_SESSION
 config SM_FW_UPDATE
 	bool
 
+# Reading the MCUboot slot and version relies on the TF-M platform services.
+config SM_TFM_MCUBOOT_INFO
+	bool
+	default y if SM_FW_UPDATE && BUILD_WITH_TFM
+
 # The LwM2M carrier library depends on DOWNLOADER and DFU_TARGET, so the hidden symbols cannot
 # depend on it, as that would make a dependency loop. SM_CARRIER depends on SM_FOTA_SESSION instead.
 
@@ -91,8 +96,12 @@ configdefault STREAM_FLASH
 configdefault IMG_MANAGER
 	default y
 
+endif # SM_FW_UPDATE
+
+if SM_TFM_MCUBOOT_INFO
+
 # MCUboot bootloader FOTA requires fw_info to validate the update after reboot.
 configdefault FW_INFO
 	default y
 
-endif # SM_FW_UPDATE
+endif # SM_TFM_MCUBOOT_INFO

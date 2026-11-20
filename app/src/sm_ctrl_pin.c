@@ -9,8 +9,8 @@
 #include <assert.h>
 #include <stdio.h>
 #include <zephyr/drivers/gpio.h>
-#include <hal/nrf_regulators.h>
 #include <zephyr/sys/reboot.h>
+#include <zephyr/sys/poweroff.h>
 #include "sm_at_host.h"
 #include "sm_defines.h"
 #include "sm_util.h"
@@ -24,6 +24,8 @@ LOG_MODULE_REGISTER(sm_ctrl_pin, CONFIG_SM_LOG_LEVEL);
 #if SM_DTR_GPIOS
 static const struct gpio_dt_spec dtr_gpio =
 	GPIO_DT_SPEC_GET_OR(DT_CHOSEN(ncs_sm_uart), dtr_gpios, {0});
+
+#define SM_DTR_GPIO_PORT DT_PROP(DT_GPIO_CTLR(DT_CHOSEN(ncs_sm_uart), dtr_gpios), port)
 
 static struct gpio_callback dtr_gpio_cb;
 #endif
@@ -106,7 +108,7 @@ void sm_ctrl_pin_enter_sleep_no_uninit(bool at_host_power_off)
 
 	k_sleep(K_MSEC(100));
 
-	nrf_regulators_system_off(NRF_REGULATORS_NS);
+	sys_poweroff();
 	assert(false);
 #endif
 }
@@ -156,7 +158,7 @@ void sm_ctrl_pin_enter_shutdown(void)
 	sm_log_flush();
 	k_sleep(K_MSEC(100));
 
-	nrf_regulators_system_off(NRF_REGULATORS_NS);
+	sys_poweroff();
 	assert(false);
 }
 
@@ -169,15 +171,16 @@ void sm_ctrl_pin_dtr_check(void)
 		return;
 	}
 
-	LOG_DBG("DTR deasserted: Pull P0.%02u %s to enable UART", dtr_gpio.pin,
-		active_low ? "low" : "high");
+	LOG_DBG("DTR deasserted: Pull P%u.%02u %s to enable UART", SM_DTR_GPIO_PORT,
+		dtr_gpio.pin, active_low ? "low" : "high");
 #endif
 }
 
 static int sm_ctrl_pin_init_gpios(void)
 {
 #if SM_DTR_GPIOS
-	nrf_gpio_cfg_sense_set(dtr_gpio.pin, NRF_GPIO_PIN_SENSE_LOW);
+	nrf_gpio_cfg_sense_set(NRF_GPIO_PIN_MAP(SM_DTR_GPIO_PORT, dtr_gpio.pin),
+			       NRF_GPIO_PIN_SENSE_LOW);
 #endif
 
 	return 0;

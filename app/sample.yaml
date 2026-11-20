@@ -16,8 +16,10 @@ tests:
     build_only: true
     platform_allow:
       - nrf9151dk/nrf9151/ns
+      - nrf9251dk/nrf9251/cpuapp
       - thingy91x/nrf9151/ns
     integration_platforms:
+      - nrf9251dk/nrf9251/cpuapp
       - thingy91x/nrf9151/ns
   serial_modem.minimal:
     sysbuild: true
@@ -67,6 +69,14 @@ tests:
     platform_allow:
       - nrf9151dk/nrf9151/ns
     tags: exclude_integration
+  serial_modem.dtr_enabled_nrf9251:
+    sysbuild: true
+    build_only: true
+    extra_args:
+      - EXTRA_DTC_OVERLAY_FILE="dtr-enabled-nrf9251.overlay"
+    platform_allow:
+      - nrf9251dk/nrf9251/cpuapp
+    tags: exclude_integration
   serial_modem.no_dtr:
     sysbuild: true
     build_only: true
@@ -94,6 +104,7 @@ tests:
       - EXTRA_CONF_FILE="cmux.conf;ppp.conf"
     platform_allow:
       - nrf9151dk/nrf9151/ns
+      - nrf9251dk/nrf9251/cpuapp
       - thingy91x/nrf9151/ns
     tags: exclude_integration
   serial_modem.ppp_cmux_with_modem_trace:
