@@ -41,6 +41,20 @@ The application supports the following development kits:
      - `thingy91x <Thingy91X_>`_
      - ``thingy91x/nrf9151/ns``
      - `Experimental <Software maturity levels_>`_
+   * - nRF9251 DK
+     - \-
+     - ``nrf9251dk``
+     - ``nrf9251dk/nrf9251/cpuapp``
+     - `Experimental <Software maturity levels_>`_
+
+.. note::
+
+   On the nRF9251 DK, DTR (**P1.01**) is deasserted by default, and the AT UART is disabled until DTR is asserted.
+   Connect **P1.01** to **GND**, or build with :file:`dtr-enabled-nrf9251.overlay` to assert DTR by default:
+
+   .. code-block:: console
+
+      west build -p -b nrf9251dk/nrf9251/cpuapp -- -DEXTRA_DTC_OVERLAY_FILE=dtr-enabled-nrf9251.overlay
 
 For more security, the application must use the ``*/ns`` `variant <app_boards_names_>`_ of the board target, which is required when using the nRF91 Series `Modem library`_.
 When built for this variant, the sample is configured to compile and run as a non-secure application using `security by separation <ug_tfm_security_by_separation_>`_.

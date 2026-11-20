@@ -447,11 +447,18 @@ The following configuration files are provided:
   This overlay can be used if your setup does not have the need or means for managing the power externally.
   Modify the overlay to fit your configuration.
 
+* :file:`dtr-enabled-nrf9251.overlay` - Devicetree overlay that asserts DTR by default on the nRF9251 DK.
+  With this overlay, DTR is active high with a pull-up, so the AT UART works without any wiring.
+  The pull-up consumes current while DTR is asserted, which increases the idle current in VDD_P1.
+  This is a temporary overlay for testing on the nRF9251 DK and is not intended for production.
+
 * :file:`nrf-device-provisioning.conf` - Configuration file that enables the nRF Cloud device provisioning client and its AT command interface.
   See :ref:`SM_AT_PROVISIONING` for more information.
 
 The board-specific devicetree overlays (:file:`boards/*.overlay`) set up configurations that are specific to each supported development kit.
-All of them configure the DTR to be deasserted from a button and RI to drive an LED.
+The nRF9151 DK and Thingy:91 X overlays configure the DTR to be deasserted from a button and RI to drive an LED.
+The nRF9251 DK, DTR uses **P1.01** with a pull-up and is active low, so it is deasserted by default to keep the idle current low.
+Connect **P1.01** to **GND** to assert DTR, or build with :file:`dtr-enabled-nrf9251.overlay` to assert DTR by default.
 
 .. _sm_partition_layouts:
 

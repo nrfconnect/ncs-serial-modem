@@ -63,4 +63,7 @@ config SM_CMUX_CHANNEL_COUNT
 config SM_FW_UPDATE
 	def_bool y
 
+config SM_TFM_MCUBOOT_INFO
+	def_bool y
+
 source "Kconfig.zephyr"
