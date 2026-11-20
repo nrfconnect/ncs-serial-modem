@@ -126,6 +126,16 @@ def docset_rst_epilog(docset: str) -> str:
 """
 
 
+# Roles belong in the prolog rather than the epilog, because a role has to be
+# defined before the page uses it. Docutils names the class of the inline
+# element after the role, which is what :file:`_static/css/custom.css` styles
+# in the HTML and what ``\DUroleversionbadge`` in the LaTeX preamble styles in
+# the PDF.
+rst_prolog = """
+.. role:: versionbadge
+"""
+
+
 # -- Options for LaTeX output -------------------------------------------------
 #
 # Every docset renders its own PDF from these settings. The only part that
@@ -619,6 +629,19 @@ latex_elements = {
 % rather than depending on when Sphinx loads that package. This is a LaTeX
 % element, so the HTML keeps its highlighting.
 \AtBeginDocument{\def\PYG#1#2{#2}}
+
+% Inline version badge, which the versionbadge role of rst_prolog produces.
+% Sphinx writes a custom role as \DUrole{<role>}{<text>}, and its style package
+% calls \DUrole<role> whenever that command exists, so this is the whole PDF
+% side of the role. Leaving it out would print the text unstyled rather than
+% break the build. tcolorbox draws the rounded outline that
+% _static/css/custom.css gives the badge in the HTML.
+\usepackage{tcolorbox}
+\definecolor{nordicfall}{RGB}{222,130,59}
+\newtcbox{\nordicversionbadge}{on line, arc=2pt, boxrule=0.4pt, boxsep=0pt,
+  left=4pt, right=4pt, top=2pt, bottom=2pt,
+  colframe=nordicfall, colback=white, coltext=nordicfall}
+\protected\def\DUroleversionbadge#1{\nordicversionbadge{\small #1}}
 
 % Notice headings, generated because there is one command per notice type. The
 % panels themselves come from the sphinxsetup keys above.
