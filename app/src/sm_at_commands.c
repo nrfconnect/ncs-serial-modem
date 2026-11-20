@@ -31,6 +31,7 @@
 #include "sm_settings.h"
 #include "sm_at_host.h"
 #include "sm_at_fota.h"
+#include "sm_fota_session.h"
 #include "sm_version.h"
 #include "sm_at_nrfcloud.h"
 #include "sm_log.h"
@@ -201,15 +202,14 @@ static void sm_modemreset(void)
 	}
 	++step;
 
-#if defined(CONFIG_SM_FULL_FOTA)
-	if (sm_fota_type == SM_FOTA_TYPE_FULL_MFW) {
+	if (IS_ENABLED(CONFIG_SM_FULL_FOTA) && sm_fota_type == SM_FOTA_TYPE_FULL_MFW) {
 		sm_finish_modem_full_fota();
 	}
-#endif
 
 	ret = nrf_modem_lib_init();
 
-	if (sm_fota_type == SM_FOTA_TYPE_MFW || sm_fota_type == SM_FOTA_TYPE_FULL_MFW) {
+	if (IS_ENABLED(CONFIG_SM_FOTA_SESSION) &&
+	    (sm_fota_type == SM_FOTA_TYPE_MFW || sm_fota_type == SM_FOTA_TYPE_FULL_MFW)) {
 		sm_fota_post_process();
 	}
 
@@ -334,6 +334,8 @@ STATIC int handle_ate1(enum at_parser_cmd_type cmd_type, struct at_parser *, uin
 	return 0;
 }
 
+#if defined(CONFIG_SM_FW_UPDATE)
+
 /** @brief Operations for AT#XBOOTINFO. */
 enum xbootinfo_op {
 	XBOOTINFO_OP_VERSION = 0,
@@ -383,6 +385,8 @@ STATIC int handle_at_xbootinfo(enum at_parser_cmd_type cmd_type, struct at_parse
 		return -EINVAL;
 	}
 }
+
+#endif /* CONFIG_SM_FW_UPDATE */
 
 #if defined(CONFIG_SM_DEBUG_STATS_HEAP)
 
