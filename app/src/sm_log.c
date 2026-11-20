@@ -132,6 +132,7 @@ const char *sm_log_cmd_sensitive_prefix(const char *cmd, size_t len)
 		"AT#XMQTTCON",   /* MQTT connect: username / password */
 		"AT#XMQTTPUB",   /* MQTT publish: topic + message inline */
 		"AT#XMQTTSUB",   /* MQTT subscribe: topic inline */
+		"AT#XMQTTWILL",  /* MQTT Will: topic + message inline */
 		"AT#XHTTPCREQ",  /* HTTP request: may carry Authorization headers */
 		"AT#XCOAPCREQ",  /* CoAP request: URI path + options (Uri-Query / Proxy-Uri) */
 		"AT#XSMS",       /* SMS send: recipient number + message text inline */
