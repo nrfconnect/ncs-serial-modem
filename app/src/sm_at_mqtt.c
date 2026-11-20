@@ -1241,6 +1241,14 @@ static int do_mqtt_publish(uint8_t *msg, size_t msg_len)
 	if (err != 0) {
 		return err;
 	}
+	/* Data mode can flush one command's payload as several publications, so each one
+	 * needs its own packet identifier.
+	 */
+	err = mqtt_message_id_next();
+	if (err < 0) {
+		return err;
+	}
+	mqtt_conn->pub_param.message_id = (uint16_t)err;
 
 	/* MQTT client does not store packets, so we will not retransmit packets
 	 * that are lacking response. This deviates from MQTT v3.1.1 and v5.0.
@@ -1267,7 +1275,10 @@ static int do_mqtt_publish(uint8_t *msg, size_t msg_len)
 #endif
 	err = mqtt_publish(&client, &mqtt_conn->pub_param);
 #if defined(CONFIG_MQTT_VERSION_5_0)
-	mqtt_pub_props_clear();
+	/* Later data mode flushes reuse the properties. Data mode clears them when it ends. */
+	if (!ctx.pub_datamode) {
+		mqtt_pub_props_clear();
+	}
 #endif
 #if SM_MQTT_TOPIC_ALIASES > 0
 	if (err == 0) {
@@ -1626,13 +1637,6 @@ static int mqtt_prepare_publish(size_t topic_len, uint16_t qos, uint16_t retain,
 #if SM_MQTT_TOPIC_ALIASES > 0
 	mqtt_alias_select();
 #endif
-
-	int message_id = mqtt_message_id_next();
-
-	if (message_id < 0) {
-		return message_id;
-	}
-	mqtt_conn->pub_param.message_id = (uint16_t)message_id;
 	return 0;
 }
 

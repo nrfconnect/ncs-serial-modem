@@ -1177,7 +1177,7 @@ The test command requires an active MQTT connection.
    The ``#XMQTTPUBPROP`` command sets MQTT v5.0 properties for the next ``#XMQTTPUB`` or ``#XMQTTPUBEMPTY`` command.
    The properties apply to that command only.
    The |SM| clears them when the command completes, whether it succeeds or fails.
-   When ``#XMQTTPUB`` enters data mode, the |SM| clears them when data mode ends.
+   When ``#XMQTTPUB`` enters data mode, they apply to every publication sent in data mode, and the |SM| clears them when data mode ends.
    Disconnecting also clears them.
    The command requires an active MQTT v5.0 connection.
 

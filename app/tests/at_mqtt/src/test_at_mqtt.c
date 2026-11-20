@@ -3733,6 +3733,97 @@ void test_mqtt_publish_datamode_other_channel(void)
 	mqtt_disconnect_ok();
 }
 
+#if defined(CONFIG_MQTT_VERSION_5_0)
+struct flush_pub {
+	uint16_t id;
+	uint16_t topic_size;
+	uint16_t alias;
+	bool content_type;
+};
+static struct flush_pub flush_pubs[4];
+static size_t flush_calls;
+
+static int flush_pub_stub(struct mqtt_client *c, const struct mqtt_publish_param *param, int calls)
+{
+	ARG_UNUSED(c);
+	ARG_UNUSED(calls);
+	TEST_ASSERT_LESS_THAN_UINT(ARRAY_SIZE(flush_pubs), flush_calls);
+	flush_pubs[flush_calls++] = (struct flush_pub){
+		.id = param->message_id,
+		.topic_size = param->message.topic.topic.size,
+		.alias = param->prop.topic_alias,
+		.content_type = param->prop.content_type.size != 0,
+	};
+	return 0;
+}
+#endif
+
+/*
+ * Test: When inactivity flushes send one data mode payload as several QoS 2 publications,
+ * each gets its own packet identifier and the command's topic alias and properties. Each
+ * QoS 2 exchange releases its Receive Maximum slot.
+ */
+void test_mqtt_publish_datamode_flushes_5_0(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	struct mqtt_evt evt = {
+		.type = MQTT_EVT_CONNACK,
+		.param.connack.prop.rx.has_receive_maximum = true,
+		.param.connack.prop.receive_maximum = 3,
+		.param.connack.prop.rx.has_topic_alias_maximum = true,
+		.param.connack.prop.topic_alias_maximum = 1,
+	};
+
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,5\r\n", MQTT_VERSION_5_0);
+	inject_mqtt_evt(&evt);
+	flush_calls = 0;
+	__cmock_mqtt_publish_Stub(flush_pub_stub);
+	/* Assign the alias, so that the data mode publications omit the topic. */
+	packet_id_command("AT#XMQTTPUBEMPTY=\"t\"\r\n");
+	packet_id_command("AT#XMQTTPUBPROP=3,\"text/plain\"\r\n");
+	packet_id_command("AT#XMQTTPUB=\"t\",\"\",2,0,9\r\n");
+	/* The idle timeout is about 32 ms, so each pause flushes the bytes received so far. */
+	uart_stub_rx_nowait((const uint8_t *)"abc", 3);
+	k_sleep(K_MSEC(100));
+	uart_stub_rx_nowait((const uint8_t *)"def", 3);
+	k_sleep(K_MSEC(100));
+	datamode_payload("#XDATAMODE: 0\r\n");
+	TEST_ASSERT_EQUAL_UINT(4, flush_calls);
+	for (size_t i = 1; i < flush_calls; i++) {
+		TEST_ASSERT_EQUAL_UINT16(0, flush_pubs[i].topic_size);
+		TEST_ASSERT_EQUAL_UINT16(1, flush_pubs[i].alias);
+		TEST_ASSERT_TRUE(flush_pubs[i].content_type);
+		for (size_t j = 1; j < i; j++) {
+			TEST_ASSERT_NOT_EQUAL(flush_pubs[j].id, flush_pubs[i].id);
+		}
+	}
+
+	for (size_t i = 1; i < flush_calls; i++) {
+		evt = (struct mqtt_evt){
+			.type = MQTT_EVT_PUBREC,
+			.param.pubrec.message_id = flush_pubs[i].id,
+		};
+		__cmock_mqtt_publish_qos2_release_ExpectAnyArgsAndReturn(0);
+		inject_mqtt_evt(&evt);
+		evt = (struct mqtt_evt){
+			.type = MQTT_EVT_PUBCOMP,
+			.param.pubcomp.message_id = flush_pubs[i].id,
+		};
+		inject_mqtt_evt(&evt);
+	}
+	/* All three Receive Maximum slots are free again. */
+	flush_calls = 0;
+	for (size_t i = 0; i < 3; i++) {
+		inflight_command("AT#XMQTTPUBEMPTY=\"t\",1\r\n", true);
+	}
+	inflight_command("AT#XMQTTPUBEMPTY=\"t\",1\r\n", false);
+	__cmock_mqtt_publish_Stub(NULL);
+	mqtt_disconnect_ok();
+#else
+	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
+#endif
+}
+
 extern int unity_main(void);
 
 int main(void)
