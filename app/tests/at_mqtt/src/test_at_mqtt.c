@@ -3630,6 +3630,109 @@ void test_mqtt_disconnect_during_payload_drain(void)
 	receive_framed(payload, sizeof(payload) - 1, MQTT_VERSION_3_1_1, "");
 }
 
+extern int handle_at_mqtt_publish(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+				  uint32_t param_count);
+extern int handle_at_mqtt_publish_empty(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+					uint32_t param_count);
+#if defined(CONFIG_MQTT_VERSION_5_0)
+extern int handle_at_mqtt_pub_prop(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+				   uint32_t param_count);
+#endif
+
+typedef int (*at_handler_t)(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
+			    uint32_t param_count);
+
+/* Run a set command as another CMUX channel would, bypassing the channel in data mode. */
+static int other_channel_set(at_handler_t handler, const char *command)
+{
+	struct at_parser parser;
+	size_t count;
+
+	TEST_ASSERT_EQUAL_INT(0, at_parser_init(&parser, command));
+	TEST_ASSERT_EQUAL_INT(0, at_parser_cmd_count_get(&parser, &count));
+	return handler(AT_PARSER_CMD_TYPE_SET, &parser, count);
+}
+
+static char shared_pub_topic[16];
+static uint8_t shared_pub_qos;
+#if defined(CONFIG_MQTT_VERSION_5_0)
+static bool shared_pub_has_content_type;
+#endif
+static size_t shared_pub_calls;
+
+static int capture_pub(struct mqtt_client *c, const struct mqtt_publish_param *param, int calls)
+{
+	ARG_UNUSED(c);
+	ARG_UNUSED(calls);
+	TEST_ASSERT_LESS_THAN_UINT(sizeof(shared_pub_topic), param->message.topic.topic.size);
+	memcpy(shared_pub_topic, param->message.topic.topic.utf8, param->message.topic.topic.size);
+	shared_pub_topic[param->message.topic.topic.size] = '\0';
+	shared_pub_qos = param->message.topic.qos;
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	shared_pub_has_content_type = param->prop.content_type.size != 0;
+#endif
+	shared_pub_calls++;
+	return 0;
+}
+
+static void datamode_payload(const char *expected)
+{
+	clear_captured_response();
+	uart_stub_rx_nowait((const uint8_t *)"abc", 3);
+	k_sleep(K_MSEC(20));
+	uart_stub_tx_done_reset();
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), expected));
+}
+
+/*
+ * Test: While AT#XMQTTPUB collects its payload in data mode, publish commands and a new
+ * connection from another CMUX channel are rejected, so the payload goes out with its own
+ * topic, QoS, and properties. The commands work again once data mode ends.
+ */
+void test_mqtt_publish_datamode_other_channel(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,5\r\n", MQTT_VERSION_5_0);
+	packet_id_command("AT#XMQTTPUBPROP=3,\"text/plain\"\r\n");
+#else
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,4\r\n", MQTT_VERSION_3_1_1);
+#endif
+	shared_pub_calls = 0;
+	__cmock_mqtt_publish_Stub(capture_pub);
+	packet_id_command("AT#XMQTTPUB=\"a/topic\",\"\",1,0,3\r\n");
+
+	TEST_ASSERT_EQUAL_INT(-EBUSY, other_channel_set(handle_at_mqtt_publish_empty,
+							"AT#XMQTTPUBEMPTY=\"b\",2,1"));
+	TEST_ASSERT_EQUAL_INT(-EBUSY,
+			      other_channel_set(handle_at_mqtt_publish, "AT#XMQTTPUB=\"b\",\"x\""));
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	TEST_ASSERT_EQUAL_INT(-EBUSY,
+			      other_channel_set(handle_at_mqtt_pub_prop, "AT#XMQTTPUBPROP=0"));
+#endif
+	datamode_payload("#XDATAMODE: 0\r\n");
+	TEST_ASSERT_EQUAL_UINT(1, shared_pub_calls);
+	TEST_ASSERT_EQUAL_STRING("a/topic", shared_pub_topic);
+	TEST_ASSERT_EQUAL_UINT8(MQTT_QOS_1_AT_LEAST_ONCE, shared_pub_qos);
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	TEST_ASSERT_TRUE(shared_pub_has_content_type);
+#endif
+	packet_id_command("AT#XMQTTPUBEMPTY=\"b\"\r\n");
+	TEST_ASSERT_EQUAL_UINT(2, shared_pub_calls);
+
+	/* Disconnecting stays possible, but a new connection waits until data mode ends. */
+	packet_id_command("AT#XMQTTPUB=\"a/topic\",\"\",0,0,3\r\n");
+	__cmock_mqtt_disconnect_ExpectAnyArgsAndReturn(0);
+	TEST_ASSERT_EQUAL_INT(0, other_channel_set(handle_at_mqtt_connect, "AT#XMQTTCON=0"));
+	TEST_ASSERT_EQUAL_INT(
+		-EBUSY, other_channel_set(handle_at_mqtt_connect,
+					  "AT#XMQTTCON=1,\"\",\"\",\"broker.example.com\",1883"));
+	datamode_payload("#XDATAMODE: -");
+	TEST_ASSERT_EQUAL_UINT(2, shared_pub_calls);
+	__cmock_mqtt_publish_Stub(NULL);
+	mqtt_connect_version("AT#XMQTTCFG=\"test_client\",60,1,4\r\n", MQTT_VERSION_3_1_1);
+	mqtt_disconnect_ok();
+}
+
 extern int unity_main(void);
 
 int main(void)

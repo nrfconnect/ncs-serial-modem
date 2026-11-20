@@ -49,6 +49,8 @@ This page describes the AT commands used to operate the MQTT client.
 
    Publish checks apply to ``#XMQTTPUB`` and ``#XMQTTPUBEMPTY``, before entering data mode and again before sending.
    Failures detected during data-mode sending report ``#XDATAMODE: -1`` when data mode ends.
+   While ``#XMQTTPUB`` collects a payload in data mode, ``#XMQTTPUB``, ``#XMQTTPUBEMPTY``, ``#XMQTTPUBPROP``, and connect requests from other CMUX channels return ``ERROR``.
+   Disconnect requests remain allowed.
    Each new network connection resets negotiated limits and outstanding-publication tracking.
 
    Publications, subscriptions, and unsubscriptions share one packet identifier sequence.

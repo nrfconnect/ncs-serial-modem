@@ -69,6 +69,10 @@ static struct sm_mqtt_ctx {
 
 	bool connected;
 	bool disconnect_requested;
+	/* An AT#XMQTTPUB payload is being collected in data mode, possibly on another CMUX
+	 * channel. Its publication state is shared, so other publish commands must wait.
+	 */
+	bool pub_datamode;
 	struct mqtt_utf8 username;
 	struct mqtt_utf8 password;
 	sec_tag_t sec_tag;
@@ -1373,6 +1377,12 @@ static int do_mqtt_subscribe(uint16_t op,
 	return err;
 }
 
+/* Return -EBUSY if a set command would change the state of a data mode publication. */
+static int mqtt_pub_datamode_check(enum at_parser_cmd_type cmd_type)
+{
+	return (cmd_type == AT_PARSER_CMD_TYPE_SET && ctx.pub_datamode) ? -EBUSY : 0;
+}
+
 SM_AT_CMD_CUSTOM(xmqttcfg, "AT#XMQTTCFG", handle_at_mqtt_config);
 STATIC int handle_at_mqtt_config(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 				 uint32_t param_count)
@@ -1459,6 +1469,10 @@ STATIC int handle_at_mqtt_connect(enum at_parser_cmd_type cmd_type, struct at_pa
 		if (op == MQTTC_CONNECT || op == MQTTC_CONNECT6)  {
 			if (ctx.connected) {
 				return -EISCONN;
+			}
+			err = mqtt_pub_datamode_check(cmd_type);
+			if (err != 0) {
+				return err;
 			}
 
 			if (mqtt_conn != NULL) {
@@ -1579,11 +1593,12 @@ static int mqtt_datamode_callback(uint8_t op, const uint8_t *data, int len, uint
 		/* Return the amount of data sent. */
 		return len;
 	}
-#if defined(CONFIG_MQTT_VERSION_5_0)
 	if (op == DATAMODE_EXIT) {
+		ctx.pub_datamode = false;
+#if defined(CONFIG_MQTT_VERSION_5_0)
 		mqtt_pub_props_clear();
-	}
 #endif
+	}
 
 	return 0;
 }
@@ -1811,6 +1826,10 @@ STATIC int handle_at_mqtt_pub_prop(enum at_parser_cmd_type cmd_type, struct at_p
 	if (!ctx.connected || client.protocol_version != MQTT_VERSION_5_0) {
 		return -ENOTCONN;
 	}
+	err = mqtt_pub_datamode_check(cmd_type);
+	if (err != 0) {
+		return err;
+	}
 	err = at_parser_num_get(parser, 1, &type);
 	if (err) {
 		return err;
@@ -1946,8 +1965,12 @@ SM_AT_CMD_CUSTOM(xmqttpubempty, "AT#XMQTTPUBEMPTY", handle_at_mqtt_publish_empty
 STATIC int handle_at_mqtt_publish_empty(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 					uint32_t param_count)
 {
-	int err = mqtt_publish_empty_command(cmd_type, parser, param_count);
+	int err = mqtt_pub_datamode_check(cmd_type);
 
+	if (err != 0) {
+		return err;
+	}
+	err = mqtt_publish_empty_command(cmd_type, parser, param_count);
 #if defined(CONFIG_MQTT_VERSION_5_0)
 	/* do_mqtt_publish() clears the properties once it has sent them. */
 	if (err != 0) {
@@ -2036,6 +2059,7 @@ static int mqtt_publish_command(enum at_parser_cmd_type cmd_type, struct at_pars
 				return err;
 			}
 			err = enter_datamode(mqtt_datamode_callback, data_len);
+			ctx.pub_datamode = err == 0;
 		} else {
 			err = do_mqtt_publish((uint8_t *)pub_msg_ptr, msg_sz);
 		}
@@ -2058,8 +2082,12 @@ SM_AT_CMD_CUSTOM(xmqttpub, "AT#XMQTTPUB", handle_at_mqtt_publish);
 STATIC int handle_at_mqtt_publish(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 				  uint32_t param_count)
 {
-	int err = mqtt_publish_command(cmd_type, parser, param_count);
+	int err = mqtt_pub_datamode_check(cmd_type);
 
+	if (err != 0) {
+		return err;
+	}
+	err = mqtt_publish_command(cmd_type, parser, param_count);
 #if defined(CONFIG_MQTT_VERSION_5_0)
 	/* do_mqtt_publish() clears the properties once it has sent them, and data mode
 	 * clears them when it ends.
