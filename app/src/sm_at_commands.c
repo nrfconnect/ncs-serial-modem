@@ -18,7 +18,6 @@
 #include <zephyr/debug/thread_analyzer.h>
 #include <sys_malloc.h>
 #include <dfu/dfu_target.h>
-#include <tfm/tfm_ioctl_api.h>
 #include <modem/at_parser.h>
 #include <modem/lte_lc.h>
 #include <modem/modem_jwt.h>

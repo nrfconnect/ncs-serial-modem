@@ -14,7 +14,7 @@
 #include <nrf_errno.h>
 #include <nrf_modem_at.h>
 #include "sm_util.h"
-#if defined(CONFIG_SM_FW_UPDATE)
+#if defined(CONFIG_SM_TFM_MCUBOOT_INFO)
 #include <fw_info.h>
 #include <tfm/tfm_ioctl_api.h>
 #endif
@@ -548,7 +548,7 @@ bool sm_util_is_cid_active(uint8_t cid)
 #if defined(CONFIG_SM_FW_UPDATE)
 int sm_util_mcuboot_active_slot(void)
 {
-#if FIXED_PARTITION_EXISTS(s1_partition)
+#if defined(CONFIG_SM_TFM_MCUBOOT_INFO) && FIXED_PARTITION_EXISTS(s1_partition)
 	bool s0_active = false;
 	int err = tfm_platform_s0_active(PARTITION_ADDRESS(s0_partition),
 					 PARTITION_ADDRESS(s1_partition), &s0_active);
@@ -565,7 +565,7 @@ int sm_util_mcuboot_active_slot(void)
 
 int sm_util_mcuboot_active_version(uint32_t *version)
 {
-#if FIXED_PARTITION_EXISTS(s1_partition)
+#if defined(CONFIG_SM_TFM_MCUBOOT_INFO) && FIXED_PARTITION_EXISTS(s1_partition)
 	bool s0_active = false;
 	int err = tfm_platform_s0_active(PARTITION_ADDRESS(s0_partition),
 					 PARTITION_ADDRESS(s1_partition), &s0_active);
