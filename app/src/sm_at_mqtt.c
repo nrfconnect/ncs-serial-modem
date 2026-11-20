@@ -844,6 +844,13 @@ static void mqtt_poll_work_handler(struct k_work *work)
 				LOG_ERR("MQTT input failed: %d", err);
 				goto abort;
 			}
+			if (!ctx.connected) {
+				/* A broker DISCONNECT closes the transport, but mqtt_input()
+				 * still succeeds.
+				 */
+				mqtt_connection_close();
+				return;
+			}
 		}
 
 		if (ctx.rx_topic_len > 0 || ctx.publish_payload_remaining > 0) {

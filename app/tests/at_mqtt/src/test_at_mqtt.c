@@ -3824,6 +3824,32 @@ void test_mqtt_publish_datamode_flushes_5_0(void)
 #endif
 }
 
+/*
+ * Test: A broker DISCONNECT that mqtt_input() decodes successfully tears down the connection,
+ * releasing the connection buffers and the in-flight publications.
+ */
+void test_mqtt_broker_disconnect_input_5_0(void)
+{
+#if defined(CONFIG_MQTT_VERSION_5_0)
+	receive_maximum_connect(1);
+	inflight_command("AT#XMQTTPUB=\"t\",\"x\",1\r\n", true);
+	__cmock_mqtt_publish_Stub(NULL);
+	packet_limit_event = (struct mqtt_evt){
+		.type = MQTT_EVT_DISCONNECT,
+		.result = 0x8e,
+	};
+	clear_captured_response();
+	receive_packet_limit_event();
+	TEST_ASSERT_NOT_NULL(strstr(get_captured_response(), "#XMQTTEVT: 1,142\r\n"));
+	TEST_ASSERT_NULL(connected_client->rx_buf);
+	TEST_ASSERT_NULL(connected_client->broker);
+	assert_mqtt_disconnected();
+	assert_mqtt_reconnects();
+#else
+	TEST_IGNORE_MESSAGE("Requires CONFIG_MQTT_VERSION_5_0");
+#endif
+}
+
 extern int unity_main(void);
 
 int main(void)
