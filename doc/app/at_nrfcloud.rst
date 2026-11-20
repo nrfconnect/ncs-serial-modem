@@ -377,34 +377,30 @@ The test command is not supported.
 nRF Cloud FOTA #XNRFCLOUDFOTA
 =============================
 
-The ``#XNRFCLOUDFOTA`` command checks for and downloads an application or modem firmware update using `Memfault release management`_, delivered over the same nRF Cloud CoAP transport as ``#XNRFCLOUDOBS*``.
+The ``#XNRFCLOUDFOTA`` command checks for and downloads an application, MCUboot bootloader, or modem firmware update using `Memfault release management`_, delivered over the same nRF Cloud CoAP transport as ``#XNRFCLOUDOBS*``.
 
 .. only:: not nrf91m1
 
    Requires the :ref:`CONFIG_SM_NRF_CLOUD_FOTA <CONFIG_SM_NRF_CLOUD_FOTA>` Kconfig option.
 
 An application update is staged the same way as ``AT#XFOTA=1``, that is, the host activates it with the ``AT#XRESET`` AT command.
+An MCUboot bootloader update is staged the same way as ``AT#XFOTA=5``, that is, the host activates it with the ``AT#XRESET`` AT command.
 A modem update is staged the same way as ``AT#XFOTA=2``, that is, the host activates it with the ``AT#XMODEMRESET`` AT command.
-Both share their FOTA session with ``#XFOTA``, but progress and completion are reported over the ``#XNRFCLOUDFOTA`` notification instead, using the same ``<fota_stage>``, ``<fota_status>`` and ``<fota_info>`` tuple as ``#XFOTA`` (see :ref:`SM_AT_FOTA` for download and activation semantics).
+All of them share their FOTA session with ``#XFOTA``, but progress and completion are reported over the ``#XNRFCLOUDFOTA`` notification instead, using the same ``<fota_stage>``, ``<fota_status>`` and ``<fota_info>`` tuple as ``#XFOTA`` (see :ref:`SM_AT_FOTA` for download and activation semantics).
 Only one FOTA session can be ongoing at a time, regardless of which command initiated it.
 
 .. note::
-   Unlike ``AT#XFOTA``, ``#XNRFCLOUDFOTA`` does not support MCUboot bootloader updates.
-   This is expected to be a rare use case.
-   The support is planned for a future release.
+   ``<op>=2`` and ``<op>=6`` check the modem firmware in the same project as the application firmware, using the ``mfw`` software type.
 
 .. note::
-   ``<op>=2`` uses a dedicated Memfault project key for modem firmware, obtained from the General section of the modem firmware project's Project Settings, which is separate from the application project.
+   ``<op>=3`` and ``<op>=7`` check the MCUboot second-stage bootloader in the same project as the application firmware.
+   The update always goes to the inactive ``s0``/``s1`` slot (see :ref:`SM_AT_XBOOTINFO`), and each slot needs its own image.
+   Therefore, the software type is ``mcuboot-s0`` when slot ``s0`` is the target, and ``mcuboot-s1`` when slot ``s1`` is the target.
+   The version of the component is the running MCUboot version, which is also the value of ``AT#XBOOTINFO=0``.
 
    .. only:: not nrf91m1
 
-      Set it with the ``CONFIG_MEMFAULT_FOTA_MODEM_PROJECT_KEY`` Kconfig option, or override it at runtime with the ``<project_key>`` parameter.
-
-   .. only:: nrf91m1
-
-      Use the ``<project_key>`` parameter to set it at runtime.
-
-   When neither is set, the request targets the default project where the device was claimed.
+      They are available only when the device uses the NSIB (B0) and MCUboot as a second-stage bootloader.
 
 Set command
 -----------
@@ -437,22 +433,15 @@ The parameters and their defined values are the following:
 
         If an interrupted download is detected, it is continued.
 
+   * ``3`` - Check for and download an MCUboot second-stage bootloader update.
    * ``4`` - Check for an application update, without downloading it.
    * ``6`` - Check for a modem firmware update, without downloading it.
+   * ``7`` - Check for an MCUboot second-stage bootloader update, without downloading it.
 
 <project_key>
    String.
    Project key used for the FOTA operation.
-
-   .. only:: not nrf91m1
-
-      For ``<op>=1`` and ``<op>=4``, it overrides the application project key (``CONFIG_MEMFAULT_PROJECT_KEY``), and for ``<op>=2`` and ``<op>=6`` it overrides ``CONFIG_MEMFAULT_FOTA_MODEM_PROJECT_KEY``.
-      If this option is not provided and the corresponding Kconfig setting is unset, the request targets the default project where the device was claimed.
-
-   .. only:: nrf91m1
-
-      For ``<op>=1`` and ``<op>=4``, it is the application Memfault project key, and for ``<op>=2`` and ``<op>=6`` it is the modem Memfault project key.
-      If this option is not provided, the request targets the default project where the device was claimed.
+   If this option is not provided, the request targets the default project where the device was claimed.
 
 The command returns ``OK`` immediately and the check runs asynchronously.
 When it completes, an unsolicited notification is sent.
@@ -532,7 +521,7 @@ Response
 
 ::
 
-   #XNRFCLOUDFOTA: (0,1,2,4,6)[,<project_key>]
+   #XNRFCLOUDFOTA: (0,1,2,3,4,6,7)[,<project_key>]
 
 .. _SM_AT_NRFCLOUDOBSUPLOAD:
 

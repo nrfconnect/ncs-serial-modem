@@ -40,8 +40,8 @@ The following methods are available for delivering an update image to the |SM|:
      - No
    * - nRF Cloud FOTA (:ref:`SM_AT_NRFCLOUDFOTA`)
      - Yes
-     - Not yet
-     - Not yet
+     - Yes
+     - Yes
      - No
 
 With DFU over UART, the host must store the update image and stream it to the |SM|.
@@ -518,6 +518,132 @@ Modem delta update with FOTA from an HTTP server
 
 See :ref:`SM_AT_FOTA` for the full description of the command and its notifications.
 
+Modem delta update with nRF Cloud FOTA
+======================================
+
+Before you use nRF Cloud FOTA, you must provision and claim the device in nRF Cloud.
+See :ref:`SM_AT_PROVISIONING` for the provisioning AT commands and the claiming procedure.
+
+The modem firmware is a component of the application, with the software type ``mfw``.
+You add the modem firmware images as component payloads to a full release of the application firmware.
+See :ref:`SM_AT_NRFCLOUDFOTA` for the full description of the command and its notifications.
+For more information about the component payloads, see `nRF Cloud multi-component OTA`_.
+
+.. note::
+   The release version must be the application version that the device reports to nRF Cloud, ``2.0.0+0`` in this procedure.
+   The component version must be exactly the version that the modem reports, for example ``mfw_nrf91x1_2.0.4``.
+   The release can contain only component payloads, so you do not need to upload an application image.
+
+.. note::
+   nRF Cloud does not offer a delta update to a lower version, and it considers ``mfw_nrf91x1_2.0.4-FOTA-TEST`` lower than ``mfw_nrf91x1_2.0.4``.
+   Therefore, the first update in this procedure, from ``2.0.4`` to ``2.0.4-FOTA-TEST``, uses a payload without a delta base version and the **Bypass Version Checks** setting of the cohort.
+   This is needed only because the images are for testing.
+   Real updates to a newer version, including the update back to ``2.0.4`` in this procedure, are normal component delta updates that do not need the setting.
+
+#. Make sure that the hardware version ``nrf9151dk`` exists in the project settings (**Project Settings** > **Hardware**).
+   If it does not exist, create it with Primary Software Type **app**.
+   Add software type ``mfw`` to Additional Software Types.
+
+#. Create a cohort for the device and assign the device to it.
+   Do not use the default cohort, because the next step changes the version checks of the whole cohort.
+
+#. In the settings of the cohort, turn on **Bypass Version Checks**.
+   The setting makes nRF Cloud offer the full release with the highest version even when it is lower than the version that the device runs.
+   Use it only for cohorts that are used for testing.
+
+#. Create a full release in the application firmware project with the version ``2.0.0+0``.
+
+#. Add an OTA payload to the release.
+   In the **Add OTA payload** dialog, select the **Component** tab, and use the following values:
+
+   * Hardware version: ``nrf9151dk``
+   * Software type: ``mfw``
+   * Component version: ``mfw_nrf91x1_2.0.4-FOTA-TEST``
+   * Delta base version: leave empty
+   * File: :file:`mfw_nrf91x1_update_from_2.0.4_to_2.0.4-FOTA-TEST.bin`
+
+   The file is a delta image from ``2.0.4``, which applies only to a modem that runs ``2.0.4``.
+   You leave the delta base version empty so that nRF Cloud registers the payload as a full payload.
+
+#. Create an activation for the release.
+   Select the cohort that you created.
+   See `nRF Cloud over-the-air updates`_ for more information.
+
+#. Verify that the modem runs the v2.0.4 firmware:
+
+   .. code-block:: none
+
+      AT%SHORTSWVER
+      %SHORTSWVER: nrf91x1_2.0.4
+      OK
+
+#. Poll for the update with the ``AT#XNRFCLOUDFOTA=6`` command, and download it when it is available.
+   The ``#XNRFCLOUDFOTA: 0,0,1`` notification means that an update is available.
+
+   .. code-block:: none
+
+      AT+CFUN=1
+      OK
+
+      AT#XNRFCLOUDFOTA=6
+      OK
+      #XNRFCLOUDFOTA: 0,0,1
+
+      AT#XNRFCLOUDFOTA=2
+      OK
+      ...
+      #XNRFCLOUDFOTA: 4,0
+
+#. Set the modem to minimal function mode before the reset:
+
+   .. code-block:: none
+
+      AT+CFUN=0
+      OK
+
+#. Reset the |SM| or only the modem with the :ref:`SM_AT_XMODEMRESET` AT command to activate the new modem firmware.
+
+   .. note::
+      ``AT#XNRFCLOUDFOTA`` does not automatically reconnect the CoAP session to nRF Cloud after ``AT+CFUN=0``.
+      A reset of the |SM| clears the session, but ``AT#XMODEMRESET`` does not.
+      If you reset only the modem, connect to nRF Cloud again with ``AT#XNRFCLOUD=1`` after ``AT+CFUN=1`` before you poll for the next update.
+      This will be addressed in a later release.
+
+#. Verify that the modem runs the ``2.0.4-FOTA-TEST`` firmware:
+
+   .. code-block:: none
+
+      AT%SHORTSWVER
+      %SHORTSWVER: nrf91x1_2.0.4-FOTA-TEST
+      OK
+
+#. In the settings of the cohort, turn off **Bypass Version Checks**.
+
+#. Add an OTA payload to the same release.
+   In the **Add OTA payload** dialog, first enter the hardware version, which enables the **Component** tab.
+   Then select the **Component** tab, and use the following values:
+
+   * Hardware version: ``nrf9151dk``
+   * Software type: ``mfw``
+   * Component version: ``mfw_nrf91x1_2.0.4``
+   * Delta base version: ``mfw_nrf91x1_2.0.4-FOTA-TEST``
+   * File: :file:`mfw_nrf91x1_update_from_2.0.4-FOTA-TEST_to_2.0.4.bin`
+
+   The update back to ``2.0.4`` is an update to a higher version, so it is a normal component delta update.
+   Make sure that the activation of the release for the cohort is still active.
+   Then repeat steps 8, 9, and 10.
+
+#. Verify that the modem runs the v2.0.4 firmware again:
+
+   .. code-block:: none
+
+      AT%SHORTSWVER
+      %SHORTSWVER: nrf91x1_2.0.4
+      OK
+
+#. Optional: abort the activation of the release for the cohort, and delete the payloads from the release.
+   The test payloads are not offered to the device again, because the version check is on again and the modem already runs the highest version.
+
 .. _nrf91m1_update_modem_full:
 
 Modem full update
@@ -574,8 +700,7 @@ An update always writes the new MCUboot to the inactive slot, and the |SM| switc
 For this reason, the |SM| needs an MCUboot image built for the inactive slot, and the image names end with ``_s1`` for the ``s1`` slot.
 
 .. note::
-   The MCUboot update is available with DFU over UART and FOTA from an HTTP server.
-   nRF Cloud FOTA does not support the MCUboot update yet.
+   The MCUboot update is available with DFU over UART, FOTA from an HTTP server, and nRF Cloud FOTA.
 
 The number of MCUboot updates is limited by the number of available monotonic counter slots, which is 40.
 
@@ -683,6 +808,100 @@ MCUboot update with FOTA from an HTTP server
 
 See :ref:`SM_AT_FOTA` for the full description of the command and its notifications.
 
+MCUboot update with nRF Cloud FOTA
+==================================
+
+Before you use nRF Cloud FOTA, you must provision and claim the device in nRF Cloud.
+See :ref:`SM_AT_PROVISIONING` for the provisioning AT commands and the claiming procedure.
+
+The MCUboot images are components of the application, like the modem firmware.
+Each slot has its own image, and therefore its own software type: ``mcuboot-s0`` for the images for slot ``s0``, and ``mcuboot-s1`` for the images for slot ``s1``.
+The |SM| checks the software type of the inactive slot.
+The component version is the MCUboot version, which is the value of ``AT#XBOOTINFO=0``.
+You add the MCUboot images as component payloads to a full release of the application firmware.
+MCUboot images are always full payloads, not delta payloads.
+See :ref:`SM_AT_NRFCLOUDFOTA` for the full description of the command and its notifications.
+For more information about the component payloads, see `nRF Cloud multi-component OTA`_.
+
+.. note::
+   The release version must be the application version that the device reports to nRF Cloud, ``2.0.0+0`` in this procedure.
+   The release can contain only component payloads, so you do not need to upload an application image.
+   By default, nRF Cloud offers a component payload only when its version is higher than the version that the device reports.
+
+#. Make sure that the hardware version ``nrf9151dk`` exists in the project settings (**Project Settings** > **Hardware**).
+   If it does not exist, create it with Primary Software Type **app**.
+   Add software types ``mcuboot-s0`` and ``mcuboot-s1`` to Additional Software Types.
+
+#. Optional: create a cohort for the device.
+   You can also use the default cohort.
+
+#. Verify the current MCUboot version and the active slot:
+
+   .. code-block:: none
+
+      AT#XBOOTINFO=0
+      #XBOOTINFO: 1
+      OK
+
+      AT#XBOOTINFO=1
+      #XBOOTINFO: 0
+      OK
+
+   MCUboot version 1 runs from slot ``s0``, so the inactive slot is ``s1``, and the software type is ``mcuboot-s1``.
+
+#. Create a full release in the application firmware project with the version ``2.0.0+0``, or use the existing release that has this version.
+
+#. Add an OTA payload to the release.
+   In the **Add OTA payload** dialog, first enter the hardware version, which enables the **Component** tab.
+   Then select the **Component** tab, and use the following values:
+
+   * Hardware version: ``nrf9151dk``
+   * Software type: ``mcuboot-s1``
+   * Component version: ``2``
+   * Delta base version: leave empty
+   * File: :file:`mcuboot_nrf91m1_s1_v2-FOTA-TEST.bin`
+
+#. Create an activation for the release, or make sure that the existing activation is active.
+   Select the cohort that you created, or the default cohort.
+   See `nRF Cloud over-the-air updates`_ for more information.
+
+#. Check that the update is available, then download it:
+
+   .. code-block:: none
+
+      AT#XNRFCLOUDFOTA=7
+      OK
+      #XNRFCLOUDFOTA: 0,0,1
+
+      AT#XNRFCLOUDFOTA=3
+      OK
+      ...
+      #XNRFCLOUDFOTA: 4,0
+
+#. Set the modem to minimal function mode before the reset:
+
+   .. code-block:: none
+
+      AT+CFUN=0
+      OK
+
+#. Reset the |SM|.
+
+#. Verify that MCUboot version 2 runs from slot ``s1``:
+
+   .. code-block:: none
+
+      AT#XBOOTINFO=0
+      #XBOOTINFO: 2
+      OK
+
+      AT#XBOOTINFO=1
+      #XBOOTINFO: 1
+      OK
+
+#. Optional: delete the payload from the release, or abort the activation of the release for the cohort.
+   The payload is not offered to the device again, because the device already runs MCUboot version 2.
+
 Updating the same version to slot s0 (optional)
 ===============================================
 
@@ -704,10 +923,15 @@ You can use this to test the update to slot ``s0`` with the images in this docum
 
 #. Send ``mcuboot_nrf91m1_s0_v2-FOTA-TEST.bin``, the MCUboot version 2 image for slot ``s0``, to the |SM| in the same way as in the previous procedures.
 
+   With nRF Cloud FOTA, nRF Cloud does not offer a component version that the device already runs.
+   To make nRF Cloud offer it, turn on **Repeatedly Return Latest Release** in the settings of the cohort.
+   Then add an OTA payload with the software type ``mcuboot-s0``, the component version ``2``, and the :file:`mcuboot_nrf91m1_s0_v2-FOTA-TEST.bin` file to the release, and update with ``AT#XNRFCLOUDFOTA=3``.
+   Use the setting only for cohorts that are used for testing, and turn it off after the test.
+
 #. Reset the |SM|.
 
    .. note::
-      If you sent the image with ``AT#XFOTA=5``, the |SM| reports the error ``1`` in the ``#XFOTA: 5,1,1`` notification after the reset, because the MCUboot version did not increase.
+      Because the MCUboot version does not increase, the |SM| reports the error ``1``, which means that the MCUboot version did not change, in the notification after the reset, for example ``#XFOTA: 5,1,1`` or ``#XNRFCLOUDFOTA: 5,1,1``.
       In this procedure, the update has still succeeded.
       Verify the result with the ``AT#XBOOTINFO`` command, as in the next step.
 

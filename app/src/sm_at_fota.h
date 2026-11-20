@@ -15,6 +15,12 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <zephyr/storage/flash_map.h>
+
+/* MCUboot bootloader FOTA needs the two MCUboot slots. */
+#if FIXED_PARTITION_EXISTS(s1_partition)
+#define SM_FOTA_BL_SUPPORTED
+#endif
 
 enum fota_stage {
 	FOTA_STAGE_INIT,
