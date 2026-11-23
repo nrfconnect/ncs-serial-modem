@@ -110,6 +110,10 @@ extern int test_memfault_capture_return;
 extern int test_memfault_capture_count;
 extern char test_memfault_fault_log[100];
 extern uint32_t test_memfault_source_mask;
+extern bool test_memfault_upload_hold;
+extern struct k_sem test_memfault_upload_entered;
+extern struct k_sem test_memfault_upload_release;
+extern const char *test_memfault_upload_key_after_hold;
 extern int sm_settings_set(const char *name, size_t len, settings_read_cb read_cb, void *cb_arg);
 
 /* Strings for cellular positioning */
@@ -1328,6 +1332,94 @@ void test_xnrfcloudobsauto_uploads_on_interval(void)
 	helper_xnrfcloud_disconnect_ok();
 }
 
+/* Holds an automatic upload that is running, with the stored project key given, and returns
+ * when the upload waits inside the Memfault upload. The caller releases it.
+ */
+static void obs_start_held_auto_upload(const char *config_cmd)
+{
+	obs_auto_reset();
+	helper_xnrfcloud_connect_ok();
+	clear_captured_response();
+
+	test_memfault_upload_hold = true;
+	send_at_command(config_cmd);
+	k_sleep(K_MSEC(10));
+	clear_captured_response();
+
+	/* The simulated clock jumps ahead to the interval. */
+	TEST_ASSERT_EQUAL_INT(0, k_sem_take(&test_memfault_upload_entered, K_SECONDS(61)));
+}
+
+/* Lets a held upload continue and waits for it to finish. */
+static void obs_release_held_upload(void)
+{
+	k_sem_give(&test_memfault_upload_release);
+	k_sleep(K_MSEC(10));
+}
+
+/*
+ * Tests that the automatic upload can be reconfigured while an upload is running, which is
+ * only possible when the command does not wait for the upload, and that the running upload
+ * keeps the project key that it started with.
+ */
+void test_xnrfcloudobsauto_reconfigure_during_upload(void)
+{
+	obs_start_held_auto_upload("AT#XNRFCLOUDOBSAUTO=1,60,\"prj_FIRST\"\r\n");
+	TEST_ASSERT_EQUAL_STRING("prj_FIRST", test_memfault_upload_seen_api_key);
+
+	/* The upload is running on the blocking work queue. The command is handled right away. */
+	send_at_command("AT#XNRFCLOUDOBSAUTO=1,120,\"prj_SECOND\"\r\n");
+	k_sleep(K_MSEC(10));
+	resp = get_captured_response();
+	TEST_ASSERT_NOT_NULL(strstr(resp, "OK"));
+	TEST_ASSERT_NULL(strstr(resp, "ERROR"));
+
+	clear_captured_response();
+	send_at_command("AT#XNRFCLOUDOBSAUTO?\r\n");
+	k_sleep(K_MSEC(10));
+	resp = get_captured_response();
+	TEST_ASSERT_NOT_NULL(strstr(resp, "#XNRFCLOUDOBSAUTO: 1,120,\"prj_SECOND\"\r\n"));
+
+	obs_release_held_upload();
+
+	/* The reconfiguration did not change the key of the upload that was running. */
+	TEST_ASSERT_EQUAL_STRING("prj_FIRST", test_memfault_upload_key_after_hold);
+	TEST_ASSERT_EQUAL_INT(1, test_memfault_upload_count);
+
+	/* The next upload uses the new key and the new interval. */
+	test_memfault_upload_hold = false;
+	k_sleep(K_SECONDS(121));
+	TEST_ASSERT_EQUAL_INT(2, test_memfault_upload_count);
+	TEST_ASSERT_EQUAL_STRING("prj_SECOND", test_memfault_upload_seen_api_key);
+
+	obs_auto_reset();
+	helper_xnrfcloud_disconnect_ok();
+}
+
+/*
+ * Tests that disabling the automatic upload while an upload is running stops the next
+ * one, so the running upload does not rearm itself.
+ */
+void test_xnrfcloudobsauto_disable_during_upload(void)
+{
+	obs_start_held_auto_upload("AT#XNRFCLOUDOBSAUTO=1,60\r\n");
+
+	send_at_command("AT#XNRFCLOUDOBSAUTO=0\r\n");
+	k_sleep(K_MSEC(10));
+	resp = get_captured_response();
+	TEST_ASSERT_NOT_NULL(strstr(resp, "OK"));
+
+	obs_release_held_upload();
+	TEST_ASSERT_EQUAL_INT(1, test_memfault_upload_count);
+
+	test_memfault_upload_hold = false;
+	k_sleep(K_SECONDS(300));
+	TEST_ASSERT_EQUAL_INT(1, test_memfault_upload_count);
+
+	obs_auto_reset();
+	helper_xnrfcloud_disconnect_ok();
+}
+
 /*
  * Tests that the automatic upload is skipped, and rearmed, while there is no connection to
  * nRF Cloud.
@@ -1948,6 +2040,47 @@ void test_xnrfcloudobsexport_no_chunks(void)
 	resp = get_captured_response();
 	TEST_ASSERT_NULL(strstr(resp, "MC:"));
 	TEST_ASSERT_NOT_NULL(strstr(resp, "OK"));
+}
+
+/*
+ * Tests that the export is rejected while an upload is draining the buffered data, which must
+ * have one drainer at a time, and that it does not consume the chunks. It works again when
+ * the upload is done.
+ */
+void test_xnrfcloudobsexport_rejected_during_upload(void)
+{
+	static const char * const chunks[] = {"hello"};
+
+	helper_xnrfcloud_connect_ok();
+	clear_captured_response();
+
+	test_memfault_set_chunks(chunks, ARRAY_SIZE(chunks));
+	test_memfault_upload_hold = true;
+	send_at_command("AT#XNRFCLOUDOBSUPLOAD\r\n");
+	k_sleep(K_MSEC(10));
+	TEST_ASSERT_EQUAL_INT(0, k_sem_take(&test_memfault_upload_entered, K_SECONDS(1)));
+
+	/* The upload runs on the blocking work queue, and holds the buffered data. */
+	clear_captured_response();
+	send_at_command("AT#XNRFCLOUDOBSEXPORT\r\n");
+	k_sleep(K_MSEC(10));
+	resp = get_captured_response();
+	TEST_ASSERT_NOT_NULL(strstr(resp, "ERROR"));
+	TEST_ASSERT_NULL(strstr(resp, "MC:"));
+
+	obs_release_held_upload();
+	test_memfault_upload_hold = false;
+
+	/* The chunk was not consumed by the rejected export. */
+	clear_captured_response();
+	send_at_command("AT#XNRFCLOUDOBSEXPORT\r\n");
+	k_sleep(K_MSEC(10));
+	resp = get_captured_response();
+	TEST_ASSERT_NOT_NULL(strstr(resp, "MC:aGVsbG8=:"));
+	TEST_ASSERT_NOT_NULL(strstr(resp, "OK"));
+
+	clear_captured_response();
+	helper_xnrfcloud_disconnect_ok();
 }
 
 /* ---------------------------------------------------------------------------

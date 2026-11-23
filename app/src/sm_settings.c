@@ -24,6 +24,11 @@ LOG_MODULE_REGISTER(sm_settings, CONFIG_SM_LOG_LEVEL);
 static struct sm_modem_fault pending_modem_fault;
 static bool modem_fault_pending;
 
+/* Protects the retained modem fault, which the modem failure handler saves and the observability
+ * upload reads and clears.
+ */
+static K_MUTEX_DEFINE(modem_fault_lock);
+
 STATIC int sm_settings_set(const char *name, size_t len, settings_read_cb read_cb, void *cb_arg)
 {
 	if (!strcmp(name, "modem_fault")) {
@@ -161,42 +166,58 @@ int sm_settings_modem_eio_retried_save(void)
 
 int sm_settings_modem_fault_save(const struct sm_modem_fault *fault)
 {
-	int err;
+	int err = 0;
+
+	k_mutex_lock(&modem_fault_lock, K_FOREVER);
 
 	if (modem_fault_pending) {
-		return -EALREADY;
+		err = -EALREADY;
+		goto out;
 	}
 
 	pending_modem_fault = *fault;
 	err = settings_save_one(MODEM_FAULT_KEY, &pending_modem_fault,
 				sizeof(pending_modem_fault));
-	if (err) {
-		return err;
+	if (!err) {
+		modem_fault_pending = true;
 	}
-	modem_fault_pending = true;
-	return 0;
+
+out:
+	k_mutex_unlock(&modem_fault_lock);
+
+	return err;
 }
 
 bool sm_settings_modem_fault_get(struct sm_modem_fault *fault)
 {
-	if (modem_fault_pending) {
+	bool pending;
+
+	k_mutex_lock(&modem_fault_lock, K_FOREVER);
+
+	pending = modem_fault_pending;
+	if (pending) {
 		*fault = pending_modem_fault;
-		return true;
 	}
-	return false;
+
+	k_mutex_unlock(&modem_fault_lock);
+
+	return pending;
 }
 
 int sm_settings_modem_fault_clear(void)
 {
-	int err;
+	int err = 0;
 
-	if (!modem_fault_pending) {
-		return 0;
+	k_mutex_lock(&modem_fault_lock, K_FOREVER);
+
+	if (modem_fault_pending) {
+		err = settings_delete(MODEM_FAULT_KEY);
+		if (!err) {
+			modem_fault_pending = false;
+		}
 	}
-	err = settings_delete(MODEM_FAULT_KEY);
-	if (err) {
-		return err;
-	}
-	modem_fault_pending = false;
-	return 0;
+
+	k_mutex_unlock(&modem_fault_lock);
+
+	return err;
 }

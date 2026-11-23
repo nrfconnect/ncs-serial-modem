@@ -81,18 +81,28 @@ BUILD_ASSERT(!IS_ENABLED(CONFIG_MEMFAULT_NCS_POST_COREDUMP_ON_NETWORK_CONNECTED)
 #define OBS_CRASH_PARAM_TYPE		1
 #define OBS_COREDUMP_PARAM_ENABLE	1
 
-/* Configuration of the automatic upload, persisted under the "sm/obs" settings subtree. */
+/* Configuration of the automatic upload, persisted under the "sm/obs" settings subtree. The AT
+ * command handler writes it on sm_work_q, and the automatic upload reads it on the blocking work
+ * queue, so obs_auto_lock protects the writes and the reads there.
+ */
+static K_MUTEX_DEFINE(obs_auto_lock);
 static bool obs_auto_enabled;
 static uint32_t obs_auto_interval = CONFIG_SM_NRF_CLOUD_OBSERVABILITY_AUTO_INTERVAL_SECONDS;
 static char obs_auto_key[OBS_PROJECT_KEY_MAX_LEN + 1];
 
+/* The Memfault data packetizer allows only one drainer at a time.
+ * Hold the lock for the whole of an upload and of an export, including the selection of the
+ * packetizer sources.
+ */
+static K_MUTEX_DEFINE(obs_drain_lock);
+
 /* Whether an upload drains the stored core dump, persisted under "sm/obs/coredump". When
  * disabled the core dump stays buffered, so it can be uploaded later by re-enabling this.
  */
-static bool obs_coredump_enabled = true;
+static atomic_t obs_coredump_enabled = ATOMIC_INIT(1);
 
 /* Whether an operation that accesses the network is ongoing. */
-static bool obs_busy;
+static atomic_t obs_busy;
 static struct modem_pipe *obs_pipe;
 
 /* Parameters saved before submitting the asynchronous work. An empty project key means
@@ -202,8 +212,10 @@ static int obs_capture_modem_fault(const struct sm_modem_fault *fault)
 						    fault->program_counter, occurred_at);
 }
 
-/* Drain buffered data, including any retained fault, and return bytes sent or an error. */
-static ssize_t obs_upload(void)
+/* Drain buffered data, including any retained fault, and return bytes sent or an error.
+ * The caller holds obs_drain_lock.
+ */
+static ssize_t obs_upload_locked(void)
 {
 	struct sm_modem_fault fault;
 	ssize_t bytes = 0;
@@ -245,7 +257,7 @@ static ssize_t obs_upload(void)
 restore_sources:
 	/* Leave the core dump buffered when its upload is disabled. */
 	memfault_packetizer_set_active_sources(
-		obs_coredump_enabled
+		atomic_get(&obs_coredump_enabled)
 			? kMfltDataSourceMask_All
 			: (kMfltDataSourceMask_Event | kMfltDataSourceMask_Log |
 			   kMfltDataSourceMask_Cdr));
@@ -257,22 +269,39 @@ restore_sources:
 	return ret < 0 ? ret : bytes + ret;
 }
 
+/* Drain buffered data, including any retained fault, and return bytes sent or an error. */
+static ssize_t obs_upload(void)
+{
+	ssize_t ret;
+
+	k_mutex_lock(&obs_drain_lock, K_FOREVER);
+	ret = obs_upload_locked();
+	k_mutex_unlock(&obs_drain_lock);
+
+	return ret;
+}
+
 /*************************************************/
 /* Persistent configuration of the auto upload   */
 /*************************************************/
 
+/* The observability operations run on the blocking work queue, like the FOTA operations,
+ * because both swap the project key of the Memfault HTTP client configuration. One queue
+ * thread runs one of them at a time, so the swaps cannot overlap.
+ */
 static void obs_auto_work_fn(struct k_work *work);
 K_WORK_DELAYABLE_DEFINE(obs_auto_work, obs_auto_work_fn);
 
 /* Arm or disarm the automatic upload according to the current configuration. */
 static void obs_auto_rearm(void)
 {
+	k_mutex_lock(&obs_auto_lock, K_FOREVER);
 	if (obs_auto_enabled) {
-		k_work_reschedule_for_queue(&sm_work_q, &obs_auto_work,
-					    K_SECONDS(obs_auto_interval));
+		sm_k_work_reschedule_blocking(&obs_auto_work, K_SECONDS(obs_auto_interval));
 	} else {
 		k_work_cancel_delayable(&obs_auto_work);
 	}
+	k_mutex_unlock(&obs_auto_lock);
 }
 
 static int obs_settings_save(void)
@@ -324,10 +353,13 @@ STATIC int obs_settings_set(const char *name, size_t len, settings_read_cb read_
 			return 0;
 		}
 	} else if (!strcmp(name, "coredump")) {
-		if (len != sizeof(obs_coredump_enabled)) {
+		bool enabled;
+
+		if (len != sizeof(enabled)) {
 			return -EINVAL;
 		}
-		if (read_cb(cb_arg, &obs_coredump_enabled, len) > 0) {
+		if (read_cb(cb_arg, &enabled, len) > 0) {
+			atomic_set(&obs_coredump_enabled, enabled);
 			return 0;
 		}
 	}
@@ -337,7 +369,7 @@ STATIC int obs_settings_set(const char *name, size_t len, settings_read_cb read_
 }
 
 /* Arm the automatic upload once the stored configuration has been loaded. Runs before
- * main() starts the Serial Modem work queue, which is safe because only the expiry of the
+ * main() starts the work queue, which is safe because only the expiry of the
  * timeout submits the work, and the shortest interval is a minute.
  */
 STATIC int obs_settings_commit(void)
@@ -359,23 +391,34 @@ static void obs_auto_work_fn(struct k_work *work)
 	ARG_UNUSED(work);
 
 	const char *previous_key;
+	char key[OBS_PROJECT_KEY_MAX_LEN + 1];
 	ssize_t result;
 
+	k_mutex_lock(&obs_auto_lock, K_FOREVER);
+
 	if (!obs_auto_enabled) {
+		k_mutex_unlock(&obs_auto_lock);
 		return;
 	}
 
 	/* Rearm first, so that the interval does not drift with the duration of the upload
 	 * and a failed upload does not stop the automatic upload.
 	 */
-	k_work_reschedule_for_queue(&sm_work_q, &obs_auto_work, K_SECONDS(obs_auto_interval));
+	sm_k_work_reschedule_blocking(&obs_auto_work, K_SECONDS(obs_auto_interval));
+
+	/* A copy, so that a reconfiguration cannot change the key while it is used for the
+	 * upload.
+	 */
+	strcpy(key, obs_auto_key);
+
+	k_mutex_unlock(&obs_auto_lock);
 
 	if (!sm_nrf_cloud_ready) {
 		LOG_DBG("Not connected to nRF Cloud, skipping upload");
 		return;
 	}
 
-	previous_key = obs_project_key_install(obs_auto_key);
+	previous_key = obs_project_key_install(key);
 	result = obs_upload();
 	g_mflt_http_client_config.api_key = previous_key;
 
@@ -404,7 +447,7 @@ static void obs_upload_work_fn(struct k_work *work)
 		urc_send_to(obs_pipe, "\r\n#XNRFCLOUDOBSUPLOAD: 0,%zd\r\n", result);
 	}
 
-	obs_busy = false;
+	atomic_set(&obs_busy, 0);
 }
 K_WORK_DEFINE(obs_upload_work, obs_upload_work_fn);
 
@@ -499,7 +542,7 @@ static void obs_forward_work_fn(struct k_work *work)
 		urc_send_to(obs_pipe, "\r\n#XNRFCLOUDOBSFORWARD: 0\r\n");
 	}
 
-	obs_busy = false;
+	atomic_set(&obs_busy, 0);
 }
 K_WORK_DEFINE(obs_forward_work, obs_forward_work_fn);
 
@@ -582,7 +625,7 @@ static int obs_check_ready(void)
 		LOG_ERR("Not connected to nRF Cloud");
 		return -ENOTCONN;
 	}
-	if (obs_busy) {
+	if (atomic_get(&obs_busy)) {
 		LOG_ERR("Observability operation already ongoing");
 		return -EBUSY;
 	}
@@ -597,8 +640,8 @@ static int obs_check_ready(void)
 static void obs_submit(struct k_work *work)
 {
 	obs_pipe = sm_at_host_get_current_pipe();
-	obs_busy = true;
-	k_work_submit_to_queue(&sm_work_q, work);
+	atomic_set(&obs_busy, 1);
+	sm_k_work_submit_blocking(work);
 }
 
 /*************************************************/
@@ -641,6 +684,7 @@ STATIC int handle_at_nrf_cloud_obs_auto(enum at_parser_cmd_type cmd_type, struct
 			return err;
 		}
 
+		k_mutex_lock(&obs_auto_lock, K_FOREVER);
 		obs_auto_enabled = enable;
 		obs_auto_interval = interval;
 		if (param_count > OBS_AUTO_PARAM_PROJECT_KEY) {
@@ -649,6 +693,7 @@ STATIC int handle_at_nrf_cloud_obs_auto(enum at_parser_cmd_type cmd_type, struct
 		}
 
 		obs_auto_rearm();
+		k_mutex_unlock(&obs_auto_lock);
 
 		err = obs_settings_save();
 		if (err) {
@@ -697,10 +742,11 @@ STATIC int handle_at_nrf_cloud_obs_coredump(enum at_parser_cmd_type cmd_type,
 			return -EINVAL;
 		}
 
-		obs_coredump_enabled = enable;
+		bool enabled = enable;
 
-		err = settings_save_one("sm/obs/coredump", &obs_coredump_enabled,
-					sizeof(obs_coredump_enabled));
+		atomic_set(&obs_coredump_enabled, enabled);
+
+		err = settings_save_one("sm/obs/coredump", &enabled, sizeof(enabled));
 		if (err) {
 			/* Applied for this session either way. */
 			LOG_WRN("Core dump upload save failed: %d", err);
@@ -709,7 +755,8 @@ STATIC int handle_at_nrf_cloud_obs_coredump(enum at_parser_cmd_type cmd_type,
 		return 0;
 
 	case AT_PARSER_CMD_TYPE_READ:
-		rsp_send("\r\n#XNRFCLOUDOBSCOREDUMP: %d\r\n", obs_coredump_enabled);
+		rsp_send("\r\n#XNRFCLOUDOBSCOREDUMP: %d\r\n",
+			 (int)atomic_get(&obs_coredump_enabled));
 		return 0;
 
 	case AT_PARSER_CMD_TYPE_TEST:
@@ -903,9 +950,9 @@ STATIC int handle_at_nrf_cloud_obs_crash(enum at_parser_cmd_type cmd_type, struc
 
 /* Print the buffered chunks to the AT interface using the Memfault chunk export format
  * ("MC:<base64>:"), which the Memfault tooling can parse. Note that this consumes the
- * chunks, so they are no longer available for upload.
+ * chunks, so they are no longer available for upload. The caller holds obs_drain_lock.
  */
-static void obs_export_chunks(void)
+static void obs_export_chunks_locked(void)
 {
 	uint8_t chunk[MEMFAULT_DATA_EXPORT_CHUNK_MAX_LEN];
 	char base64[MEMFAULT_BASE64_ENCODE_LEN(MEMFAULT_DATA_EXPORT_CHUNK_MAX_LEN) + 1];
@@ -933,7 +980,11 @@ STATIC int handle_at_nrf_cloud_obs_export(enum at_parser_cmd_type cmd_type,
 
 	switch (cmd_type) {
 	case AT_PARSER_CMD_TYPE_SET:
-		obs_export_chunks();
+		if (k_mutex_lock(&obs_drain_lock, K_NO_WAIT) != 0) {
+			return -EBUSY;
+		}
+		obs_export_chunks_locked();
+		k_mutex_unlock(&obs_drain_lock);
 		return 0;
 
 	default:
