@@ -91,6 +91,11 @@ The following tables shows how to connect the UART pins to the corresponding pin
       The DTR pin defaults to pull-up with an active high level, so the UART is always powered on.
       This pin is shared with **Button 1**, which you can use to manually toggle the DTR state.
       When the button is pressed, DTR is pulled low (inactive), powering down the UART.
+      While the button is pressed, the pin is driven low against the internal pull-up resistor.
+      This draws current from **VDD_GPIO** exactly when the device is supposed to be in the low-power state.
+      This setup simplifies use with a PC host.
+      Do not replicate it in a production design.
+      For details, see :ref:`uart_pull_up_power`.
 
       The RI pin is connected to **LED1**, as it is not routed to the host PC.
 
@@ -124,10 +129,12 @@ The following tables shows how to connect the UART pins to the corresponding pin
 
       The DTR pin defaults to pull-up, so the external MCU must assert DTR to power on the UART.
       When UART power management is not used, the DTR pin should be pulled to active state.
+      Asserting DTR drives the pin low against the internal pull-up resistor, which draws current from **VDD_GPIO** while DTR is asserted.
+      For details, see :ref:`uart_pull_up_power`.
 
       When hardware flow control is not used, remove ``hw-flow-control;`` from the ``uart2`` node and remove the ``bias-pull-up`` from the CTS pin in the overlay.
       With hardware flow control disabled, the UART peripheral does not monitor the CTS pin, so |SM| transmits unconditionally.
-      The RTS and CTS pins can be left unconnected.
+      You do not need to connect the RTS and CTS pins to the host.
       See :ref:`uart_without_flow_control` for further considerations.
 
       This setup is provided in the :file:`app/external-mcu.overlay` overlay file.
@@ -162,6 +169,11 @@ The following tables shows how to connect the UART pins to the corresponding pin
       The DTR pin defaults to pull-up with the active high level, so the UART is always powered on.
       This pin is shared with **Button 0**, which you can use to manually toggle the DTR state.
       When the button is pressed, DTR is pulled low (inactive), powering down the UART.
+      While the button is pressed, the pin is driven low against the internal pull-up resistor.
+      This draws current from **VDD_GPIO** exactly when the device is supposed to be in the low-power state.
+      This setup simplifies use with a PC host.
+      Do not replicate it in a production design.
+      For details, see :ref:`uart_pull_up_power`.
 
       The RI pin is connected to the blue LED, which is used to indicate incoming data.
 
@@ -249,7 +261,7 @@ Each one assigns its own pinctrl states and points ``uart0`` at them, so the pin
       The overlay remaps the ``uart0`` pins to match the interposer footprint and removes ``hw-flow-control``.
       DTR and RI keep the `nrf9151dk`_ board defaults.
 
-      The RTS and CTS pins are still assigned in the pinctrl states but are not used for flow control, and both can be left unconnected.
+      The RTS and CTS pins are still assigned in the pinctrl states but are not used for flow control, and neither needs to be connected to the host.
       See :ref:`uart_without_flow_control` for further considerations.
 
       This setup is provided in the :file:`app/interposer-nrf9151-mk-bg95.overlay` devicetree overlay file.
@@ -384,7 +396,7 @@ Power consumption can be reduced from hundreds of microamps to just a few microa
 
 UART power management is completely independent of the modem power management (CFUN, PSM, eDRX, and so on).
 By actively managing the UART power state through DTR control, the |SiP| achieves ultra-low power consumption of approximately 2 µA when the cellular modem enters  Power Saving Mode (PSM) and the UART is powered down.
-This is a reduction of over 99% compared to the 400-450 µA consumed when the UART remains active during idle periods.
+For comparison, the `nRF9151 Product Specification`_ lists a typical current of 510 µA for UARTE transferring data at 115200 bps.
 The |SiP| retains all the RAM content while in any of the power saving modes, so the application can resume from where it left off when the UART is powered up.
 Full network context is maintained, including socket connections, TLS/DTLS sessions, and so on.
 LTE connection is automatically resumed when there is outgoing data to be sent.
@@ -460,6 +472,67 @@ To reset the |SiP| to a known state, do one of the following:
 
 After the reset, the startup sequence is the same as in the `Boot-up scenario`_.
 
+.. _uart_pull_up_power:
+
+Pull-up resistors and power consumption
+=======================================
+
+The **DTR** input and the UART **RX** and **CTS** pins of the |SiP| have internal pull-up resistors.
+A pull-up resistor connects the pin to the I/O supply (**VDD_GPIO**), so that the pin reads as high when nothing drives it.
+
+The pull-up of the DTR pin is always enabled.
+The pull-ups of the RX and CTS pins are enabled only while the UART is powered on.
+When the UART is powered down, the pull-ups are disabled and the input buffers are disconnected, so the RX and CTS pins are floating.
+This prevents pull-up current when the host drives these pins low, so the pins do not add to the power consumption in that state.
+
+When the host drives such a pin low, the host output works against the pull-up resistor.
+Current flows from **VDD_GPIO**, through the pull-up resistor, and into the host output.
+
+According to the GPIO electrical specification in the `nRF9151 Product Specification`_, the pull-up resistance is 11 kΩ minimum, 13 kΩ typical, and 16 kΩ maximum.
+The lower the resistance, the higher the current.
+The specification does not list the resulting currents.
+The following table lists the current for each pin that is driven low, calculated from these resistance values with *I* = *V* / *R*:
+
+.. list-table::
+   :header-rows: 1
+   :widths: auto
+
+   * - **VDD_GPIO**
+     - Lowest current (16 kΩ)
+     - Typical (13 kΩ)
+     - Highest current (11 kΩ)
+   * - 1.8 V
+     - 113 µA
+     - 138 µA
+     - 164 µA
+   * - 3.0 V
+     - 188 µA
+     - 231 µA
+     - 273 µA
+
+For comparison, an active UART consumes about 510 µA at 115200 bps, so the pull-up current is a considerable addition.
+The UART current is drawn from **VDD** (3.0 V to 5.5 V), and the `nRF9151 Product Specification`_ gives the typical value at 3.7 V.
+The pull-up current is drawn from **VDD_GPIO** (1.7 V to 3.6 V), so the table lists 1.8 V and 3.0 V as examples of host I/O voltages.
+Compared to the current of an active modem, both the pull-up current and the UART current are small.
+
+.. important::
+   The pull-up current is drawn from **VDD_GPIO**, not from the main supply (**VDD**).
+   A current measurement on **VDD**, for example with the Power Profiler Kit II (PPK2) connected between the power source and **VDD**, does not include this current.
+   To see it, measure the current of the **VDD_GPIO** supply.
+
+.. only:: nrf91m1
+
+   The DTR signal of the |SM| is active low.
+   Therefore, the pull-up current flows for as long as the host keeps DTR asserted.
+   While DTR is deasserted, the pin is high and no current flows.
+
+To reduce the current, release the pin or drive it high whenever you do not need the low state.
+The internal pull-up then holds the pin high, and no current flows.
+
+.. only:: not nrf91m1
+
+   In a custom build, you can also remove the pull-up from the pin in the devicetree overlay and add an external pull-up resistor with a higher resistance on the host side.
+
 .. uart_power_management_end
 
 .. _uart_without_flow_control:
@@ -476,7 +549,8 @@ The approach for a custom |SM| build is the following:
 
 * **Remove** ``hw-flow-control;`` **from the UART node in the overlay** — With hardware flow control disabled, the UART peripheral does not monitor CTS and |SM| transmits unconditionally.
 * **Remove the** ``bias-pull-up`` **from the CTS pinctrl group in the overlay** — This avoids a pull resistor drawing current against any external signal.
-* **Leave RTS and CTS unconnected** — Neither pin is used and both can be left floating.
+  See :ref:`uart_pull_up_power`.
+* **RTS and CTS do not need to be connected** — Neither pin is used.
 
 **Key requirements:**
 

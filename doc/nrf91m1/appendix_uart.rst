@@ -140,8 +140,9 @@ To operate without hardware flow control, do the following:
 
   * **Increased power consumption** — The |SM| has an internal pull-up on the CTS pin that cannot be removed.
     With CTS wired to GND, the pull-up draws current and increases the power consumption while the UART is active.
+    See :ref:`uart_pull_up_power`.
 
-* **Leave RTS unconnected** — The RTS pin is not used and can be left floating.
+* **RTS does not need to be connected** — The RTS pin is not used.
 
 **Key requirements:**
 
