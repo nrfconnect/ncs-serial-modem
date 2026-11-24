@@ -101,7 +101,11 @@ jobs:
           if [[ "$DOC_BUILD_PDF" == "1" ]]; then
             FORMATS="$FORMATS --format pdf"
           fi
-          python _scripts/build_docsets.py -b build $FORMATS -W --keep-going
+          KAPA_TAG=""
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+             KAPA_TAG="-t kapa"
+          fi
+          python _scripts/build_docsets.py -b build $FORMATS -W --keep-going ${KAPA_TAG}
 
       - name: Prepare Azure upload
         run: |
