@@ -102,7 +102,7 @@ jobs:
             FORMATS="$FORMATS --format pdf"
           fi
           KAPA_TAG=""
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+          if [[ "${{ github.ref }}" == "refs/heads/v2-branch" ]]; then
              KAPA_TAG="-t kapa"
           fi
           python _scripts/build_docsets.py -b build $FORMATS -W --keep-going ${KAPA_TAG}
