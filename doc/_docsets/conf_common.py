@@ -671,6 +671,10 @@ class RemoveLocalContents(SphinxPostTransform):
 def setup(app):
     app.add_post_transform(RemoveLocalContents)
 
+    from kapa import add_kapa_search
+
+    add_kapa_search(app)
+
 def docset_exclude_patterns(docset: str) -> list[str]:
     """Return the exclude patterns for a docset.
 
