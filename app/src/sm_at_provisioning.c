@@ -38,10 +38,7 @@ static void nrf_provisioning_callback(const struct nrf_provisioning_callback_dat
 {
 	switch (event->type) {
 	case NRF_PROVISIONING_EVENT_START:
-		LOG_INF("Provisioning started");
-		break;
 	case NRF_PROVISIONING_EVENT_STOP:
-		LOG_INF("Provisioning stopped");
 		break;
 	case NRF_PROVISIONING_EVENT_NEED_LTE_DEACTIVATED:
 		LOG_INF("Provisioning needs LTE deactivated");
@@ -52,21 +49,20 @@ static void nrf_provisioning_callback(const struct nrf_provisioning_callback_dat
 		xnrfprov_send_status(XNRFPROV_NEED_LTE_ACTIVATED);
 		break;
 	case NRF_PROVISIONING_EVENT_FAILED_TOO_MANY_COMMANDS:
-		xnrfprov_log_failed("too many commands for the device to handle");
+		xnrfprov_log_failed("too many commands");
 		xnrfprov_send_status(XNRFPROV_FAILED_TOO_MANY_CMDS);
 		break;
 	case NRF_PROVISIONING_EVENT_NO_COMMANDS:
-		LOG_INF("Provisioning done, no commands received");
+		LOG_INF("Provisioning done, no commands");
 		xnrfprov_send_status(XNRFPROV_DONE);
 		break;
 	case NRF_PROVISIONING_EVENT_FAILED:
-		xnrfprov_log_failed("try again...");
+		xnrfprov_log_failed("try again");
 		xnrfprov_send_status(XNRFPROV_FAILED);
 		break;
 	case NRF_PROVISIONING_EVENT_FAILED_DEVICE_NOT_CLAIMED:
 		LOG_WRN("Provisioning failed: %s", "device not claimed");
-		LOG_WRN("Claim the device using the device's attestation token on "
-			"nrfcloud.com");
+		LOG_WRN("Claim the device on nrfcloud.com");
 
 		/* Note: We explicitly allow attestation token to be printed to log */
 		if (IS_ENABLED(CONFIG_NRF_PROVISIONING_PROVIDE_ATTESTATION_TOKEN)) {
@@ -77,22 +73,25 @@ static void nrf_provisioning_callback(const struct nrf_provisioning_callback_dat
 		xnrfprov_send_status(XNRFPROV_FAILED_NOT_CLAIMED);
 		break;
 	case NRF_PROVISIONING_EVENT_FAILED_WRONG_ROOT_CA:
-		xnrfprov_log_failed("wrong root CA certificate for nRF Cloud");
+		xnrfprov_log_failed("wrong root CA");
 		xnrfprov_send_status(XNRFPROV_FAILED_WRONG_ROOT_CA);
 		break;
 	case NRF_PROVISIONING_EVENT_FAILED_NO_VALID_DATETIME:
-		xnrfprov_log_failed("no valid modem/network time");
+		xnrfprov_log_failed("no valid time");
 		xnrfprov_send_status(XNRFPROV_FAILED_NO_DATETIME);
 		break;
 	case NRF_PROVISIONING_EVENT_FATAL_ERROR:
 		xnrfprov_log_failed("irrecoverable");
 		xnrfprov_send_status(XNRFPROV_FATAL_ERROR);
 		break;
+#if defined(CONFIG_NRF_PROVISIONING_SCHEDULED)
+	/* The library sends this event only with scheduled provisioning. */
 	case NRF_PROVISIONING_EVENT_SCHEDULED_PROVISIONING:
 		LOG_INF("Provisioning scheduled, next attempt in %lld seconds",
 			event->next_attempt_time_seconds);
 		urc_send("\r\n#XNRFPROV: %lld\r\n", event->next_attempt_time_seconds);
 		break;
+#endif
 	case NRF_PROVISIONING_EVENT_DONE:
 		LOG_INF("Provisioning done");
 		xnrfprov_send_status(XNRFPROV_DONE);
