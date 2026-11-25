@@ -124,14 +124,31 @@ jobs:
             OUTDIR="${VERSION}"
           fi
 
+          # The files the push changes, which a publication can require one of
+          # its own files to be among. The checkout is shallow, so the previous
+          # tip of the branch is fetched for the comparison. A push that
+          # creates the branch has no previous tip and changes nothing here.
+          CHANGED=""
+          BEFORE="${{ github.event.before }}"
+          if [[ "${{ github.event_name }}" == "push" && -n "$BEFORE" && ! "$BEFORE" =~ ^0+$ ]]; then
+            if git fetch --no-tags --depth=1 origin "$BEFORE"; then
+              CHANGED=$(git diff --name-only "$BEFORE" "${{ github.sha }}")
+            else
+              echo "::warning::Cannot fetch $BEFORE. Treating the push as changing no files."
+            fi
+          fi
+          export CHANGED
+
           # One archive and one monitor file per publication, each uploaded to
           # an add-on directory of its own. Which publications this build
           # publishes, the directory of the add-on each goes into, and the
           # directory each is archived from all follow from PUBLICATIONS in
           # doc/_utils/docsets.py. Every branch builds every publication, which
           # keeps the sources validated, but a publication can be limited to
-          # the branch it is published from and the tags of its releases.
+          # pushes to the branches it is published from, and a branch to the
+          # pushes that change its release file.
           SPECS=$(python - "$OUTDIR" "$BRANCH" <<'EOF'
+          import os
           import sys
           from pathlib import Path
 
@@ -139,9 +156,10 @@ jobs:
           import docsets
 
           version, branch = sys.argv[1:]
+          changed = set(os.environ["CHANGED"].splitlines())
 
           for publication in docsets.PUBLICATIONS:
-              outdir = docsets.publish_version(publication, version, branch)
+              outdir = docsets.publish_version(publication, version, branch, changed)
               if outdir is None:
                   print(f"Not publishing {publication} from {branch}", file=sys.stderr)
                   continue

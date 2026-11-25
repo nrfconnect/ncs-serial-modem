@@ -11,9 +11,10 @@ live in :file:`doc/_docsets/conf_common.py`.
 
 It is the only docset of the nrf91m1 publication, so it is hosted as a
 document of its own, published from this docset directly and therefore without
-a docset switcher. The version dropdown follows
-:file:`doc/nrf91m1/versions.json`. See ``PUBLICATIONS`` in
-:file:`doc/_utils/docsets.py`.
+a docset switcher. It has no version dropdown either: ``main`` publishes it at
+the root of its add-on directory whenever :file:`doc/nrf91m1/DOC_VERSION`
+changes, and every push to ``v2-branch`` publishes it into ``2-branch``. See
+``PUBLICATIONS`` in :file:`doc/_utils/docsets.py`.
 
 Add the pages that do not apply to the nRF91M1 to ``exclude_patterns`` below.
 Excluded pages are never read, so an ``:ref:`` or ``:doc:`` link from an

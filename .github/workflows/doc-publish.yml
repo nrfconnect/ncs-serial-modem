@@ -27,17 +27,19 @@ jobs:
         working-directory: docs
         run: |
           # The build writes one monitor file per publication. Its third field
-          # is the version directory to publish into, its fourth the archive,
-          # and the archive name holds the add-on directory the publication is
-          # hosted in. Each publication is unpacked below that directory, so
-          # that publications sharing a version do not overwrite each other.
+          # is the version directory to publish into, or "root" for the add-on
+          # directory itself, its fourth the archive, and the archive name
+          # holds the add-on directory the publication is hosted in. Each
+          # publication is unpacked below that directory, so that publications
+          # sharing a version do not overwrite each other. Every upload is
+          # recorded as <add-on>:<version directory>.
           UPLOADS=""
           for MONITOR in monitor_*.txt; do
             # An unmatched glob is left as it is, so a build that produced no
             # monitor file at all reaches this with a name that does not exist.
             [ -f "$MONITOR" ] || continue
 
-            OUTDIR=$(awk 'NR==1 { if ($3 ~ /^(latest|PR-[0-9]+|[0-9]+\.[0-9a-zA-Z\.\-]+|[0-9]+-branch)$/) print $3 }' "$MONITOR")
+            OUTDIR=$(awk 'NR==1 { if ($3 ~ /^(root|latest|PR-[0-9]+|[0-9]+\.[0-9a-zA-Z\.\-]+|[0-9]+-branch)$/) print $3 }' "$MONITOR")
             if [ -z "$OUTDIR" ]; then
               echo "::warning::$MONITOR holds no publishable version. Skipping it."
               continue
@@ -50,10 +52,15 @@ jobs:
             fi
             ADDON="${BASH_REMATCH[1]}"
 
-            mkdir -p "$ADDON/$OUTDIR"
-            unzip "$ARCHIVE" -d "$ADDON/$OUTDIR"
-            find "$ADDON/$OUTDIR" -type l -delete
-            UPLOADS="$UPLOADS $ADDON/$OUTDIR"
+            if [[ "$OUTDIR" == "root" ]]; then
+              DEST="$ADDON"
+            else
+              DEST="$ADDON/$OUTDIR"
+            fi
+            mkdir -p "$DEST"
+            unzip "$ARCHIVE" -d "$DEST"
+            find "$DEST" -type l -delete
+            UPLOADS="$UPLOADS $ADDON:$OUTDIR"
           done
 
           if [ -z "$UPLOADS" ]; then
@@ -83,14 +90,26 @@ jobs:
           # Each publication goes to the add-on directory its archive named,
           # and a pull request collects one preview link per publication for
           # the comment below.
+          #
+          # A version directory is copied into the add-on directory as a whole.
+          # A publication at the root has its contents copied instead, which
+          # leaves the version directories next to them in place.
           PREVIEWS=""
           for UPLOAD in $UPLOADS; do
-            ADDON=$(dirname "$UPLOAD")
-            if [[ "${{ github.event.workflow_run.event }}" == "pull_request" ]]; then
-              azcopy cp "$UPLOAD" "${{ vars.NCS_DOC_PR_STORAGE_URL }}addons/$ADDON?$NCS_DOC_SAS_PRS" --recursive=true
-              PREVIEWS="${PREVIEWS}- [${ADDON}](${{ vars.NCS_DOC_PR_HOSTING_URL }}addons/${UPLOAD}/)"$'\n'
+            ADDON="${UPLOAD%%:*}"
+            OUTDIR="${UPLOAD#*:}"
+            if [[ "$OUTDIR" == "root" ]]; then
+              SRC="$ADDON/*"
+              PAGE="addons/${ADDON}/"
             else
-              azcopy cp "$UPLOAD" "${{ vars.NCS_DOC_STORAGE_URL }}addons/$ADDON?$NCS_DOC_SAS_MAIN" --recursive=true
+              SRC="$ADDON/$OUTDIR"
+              PAGE="addons/${ADDON}/${OUTDIR}/"
+            fi
+            if [[ "${{ github.event.workflow_run.event }}" == "pull_request" ]]; then
+              azcopy cp "$SRC" "${{ vars.NCS_DOC_PR_STORAGE_URL }}addons/$ADDON?$NCS_DOC_SAS_PRS" --recursive=true
+              PREVIEWS="${PREVIEWS}- [${ADDON}](${{ vars.NCS_DOC_PR_HOSTING_URL }}${PAGE})"$'\n'
+            else
+              azcopy cp "$SRC" "${{ vars.NCS_DOC_STORAGE_URL }}addons/$ADDON?$NCS_DOC_SAS_MAIN" --recursive=true
             fi
           done
 

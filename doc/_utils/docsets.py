@@ -24,7 +24,6 @@ published from the docset itself, which is what :attr:`Publication.docset_at_roo
 and :func:`publish_dir` describe.
 """
 
-import json
 import sys
 from pathlib import Path
 from typing import NamedTuple
@@ -42,6 +41,27 @@ ALL_DOCSETS = {
 }
 
 
+# Directory that :func:`publish_version` returns for a publication that is
+# published at the root of its add-on directory instead of a version directory
+# below it, see .github/workflows/doc-publish.yml.
+ADDON_ROOT = "root"
+
+
+class Release(NamedTuple):
+    """Where pushes to one branch publish a publication.
+
+    Attributes:
+        outdir: Directory below the add-on directory of the publication, or
+            :data:`ADDON_ROOT` for the add-on directory itself.
+        release_file: File whose change releases the publication, as a path
+            below :file:`doc`, or ``None``. Setting it limits the pushes to the
+            branch that publish the publication to those that change the file.
+    """
+
+    outdir: str
+    release_file: str | None = None
+
+
 class Publication(NamedTuple):
     """How one hosted document is assembled from docsets.
 
@@ -50,8 +70,9 @@ class Publication(NamedTuple):
             docset switcher. The landing page redirects to the first one.
         url: Base URL of the hosted publication, which the links that cross a
             publication boundary are built from because they cannot be
-            relative. It ends in the version directory of the current version,
-            which the theme calls ``latest``.
+            relative. It ends in the directory of the current version, which
+            the theme calls ``latest``, or in the add-on directory for a
+            publication whose current version is published at its root.
         versions: Version list of the publication, as a path below :file:`doc`,
             or ``None`` for a publication that is hosted in one version. The
             theme renders its version dropdown from the file, which is copied
@@ -65,18 +86,18 @@ class Publication(NamedTuple):
             way, and it also loses the docset switcher of the theme, which can
             only link to a sibling directory, see
             :file:`_static/css/no_docset_switcher.css`.
-        branch: Branch whose documentation is published as the current version
-            of the publication, or ``None`` for a publication that every
-            branch publishes. Setting it limits the published documentation to
-            that branch and to the tags of the versions in :attr:`versions`,
-            but not the pull request previews, see :func:`publish_version`.
+        branches: Branches the publication is published from, each mapped to
+            where its pushes publish it, or ``None`` for a publication that
+            every ref publishes. Setting it limits the published documentation
+            to pushes to those branches and to pull request previews, without
+            tag builds, see :func:`publish_version`.
     """
 
     docsets: tuple[str, ...]
     url: str
     versions: str | None = None
     docset_at_root: bool = False
-    branch: str | None = None
+    branches: dict[str, Release] | None = None
 
 
 # Publication directory name mapped to its contents. The name is also the
@@ -90,10 +111,12 @@ PUBLICATIONS = {
     ),
     "nrf91m1": Publication(
         docsets=("nrf91m1",),
-        url="https://nrfconnectdocs.nordicsemi.com/addons/addon-nrf91m1/latest",
-        versions="nrf91m1/versions.json",
+        url="https://nrfconnectdocs.nordicsemi.com/addons/addon-nrf91m1",
         docset_at_root=True,
-        branch="v2-branch",
+        branches={
+            "main": Release(ADDON_ROOT, release_file="nrf91m1/DOC_VERSION"),
+            "v2-branch": Release("2-branch"),
+        },
     ),
 }
 
@@ -189,35 +212,18 @@ def versions_file(publication: str) -> Path | None:
     return DOC_BASE / versions if versions else None
 
 
-def hosted_versions(publication: str) -> list[str]:
-    """Return the versions a publication is hosted in.
-
-    The first one is the current version, which the theme both labels and
-    hosts as ``latest``; every other one is hosted in a directory named after
-    it, see :func:`publish_version`.
-
-    Args:
-        publication: Publication name.
-
-    Returns:
-        Contents of the version list, or an empty list for a publication that
-        is hosted in one version.
-    """
-
-    versions = versions_file(publication)
-    return json.loads(versions.read_text()) if versions else []
-
-
-def publish_version(publication: str, version: str, branch: str) -> str | None:
+def publish_version(
+    publication: str, version: str, branch: str, changed: set[str]
+) -> str | None:
     """Return the directory of the add-on that a build publishes into.
 
     A pull request previews every publication, whatever branch it is against,
     because a preview directory of its own overwrites nothing. Of the other
-    builds, a publication that every branch publishes follows the version of
-    the build, and a publication that names a branch is published from that
-    branch only, as the current version, and from the tags of the releases it
-    is hosted in, which keeps an older release from being overwritten by a
-    branch it was not built from.
+    builds, a publication that every ref publishes follows the version of the
+    build, and a publication that names its branches is published from pushes
+    to those branches only, into the directory each of them names, and only
+    from those that change the release file of the branch if it names one. It
+    is not published from a tag.
 
     Args:
         publication: Publication name.
@@ -225,21 +231,27 @@ def publish_version(publication: str, version: str, branch: str) -> str | None:
             :file:`.github/workflows/doc-build.yml` derives it.
         branch: Branch of the build, which is the base branch of a pull
             request and the tag name of a tag build.
+        changed: Paths, relative to the repository root, that the push of
+            the build changes. Empty for a build that is not a push.
 
     Returns:
-        Directory below the add-on directory of the publication, or ``None``
-        when this build does not publish it.
+        Directory below the add-on directory of the publication,
+        :data:`ADDON_ROOT` for the add-on directory itself, or ``None`` when
+        this build does not publish it.
     """
 
     spec = PUBLICATIONS[publication]
     if not version:
         return None
-    if spec.branch is None or version.startswith("PR-"):
+    if spec.branches is None or version.startswith("PR-"):
         return version
-    if branch != spec.branch:
-        return version if version in hosted_versions(publication) else None
+    release = spec.branches.get(branch)
+    if release is None:
+        return None
+    if release.release_file and f"doc/{release.release_file}" not in changed:
+        return None
 
-    return "latest"
+    return release.outdir
 
 
 # PDF base filename produced for each docset (without extension).
