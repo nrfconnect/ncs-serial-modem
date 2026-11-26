@@ -44,6 +44,7 @@ The parameters and their defined values are the following:
        Can only be used when the :file:`full-fota.conf` configuration file and :file:`full-fota-nrf9151.overlay` devicetree overlay are used.
 
    * ``5`` - Start FOTA for MCUboot second-stage bootloader update.
+     See :ref:`sm_mcuboot_update_risks` before using this type.
 
    .. only:: not nrf91m1
 
@@ -84,6 +85,9 @@ The parameters and their defined values are the following:
 
 After the ``#XFOTA: 4,0`` notification indicating that the FOTA update is downloaded, it must be activated by resetting either the whole device with the ``AT#XRESET`` command, or in case of modem update only the modem with the ``AT#XMODEMRESET`` command.
 
+For an application update, the host must supervise the activation and reset the device if it does not report ``Ready`` in time.
+See :ref:`sm_app_update_activation` for more information.
+
 .. note::
 
    During a delta update to the modem, the modem DFU area is automatically erased as needed as part of the update process. Erasing this area manually is optional.
@@ -101,6 +105,7 @@ After the ``#XFOTA: 4,0`` notification indicating that the FOTA update is downlo
 
    For the MCUboot bootloader update, NSIB (B0) uses monotonic counter values to prevent rollback.
    When performing an MCUboot FOTA, the host must ensure that the new MCUboot image has a strictly higher monotonic counter value than the currently running MCUboot to avoid update failure.
+   See :ref:`sm_mcuboot_update_risks` for the risks of updating MCUboot.
 
    .. only:: not nrf91m1
 

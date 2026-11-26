@@ -40,6 +40,7 @@ The following DFU image types are supported:
 * ``3`` - MCUboot second-stage bootloader self-update.
   Only available when the device uses the NSIB (B0) and MCUboot as a second-stage bootloader.
   The host must stream the signed image for the **inactive** ``s0``/``s1`` slot.
+  See :ref:`sm_mcuboot_update_risks` before using this type.
 
 .. caution::
 
@@ -248,6 +249,7 @@ The parameters and their defined values are the following:
    The DFU image type as specified in the :ref:`dfu_types` section.
 
 For application (type ``0``), delta modem firmware (type ``1``), and MCUboot bootloader (type ``3``), the update is scheduled and will be activated on the next reset, which can be done with the ``AT#XRESET`` command.
+For an application update, see :ref:`sm_app_update_activation` for how to supervise the activation.
 For full modem firmware (type ``2``), the command applies the current segment (bootloader or firmware) and triggers a reboot if needed.
 
 .. TODO: REMOVE FILTERING WHEN NRF91M1 IS RELEASED
@@ -381,6 +383,27 @@ The following example shows a complete application firmware update:
    #XSMVER: "v1.99.1-8-gf0fd0f46-dirty","3.3.0-rc1"
    OK
 
+.. _sm_app_update_activation:
+
+Application update activation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The new application is activated on the reset that follows a completed application update.
+MCUboot swaps the new image in, and the new application must confirm itself after it has booted.
+If the new application resets before it has confirmed itself, MCUboot reverts to the previous application on the next boot.
+
+The |SM| application has no watchdog, so a new application that gets stuck during activation does not recover by itself.
+Therefore, the host must supervise the activation:
+
+1. After a reset to activate the new application, wait for the ``Ready`` indication.
+   A normal activation takes approximately 45 to 50 seconds.
+#. If the new application resets during boot and MCUboot rolls back to the previous application, the device goes through a second boot cycle.
+   Allow up to 120 seconds in total before concluding that the activation failed.
+#. If ``Ready`` has not been received within 120 seconds, reset the |SM| with the reset pin or power cycle it.
+   This causes MCUboot to roll back to the previous application, provided that the new application had not confirmed itself.
+#. After the device is back, verify with ``AT#XSMVER`` which application version is running.
+   If the previous version is running, the update failed and was rolled back.
+
 Delta modem firmware update
 ---------------------------
 
@@ -511,6 +534,7 @@ MCUboot firmware update
 .. important::
    NSIB (B0) uses monotonic counter values to prevent rollback of the MCUboot bootloader.
    When performing an MCUboot DFU, the host must ensure that the new MCUboot image has a strictly higher monotonic counter value than the currently running MCUboot to avoid update failure.
+   See :ref:`sm_mcuboot_update_risks` for the risks of updating MCUboot.
 
    .. only:: not nrf91m1
 
@@ -581,6 +605,53 @@ The following example shows a complete MCUboot firmware update:
    AT#XBOOTINFO=1
    #XBOOTINFO: 1
    OK
+
+.. _sm_mcuboot_update_risks:
+
+MCUboot update risks
+~~~~~~~~~~~~~~~~~~~~
+
+.. warning::
+   An MCUboot update cannot be reverted.
+   NSIB (B0) does not have a test or confirm state for the second-stage bootloader.
+   It boots the valid slot with the highest version, raises the monotonic counter, and jumps to it without ever regaining control.
+
+   * If the new MCUboot image fails validation (signature, hash, or a version lower than the monotonic counter), B0 invalidates it and boots the other slot.
+
+     The device stays operational, but the MCUboot slot did not change and the update was not applied.
+     Verify with ``AT#XBOOTINFO=0`` that the monotonic counter value was updated.
+   * If the new MCUboot image passes validation but fails at runtime, B0 boots the same slot again on every reset.
+     The previous MCUboot cannot be used as a fallback, because its version is lower than the monotonic counter.
+
+     .. only:: not nrf91m1
+
+        The device cannot be recovered over the air and requires reprogramming over SWD.
+
+     .. only:: nrf91m1
+
+        The device cannot be recovered.
+        Nordic tests the combinations of released software to prevent this from happening.
+
+.. only:: not nrf91m1
+
+   Before releasing an MCUboot update, test the exact signed images that will be shipped:
+
+   1. Use devices with the same B0, partition layout, and MCUboot configuration as the devices in the field.
+      The monotonic counter of the tested devices is raised by the test and cannot be lowered.
+   #. Update from slot 0 to slot 1 and from slot 1 to slot 0 using the same update method as in the field, and confirm with ``AT#XBOOTINFO=0`` and ``AT#XBOOTINFO=1``.
+   #. Verify that the device boots into the application and that an application update still works with the new MCUboot.
+   #. Verify that an interrupted update (power loss or reset before the update is applied) leaves the device running the current MCUboot.
+   #. Verify that an image that fails B0 validation is rejected and that the device boots the previous MCUboot.
+      For example, use an image signed with a wrong key.
+
+.. only:: nrf91m1
+
+   Nordic tests all combinations of released software, including MCUboot updates.
+   Use only the MCUboot images released by Nordic for the software version you are updating to.
+
+Use fleet management to roll out MCUboot updates.
+Update a small group of devices first, verify that they boot and report the expected ``AT#XBOOTINFO=0`` and ``AT#XBOOTINFO=1`` values, and then extend the rollout gradually.
+Stop the rollout if any device fails to come back.
 
 
 .. _sm_dfu_host_example:
