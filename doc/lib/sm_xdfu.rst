@@ -9,7 +9,7 @@
 
 .. note::
 
-   This library is `Experimental <Software maturity levels_>`_.
+   This library is :ref:`Experimental <nrf:software_maturity>`.
 
 The |SM| XDFU library implements the host side of the ``AT#XDFU`` update sequence, so that a host MCU can update the nRF91 Series SiP that runs the :ref:`serial_modem_app`.
 This library is intended for applications running on an external MCU that use Zephyr's ``modem_cellular`` driver to control the |SM| device over UART, for example, the :ref:`sm_ppp_shell_sample`.
@@ -36,10 +36,10 @@ Configure the following Kconfig option to enable the library:
 
 The library also depends on the following features, which must be enabled by the application:
 
-* ``CONFIG_MODEM_CELLULAR`` - Provides the modem device and UART pipe that the library attaches to.
-* ``CONFIG_FILE_SYSTEM`` - Provides access to the update file.
-* ``CONFIG_ZCBOR`` - Decodes the CBOR-encoded full modem firmware update package.
-* ``CONFIG_COMMON_LIBC_MALLOC`` - Provides dynamic memory for the library's internal chat instance and CBOR metadata buffer.
+* :kconfig:option:`CONFIG_MODEM_CELLULAR` - Provides the modem device and UART pipe that the library attaches to.
+* :kconfig:option:`CONFIG_FILE_SYSTEM` - Provides access to the update file.
+* :kconfig:option:`CONFIG_ZCBOR` - Decodes the CBOR-encoded full modem firmware update package.
+* :kconfig:option:`CONFIG_COMMON_LIBC_MALLOC` - Provides dynamic memory for the library's internal chat instance and CBOR metadata buffer.
 
 Usage
 *****
@@ -70,4 +70,3 @@ API documentation
 | Source file: :file:`lib/sm_xdfu/sm_xdfu.c`
 
 .. doxygengroup:: sm_xdfu
-   :members:

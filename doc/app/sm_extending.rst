@@ -7,13 +7,13 @@ Extending the application
    :local:
    :depth: 2
 
-The AT commands in the |SM| are implemented with the `Custom AT commands`_ library.
+The AT commands in the |SM| are implemented with the :ref:`Custom AT commands <nrf:at_cmd_custom_readme>` library.
 You can extend the |SM| application by adding your own AT commands.
 
 Adding AT commands
 ******************
 
-If you want to implement a custom AT command in |SM|, you will need to follow the instructions in the `Custom AT commands`_ library documentation.
+If you want to implement a custom AT command in |SM|, you will need to follow the instructions in the :ref:`Custom AT commands <nrf:at_cmd_custom_readme>` library documentation.
 Setting the AT command filter and callback with the ``AT_CMD_CUSTOM`` macro is enough for a custom AT command that does not require setup or teardown.
 
 As a preferred alternative to the ``AT_CMD_CUSTOM`` macro, |SM| defines the ``SM_AT_CMD_CUSTOM`` macro, which is a wrapper around the ``AT_CMD_CUSTOM`` macro.

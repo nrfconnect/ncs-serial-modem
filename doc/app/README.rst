@@ -31,45 +31,45 @@ The application supports the following development kits:
      - Board name
      - Board target
      - SW maturity level
-   * - `nRF9151 DK <nRF91 DK_>`_
+   * - :ref:`nRF9151 DK <nrf:ug_nrf91>`
      - PCA10171
-     - `nrf9151dk`_
+     - :doc:`nrf9151dk <zephyr:boards/nordic/nrf9151dk/doc/index>`
      - ``nrf9151dk/nrf9151/ns``
-     - `Supported <Software maturity levels_>`_
-   * - `Thingy:91 X <Thingy91X_>`_
+     - :ref:`Supported <nrf:software_maturity>`
+   * - :ref:`Thingy:91 X <nrf:ug_thingy91x>`
      - PCA20065
-     - `thingy91x <Thingy91X_>`_
+     - :ref:`thingy91x <nrf:ug_thingy91x>`
      - ``thingy91x/nrf9151/ns``
-     - `Experimental <Software maturity levels_>`_
+     - :ref:`Experimental <nrf:software_maturity>`
 
-For more security, the application must use the ``*/ns`` `variant <app_boards_names_>`_ of the board target, which is required when using the nRF91 Series `Modem library`_.
-When built for this variant, the sample is configured to compile and run as a non-secure application using `security by separation <ug_tfm_security_by_separation_>`_.
-Therefore, it automatically includes `Trusted Firmware-M <ug_tfm_>`_ that prepares the required peripherals and secure services to be available for the application.
+For more security, the application must use the ``*/ns`` :ref:`variant <nrf:app_boards_names>` of the board target, which is required when using the nRF91 Series :ref:`Modem library <nrfxlib:nrf_modem>`.
+When built for this variant, the sample is configured to compile and run as a non-secure application using :ref:`security by separation <nrf:ug_tfm_security_by_separation>`.
+Therefore, it automatically includes :ref:`Trusted Firmware-M <nrf:ug_tfm>` that prepares the required peripherals and secure services to be available for the application.
 
 This application has the following dependencies:
 
 * This application uses the following |NCS| libraries:
 
-  * `AT parser`_
-  * `AT monitor`_
-  * `Modem library integration layer`_
-  * `Modem JWT`_
-  * `SMS`_
-  * `FOTA download`_
-  * `Downloader`_
-  * `nRF Cloud`_
-  * `nRF Cloud A-GNSS`_
-  * `nRF Cloud P-GPS`_
-  * `nRF Cloud location`_
-  * `nRF Cloud device provisioning`_
+  * :ref:`AT parser <nrf:at_parser_readme>`
+  * :ref:`AT monitor <nrf:at_monitor_readme>`
+  * :ref:`Modem library integration layer <nrf:nrf_modem_lib_readme>`
+  * :ref:`Modem JWT <nrf:lib_modem_jwt>`
+  * :ref:`SMS <nrf:sms_readme>`
+  * :ref:`FOTA download <nrf:lib_fota_download>`
+  * :ref:`Downloader <nrf:lib_downloader>`
+  * :ref:`nRF Cloud <nrf:lib_nrf_cloud>`
+  * :ref:`nRF Cloud A-GNSS <nrf:lib_nrf_cloud_agnss>`
+  * :ref:`nRF Cloud P-GPS <nrf:lib_nrf_cloud_pgps>`
+  * :ref:`nRF Cloud location <nrf:lib_nrf_cloud_location>`
+  * :ref:`nRF Cloud device provisioning <nrf:lib_nrf_provisioning>`
 
 * It uses the following `sdk-nrfxlib`_ libraries:
 
-  * `Modem library`_
+  * :ref:`Modem library <nrfxlib:nrf_modem>`
 
 * In addition, it uses the following secure firmware component:
 
-  * `Trusted Firmware-M`_
+  * :ref:`Trusted Firmware-M <nrf:ug_tfm>`
 
 See the subpages for how to use the application, how to extend it, and information on the supported AT commands.
 

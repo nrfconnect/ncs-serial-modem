@@ -12,7 +12,7 @@ These commands allow you to update the application firmware, delta modem firmwar
 
 .. only:: not nrf91m1
 
-   The commands are available when the :ref:`CONFIG_SM_DFU <CONFIG_SM_DFU>` Kconfig option is enabled.
+   The commands are available when the :option:`CONFIG_SM_DFU` Kconfig option is enabled.
 
 .. note::
 
@@ -31,7 +31,7 @@ The following DFU image types are supported:
 
 .. only:: not nrf91m1
 
-   * ``2`` - Full modem firmware (requires :ref:`CONFIG_SM_DFU_MODEM_FULL <CONFIG_SM_DFU_MODEM_FULL>`)
+   * ``2`` - Full modem firmware (requires :option:`CONFIG_SM_DFU_MODEM_FULL`)
 
 .. only:: nrf91m1
 
@@ -435,7 +435,7 @@ The following example shows a complete full modem firmware update.
 
 .. only:: not nrf91m1
 
-   For full modem firmware update, enable the :ref:`CONFIG_SM_DFU_MODEM_FULL <CONFIG_SM_DFU_MODEM_FULL>` Kconfig option.
+   For full modem firmware update, enable the :option:`CONFIG_SM_DFU_MODEM_FULL` Kconfig option.
 
 .. important::
 
@@ -514,7 +514,7 @@ MCUboot firmware update
 
    .. only:: not nrf91m1
 
-      This means that updates for MCUboot images are limited to the number of slots defined in the ``SB_CONFIG_SECURE_BOOT_NUM_VER_COUNTER_SLOTS`` Kconfig option.
+      This means that updates for MCUboot images are limited to the number of slots defined in the :kconfig:option:`SB_CONFIG_SECURE_BOOT_NUM_VER_COUNTER_SLOTS` Kconfig option.
       In |SM|, it is set to ``40`` by default.
 
    .. only:: nrf91m1

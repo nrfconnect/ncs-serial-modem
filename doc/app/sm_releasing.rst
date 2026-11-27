@@ -5,7 +5,7 @@ Releasing |SM|
 
 Before each official release or pre-release, update the following version metadata.
 Each published application image must carry a higher MCUboot sign version than the previous one on the same product line.
-Increment ``CONFIG_FW_INFO_FIRMWARE_VERSION`` only when the MCUboot bootloader image changes.
+Increment :kconfig:option:`CONFIG_FW_INFO_FIRMWARE_VERSION` only when the MCUboot bootloader image changes.
 
 Application - :file:`app/VERSION`
 =================================
@@ -13,7 +13,7 @@ Application - :file:`app/VERSION`
 :file:`app/VERSION` is the single source of truth for:
 
 * The ``major.minor.patchlevel`` prefix in ``AT#XSMVER`` ``<sm_version>`` (Git-describe style: ``v`` + that triplet + optional ``-N-g<hash>`` from Git).
-* The MCUboot application sign version (``CONFIG_MCUBOOT_IMGTOOL_SIGN_VERSION``, ``major.minor.patchlevel+VERSION_TWEAK``), used for application downgrade prevention during DFU.
+* The MCUboot application sign version (:kconfig:option:`CONFIG_MCUBOOT_IMGTOOL_SIGN_VERSION`, ``major.minor.patchlevel+VERSION_TWEAK``), used for application downgrade prevention during DFU.
 
 See `Zephyr application VERSION`_.
 

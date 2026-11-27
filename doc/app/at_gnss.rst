@@ -19,18 +19,18 @@ Set command
 
 The set command allows you to start and stop the GNSS module.
 
-The `nRF Cloud A-GNSS`_ service can be used with the module to reduce the time it takes for the GNSS module to estimate device position.
+The :ref:`nRF Cloud A-GNSS <nrf:lib_nrf_cloud_agnss>` service can be used with the module to reduce the time it takes for the GNSS module to estimate device position.
 
 .. only:: not nrf91m1
 
-   Both the `nRF Cloud A-GNSS`_ service and the `nRF Cloud P-GPS`_ service can be used with the module, either together or independently of each other.
+   Both the :ref:`nRF Cloud A-GNSS <nrf:lib_nrf_cloud_agnss>` service and the :ref:`nRF Cloud P-GPS <nrf:lib_nrf_cloud_pgps>` service can be used with the module, either together or independently of each other.
    Using them reduces the time it takes for the GNSS module to estimate device position.
 
    To use either of them, the device must be connected to nRF Cloud (using the :ref:`#XNRFCLOUD <SM_AT_NRFCLOUD>` AT command) when starting the GNSS module.
    In addition, the following Kconfig options must be enabled:
 
-   * ``CONFIG_NRF_CLOUD_AGNSS`` to use A-GNSS.
-   * ``CONFIG_NRF_CLOUD_PGPS`` to use P-GPS.
+   * :kconfig:option:`CONFIG_NRF_CLOUD_AGNSS` to use A-GNSS.
+   * :kconfig:option:`CONFIG_NRF_CLOUD_PGPS` to use P-GPS.
      This also requires applying the :file:`pgps-nrf9151.overlay` devicetree overlay to both the application and the ``mcuboot`` image (using the absolute path for the latter).
 
    If both assistive services were enabled during compilation, you cannot choose to use only one of them at run time.
@@ -100,18 +100,18 @@ In periodic navigation mode, the ``<interval>`` and ``<timeout>`` parameters are
 
    .. note::
 
-      See the documentation for the `nRF Cloud A-GNSS`_ and `nRF Cloud P-GPS`_ libraries for information on how to best configure and use A-GNSS and P-GPS, respectively.
+      See the documentation for the :ref:`nRF Cloud A-GNSS <nrf:lib_nrf_cloud_agnss>` and :ref:`nRF Cloud P-GPS <nrf:lib_nrf_cloud_pgps>` libraries for information on how to best configure and use A-GNSS and P-GPS, respectively.
 
    .. note::
 
-      When using P-GPS, make sure that the value of the :ref:`CONFIG_SM_PGPS_INJECT_FIX_DATA <CONFIG_SM_PGPS_INJECT_FIX_DATA>` Kconfig option matches your use case.
+      When using P-GPS, make sure that the value of the :option:`CONFIG_SM_PGPS_INJECT_FIX_DATA` Kconfig option matches your use case.
       It is enabled by default but should be disabled if the device is expected to move distances longer than a few dozen kilometers between fix attempts.
 
    .. note::
 
       When using P-GPS, apply the :file:`pgps-nrf9151.overlay` devicetree overlay to both the application and the ``mcuboot`` image to provide a dedicated flash partition for P-GPS prediction data storage and to ensure MCUboot operates with the same partition layout.
       The absolute path to the overlay file must be provided when passing it to the ``mcuboot`` image using :makevar:`mcuboot_EXTRA_DTC_OVERLAY_FILE`.
-      See :ref:`sm_config_files` for more information.
+      See :ref:`Configuration files <main:sm_config_files>` for more information.
 
 As an alternative to GNSS-based positioning, see :ref:`#XNRFCLOUDPOS <SM_AT_NRFCLOUDPOS>` for cellular and Wi-Fi® positioning.
 

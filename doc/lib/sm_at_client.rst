@@ -9,7 +9,7 @@
 
 .. note::
 
-   This library is `Experimental <Software maturity levels_>`_.
+   This library is :ref:`Experimental <nrf:software_maturity>`.
 
 The |SM| AT Client library exposes the AT command interface of the :ref:`serial_modem_app` for external devices over a serial interface.
 This library is intended for applications running on an external MCU that are connected to an nRF91 Series SiP through UART.
@@ -19,15 +19,15 @@ Overview
 
 The |SM| AT Client library allows you to perform the following functions:
 
-* Send modem or |SM| proprietary AT commands, receive responses and notifications, similar to the `AT Host`_ library.
-  Received AT responses or notifications can be parsed by the `AT parser`_ library.
+* Send modem or |SM| proprietary AT commands, receive responses and notifications, similar to the :ref:`AT Host <nrf:lib_at_host>` library.
+  Received AT responses or notifications can be parsed by the :ref:`AT parser <nrf:at_parser_readme>` library.
 * Send raw data in |SM| data mode.
   Refer to :ref:`sm_data_mode`.
 * Manage the UART power state of the host.
 * Manage the UART power state of the |SM| with DTR (Data Terminal Ready) and RI (Ring Indicator) pins.
   See :ref:`uart_configuration` for more information.
-* Monitor AT notifications with registered callbacks, similar to the `AT monitor`_ library.
-* Send AT commands through UART or RTT shell, similar to the `AT shell`_ library.
+* Monitor AT notifications with registered callbacks, similar to the :ref:`AT monitor <nrf:at_monitor_readme>` library.
+* Send AT commands through UART or RTT shell, similar to the :ref:`AT shell <nrf:lib_at_shell>` library.
 
 Configuration
 *************
@@ -59,7 +59,7 @@ The library sends the termination character automatically after an AT command.
 
 The application must configure the devicetree nodes for the UART, UART pins, and DTR GPIOs.
 
-The following is an example overlay for configuring UART and DTR/RI GPIOs with the `nrf54l15dk`_:
+The following is an example overlay for configuring UART and DTR/RI GPIOs with the :doc:`nrf54l15dk <zephyr:boards/nordic/nrf54l15dk/doc/index>`:
 
 .. code-block:: devicetree
 
@@ -157,7 +157,7 @@ UARTs are resumed when there is an RI signal from the |SM| or when the host send
 |SM| AT Client Monitor usage
 ****************************
 
-The |SM| AT Client Monitor has similar functions to the `AT monitor`_ library, except "Direct dispatching".
+The |SM| AT Client Monitor has similar functions to the :ref:`AT monitor <nrf:at_monitor_readme>` library, except "Direct dispatching".
 
   .. code-block:: console
 
@@ -171,4 +171,3 @@ API documentation
 | Source file: :file:`lib/sm_at_client/sm_at_client_monitor.c`
 
 .. doxygengroup:: sm_at_client
-   :members:

@@ -19,7 +19,8 @@ Add the pages that do not apply to the nRF91M1 to ``exclude_patterns`` below.
 Excluded pages are never read, so an ``:ref:`` or ``:doc:`` link from an
 included page to an excluded one becomes a warning. Turn such links into
 intersphinx references to the main docset instead, for example
-``:external+main:doc:`app/at_carrier```.
+``:doc:`main:app/at_carrier```. The prefix also resolves when the main docset
+itself is built, so a page shared by both docsets needs only the one form.
 """
 
 import sys
@@ -31,7 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from conf_common import *  # noqa: F401,F403
 from conf_common import author, docsets, docset_exclude_patterns, docset_rst_epilog, \
     html_theme_options, docset_latex_documents, docset_html_context, \
-    docset_latex_elements, docset_html_css_files, docset_theme_options
+    docset_latex_elements, docset_html_css_files, docset_theme_options, docset_intersphinx_mapping
 from pdf_revision import revision_for  # noqa: E402 — conf_common adds ``doc/_utils``
 
 DOCSET = Path(__file__).resolve().parent.name
@@ -64,13 +65,6 @@ html_theme_options.update(docset_theme_options(DOCSET))
 html_css_files = docset_html_css_files(DOCSET)
 html_context = docset_html_context(DOCSET)
 
-# Lets this docset link into the main docset with :external+main:. The main
-# docset belongs to another publication, so such a link resolves to its hosted
-# URL rather than to a sibling directory. The mapping is only available once
-# the main docset has been built, which is why _scripts/build_docsets.py builds
-# the docsets in order.
-intersphinx_mapping = {}
-
-_main_mapping = docsets.get_intersphinx_mapping(DOCSET, "main")
-if _main_mapping:
-    intersphinx_mapping["main"] = _main_mapping
+# Lets this docset reference the other docsets with the "<docset>:" prefix, the
+# same way "nrf:" and "zephyr:" reference the |NCS| documentation.
+intersphinx_mapping = docset_intersphinx_mapping(DOCSET)
