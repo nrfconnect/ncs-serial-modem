@@ -13,10 +13,10 @@
 
 LOG_MODULE_REGISTER(sm_fw_update, CONFIG_SM_LOG_LEVEL);
 
-/* Reserves the modem DFU area for direct delta modem DFU, so that AT#XFOTA and AT#XNRFCLOUDFOTA
- * cannot erase or overwrite a partly written or scheduled image.
+/* Reserves the firmware update targets for direct DFU, so that AT#XFOTA and AT#XNRFCLOUDFOTA
+ * cannot erase, abort or overwrite a partly written or scheduled image.
  */
-static atomic_t modem_dfu_claimed;
+static atomic_t dfu_claimed;
 
 static void on_modem_dfu_res(int dfu_res, void *ctx)
 {
@@ -100,25 +100,26 @@ void sm_fw_update_boot_check(void)
 	sm_fota_stage  = FOTA_STAGE_COMPLETE;
 }
 
-int sm_fw_update_modem_dfu_claim(void)
+int sm_fw_update_dfu_claim(enum sm_fw_update_target target)
 {
 	if (IS_ENABLED(CONFIG_SM_FOTA_SESSION) && sm_fota_stage != FOTA_STAGE_INIT) {
 		LOG_ERR("FOTA in progress");
 		return -EBUSY;
 	}
-	atomic_set(&modem_dfu_claimed, 1);
+	atomic_set_bit(&dfu_claimed, target);
 	return 0;
 }
 
-bool sm_fw_update_modem_dfu_busy(void)
+bool sm_fw_update_dfu_busy(void)
 {
-	return atomic_get(&modem_dfu_claimed) != 0;
+	return atomic_get(&dfu_claimed) != 0;
 }
 
+/* The modem library shutdown activates a scheduled modem update, release claim for modem. */
 static void modem_dfu_release(void *ctx)
 {
 	ARG_UNUSED(ctx);
 
-	atomic_set(&modem_dfu_claimed, 0);
+	atomic_clear_bit(&dfu_claimed, SM_FW_UPDATE_TARGET_MODEM);
 }
 NRF_MODEM_LIB_ON_SHUTDOWN(sm_fw_update_shutdown, modem_dfu_release, NULL);

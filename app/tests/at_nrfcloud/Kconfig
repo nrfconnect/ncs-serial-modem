@@ -86,6 +86,13 @@ config SM_NRF_CLOUD_OBSERVABILITY_DEBUG
 	bool "Debug nRF Cloud observability AT commands"
 	depends on SM_NRF_CLOUD_OBSERVABILITY
 
+# The application selects this with nRF Cloud, so the observability uploads and the nRF Cloud
+# FOTA checks run on the blocking work queue, which ../stubs/sm_workq.c starts. Enabled here so
+# that the tests exercise the same queue split as the product.
+config SM_BLOCKING_WORK_Q
+	bool
+	default y
+
 choice MEMFAULT_SYSTEM_TIME_SOURCE
 	bool "Memfault system time from date_time (test stub)"
 	default MEMFAULT_SYSTEM_TIME_SOURCE_DATETIME

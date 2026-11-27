@@ -79,17 +79,12 @@ The parameters and their defined values are the following:
 
 For full modem firmware (type ``2``), the command triggers an immediate reboot into bootloader mode.
 
-.. TODO: REMOVE FILTERING WHEN NRF91M1 IS RELEASED
-.. only:: not nrf91m1
-
-   The ``#XDFUINIT``, ``#XDFUWRITE``, and ``#XDFUAPPLY`` commands use the same modem DFU area as the ``#XFOTA`` and ``#XNRFCLOUDFOTA`` commands.
-   For delta modem firmware (type ``1``), they return ``ERROR`` in one of the following cases:
-
-   * A FOTA update started with the ``#XFOTA`` or ``#XNRFCLOUDFOTA`` command is in progress.
-   * Such an update is downloaded, but not yet activated.
-
-   When one of these commands succeeds, it reserves the modem DFU area for direct DFU until the modem is reset, for example with the ``#XMODEMRESET`` or ``#XRESET`` command.
-   While the area is reserved, the ``#XFOTA`` and ``#XNRFCLOUDFOTA`` commands cannot start a modem firmware update or erase the modem DFU area.
+The ``#XFOTA`` and ``#XNRFCLOUDFOTA`` commands (see :ref:`SM_AT_FOTA` and :ref:`SM_AT_NRFCLOUDFOTA`) use the same update targets as direct DFU, so you cannot use direct DFU and FOTA at the same time.
+The DFU commands fail while a FOTA update is in progress, or downloaded but not yet activated.
+When a DFU command succeeds, it reserves the update targets.
+Until the reservation ends, the FOTA commands cannot start an update or erase the modem DFU area.
+The reservation of the modem DFU area ends when the modem is reset.
+The reservation of the application and MCUboot bootloader update slot ends when the |SM| is reset.
 
 Example
 ~~~~~~~
@@ -173,11 +168,6 @@ The parameters and their defined values are the following:
 After the command returns ``OK``, the |SM| enters data mode to receive exactly ``<len>`` bytes of firmware data.
 When the data has been received and written, the |SM| sends a ``#XDFU`` unsolicited notification with the status.
 
-.. TODO: REMOVE FILTERING WHEN NRF91M1 IS RELEASED
-.. only:: not nrf91m1
-
-   For delta modem firmware (type ``1``), the command returns ``ERROR`` under the same conditions as the ``#XDFUINIT`` command.
-
 Example
 ~~~~~~~
 
@@ -249,11 +239,6 @@ The parameters and their defined values are the following:
 
 For application (type ``0``), delta modem firmware (type ``1``), and MCUboot bootloader (type ``3``), the update is scheduled and will be activated on the next reset, which can be done with the ``AT#XRESET`` command.
 For full modem firmware (type ``2``), the command applies the current segment (bootloader or firmware) and triggers a reboot if needed.
-
-.. TODO: REMOVE FILTERING WHEN NRF91M1 IS RELEASED
-.. only:: not nrf91m1
-
-   For delta modem firmware (type ``1``), the command returns ``ERROR`` under the same conditions as the ``#XDFUINIT`` command.
 
 Example
 ~~~~~~~

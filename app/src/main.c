@@ -270,7 +270,7 @@ static int sm_main(void)
 		(void)sm_settings_modem_eio_retried_save();
 	}
 
-	if (IS_ENABLED(CONFIG_SM_FOTA)) {
+	if (IS_ENABLED(CONFIG_SM_FOTA_SESSION)) {
 		sm_fota_mcuboot_bl_boot_check();
 	}
 

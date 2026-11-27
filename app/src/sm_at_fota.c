@@ -34,10 +34,6 @@ LOG_MODULE_REGISTER(sm_fota, CONFIG_SM_LOG_LEVEL);
 
 #define ERASE_POLL_TIME 2
 
-#if FIXED_PARTITION_EXISTS(s1_partition)
-#define SM_FOTA_BL_SUPPORTED
-#endif
-
 enum sm_fota_operation {
 	SM_FOTA_STOP = 0,
 	SM_FOTA_START_APP = 1,
@@ -48,8 +44,6 @@ enum sm_fota_operation {
 	SM_FOTA_MFW_READ = 7,
 	SM_FOTA_ERASE_MFW = 9
 };
-
-uint32_t sm_fota_bl_version_before;
 
 /* Heap buffers for the current FOTA hostname and path.
  * fota_download stores raw pointers to these, so they must
@@ -405,7 +399,7 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 				err = -EBUSY;
 				break;
 			}
-			if (op == SM_FOTA_START_MFW && sm_fw_update_modem_dfu_busy()) {
+			if (sm_fw_update_dfu_busy()) {
 				err = -EBUSY;
 				break;
 			}
@@ -450,6 +444,12 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 			else {
 				type = DFU_TARGET_IMAGE_TYPE_MODEM_DELTA;
 			}
+			if (IS_ENABLED(SM_FOTA_BL_SUPPORTED) && op == SM_FOTA_START_MCUBOOT_BL) {
+				err = sm_fota_mcuboot_bl_state_record();
+				if (err) {
+					break;
+				}
+			}
 			err = do_fota_start(uri_ptr, uri_len, sec_tag, pdn_id, type);
 			if (err == 0) {
 				sm_fota_init_state();
@@ -466,11 +466,6 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 #if defined(SM_FOTA_BL_SUPPORTED)
 				else if (op == SM_FOTA_START_MCUBOOT_BL) {
 					sm_fota_type = SM_FOTA_TYPE_MCUBOOT_BL;
-
-					/* Save the MCUboot version before FOTA. */
-					sm_util_mcuboot_active_version(&sm_fota_bl_version_before);
-					sm_settings_fota_bl_version_save();
-					sm_settings_fota_save();
 				}
 #endif
 				else {
@@ -483,7 +478,7 @@ static int handle_at_fota(enum at_parser_cmd_type cmd_type, struct at_parser *pa
 			err = do_fota_mfw_read();
 			break;
 		case SM_FOTA_ERASE_MFW:
-			if (sm_fota_stage != FOTA_STAGE_INIT || sm_fw_update_modem_dfu_busy()) {
+			if (sm_fota_stage != FOTA_STAGE_INIT || sm_fw_update_dfu_busy()) {
 				err = -EBUSY;
 				break;
 			}
@@ -543,35 +538,6 @@ static int sm_at_fota_init(void)
 	return 0;
 }
 SYS_INIT(sm_at_fota_init, APPLICATION, 0);
-
-void sm_fota_mcuboot_bl_boot_check(void)
-{
-#if defined(SM_FOTA_BL_SUPPORTED)
-	if (sm_fota_type != SM_FOTA_TYPE_MCUBOOT_BL) {
-		return;
-	}
-
-	uint32_t current_version = 0;
-	int err = sm_util_mcuboot_active_version(&current_version);
-
-	if (err != 0) {
-		sm_fota_status = FOTA_STATUS_ERROR;
-		sm_fota_info = err;
-		LOG_ERR("MCUboot BL version read failed: %d", err);
-	} else if (current_version <= sm_fota_bl_version_before) {
-		sm_fota_status = FOTA_STATUS_ERROR;
-		sm_fota_info = 1;
-		LOG_WRN("MCUboot BL version unchanged was=%u now=%u",
-			sm_fota_bl_version_before, current_version);
-	} else {
-		sm_fota_status = FOTA_STATUS_OK;
-		sm_fota_info = 0;
-	}
-
-	sm_fota_type = SM_FOTA_TYPE_MCUBOOT_BL;
-	sm_fota_stage = FOTA_STAGE_COMPLETE;
-#endif
-}
 
 #if defined(CONFIG_SM_FULL_FOTA)
 

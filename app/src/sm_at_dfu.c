@@ -280,6 +280,11 @@ static int handle_at_xdfu_init(enum at_parser_cmd_type cmd_type, struct at_parse
 				return err;
 			}
 
+			err = sm_fw_update_dfu_claim(SM_FW_UPDATE_TARGET_IMAGE);
+			if (err) {
+				return err;
+			}
+
 			if (!app_dfu_buffer_initialized) {
 				err = dfu_target_mcuboot_set_buf(app_dfu_buffer,
 								 APP_DFU_BUFFER_SIZE);
@@ -292,7 +297,7 @@ static int handle_at_xdfu_init(enum at_parser_cmd_type cmd_type, struct at_parse
 
 			err = dfu_target_mcuboot_init(size, 0, NULL);
 			if (err == -EFAULT) {
-				/* Already initialized - abort and retry */
+				/* Already initialized by a previous direct DFU - abort and retry */
 				LOG_WRN("MCUboot DFU already initialized, aborting and retrying");
 				(void)dfu_target_mcuboot_done(false);
 				err = dfu_target_mcuboot_init(size, 0, NULL);
@@ -312,7 +317,7 @@ static int handle_at_xdfu_init(enum at_parser_cmd_type cmd_type, struct at_parse
 				return err;
 			}
 
-			err = sm_fw_update_modem_dfu_claim();
+			err = sm_fw_update_dfu_claim(SM_FW_UPDATE_TARGET_MODEM);
 			if (err) {
 				return err;
 			}
@@ -421,6 +426,11 @@ static int handle_at_xdfu_write(enum at_parser_cmd_type cmd_type, struct at_pars
 				return -EINVAL;
 			}
 
+			err = sm_fw_update_dfu_claim(SM_FW_UPDATE_TARGET_IMAGE);
+			if (err) {
+				return err;
+			}
+
 			/* Prepare per-chunk accounting for the datamode callback. */
 			xdfu_current_image_type = (enum xdfu_image_type)type;
 			xdfu_bytes_written = 0;
@@ -455,7 +465,7 @@ static int handle_at_xdfu_write(enum at_parser_cmd_type cmd_type, struct at_pars
 				return -EINVAL;
 			}
 
-			err = sm_fw_update_modem_dfu_claim();
+			err = sm_fw_update_dfu_claim(SM_FW_UPDATE_TARGET_MODEM);
 			if (err) {
 				return err;
 			}
@@ -577,6 +587,11 @@ static int handle_at_xdfu_apply(enum at_parser_cmd_type cmd_type, struct at_pars
 #if defined(SM_DFU_BL_SUPPORTED)
 		case DFU_TYPE_MCUBOOT_BL:
 #endif
+			err = sm_fw_update_dfu_claim(SM_FW_UPDATE_TARGET_IMAGE);
+			if (err) {
+				return err;
+			}
+
 			err = dfu_target_mcuboot_done(true);
 			if (err) {
 				LOG_ERR("%s update finalize failed: %d",
@@ -603,7 +618,7 @@ static int handle_at_xdfu_apply(enum at_parser_cmd_type cmd_type, struct at_pars
 
 			return 0;
 		case DFU_TYPE_DELTA_MFW:
-			err = sm_fw_update_modem_dfu_claim();
+			err = sm_fw_update_dfu_claim(SM_FW_UPDATE_TARGET_MODEM);
 			if (err) {
 				return err;
 			}

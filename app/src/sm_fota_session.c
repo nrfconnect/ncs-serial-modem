@@ -8,6 +8,7 @@
 #include <zephyr/logging/log.h>
 #include "sm_at_host.h"
 #include "sm_settings.h"
+#include "sm_util.h"
 #include "sm_fota_session.h"
 
 LOG_MODULE_REGISTER(sm_fota_session, CONFIG_SM_LOG_LEVEL);
@@ -26,6 +27,53 @@ void sm_fota_init_state(void)
 	sm_fota_status = FOTA_STATUS_OK;
 	sm_fota_info = 0;
 	sm_fota_nrfcloud = false;
+}
+
+uint32_t sm_fota_bl_version_before;
+
+int sm_fota_mcuboot_bl_state_record(void)
+{
+#if defined(SM_FOTA_BL_SUPPORTED)
+	int err = sm_util_mcuboot_active_version(&sm_fota_bl_version_before);
+
+	if (err) {
+		LOG_ERR("MCUboot BL version read failed: %d", err);
+		return err;
+	}
+
+	return sm_settings_fota_bl_version_save();
+#else
+	return -ENOTSUP;
+#endif
+}
+
+void sm_fota_mcuboot_bl_boot_check(void)
+{
+#if defined(SM_FOTA_BL_SUPPORTED)
+	if (sm_fota_type != SM_FOTA_TYPE_MCUBOOT_BL) {
+		return;
+	}
+
+	uint32_t current_version = 0;
+	int err = sm_util_mcuboot_active_version(&current_version);
+
+	if (err != 0) {
+		sm_fota_status = FOTA_STATUS_ERROR;
+		sm_fota_info = err;
+		LOG_ERR("MCUboot BL version read failed: %d", err);
+	} else if (current_version <= sm_fota_bl_version_before) {
+		sm_fota_status = FOTA_STATUS_ERROR;
+		sm_fota_info = 1;
+		LOG_WRN("MCUboot BL version unchanged was=%u now=%u",
+			sm_fota_bl_version_before, current_version);
+	} else {
+		sm_fota_status = FOTA_STATUS_OK;
+		sm_fota_info = 0;
+	}
+
+	sm_fota_type = SM_FOTA_TYPE_MCUBOOT_BL;
+	sm_fota_stage = FOTA_STAGE_COMPLETE;
+#endif
 }
 
 #if defined(CONFIG_LWM2M_CARRIER)

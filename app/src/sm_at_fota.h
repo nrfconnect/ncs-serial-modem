@@ -16,16 +16,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-/** MCUboot bootloader FOTA: Active slot fw_info version before a bootloader update was started. */
-extern uint32_t sm_fota_bl_version_before;
-
-/**
- * @brief After reboot, validate an MCUboot bootloader update by checking that the
- * active image fw_info version (monotonic counter) increased from the value recorded
- * before the update started.
- */
-void sm_fota_mcuboot_bl_boot_check(void);
-
 /**
  * @brief (Re-)registers this module's fota_download callback.
  *

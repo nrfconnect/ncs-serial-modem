@@ -111,6 +111,10 @@ After the ``#XFOTA: 4,0`` notification indicating that the FOTA update is downlo
 
       Updates for MCUboot images are limited to 40 slots.
 
+The direct DFU commands (see :ref:`DFU_AT_commands`) reserve the same update targets.
+The ``#XFOTA`` command cannot start an update or erase the modem DFU area while direct DFU has reserved them.
+The same applies to the ``#XNRFCLOUDFOTA`` command (see :ref:`SM_AT_NRFCLOUDFOTA`).
+
 Response syntax
 ~~~~~~~~~~~~~~~
 

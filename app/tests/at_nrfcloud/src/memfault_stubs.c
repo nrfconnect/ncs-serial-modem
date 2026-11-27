@@ -26,6 +26,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <sys/types.h>
+#include <zephyr/kernel.h>
 
 #include "memfault/core/data_export.h"
 #include "memfault/core/data_packetizer.h"
@@ -51,8 +52,24 @@ ssize_t test_memfault_upload_return;
 int test_memfault_log_trigger_count;
 /* True when the log collection was triggered before the upload ran. */
 bool test_memfault_log_triggered_before_upload;
+/* A copy of the key that the handler installed for the upload, because the key can live on the
+ * stack of the work function, which has returned when the test reads it. NULL when no key was
+ * installed.
+ */
+static char upload_seen_api_key_copy[128];
 const char *test_memfault_upload_seen_api_key;
 int test_memfault_upload_count;
+
+/* A test can hold an upload while it is running, to observe or act on the module during it.
+ * test_memfault_upload_entered is given when the upload waits, and the upload continues when
+ * the test gives test_memfault_upload_release. The key that is installed after the wait is
+ * recorded too, to show that it did not change while the upload was held.
+ */
+bool test_memfault_upload_hold;
+K_SEM_DEFINE(test_memfault_upload_entered, 0, 1);
+K_SEM_DEFINE(test_memfault_upload_release, 0, 1);
+static char upload_key_after_hold_copy[128];
+const char *test_memfault_upload_key_after_hold;
 int test_memfault_event_upload_error;
 int test_memfault_event_batches;
 int test_memfault_capture_batches;
@@ -108,9 +125,31 @@ void memfault_log_trigger_collection(void)
 ssize_t memfault_zephyr_port_post_data_return_size(void)
 {
 	/* Capture what the handler installed for this upload. */
-	test_memfault_upload_seen_api_key = g_mflt_http_client_config.api_key;
+	if (g_mflt_http_client_config.api_key != NULL) {
+		strncpy(upload_seen_api_key_copy, g_mflt_http_client_config.api_key,
+			sizeof(upload_seen_api_key_copy) - 1);
+		upload_seen_api_key_copy[sizeof(upload_seen_api_key_copy) - 1] = '\0';
+		test_memfault_upload_seen_api_key = upload_seen_api_key_copy;
+	} else {
+		test_memfault_upload_seen_api_key = NULL;
+	}
 	test_memfault_log_triggered_before_upload = (test_memfault_log_trigger_count > 0);
 	test_memfault_upload_count++;
+	if (test_memfault_upload_hold) {
+		k_sem_give(&test_memfault_upload_entered);
+		/* Bounded, so that a failed assertion cannot wedge the work queue for later
+		 * tests.
+		 */
+		k_sem_take(&test_memfault_upload_release, K_SECONDS(5));
+		if (g_mflt_http_client_config.api_key != NULL) {
+			strncpy(upload_key_after_hold_copy, g_mflt_http_client_config.api_key,
+				sizeof(upload_key_after_hold_copy) - 1);
+			upload_key_after_hold_copy[sizeof(upload_key_after_hold_copy) - 1] = '\0';
+			test_memfault_upload_key_after_hold = upload_key_after_hold_copy;
+		} else {
+			test_memfault_upload_key_after_hold = NULL;
+		}
+	}
 	if (test_memfault_source_mask == kMfltDataSourceMask_Event) {
 		if (test_memfault_event_upload_error &&
 		    (test_event_available || test_memfault_event_batches > 0)) {
@@ -254,6 +293,10 @@ void test_memfault_stubs_reset(void)
 	test_memfault_log_triggered_before_upload = false;
 	test_memfault_upload_seen_api_key = NULL;
 	test_memfault_upload_count = 0;
+	test_memfault_upload_hold = false;
+	test_memfault_upload_key_after_hold = NULL;
+	k_sem_reset(&test_memfault_upload_entered);
+	k_sem_reset(&test_memfault_upload_release);
 	test_memfault_event_upload_error = 0;
 	test_memfault_event_batches = 0;
 	test_memfault_capture_batches = 0;

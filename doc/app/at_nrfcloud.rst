@@ -377,34 +377,39 @@ The test command is not supported.
 nRF Cloud FOTA #XNRFCLOUDFOTA
 =============================
 
-The ``#XNRFCLOUDFOTA`` command checks for and downloads an application or modem firmware update using `Memfault release management`_, delivered over the same nRF Cloud CoAP transport as ``#XNRFCLOUDOBS*``.
+The ``#XNRFCLOUDFOTA`` command checks for and downloads an application, MCUboot bootloader, or modem firmware update using `Memfault release management`_, delivered over the same nRF Cloud CoAP transport as ``#XNRFCLOUDOBS*``.
 
 .. only:: not nrf91m1
 
    Requires the :ref:`CONFIG_SM_NRF_CLOUD_FOTA <CONFIG_SM_NRF_CLOUD_FOTA>` Kconfig option.
 
 An application update is staged the same way as ``AT#XFOTA=1``, that is, the host activates it with the ``AT#XRESET`` AT command.
-A modem update is staged the same way as ``AT#XFOTA=2``, that is, the host activates it with the ``AT#XMODEMRESET`` AT command.
-Both share their FOTA session with ``#XFOTA``, but progress and completion are reported over the ``#XNRFCLOUDFOTA`` notification instead, using the same ``<fota_stage>``, ``<fota_status>`` and ``<fota_info>`` tuple as ``#XFOTA`` (see :ref:`SM_AT_FOTA` for download and activation semantics).
+
+An MCUboot bootloader update is staged the same way as ``AT#XFOTA=5``, that is, the host activates it with the ``AT#XRESET`` AT command. |badge_nrf91m1_v2_0_1|
+
+A modem update is staged the same way as ``AT#XFOTA=2``, that is, the host activates it with the ``AT#XMODEMRESET`` AT command. |badge_nrf91m1_v2_0_1|
+
+All of them share their FOTA session with ``#XFOTA``, but progress and completion are reported over the ``#XNRFCLOUDFOTA`` notification instead, using the same ``<fota_stage>``, ``<fota_status>`` and ``<fota_info>`` tuple as ``#XFOTA`` (see :ref:`SM_AT_FOTA` for download and activation semantics).
 Only one FOTA session can be ongoing at a time, regardless of which command initiated it.
 
-.. note::
-   Unlike ``AT#XFOTA``, ``#XNRFCLOUDFOTA`` does not support MCUboot bootloader updates.
-   This is expected to be a rare use case.
-   The support is planned for a future release.
+The direct DFU commands (see :ref:`DFU_AT_commands`) reserve the same update targets.
+The ``#XNRFCLOUDFOTA`` command cannot start an update while direct DFU has reserved them.
 
 .. note::
-   ``<op>=2`` uses a dedicated Memfault project key for modem firmware, obtained from the General section of the modem firmware project's Project Settings, which is separate from the application project.
+   |badge_nrf91m1_v2_0_1|
+
+   ``<op>=2`` and ``<op>=6`` check the modem firmware as a component of the application, using the ``mfw`` software type.
+
+.. note::
+   |badge_nrf91m1_v2_0_1|
+
+   ``<op>=3`` and ``<op>=7`` check the MCUboot second-stage bootloader as a component of the application.
+   The ``s0`` and ``s1`` slots each need their own image, so add the images to both the ``mcuboot-s0`` and ``mcuboot-s1`` software types in nRF Cloud.
+   Upload each image with the MCUboot version of that image as the component version.
 
    .. only:: not nrf91m1
 
-      Set it with the ``CONFIG_MEMFAULT_FOTA_MODEM_PROJECT_KEY`` Kconfig option, or override it at runtime with the ``<project_key>`` parameter.
-
-   .. only:: nrf91m1
-
-      Use the ``<project_key>`` parameter to set it at runtime.
-
-   When neither is set, the request targets the default project where the device was claimed.
+      They are available only when the device uses the NSIB (B0) and MCUboot as a second-stage bootloader.
 
 Set command
 -----------
@@ -432,27 +437,21 @@ The parameters and their defined values are the following:
    * ``1`` - Check for and download an application update.
    * ``2`` - Check for and download a modem firmware update.
 
-     .. TODO: REMOVE FILTERING WHEN NRF91M1 IS RELEASED
-     .. only:: not nrf91m1
+     If an interrupted download is detected, it is continued. |badge_nrf91m1_v2_0_1|
 
-        If an interrupted download is detected, it is continued.
-
+   * ``3`` - Check for and download an MCUboot second-stage bootloader update. |badge_nrf91m1_v2_0_1|
    * ``4`` - Check for an application update, without downloading it.
-   * ``6`` - Check for a modem firmware update, without downloading it.
+   * ``6`` - Check for a modem firmware update, without downloading it. |badge_nrf91m1_v2_0_1|
+   * ``7`` - Check for an MCUboot second-stage bootloader update, without downloading it. |badge_nrf91m1_v2_0_1|
 
 <project_key>
    String.
    Project key used for the FOTA operation.
+   If this option is not provided, the request targets the default project where the device was claimed.
 
    .. only:: not nrf91m1
 
-      For ``<op>=1`` and ``<op>=4``, it overrides the application project key (``CONFIG_MEMFAULT_PROJECT_KEY``), and for ``<op>=2`` and ``<op>=6`` it overrides ``CONFIG_MEMFAULT_FOTA_MODEM_PROJECT_KEY``.
-      If this option is not provided and the corresponding Kconfig setting is unset, the request targets the default project where the device was claimed.
-
-   .. only:: nrf91m1
-
-      For ``<op>=1`` and ``<op>=4``, it is the application Memfault project key, and for ``<op>=2`` and ``<op>=6`` it is the modem Memfault project key.
-      If this option is not provided, the request targets the default project where the device was claimed.
+      A build can configure a project key that is used instead of the default project.
 
 The command returns ``OK`` immediately and the check runs asynchronously.
 When it completes, an unsolicited notification is sent.
@@ -479,7 +478,7 @@ This form is used by ``#XNRFCLOUDFOTA`` only (not ``#XFOTA``) and specified as f
 |``0`` (namely *Init*)    | ``0`` (namely *OK*)        | ``0`` - No update is available                     |
 +-------------------------+----------------------------+----------------------------------------------------+
 |``0`` (namely *Init*)    | ``0`` (namely *OK*)        | ``1`` - An update is available (sent only for      |
-|                         |                            |         ``<op>=4`` and ``<op>=6``                  |
+|                         |                            |         ``<op>=4``, ``<op>=6`` and ``<op>=7``)     |
 +-------------------------+----------------------------+----------------------------------------------------+
 |``0`` (namely *Init*)    | ``1`` (namely *ERROR*)     | Error code                                         |
 +-------------------------+----------------------------+----------------------------------------------------+
@@ -532,7 +531,7 @@ Response
 
 ::
 
-   #XNRFCLOUDFOTA: (0,1,2,4,6)[,<project_key>]
+   #XNRFCLOUDFOTA: (0,1,2,3,4,6,7)[,<project_key>]
 
 .. _SM_AT_NRFCLOUDOBSUPLOAD:
 
